@@ -1,4 +1,4 @@
-"""MaiBot 抓猪插件 2A 框架入口。"""
+"""MaiBot 抓猪插件 2B 正式素材框架入口。"""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from .pig_catcher.config import AccessPolicy, PigCatcherConfig
 from .pig_catcher.domain.errors import CommandContextError
 from .pig_catcher.infrastructure import PigCatcherDatabase, safe_database_path
 from .pig_catcher.rendering import (
+    AnimatedCardComposer,
     PigCatcherRenderer,
     RenderDelivery,
     RenderOptions,
@@ -28,7 +29,7 @@ from .pig_catcher.version import PLUGIN_VERSION
 
 
 class PigCatcherPlugin(MaiBotPlugin):
-    """只开放已闭环帮助命令的 2A 插件骨架。"""
+    """开放帮助并承载正式素材、动画和后续玩法服务。"""
 
     config_model = PigCatcherConfig
 
@@ -40,6 +41,7 @@ class PigCatcherPlugin(MaiBotPlugin):
         self._framework_service: FrameworkService | None = None
         self._receipt_service: ReceiptService | None = None
         self._renderer: PigCatcherRenderer | None = None
+        self._animation_composer: AnimatedCardComposer | None = None
         self._delivery: RenderDelivery | None = None
         self._maintenance: MaintenanceRunner | None = None
 
@@ -57,9 +59,15 @@ class PigCatcherPlugin(MaiBotPlugin):
 
     @property
     def renderer(self) -> PigCatcherRenderer | None:
-        """供 2A 本地视觉验收调用，不注册群聊预览命令。"""
+        """供本地视觉验收调用，不注册群聊预览命令。"""
 
         return self._renderer
+
+    @property
+    def animation_composer(self) -> AnimatedCardComposer | None:
+        """供后续抓取与图鉴卡片复用动画保真服务。"""
+
+        return self._animation_composer
 
     async def on_load(self) -> None:
         if self.settings.plugin.enabled:
@@ -110,6 +118,8 @@ class PigCatcherPlugin(MaiBotPlugin):
                 storage,
                 min_image_side=settings.assets.min_image_side,
                 max_image_bytes=settings.assets.max_image_bytes,
+                max_animation_frames=settings.assets.max_animation_frames,
+                max_animation_duration_ms=settings.assets.max_animation_duration_ms,
             )
             renderer = PigCatcherRenderer(
                 self.ctx.render,
@@ -119,8 +129,14 @@ class PigCatcherPlugin(MaiBotPlugin):
                     device_scale_factor=settings.rendering.device_scale_factor,
                     render_timeout_ms=settings.rendering.render_timeout_ms,
                     max_png_bytes=settings.rendering.max_png_bytes,
+                    max_animation_bytes=settings.rendering.max_animation_bytes,
+                    missing_frame_duration_ms=settings.rendering.missing_frame_duration_ms,
                     font_family=settings.rendering.font_family,
                 ),
+            )
+            animation_composer = AnimatedCardComposer(
+                max_output_bytes=settings.rendering.max_animation_bytes,
+                missing_frame_duration_ms=settings.rendering.missing_frame_duration_ms,
             )
             maintenance = MaintenanceRunner(
                 database,
@@ -142,6 +158,7 @@ class PigCatcherPlugin(MaiBotPlugin):
             self._framework_service = FrameworkService(database)
             self._receipt_service = ReceiptService(database)
             self._renderer = renderer
+            self._animation_composer = animation_composer
             self._delivery = RenderDelivery(
                 self.ctx.send,
                 logger=self.ctx.logger,
@@ -167,6 +184,7 @@ class PigCatcherPlugin(MaiBotPlugin):
     def _clear_runtime_references(self) -> None:
         self._maintenance = None
         self._delivery = None
+        self._animation_composer = None
         self._renderer = None
         self._receipt_service = None
         self._framework_service = None

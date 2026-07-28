@@ -17,11 +17,13 @@ async def test_plugin_loads_initializes_and_unloads_cleanly(tmp_path: Path) -> N
     assert plugin.database is not None
     assert plugin.database.is_open
     assert plugin.renderer is not None
+    assert plugin.animation_composer is not None
     assert (tmp_path / "pig_catcher.sqlite3").is_file()
     assert (tmp_path / "assets" / "catalogs").is_dir()
     await plugin.on_unload()
     assert plugin.database is None
     assert plugin.renderer is None
+    assert plugin.animation_composer is None
 
 
 @pytest.mark.asyncio
@@ -72,7 +74,7 @@ def test_plugin_exposes_fully_chinese_webui_schema() -> None:
     schema = plugin.get_webui_config_schema(
         plugin_id="local.pig-catcher",
         plugin_name="抓猪插件",
-        plugin_version="0.1.0",
+        plugin_version="0.2.0",
     )
     serialized = str(schema)
     assert "插件设置" in serialized

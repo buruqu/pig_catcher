@@ -104,10 +104,23 @@
 
 ## 6. 当前缺口
 
-- 正式素材、描述、授权和合理属性范围尚未交付。
+- 正式素材、描述、群授权和合理属性范围已在 2B 接入；字体和独立品牌图标尚未交付。
 - Manifest 当前暂用名称“抓猪插件”、作者 `buruqu`、MIT 和预留仓库地址；远程仓库尚未创建或推送，发布前仍可调整。
 - 具体美食效果、6 星超级效果和联动猪规则尚未补充。
 - 玩法、经济、社交和排行榜尚未进入对应开发轮次。
 - 待确认默认项集中列在 `docs/07-roadmap-and-acceptance.md` 第 5 节。
 
-这些缺口不影响 2A 框架验收，但会影响 2B 正式素材和后续玩法实现。
+这些缺口不影响 2B 正式素材验收，但会影响后续玩法实现。
+
+## 7. 第二轮 2B 实现追溯
+
+| 编号 | 2B 目标 | 实现位置 | 状态 |
+| --- | --- | --- | --- |
+| B-001 | 完整读取并登记 98 项用户素材 | `catalogs/2b/catalog-definitions.json`、`tools/build_asset_package.py` | 已完成 |
+| B-002 | 83 只猪、15 道美食按品质接入 | `tools/import_asset_catalog.py`、素材仓储 | 已完成 |
+| B-003 | 群 `1092931381` 的 4 项六星素材隔离 | Asset Manifest、模板仓储 | 已完成并用两个群实测 |
+| B-004 | GIF 和动画 WebP 保持动态 | `rendering/animation.py`、`tools/accept_asset_catalog.py` | 已完成，9 项逐帧验收 |
+| B-005 | BanG Dream 角色、乐队与 `X/5` 图鉴进度 | Asset Manifest v2、`services/assets.py` | 已完成 |
+| B-006 | 每项静态整活描述与指定原文 | `catalogs/2b/catalog-definitions.json` | 已完成并测试精确文案 |
+| B-007 | 白色淡粉正式素材卡片 | `rendering/templates/asset_preview.html` | 已完成 98 项 Chromium 验收 |
+| B-008 | 数据迁移、原子导入与校验值 | `v0002_asset_media_and_collections.py`、素材导入服务 | 已完成 |

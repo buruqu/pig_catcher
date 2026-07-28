@@ -13,7 +13,16 @@ from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoes
 from PIL import Image, UnidentifiedImageError
 
 from ..domain.errors import RenderError
-from .models import FrameworkPreviewViewModel, RenderedImage, RenderOptions
+from .models import (
+    AssetPreviewViewModel,
+    FrameworkPreviewViewModel,
+    MediaSlot,
+    RenderedAssetPreviewBase,
+    RenderedImage,
+    RenderOptions,
+)
+
+_ASSET_PREVIEW_SLOT = MediaSlot(x=38, y=154, width=500, height=500)
 
 
 class HtmlRenderCapability(Protocol):
@@ -76,6 +85,94 @@ class PigCatcherRenderer:
             )
         except Exception as exc:
             raise RenderError(f"MaiBot HTML 图片渲染失败：{exc}") from exc
+        return self._normalize_result(result)
+
+    async def render_asset_preview_base(
+        self,
+        view: AssetPreviewViewModel,
+    ) -> RenderedAssetPreviewBase:
+        """渲染没有烘焙素材的底图，供静态图或逐帧动画后处理复用。"""
+
+        template = self._environment.get_template("asset_preview.html")
+        html = template.render(
+            view=view,
+            theme_css=self._theme_css,
+            font_family=self.options.font_family,
+            media_data_url="",
+        )
+        image = await self._render_asset_html(html)
+        if (
+            _ASSET_PREVIEW_SLOT.x + _ASSET_PREVIEW_SLOT.width > image.width
+            or _ASSET_PREVIEW_SLOT.y + _ASSET_PREVIEW_SLOT.height > image.height
+        ):
+            raise RenderError("素材底图尺寸不足以容纳固定素材区域")
+        return RenderedAssetPreviewBase(
+            image=image,
+            media_slot=_ASSET_PREVIEW_SLOT,
+        )
+
+    async def render_static_asset_preview(
+        self,
+        view: AssetPreviewViewModel,
+        source_path: Path,
+    ) -> RenderedImage:
+        """把单帧正式素材以内联 data URL 交给禁网 HTML 渲染。"""
+
+        path = Path(source_path)
+        if not path.is_file():
+            raise RenderError(f"静态素材不存在：{path.name}")
+        try:
+            payload = path.read_bytes()
+            with Image.open(BytesIO(payload)) as source:
+                if int(getattr(source, "n_frames", 1)) > 1:
+                    raise RenderError("动画素材必须使用逐帧合成，不能截成静态预览")
+                image_format = str(source.format or "").upper()
+                source.load()
+        except RenderError:
+            raise
+        except (OSError, UnidentifiedImageError, Image.DecompressionBombError) as exc:
+            raise RenderError(f"静态素材无法解码：{path.name}") from exc
+        mime_types = {
+            "PNG": "image/png",
+            "JPEG": "image/jpeg",
+            "WEBP": "image/webp",
+            "GIF": "image/gif",
+        }
+        mime_type = mime_types.get(image_format)
+        if mime_type is None:
+            raise RenderError(f"静态素材格式不受支持：{image_format or '未知'}")
+        template = self._environment.get_template("asset_preview.html")
+        html = template.render(
+            view=view,
+            theme_css=self._theme_css,
+            font_family=self.options.font_family,
+            media_data_url=(
+                f"data:{mime_type};base64,"
+                f"{base64.b64encode(payload).decode('ascii')}"
+            ),
+        )
+        return await self._render_asset_html(html)
+
+    async def _render_asset_html(self, html: str) -> RenderedImage:
+        try:
+            result = await self.capability.html2png(
+                html,
+                selector="[data-pig-catcher-root]",
+                viewport={
+                    "width": self.options.card_width,
+                    "height": self.options.viewport_height,
+                },
+                device_scale_factor=self.options.device_scale_factor,
+                full_page=False,
+                omit_background=False,
+                wait_until="load",
+                wait_for_selector="[data-render-ready='true']",
+                wait_for_timeout_ms=0,
+                render_timeout_ms=self.options.render_timeout_ms,
+                allow_network=False,
+            )
+        except Exception as exc:
+            raise RenderError(f"MaiBot 素材图片渲染失败：{exc}") from exc
         return self._normalize_result(result)
 
     def _normalize_result(self, result: object) -> RenderedImage:

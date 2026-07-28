@@ -6,7 +6,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, ImageSequence, UnidentifiedImageError
 from pydantic import ValidationError
 
 from ..domain.errors import AssetValidationError
@@ -40,13 +40,26 @@ def _safe_asset_path(root: Path, relative_path: str) -> Path:
 class AssetManifestValidator:
     """从 JSON 清单生成可安全导入的不可变结果。"""
 
-    def __init__(self, *, min_image_side: int = 256, max_image_bytes: int = 12 * 1024 * 1024) -> None:
+    def __init__(
+        self,
+        *,
+        min_image_side: int = 256,
+        max_image_bytes: int = 12 * 1024 * 1024,
+        max_animation_frames: int = 300,
+        max_animation_duration_ms: int = 30000,
+    ) -> None:
         self.min_image_side = int(min_image_side)
         self.max_image_bytes = int(max_image_bytes)
+        self.max_animation_frames = int(max_animation_frames)
+        self.max_animation_duration_ms = int(max_animation_duration_ms)
         if self.min_image_side < 32:
             raise ValueError("图片最短边不能低于 32 像素。")
         if self.max_image_bytes < 1024:
             raise ValueError("图片大小上限不能低于 1024 字节。")
+        if self.max_animation_frames < 2:
+            raise ValueError("动画帧数上限不能低于 2。")
+        if self.max_animation_duration_ms < 100:
+            raise ValueError("动画时长上限不能低于 100 毫秒。")
 
     def validate_file(self, manifest_path: Path) -> ValidatedManifest:
         path = Path(manifest_path)
@@ -75,17 +88,38 @@ class AssetManifestValidator:
             sha256 = hashlib.sha256(source_path.read_bytes()).hexdigest()
             try:
                 with Image.open(source_path) as image:
-                    image.verify()
-                with Image.open(source_path) as image:
                     width, height = image.size
                     image_format = str(image.format or "").upper()
+                    frame_count = int(getattr(image, "n_frames", 1))
+                    is_animated = frame_count > 1
+                    loop_count = image.info.get("loop")
+                    durations: list[int] = []
+                    has_transparency = image.mode in {"RGBA", "LA"} or "transparency" in image.info
+                    for frame in ImageSequence.Iterator(image):
+                        frame.load()
+                        durations.append(int(frame.info.get("duration", image.info.get("duration", 0)) or 0))
+                        has_transparency = (
+                            has_transparency
+                            or frame.mode in {"RGBA", "LA"}
+                            or "transparency" in frame.info
+                        )
             except (OSError, UnidentifiedImageError, Image.DecompressionBombError) as exc:
                 raise AssetValidationError(f"素材图片无法解码：{entry.image}") from exc
-            if image_format not in {"PNG", "WEBP"}:
-                raise AssetValidationError(f"素材图片格式必须是 PNG 或 WebP：{entry.image}")
+            if image_format not in {"PNG", "JPEG", "WEBP", "GIF"}:
+                raise AssetValidationError(f"素材图片格式必须是 PNG、JPEG、WebP 或 GIF：{entry.image}")
             if min(width, height) < self.min_image_side:
                 raise AssetValidationError(
                     f"素材图片最短边不足 {self.min_image_side}px：{entry.image}（{width}x{height}）"
+                )
+            if frame_count > self.max_animation_frames:
+                raise AssetValidationError(
+                    f"素材动画超过 {self.max_animation_frames} 帧：{entry.image}（{frame_count} 帧）"
+                )
+            total_duration_ms = sum(durations)
+            if total_duration_ms > self.max_animation_duration_ms:
+                raise AssetValidationError(
+                    f"素材动画超过 {self.max_animation_duration_ms} 毫秒："
+                    f"{entry.image}（{total_duration_ms} 毫秒）"
                 )
             validated_assets.append(
                 ValidatedAsset(
@@ -95,6 +129,12 @@ class AssetManifestValidator:
                     width=width,
                     height=height,
                     image_format=image_format,
+                    is_animated=is_animated,
+                    frame_count=frame_count,
+                    frame_durations_ms=tuple(durations),
+                    total_duration_ms=total_duration_ms,
+                    loop_count=int(loop_count) if loop_count is not None else None,
+                    has_transparency=has_transparency,
                 )
             )
 

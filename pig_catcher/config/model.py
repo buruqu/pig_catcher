@@ -42,11 +42,11 @@ class PluginSection(PluginConfigBase):
         frozen=True,
         json_schema_extra=_ui("配置版本", "由插件维护，不需要手工修改", disabled=True),
     )
-    framework_phase: Literal["2A"] = Field(
+    framework_phase: Literal["2B"] = Field(
         default=FRAMEWORK_PHASE,
         description="当前开发交付阶段",
         frozen=True,
-        json_schema_extra=_ui("框架阶段", "2A 仅开放帮助与工程基础，不伪造玩法结果", disabled=True),
+        json_schema_extra=_ui("框架阶段", "2B 已接入正式素材与动画管线，玩法命令仍按后续轮次开放", disabled=True),
     )
 
 
@@ -192,6 +192,20 @@ class AssetsSection(PluginConfigBase):
         le=52428800,
         description="单张素材图片的最大字节数",
         json_schema_extra=_ui("单图大小上限", "默认 12 MiB，超过后拒绝导入"),
+    )
+    max_animation_frames: int = Field(
+        default=300,
+        ge=2,
+        le=2000,
+        description="单个动画素材允许的最大帧数",
+        json_schema_extra=_ui("动画帧数上限", "当前正式素材最多 96 帧；默认上限保留扩展余量"),
+    )
+    max_animation_duration_ms: int = Field(
+        default=30000,
+        ge=100,
+        le=600000,
+        description="单个动画素材显式帧时长合计上限",
+        json_schema_extra=_ui("动画时长上限", "缺少帧时长的原素材不会被篡改，卡片合成时使用兼容回退"),
     )
     staging_max_age_hours: int = Field(
         default=24,
@@ -372,12 +386,12 @@ class TradingSection(PluginConfigBase):
     gift_enabled: bool = Field(
         default=False,
         description="是否启用同群赠送",
-        json_schema_extra=_ui("启用赠送", "2A 尚未注册赠送命令，后续功能完成后再开启"),
+        json_schema_extra=_ui("启用赠送", "2B 尚未注册赠送命令，后续功能完成后再开启"),
     )
     trade_enabled: bool = Field(
         default=False,
         description="是否启用两阶段玩家交易",
-        json_schema_extra=_ui("启用交易", "2A 尚未注册交易命令，后续功能完成后再开启"),
+        json_schema_extra=_ui("启用交易", "2B 尚未注册交易命令，后续功能完成后再开启"),
     )
     max_trade_price: int = Field(
         default=1000000,
@@ -447,6 +461,20 @@ class RenderingSection(PluginConfigBase):
         description="允许发送的 PNG 最大字节数",
         json_schema_extra=_ui("图片大小上限", "默认 12 MiB，超出后触发文字兜底"),
     )
+    max_animation_bytes: int = Field(
+        default=52428800,
+        ge=1024,
+        le=104857600,
+        description="合成后 GIF 动画卡片的最大字节数",
+        json_schema_extra=_ui("动画卡片大小上限", "默认 50 MiB；超过后记录失败并走纯文字兜底"),
+    )
+    missing_frame_duration_ms: int = Field(
+        default=100,
+        ge=10,
+        le=10000,
+        description="原动画未声明帧时长时，合成卡片采用的兼容时长",
+        json_schema_extra=_ui("缺失帧时长回退", "只影响合成卡片播放；素材库中的原文件保持逐字节不变"),
+    )
     font_family: str = Field(
         default='"Noto Sans CJK SC", "Microsoft YaHei", sans-serif',
         min_length=3,
@@ -493,7 +521,7 @@ class MaintenanceSection(PluginConfigBase):
 
 
 class PigCatcherConfig(PluginConfigBase):
-    """抓猪插件完整 2A 配置。"""
+    """抓猪插件完整 2B 配置。"""
 
     plugin: PluginSection = Field(default_factory=PluginSection)
     features: FeaturesSection = Field(default_factory=FeaturesSection)

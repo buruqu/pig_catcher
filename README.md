@@ -1,6 +1,6 @@
 # MaiBot 抓猪插件
 
-这是“抓猪插件”的独立 MaiBot 插件仓库。当前版本为 `0.1.0`，已完成第二轮 `2A` 无正式素材框架期。
+这是“抓猪插件”的独立 MaiBot 插件仓库。当前版本为 `0.2.0`，已完成第二轮 `2B` 正式素材接入期。
 
 ## 当前状态
 
@@ -8,28 +8,31 @@
 - 目标 MaiBot：`1.0.12`
 - 目标 SDK：`maibot-plugin-sdk >=2.7.0,<3.0.0`
 - Python：`>=3.12`，本机验收环境 `3.14.4`
-- 数据协议：Schema `1`、Asset Manifest `1`、Ruleset `1`
+- 数据协议：Schema `2`、Asset Manifest `2`、Ruleset `1`
 - 当前群聊命令：仅 `/抓猪帮助 [主题]`
 
-玩法命令尚未开放。帮助会列出后续完整命令格式，但会明确标注当前处于 `2A`，不会产生假抓取、假资产或假结算。
+玩法命令尚未开放。帮助会列出后续完整命令格式，但会明确标注当前处于 `2B`，不会产生假抓取、假资产或假结算。
 
-## 2A 已完成
+## 2A 与 2B 已完成
 
 - Manifest v2、SDK 生命周期、配置热更新和简体中文 WebUI 配置模型
 - 群与用户黑白名单，黑名单优先
 - 插件自有 SQLite、逐级迁移、外键、WAL、显式事务和在线备份
 - 消息 ID 幂等键与 `pending -> claimed -> sent/failed` 一次发送回执
-- 素材 Manifest、PNG/WebP、路径、尺寸、重复 ID 和授权校验
+- 素材 Manifest、实际媒体格式、逐帧解码、路径、尺寸、重复 ID 和授权校验
 - 1 至 5 星公共素材与 6 星群专属素材的数据边界、授权和撤回
 - 原子素材目录发布及过期暂存目录清理
 - 白色、淡粉红本地 HTML/CSS 模板、隐私占位和 PNG 输出校验
+- 98 项正式素材：83 只猪、15 道美食，其中 9 项动画、4 项群专属
+- GIF 与动画 WebP 逐帧卡片合成，保留帧数、时长和循环，不改写原始素材
+- 5 只 BanG Dream 联动猪的角色、乐队、官方资料与固定 `X/5` 收集进度
+- 98 项逐图检查、9 项逐帧动画检查及两个群的六星可见性实测
 - 图片生成或发送失败后的纯文字降级服务
 - 可替换随机源、时钟、身份、选择器和规则版本接口
 - pytest、Ruff、编译、严格 Manifest、宿主加载和 Chromium 视觉验收
 
 ## 有意延后
 
-- `2B`：用户提供的正式猪、美食、字体和授权素材
 - 第三轮：真实抓猪、属性、背包、详情、图鉴、经验和群纪录
 - 第四轮：做菜、吃菜、商城、升级、猪币账本和官方售卖
 - 第五轮：赠送、两阶段交易、展示设置和排行榜
@@ -37,15 +40,16 @@
 
 ## 开发验证
 
-在 MaiBot 环境中运行：
+建立独立开发环境并运行：
 
 ```powershell
-C:\Users\Administrator\MaiBot\.venv\Scripts\python.exe -m pytest
-C:\Users\Administrator\MaiBot\.venv\Scripts\python.exe -m compileall -q plugin.py pig_catcher tests
-C:\Users\Administrator\MaiBot\.venv\Scripts\ruff.exe check plugin.py pig_catcher tests
+uv sync --all-groups --locked
+.\.venv\Scripts\python.exe -m pytest
+.\.venv\Scripts\python.exe -m compileall -q plugin.py pig_catcher tests tools
+.\.venv\Scripts\ruff.exe check plugin.py pig_catcher tests tools
 ```
 
-生成的本地视觉验收图位于忽略目录 `artifacts/`，不会进入插件发布包。正式素材进入 `2B` 前也不会进入 Git 历史。
+生成的本地视觉验收图位于忽略目录 `artifacts/`，不会进入插件发布包。可审计的 2B 清单定义保存在 `catalogs/2b/`；用户素材原件和运行副本保存在 Git 忽略目录及 `ctx.paths.data_dir`，避免群专属素材进入公共历史。
 
 ## 设计文档
 

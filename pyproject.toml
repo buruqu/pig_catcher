@@ -1,6 +1,6 @@
 [project]
 name = "maibot-pig-catcher"
-version = "0.1.0"
+version = "0.2.0"
 description = "MaiBot 抓猪收集与交易插件"
 requires-python = ">=3.12"
 dependencies = [
@@ -12,6 +12,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "playwright>=1.49.0,<2.0.0",
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
     "ruff>=0.12.0",

@@ -19,19 +19,21 @@ from pig_catcher.domain.errors import (
 )
 from pig_catcher.domain.models import CommandIdentity, ScopeKey
 from pig_catcher.infrastructure import PigCatcherDatabase, safe_database_path
+from pig_catcher.infrastructure.migrations.v0001_initial import MIGRATION_0001
 from pig_catcher.services import (
     FrameworkService,
     MaintenanceOptions,
     MaintenanceRunner,
     ReceiptService,
 )
+from pig_catcher.version import SCHEMA_VERSION
 
 
 @pytest.mark.asyncio
 async def test_empty_database_migrates_and_passes_integrity_check(tmp_path: Path) -> None:
     database = PigCatcherDatabase(tmp_path / "pig.sqlite3")
     await database.open()
-    assert await database.schema_version() == 1
+    assert await database.schema_version() == SCHEMA_VERSION
     assert await database.integrity_check() == ("ok",)
     rows = await database.fetch_all("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
     names = {str(row["name"]) for row in rows}
@@ -43,6 +45,46 @@ async def test_empty_database_migrates_and_passes_integrity_check(tmp_path: Path
         "command_receipts",
         "currency_ledger",
         "trade_offers",
+    } <= names
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_existing_v1_database_migrates_media_and_collection_columns(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "v1.sqlite3"
+    connection = sqlite3.connect(path)
+    connection.execute(
+        """
+        CREATE TABLE schema_migrations (
+            version INTEGER PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE,
+            applied_at TEXT NOT NULL
+        )
+        """
+    )
+    for statement in MIGRATION_0001.statements:
+        connection.execute(statement)
+    connection.execute(
+        "INSERT INTO schema_migrations(version, name, applied_at) VALUES (1, ?, 'now')",
+        (MIGRATION_0001.name,),
+    )
+    connection.execute("PRAGMA user_version = 1")
+    connection.commit()
+    connection.close()
+
+    database = PigCatcherDatabase(path)
+    await database.open()
+    assert await database.schema_version() == SCHEMA_VERSION
+    columns = await database.fetch_all("PRAGMA table_info(pig_templates)")
+    names = {str(row["name"]) for row in columns}
+    assert {
+        "media_format",
+        "is_animated",
+        "frame_count",
+        "collection_id",
+        "character_name",
     } <= names
     await database.close()
 
@@ -77,8 +119,12 @@ async def test_database_rejects_future_schema(tmp_path: Path) -> None:
     path = tmp_path / "future.sqlite3"
     connection = sqlite3.connect(path)
     connection.execute("CREATE TABLE schema_migrations(version INTEGER PRIMARY KEY, name TEXT UNIQUE, applied_at TEXT)")
-    connection.execute("INSERT INTO schema_migrations(version, name, applied_at) VALUES (2, 'future', 'now')")
-    connection.execute("PRAGMA user_version = 2")
+    future_version = SCHEMA_VERSION + 1
+    connection.execute(
+        "INSERT INTO schema_migrations(version, name, applied_at) VALUES (?, 'future', 'now')",
+        (future_version,),
+    )
+    connection.execute(f"PRAGMA user_version = {future_version}")
     connection.commit()
     connection.close()
     database = PigCatcherDatabase(path)
@@ -102,7 +148,7 @@ async def test_online_backup_is_readable(tmp_path: Path) -> None:
     backup = await database.backup_to(tmp_path / "backups" / "copy.sqlite3")
     connection = sqlite3.connect(backup)
     assert connection.execute("PRAGMA quick_check").fetchone() == ("ok",)
-    assert connection.execute("PRAGMA user_version").fetchone() == (1,)
+    assert connection.execute("PRAGMA user_version").fetchone() == (SCHEMA_VERSION,)
     connection.close()
     await database.close()
 

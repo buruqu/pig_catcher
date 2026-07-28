@@ -27,6 +27,22 @@ class CatalogImportResult:
     storage_relative_path: str
 
 
+@dataclass(frozen=True, slots=True)
+class CollectionProgress:
+    """一个联动乐队在图鉴中的玩家收集进度。"""
+
+    collection_id: str
+    collection_name: str
+    collaboration_name: str
+    collected_count: int
+    available_count: int
+    total_count: int
+
+    @property
+    def display_progress(self) -> str:
+        return f"{self.collected_count}/{self.total_count}"
+
+
 class AssetCatalogService:
     """让文件发布先完成、数据库激活后完成。"""
 
@@ -37,6 +53,8 @@ class AssetCatalogService:
         *,
         min_image_side: int,
         max_image_bytes: int,
+        max_animation_frames: int = 300,
+        max_animation_duration_ms: int = 30000,
         repository: AssetRepository | None = None,
         clock: Clock | None = None,
     ) -> None:
@@ -45,6 +63,8 @@ class AssetCatalogService:
         self.validator = AssetManifestValidator(
             min_image_side=min_image_side,
             max_image_bytes=max_image_bytes,
+            max_animation_frames=max_animation_frames,
+            max_animation_duration_ms=max_animation_duration_ms,
         )
         self.repository = repository or AssetRepository()
         self.clock = clock or SystemClock()
@@ -73,3 +93,21 @@ class AssetCatalogService:
                 kind=kind,
                 scope_id=scope_id,
             )
+
+    async def list_collection_progress(self, *, player_id: str) -> list[CollectionProgress]:
+        async with self.database.transaction(immediate=False) as session:
+            rows = await self.repository.list_collection_progress_rows(
+                session,
+                player_id=player_id,
+            )
+        return [
+            CollectionProgress(
+                collection_id=str(row["collection_id"]),
+                collection_name=str(row["collection_name"]),
+                collaboration_name=str(row["collaboration_name"]),
+                collected_count=int(row["collected_count"]),
+                available_count=int(row["available_count"]),
+                total_count=int(row["collection_total"]),
+            )
+            for row in rows
+        ]

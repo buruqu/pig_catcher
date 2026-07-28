@@ -80,6 +80,12 @@ class AssetCatalogStorage:
                     "width": asset.width,
                     "height": asset.height,
                     "format": asset.image_format,
+                    "is_animated": asset.is_animated,
+                    "frame_count": asset.frame_count,
+                    "frame_durations_ms": list(asset.frame_durations_ms),
+                    "total_duration_ms": asset.total_duration_ms,
+                    "loop_count": asset.loop_count,
+                    "has_transparency": asset.has_transparency,
                 }
                 for asset in validated.assets
             ],

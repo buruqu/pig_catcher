@@ -77,12 +77,13 @@ def _write_manifest(
     entries: list[dict[str, object]],
     *,
     catalog_id: str = "test-catalog",
+    manifest_version: int = 1,
 ) -> Path:
     path = root / "assets.json"
     path.write_text(
         json.dumps(
             {
-                "manifest_version": 1,
+                "manifest_version": manifest_version,
                 "catalog_id": catalog_id,
                 "source_label": "pytest synthetic catalog",
                 "entries": entries,
@@ -95,6 +96,29 @@ def _write_manifest(
     return path
 
 
+def _write_gif(
+    path: Path,
+    *,
+    durations: list[int] | None = None,
+    loop: int = 0,
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    frames = [
+        Image.new("RGBA", (64, 64), color)
+        for color in ("#F58CAD", "#66BFA3", "#5B8FD1")
+    ]
+    options: dict[str, object] = {
+        "format": "GIF",
+        "save_all": True,
+        "append_images": frames[1:],
+        "loop": loop,
+        "disposal": 2,
+    }
+    if durations is not None:
+        options["duration"] = durations
+    frames[0].save(path, **options)
+
+
 def test_manifest_validator_accepts_png_and_is_deterministic(tmp_path: Path) -> None:
     _write_png(tmp_path / "pig.png", (255, 180, 205, 255))
     manifest = _write_manifest(tmp_path, [_pig_entry("common-pig", "pig.png")])
@@ -104,6 +128,27 @@ def test_manifest_validator_accepts_png_and_is_deterministic(tmp_path: Path) -> 
     assert first.catalog_hash == second.catalog_hash
     assert first.assets[0].width == 64
     assert first.assets[0].image_format == "PNG"
+
+
+def test_manifest_detects_animated_content_even_when_extension_is_jpg(
+    tmp_path: Path,
+) -> None:
+    _write_gif(tmp_path / "animated.jpg", durations=[40, 70, 90], loop=3)
+    manifest = _write_manifest(
+        tmp_path,
+        [_pig_entry("animated-pig", "animated.jpg")],
+        manifest_version=2,
+    )
+    asset = AssetManifestValidator(
+        min_image_side=32,
+        max_image_bytes=1024 * 1024,
+    ).validate_file(manifest).assets[0]
+    assert asset.image_format == "GIF"
+    assert asset.is_animated is True
+    assert asset.frame_count == 3
+    assert asset.frame_durations_ms == (40, 70, 90)
+    assert asset.total_duration_ms == 200
+    assert asset.loop_count == 3
 
 
 @pytest.mark.parametrize(
@@ -160,6 +205,38 @@ def test_manifest_model_rejects_path_traversal(tmp_path: Path) -> None:
     validator = AssetManifestValidator(min_image_side=32, max_image_bytes=1024 * 1024)
     with pytest.raises(AssetValidationError, match="相对路径"):
         validator.validate_file(manifest)
+
+
+def test_manifest_rejects_duplicate_collection_slots(tmp_path: Path) -> None:
+    _write_png(tmp_path / "one.png", (255, 180, 205, 255))
+    _write_png(tmp_path / "two.png", (220, 150, 240, 255))
+    collection = {
+        "collaboration_name": "BanG Dream!",
+        "collection_id": "bandori-test",
+        "collection_name": "测试乐队",
+        "slot": 1,
+        "total": 5,
+        "character_id": "member-one",
+        "character_name": "成员一",
+        "official_profile_url": "https://bang-dream.com/member-one/",
+    }
+    entries = [
+        {**_pig_entry("member-one", "one.png"), "collection": collection},
+        {
+            **_pig_entry("member-two", "two.png"),
+            "collection": {
+                **collection,
+                "character_id": "member-two",
+                "character_name": "成员二",
+            },
+        },
+    ]
+    manifest = _write_manifest(tmp_path, entries, manifest_version=2)
+    with pytest.raises(AssetValidationError, match="重复槽位"):
+        AssetManifestValidator(
+            min_image_side=32,
+            max_image_bytes=1024 * 1024,
+        ).validate_file(manifest)
 
 
 @pytest.mark.asyncio
@@ -317,4 +394,88 @@ async def test_group_template_cannot_move_to_another_group(tmp_path: Path) -> No
         )
         == []
     )
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_band_collection_progress_uses_fixed_five_member_denominator(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    _write_png(source / "kasumi.png", (255, 180, 205, 255))
+    _write_png(source / "rimi.png", (220, 150, 240, 255))
+    base_collection = {
+        "collaboration_name": "BanG Dream!",
+        "collection_id": "bandori-poppin-party",
+        "collection_name": "Poppin'Party",
+        "total": 5,
+        "official_profile_url": "https://bang-dream.com/artist/poppinparty/",
+    }
+    manifest = _write_manifest(
+        source,
+        [
+            {
+                **_pig_entry("kasumi-star", "kasumi.png", rarity=5),
+                "collection": {
+                    **base_collection,
+                    "slot": 1,
+                    "character_id": "toyama-kasumi",
+                    "character_name": "户山香澄",
+                },
+            },
+            {
+                **_pig_entry("rimi-chocolate", "rimi.png", rarity=5),
+                "collection": {
+                    **base_collection,
+                    "slot": 3,
+                    "character_id": "ushigome-rimi",
+                    "character_name": "牛込里美",
+                },
+            },
+        ],
+        manifest_version=2,
+    )
+    data_dir = tmp_path / "data"
+    database = PigCatcherDatabase(data_dir / "pig.sqlite3")
+    await database.open()
+    service = AssetCatalogService(
+        database,
+        AssetCatalogStorage(data_dir),
+        min_image_side=32,
+        max_image_bytes=1024 * 1024,
+    )
+    await service.import_manifest(manifest)
+    identity = CommandIdentity(
+        scope=ScopeKey("qq", "100"),
+        stream_id="stream-100",
+        user_id="user-1",
+        display_name="成员",
+    )
+    await FrameworkService(database).touch_identity(identity)
+    async with database.transaction() as session:
+        await session.execute(
+            """
+            INSERT INTO pig_catalog_entries(
+                player_id, template_id, first_acquired_at, last_acquired_at,
+                acquired_count, best_size, best_weight
+            )
+            VALUES (?, 'kasumi-star', 'now', 'now', 1, 50, 80)
+            """,
+            (identity.player_id,),
+        )
+    progress = await service.list_collection_progress(player_id=identity.player_id)
+    assert len(progress) == 1
+    assert progress[0].collection_name == "Poppin'Party"
+    assert progress[0].display_progress == "1/5"
+    assert progress[0].available_count == 2
+    row = await database.fetch_one(
+        """
+        SELECT character_name, media_format, frame_count
+        FROM pig_templates
+        WHERE template_id = 'kasumi-star'
+        """
+    )
+    assert row is not None
+    assert tuple(row) == ("户山香澄", "PNG", 1)
     await database.close()

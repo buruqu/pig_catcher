@@ -13,6 +13,27 @@ from ..domain.models import ScopeKey
 from ..version import ASSET_MANIFEST_VERSION
 
 
+class CollectionMetadata(BaseModel):
+    """联动收藏系列中的稳定槽位与官方资料来源。"""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, str_strip_whitespace=True)
+
+    collaboration_name: str = Field(min_length=1, max_length=80)
+    collection_id: str = Field(pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$", min_length=2, max_length=80)
+    collection_name: str = Field(min_length=1, max_length=80)
+    slot: int = Field(ge=1, le=100)
+    total: int = Field(ge=1, le=100)
+    character_id: str = Field(pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$", min_length=2, max_length=80)
+    character_name: str = Field(min_length=1, max_length=80)
+    official_profile_url: str = Field(pattern=r"^https://", min_length=10, max_length=500)
+
+    @model_validator(mode="after")
+    def validate_slot(self) -> CollectionMetadata:
+        if self.slot > self.total:
+            raise ValueError("联动收藏槽位不能大于系列总数")
+        return self
+
+
 class AssetManifestEntry(BaseModel):
     """一张猪或美食素材的静态定义。"""
 
@@ -37,6 +58,7 @@ class AssetManifestEntry(BaseModel):
     fat_profile: FatProfile | None = None
     recipe_tags: list[str] = Field(default_factory=list, max_length=20)
     effect_id: str = Field(default="", max_length=80)
+    collection: CollectionMetadata | None = None
 
     @field_validator("image")
     @classmethod
@@ -44,8 +66,8 @@ class AssetManifestEntry(BaseModel):
         path = Path(value)
         if path.is_absolute() or value.startswith(("/", "\\")) or ".." in path.parts or "\x00" in value:
             raise ValueError("图片必须使用素材包内不含上级跳转的相对路径")
-        if path.suffix.lower() not in {".png", ".webp"}:
-            raise ValueError("图片仅支持 PNG 或 WebP")
+        if path.suffix.lower() not in {".png", ".webp", ".jpg", ".jpeg", ".gif"}:
+            raise ValueError("图片路径仅支持 PNG、JPEG、WebP 或 GIF 扩展名")
         return path.as_posix()
 
     @field_validator("recipe_tags")
@@ -105,6 +127,8 @@ class AssetManifestEntry(BaseModel):
             )
         ):
             raise ValueError("美食素材不能填写猪的体型、重量或肥瘦画像")
+        if self.kind is AssetKind.FOOD and self.collection is not None:
+            raise ValueError("美食素材不能加入猪猪联动收藏系列")
         return self
 
 
@@ -113,7 +137,7 @@ class AssetManifest(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True, str_strip_whitespace=True)
 
-    manifest_version: Literal[1] = ASSET_MANIFEST_VERSION
+    manifest_version: Literal[1, 2] = ASSET_MANIFEST_VERSION
     catalog_id: str = Field(pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$", min_length=2, max_length=80)
     source_label: str = Field(min_length=1, max_length=200)
     entries: list[AssetManifestEntry] = Field(min_length=1, max_length=5000)
@@ -123,6 +147,26 @@ class AssetManifest(BaseModel):
         template_ids = [entry.template_id for entry in self.entries]
         if len(template_ids) != len(set(template_ids)):
             raise ValueError("素材清单中存在重复 template_id")
+        collection_slots: set[tuple[str, int]] = set()
+        collection_definitions: dict[str, tuple[str, int, str]] = {}
+        for entry in self.entries:
+            collection = entry.collection
+            if collection is None:
+                continue
+            slot_key = (collection.collection_id, collection.slot)
+            if slot_key in collection_slots:
+                raise ValueError(
+                    f"联动收藏系列 {collection.collection_id} 存在重复槽位 {collection.slot}"
+                )
+            collection_slots.add(slot_key)
+            definition = (
+                collection.collection_name,
+                collection.total,
+                collection.collaboration_name,
+            )
+            existing = collection_definitions.setdefault(collection.collection_id, definition)
+            if existing != definition:
+                raise ValueError(f"联动收藏系列 {collection.collection_id} 的名称或总数不一致")
         return self
 
 
@@ -136,6 +180,12 @@ class ValidatedAsset:
     width: int
     height: int
     image_format: str
+    is_animated: bool
+    frame_count: int
+    frame_durations_ms: tuple[int, ...]
+    total_duration_ms: int
+    loop_count: int | None
+    has_transparency: bool
 
 
 @dataclass(frozen=True, slots=True)

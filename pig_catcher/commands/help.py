@@ -61,7 +61,7 @@ def _topic_block(topic: str) -> str:
 
 
 def format_help(topic: str = "") -> str:
-    """按主题返回纯文字帮助，并明确 2A 尚未开放玩法。"""
+    """按主题返回纯文字帮助，并明确当前尚未开放玩法。"""
 
     normalized = str(topic or "").strip()
     normalized = _TOPIC_ALIASES.get(normalized, normalized)

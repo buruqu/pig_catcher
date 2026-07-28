@@ -148,6 +148,7 @@ class AssetRepository:
         now: str,
     ) -> None:
         entry = asset.entry
+        collection = entry.collection
         enabled = int(entry.scope is TemplateScope.COMMON or entry.consent_status is ConsentStatus.GRANTED)
         await session.execute(
             """
@@ -156,9 +157,23 @@ class AssetRepository:
                 scope_type, description, image_relpath, image_sha256, image_fit,
                 length_min, length_max, weight_min, weight_max, fat_profile,
                 recipe_tags_json, source_label, license, consent_status,
+                media_format, is_animated, frame_count, total_duration_ms,
+                loop_count, has_transparency, collaboration_name, collection_id,
+                collection_name, collection_slot, collection_total, character_id,
+                character_name, official_profile_url,
                 enabled, created_at, updated_at
             )
-            VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (
+                :template_id, :catalog_hash, 1, :display_name, :rarity,
+                :scope_type, :description, :image_relpath, :image_sha256, :image_fit,
+                :length_min, :length_max, :weight_min, :weight_max, :fat_profile,
+                :recipe_tags_json, :source_label, :license, :consent_status,
+                :media_format, :is_animated, :frame_count, :total_duration_ms,
+                :loop_count, :has_transparency, :collaboration_name, :collection_id,
+                :collection_name, :collection_slot, :collection_total, :character_id,
+                :character_name, :official_profile_url,
+                :enabled, :created_at, :updated_at
+            )
             ON CONFLICT(template_id) DO UPDATE SET
                 catalog_hash = excluded.catalog_hash,
                 template_version = CASE
@@ -180,32 +195,64 @@ class AssetRepository:
                 source_label = excluded.source_label,
                 license = excluded.license,
                 consent_status = excluded.consent_status,
+                media_format = excluded.media_format,
+                is_animated = excluded.is_animated,
+                frame_count = excluded.frame_count,
+                total_duration_ms = excluded.total_duration_ms,
+                loop_count = excluded.loop_count,
+                has_transparency = excluded.has_transparency,
+                collaboration_name = excluded.collaboration_name,
+                collection_id = excluded.collection_id,
+                collection_name = excluded.collection_name,
+                collection_slot = excluded.collection_slot,
+                collection_total = excluded.collection_total,
+                character_id = excluded.character_id,
+                character_name = excluded.character_name,
+                official_profile_url = excluded.official_profile_url,
                 enabled = excluded.enabled,
                 updated_at = excluded.updated_at
             """,
-            (
-                entry.template_id,
-                validated.catalog_hash,
-                entry.display_name,
-                int(entry.rarity),
-                entry.scope.value,
-                entry.description,
-                self._stored_image_path(stored, asset),
-                asset.sha256,
-                entry.fit.value,
-                entry.length_min_cm,
-                entry.length_max_cm,
-                entry.weight_min_kg,
-                entry.weight_max_kg,
-                entry.fat_profile.value,
-                json.dumps(entry.recipe_tags, ensure_ascii=False, separators=(",", ":")),
-                entry.source,
-                entry.license,
-                entry.consent_status.value,
-                enabled,
-                now,
-                now,
-            ),
+            {
+                "template_id": entry.template_id,
+                "catalog_hash": validated.catalog_hash,
+                "display_name": entry.display_name,
+                "rarity": int(entry.rarity),
+                "scope_type": entry.scope.value,
+                "description": entry.description,
+                "image_relpath": self._stored_image_path(stored, asset),
+                "image_sha256": asset.sha256,
+                "image_fit": entry.fit.value,
+                "length_min": entry.length_min_cm,
+                "length_max": entry.length_max_cm,
+                "weight_min": entry.weight_min_kg,
+                "weight_max": entry.weight_max_kg,
+                "fat_profile": entry.fat_profile.value,
+                "recipe_tags_json": json.dumps(
+                    entry.recipe_tags,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ),
+                "source_label": entry.source,
+                "license": entry.license,
+                "consent_status": entry.consent_status.value,
+                "media_format": asset.image_format,
+                "is_animated": int(asset.is_animated),
+                "frame_count": asset.frame_count,
+                "total_duration_ms": asset.total_duration_ms,
+                "loop_count": asset.loop_count,
+                "has_transparency": int(asset.has_transparency),
+                "collaboration_name": collection.collaboration_name if collection else "",
+                "collection_id": collection.collection_id if collection else "",
+                "collection_name": collection.collection_name if collection else "",
+                "collection_slot": collection.slot if collection else None,
+                "collection_total": collection.total if collection else 0,
+                "character_id": collection.character_id if collection else "",
+                "character_name": collection.character_name if collection else "",
+                "official_profile_url": collection.official_profile_url if collection else "",
+                "enabled": enabled,
+                "created_at": now,
+                "updated_at": now,
+            },
         )
         if entry.scope is TemplateScope.GROUP:
             scope = await self._ensure_group_scope(session, scope_id=str(entry.group_scope_id), now=now)
@@ -247,9 +294,18 @@ class AssetRepository:
                 template_id, catalog_hash, template_version, display_name, rarity,
                 scope_type, description, image_relpath, image_sha256, image_fit,
                 recipe_tags_json, effect_id, effect_params_json, source_label,
-                license, consent_status, enabled, created_at, updated_at
+                license, consent_status, media_format, is_animated, frame_count,
+                total_duration_ms, loop_count, has_transparency,
+                enabled, created_at, updated_at
             )
-            VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, '{}', ?, ?, ?, ?, ?, ?)
+            VALUES (
+                :template_id, :catalog_hash, 1, :display_name, :rarity,
+                :scope_type, :description, :image_relpath, :image_sha256, :image_fit,
+                :recipe_tags_json, :effect_id, '{}', :source_label,
+                :license, :consent_status, :media_format, :is_animated, :frame_count,
+                :total_duration_ms, :loop_count, :has_transparency,
+                :enabled, :created_at, :updated_at
+            )
             ON CONFLICT(template_id) DO UPDATE SET
                 catalog_hash = excluded.catalog_hash,
                 template_version = CASE
@@ -267,28 +323,44 @@ class AssetRepository:
                 source_label = excluded.source_label,
                 license = excluded.license,
                 consent_status = excluded.consent_status,
+                media_format = excluded.media_format,
+                is_animated = excluded.is_animated,
+                frame_count = excluded.frame_count,
+                total_duration_ms = excluded.total_duration_ms,
+                loop_count = excluded.loop_count,
+                has_transparency = excluded.has_transparency,
                 enabled = excluded.enabled,
                 updated_at = excluded.updated_at
             """,
-            (
-                entry.template_id,
-                validated.catalog_hash,
-                entry.display_name,
-                int(entry.rarity),
-                entry.scope.value,
-                entry.description,
-                self._stored_image_path(stored, asset),
-                asset.sha256,
-                entry.fit.value,
-                json.dumps(entry.recipe_tags, ensure_ascii=False, separators=(",", ":")),
-                entry.effect_id,
-                entry.source,
-                entry.license,
-                entry.consent_status.value,
-                enabled,
-                now,
-                now,
-            ),
+            {
+                "template_id": entry.template_id,
+                "catalog_hash": validated.catalog_hash,
+                "display_name": entry.display_name,
+                "rarity": int(entry.rarity),
+                "scope_type": entry.scope.value,
+                "description": entry.description,
+                "image_relpath": self._stored_image_path(stored, asset),
+                "image_sha256": asset.sha256,
+                "image_fit": entry.fit.value,
+                "recipe_tags_json": json.dumps(
+                    entry.recipe_tags,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ),
+                "effect_id": entry.effect_id,
+                "source_label": entry.source,
+                "license": entry.license,
+                "consent_status": entry.consent_status.value,
+                "media_format": asset.image_format,
+                "is_animated": int(asset.is_animated),
+                "frame_count": asset.frame_count,
+                "total_duration_ms": asset.total_duration_ms,
+                "loop_count": asset.loop_count,
+                "has_transparency": int(asset.has_transparency),
+                "enabled": enabled,
+                "created_at": now,
+                "updated_at": now,
+            },
         )
         if entry.scope is TemplateScope.GROUP:
             scope = await self._ensure_group_scope(session, scope_id=str(entry.group_scope_id), now=now)
@@ -361,3 +433,50 @@ class AssetRepository:
                 (scope_id,),
             )
         return [str(row["template_id"]) for row in rows]
+
+    async def list_collection_progress_rows(
+        self,
+        session: DatabaseSession,
+        *,
+        player_id: str,
+    ) -> list[dict[str, object]]:
+        rows = await session.fetch_all(
+            """
+            SELECT
+                template.collection_id,
+                template.collection_name,
+                template.collaboration_name,
+                MAX(template.collection_total) AS collection_total,
+                COUNT(DISTINCT template.collection_slot) AS available_count,
+                COUNT(DISTINCT CASE
+                    WHEN catalog.player_id IS NOT NULL THEN template.collection_slot
+                    ELSE NULL
+                END) AS collected_count
+            FROM players AS player
+            JOIN pig_templates AS template
+              ON template.enabled = 1
+             AND template.collection_id <> ''
+            LEFT JOIN scope_pig_templates AS allowed
+              ON allowed.template_id = template.template_id
+             AND allowed.scope_id = player.scope_id
+            LEFT JOIN pig_catalog_entries AS catalog
+              ON catalog.template_id = template.template_id
+             AND catalog.player_id = player.player_id
+            WHERE player.player_id = ?
+              AND (
+                  template.scope_type = 'common'
+                  OR (
+                      template.scope_type = 'group'
+                      AND allowed.authorized = 1
+                      AND allowed.consent_status = 'granted'
+                  )
+              )
+            GROUP BY
+                template.collection_id,
+                template.collection_name,
+                template.collaboration_name
+            ORDER BY MIN(template.collection_slot), template.collection_id
+            """,
+            (player_id,),
+        )
+        return [dict(row) for row in rows]
