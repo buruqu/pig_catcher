@@ -1,0 +1,72 @@
+[plugin]
+enabled = true
+config_version = "0.1.0"
+framework_phase = "2A"
+
+[features]
+help_enabled = true
+
+[access]
+group_whitelist = []
+group_blacklist = []
+user_whitelist = []
+user_blacklist = []
+admin_user_ids = []
+notify_denied = true
+denied_message = "当前群或账号未启用抓猪插件。"
+
+[storage]
+database_filename = "pig_catcher.sqlite3"
+sqlite_busy_timeout_ms = 5000
+auto_backup_enabled = true
+backup_interval_hours = 24
+backup_retention_count = 7
+
+[assets]
+manifest_filename = "assets.json"
+min_image_side = 256
+max_image_bytes = 12582912
+staging_max_age_hours = 24
+
+[catching]
+daily_limit = 30
+cooldown_seconds = 60
+rarity_1_weight = 55.0
+rarity_2_weight = 25.0
+rarity_3_weight = 12.0
+rarity_4_weight = 5.5
+rarity_5_weight = 2.0
+rarity_6_weight = 0.5
+max_feed_level = 5
+missing_six_star_strategy = "transfer-to-five"
+
+[cooking]
+max_cookware_level = 5
+six_star_to_five_percent = 90
+six_star_to_six_percent = 10
+
+[economy]
+max_upgrade_level = 5
+feed_upgrade_prices = [500, 1200, 2800, 6500, 15000]
+cookware_upgrade_prices = [500, 1200, 2800, 6500, 15000]
+
+[trading]
+gift_enabled = false
+trade_enabled = false
+max_trade_price = 1000000
+offer_expiry_minutes = 5
+
+[rendering]
+enabled = true
+fallback_to_text = true
+card_width = 1200
+viewport_height = 1600
+device_scale_factor = 1.0
+render_timeout_ms = 15000
+max_png_bytes = 12582912
+font_family = "\"Noto Sans CJK SC\", \"Microsoft YaHei\", sans-serif"
+
+[maintenance]
+enabled = true
+interval_minutes = 60
+run_integrity_check = true

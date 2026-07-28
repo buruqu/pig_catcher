@@ -8,9 +8,9 @@
 - 数据库：SQLite，异步访问
 - 语言：运行日志、配置面板、命令和用户提示均以简体中文为首要实现
 
-第二轮开始前再次读取本机锁文件和官方 SDK 文档；若版本变化，先更新兼容设计再写代码。
+第二轮 2A 已重新读取本机锁文件、SDK 2.7.0 实现和宿主加载器；若后续版本变化，先更新兼容设计再写代码。
 
-第二轮启动时冻结首批版本标识：`schema_version`、`asset_manifest_version` 和 `ruleset_version`。三者独立递增，不能用插件版本代替数据、素材和数值规则版本。
+2A 已冻结首批版本标识：`schema_version=1`、`asset_manifest_version=1` 和 `ruleset_version=1`。三者独立递增，不能用插件版本代替数据、素材和数值规则版本。
 
 ## 2. SDK 映射
 
@@ -27,9 +27,9 @@
 
 首版不注册普通消息 `@EventHandler`、LLM `@Tool`、模型提供器或网关。联动猪如果未来需要插件间能力，再基于明确用例设计稳定 `@API`，不提前暴露宽泛写接口。
 
-## 3. 计划项目结构
+## 3. 当前项目结构
 
-以下只是第二轮目标结构，本轮不创建这些运行文件：
+2A 已建立以下运行结构；后续业务文件按功能轮次增加：
 
 ```text
 pig_catcher/
@@ -41,12 +41,7 @@ pig_catcher/
   pig_catcher/
     commands/
       help.py
-      catching.py
-      inventory.py
-      cooking.py
-      economy.py
-      social.py
-      ranking.py
+      context.py
     domain/
       models.py
       enums.py
@@ -54,51 +49,45 @@ pig_catcher/
       selectors.py
       errors.py
     services/
-      catch_service.py
-      cooking_service.py
-      inventory_service.py
-      economy_service.py
-      trade_service.py
-      ranking_service.py
-      asset_service.py
+      assets.py
+      framework.py
+      maintenance.py
+      receipts.py
     infrastructure/
       database.py
       migrations/
       repositories/
-      asset_loader.py
-      locks.py
     rendering/
       renderer.py
-      view_models.py
+      models.py
+      delivery.py
       templates/
-      styles/
     config/
       model.py
-      access_policy.py
-  assets/
+      access.py
   tests/
-    unit/
-    integration/
-    rendering/
-    uat/
+  artifacts/                  # 仅本地视觉验收，Git 忽略
 ```
 
 命令处理器只负责解析、权限、调用服务和发送；随机、价值、交易、纪录和资产状态都留在领域或服务层。
 
 ## 4. 配置模型
 
-计划中文面板分区：
+2A 中文面板分区：
 
 | 分区 | 主要配置 |
 | --- | --- |
-| 基础设置 | 启用、默认语言、冷却、每日次数 |
+| 插件设置 | 启用、配置版本、框架阶段 |
+| 功能开关 | 当前仅控制纯文字帮助 |
 | 访问控制 | 群黑白名单、用户黑白名单、Bot 管理员 |
-| 抓猪概率 | 六档基础权重、饲料修正、缺少 6 星素材策略 |
-| 做菜规则 | 品质矩阵、厨具修正、道具限制 |
-| 经济系统 | 奖励、价值、升级价格、商品价格、交易上限 |
-| 交易设置 | 赠送开关、交易开关、报价有效期 |
-| 渲染设置 | 字体、宽度、图片质量、临时文件保留 |
-| 数据维护 | 自动备份、审计级别、账本检查 |
+| 数据存储 | 数据库文件、忙等待、在线备份和保留数 |
+| 素材管理 | 清单文件、图片尺寸与大小、暂存清理 |
+| 抓猪规则 | 冷却、每日次数、六档权重和缺失六星策略 |
+| 做菜规则 | 厨具上限与不可修改的六星 90/10 规则 |
+| 猪币经济 | 饲料和厨具永久升级价格 |
+| 赠送与交易 | 功能开关、交易价格上限和报价有效期 |
+| 图片展示 | 字体、宽度、视口、超时、PNG 上限和文字降级 |
+| 运行维护 | 维护任务、间隔和完整性检查 |
 
 关键规则配置需要交叉校验：
 
@@ -110,7 +99,7 @@ pig_catcher/
 ## 5. 数据库
 
 - 使用 `aiosqlite` 管理插件自有表，不把自定义模型塞进 MaiBot 核心数据库。
-- 数据库位于 `ctx.paths.data_dir / "pig_catcher.db"`。
+- 数据库默认位于 `ctx.paths.data_dir / "pig_catcher.sqlite3"`，文件名可配置但不能逃逸数据目录。
 - 启用 `PRAGMA foreign_keys=ON`、WAL 和合理的 `busy_timeout`。
 - 一个数据库连接管理器负责初始化、迁移、事务和关闭。
 - 仓储层不提交事务；事务由应用服务统一拥有。
@@ -148,13 +137,13 @@ pig_catcher/
 
 ## 7. 渲染管线
 
-计划使用本地 HTML/CSS 模板和 `ctx.render.html2png()`：
+使用本地 HTML/CSS 模板和 `ctx.render.html2png()`：
 
 1. 领域对象转换为无副作用的视图模型。
 2. 对所有用户文本转义并限制长度。
 3. 只引用插件资产和 `data_dir` 中当前群已授权素材。
 4. 生成固定宽度、受限高度的 HTML。
-5. 渲染到 `runtime_dir`，检查尺寸、文件大小和非空像素。
+5. SDK 返回 Base64 PNG 后，检查格式、解码、尺寸、文件大小和透明像素。
 6. 调用 `ctx.send.image`。
 7. 成功后清理临时文件；失败则记录并发送文字摘要。
 
@@ -162,10 +151,10 @@ pig_catcher/
 
 ## 8. 素材导入
 
-素材导入分为两个路径：
+素材导入协议分为两个路径：
 
-- 1 至 5 星公共素材：随版本发布，启动时只读校验。
-- 6 星群素材：由管理面板导入数据目录，先落入暂存区，验证清单与图片后再原子激活。
+- 1 至 5 星公共素材：在 2B 随版本发布，通过同一清单协议导入。
+- 6 星群素材：在 2B 导入数据目录，先落入暂存区，验证清单、图片、所属群和授权后再原子激活。
 
 文件路径通过解析后的根目录校验，拒绝绝对路径、`..`、符号链接逃逸和无法识别的媒体。停用模板不删除历史行。
 
@@ -188,13 +177,13 @@ pig_catcher/
 - 渲染与发送失败
 - 账本不一致、资产状态冲突和迁移失败
 
-维护工具计划支持：
+2A 维护任务已支持：
 
 - SQLite 一致性检查
-- 余额与账本对账
-- 过期报价解锁
-- 丢失素材扫描
-- 数据库备份和恢复演练
+- 数据库在线备份与保留数量清理
+- 过期素材暂存目录清理
+
+余额与账本对账、过期报价解锁和丢失素材扫描随对应玩法阶段实现。
 
 这些工具默认只读或需要显式确认，不在插件启动时静默修复未知问题。
 

@@ -3,6 +3,9 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
 .venv/
 dist/
 build/
@@ -10,6 +13,7 @@ logs/
 runtime/
 data/
 incoming_assets/
+artifacts/
 *.db
 *.db-shm
 *.db-wal

@@ -1,0 +1,6 @@
+{% macro privacy_placeholder(label="素材暂未公开") -%}
+<div class="privacy-placeholder" role="img" aria-label="{{ label }}">
+  <span class="privacy-placeholder__mark">?</span>
+  <strong>{{ label }}</strong>
+</div>
+{%- endmacro %}

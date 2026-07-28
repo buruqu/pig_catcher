@@ -1,0 +1,10 @@
+"""抓猪插件领域与基础设施包。"""
+
+from .version import ASSET_MANIFEST_VERSION, PLUGIN_VERSION, RULESET_VERSION, SCHEMA_VERSION
+
+__all__ = [
+    "ASSET_MANIFEST_VERSION",
+    "PLUGIN_VERSION",
+    "RULESET_VERSION",
+    "SCHEMA_VERSION",
+]
