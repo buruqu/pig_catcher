@@ -114,7 +114,7 @@ class AssetRepository:
                 (entry.template_id,),
             )
             existing_scope_ids = {str(row["scope_id"]) for row in scope_rows}
-            if existing_scope_ids and existing_scope_ids != {str(entry.group_scope_id)}:
+            if existing_scope_ids and str(entry.group_scope_id) not in existing_scope_ids:
                 raise AssetImportError(f"群专属模板发布后不能迁移所属群：{entry.template_id}")
 
     async def _ensure_group_scope(

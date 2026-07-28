@@ -693,13 +693,13 @@ class GameplayService:
 
         request_payload = {"command_version": 1}
         idempotency_key = MessageKeyFactory.build(identity, _CATCH_COMMAND)
-        now_datetime = _safe_datetime(self.clock.now())
-        now = iso_timestamp(now_datetime)
-        day_start, day_end = _day_window(
-            now_datetime,
-            self.catching.daily_reset_timezone,
-        )
         async with self.database.transaction() as session:
+            now_datetime = _safe_datetime(self.clock.now())
+            now = iso_timestamp(now_datetime)
+            day_start, day_end = _day_window(
+                now_datetime,
+                self.catching.daily_reset_timezone,
+            )
             existing = await self.receipt_repository.get_by_key(session, idempotency_key)
             if existing is not None:
                 validate_existing_receipt(

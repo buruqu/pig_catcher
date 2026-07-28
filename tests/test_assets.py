@@ -398,6 +398,75 @@ async def test_group_template_cannot_move_to_another_group(tmp_path: Path) -> No
 
 
 @pytest.mark.asyncio
+async def test_group_template_can_keep_additional_authorized_scope_on_reimport(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    _write_png(source / "group.png", (220, 150, 240, 255))
+    entry = _pig_entry(
+        "shared-group-pig",
+        "group.png",
+        rarity=6,
+        scope="group",
+        group_scope_id="qq:100",
+        consent_status="granted",
+    )
+    manifest = _write_manifest(source, [entry])
+    data_dir = tmp_path / "data"
+    database = PigCatcherDatabase(data_dir / "pig.sqlite3")
+    await database.open()
+    service = AssetCatalogService(
+        database,
+        AssetCatalogStorage(data_dir),
+        min_image_side=32,
+        max_image_bytes=1024 * 1024,
+    )
+    await service.import_manifest(manifest)
+
+    async with database.transaction() as session:
+        await session.execute(
+            """
+            INSERT INTO scopes(
+                scope_id, platform, group_id, group_name, stream_id,
+                enabled, created_at, updated_at
+            )
+            VALUES (
+                'qq:200', 'qq', '200', '', '', 1,
+                '2026-07-28T00:00:00.000Z',
+                '2026-07-28T00:00:00.000Z'
+            )
+            """
+        )
+        await session.execute(
+            """
+            INSERT INTO scope_pig_templates(
+                scope_id, template_id, authorized, consent_status,
+                created_at, updated_at
+            )
+            VALUES (
+                'qq:200', 'shared-group-pig', 1, 'granted',
+                '2026-07-28T00:00:00.000Z',
+                '2026-07-28T00:00:00.000Z'
+            )
+            """
+        )
+
+    updated = {**entry, "description": "Updated without revoking the shared scope."}
+    _write_manifest(source, [updated])
+    await service.import_manifest(manifest)
+    assert await service.list_drawable_template_ids(
+        kind=AssetKind.PIG,
+        scope_id="qq:100",
+    ) == ["shared-group-pig"]
+    assert await service.list_drawable_template_ids(
+        kind=AssetKind.PIG,
+        scope_id="qq:200",
+    ) == ["shared-group-pig"]
+    await database.close()
+
+
+@pytest.mark.asyncio
 async def test_band_collection_progress_uses_fixed_five_member_denominator(
     tmp_path: Path,
 ) -> None:

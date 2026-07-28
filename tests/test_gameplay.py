@@ -275,6 +275,66 @@ async def test_default_frequency_is_twenty_per_day_with_twenty_second_cooldown(
 
 
 @pytest.mark.asyncio
+async def test_daily_quota_reset_keeps_receipts_and_lifetime_statistics(
+    tmp_path: Path,
+) -> None:
+    database = await _database_with_catalog(
+        tmp_path,
+        [_pig_entry("one-pig", rarity=1)],
+    )
+    clock = MutableClock(datetime(2026, 7, 28, 4, 0, tzinfo=UTC))
+    service = GameplayService(
+        database,
+        CatchingSection(cooldown_seconds=0, daily_limit=2),
+        random_source=SequenceRandom(
+            *_catch_rolls(),
+            *_catch_rolls(),
+            *_catch_rolls(),
+        ),
+        clock=clock,
+    )
+    await service.catch(_identity(message_id="before-reset-1"))
+    await service.catch(_identity(message_id="before-reset-2"))
+    with pytest.raises(DailyCatchLimitError, match="2/2"):
+        await service.catch(_identity(message_id="before-reset-limit"))
+
+    clock.value += timedelta(seconds=1)
+    async with database.transaction() as session:
+        await session.execute(
+            """
+            INSERT INTO audit_events(
+                audit_event_id, scope_id, actor_user_id, action,
+                object_type, object_id, detail_json, created_at
+            )
+            VALUES (
+                'quota-reset-1', NULL, 'local-operator',
+                'daily-catch-quota-reset', 'daily-quota',
+                '2026-07-28', '{"scope":"all"}',
+                '2026-07-28T04:00:01.000Z'
+            )
+            """
+        )
+
+    await service.catch(_identity(message_id="after-reset-1"))
+    profile = await service.profile(_identity(message_id="after-reset-profile"))
+    assert profile.daily_count == 1
+
+    rows = await database.fetch_one(
+        """
+        SELECT
+            (SELECT COUNT(*) FROM command_receipts
+             WHERE command_name = 'pig-catcher.catch') AS receipts,
+            (SELECT total_catches FROM player_statistics
+             WHERE player_id = ?) AS lifetime_catches
+        """,
+        (_identity().player_id,),
+    )
+    assert rows is not None
+    assert tuple(rows) == (3, 3)
+    await database.close()
+
+
+@pytest.mark.asyncio
 async def test_cooldown_does_not_reset_at_beijing_midnight(tmp_path: Path) -> None:
     database = await _database_with_catalog(
         tmp_path,

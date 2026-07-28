@@ -66,14 +66,36 @@ class GameplayRepository:
                     FROM command_receipts
                     WHERE player_id = ?
                       AND command_name = 'pig-catcher.catch'
-                      AND created_at >= ?
+                      AND created_at >= (
+                          SELECT COALESCE(MAX(reset.created_at), ?)
+                          FROM audit_events AS reset
+                          WHERE reset.action = 'daily-catch-quota-reset'
+                            AND reset.created_at >= ?
+                            AND reset.created_at < ?
+                            AND (
+                                reset.scope_id IS NULL
+                                OR reset.scope_id = (
+                                    SELECT player.scope_id
+                                    FROM players AS player
+                                    WHERE player.player_id = ?
+                                )
+                            )
+                      )
                       AND created_at < ?
                 ) AS daily_count,
                 statistic.last_catch_at AS last_acquired_at
             FROM player_statistics AS statistic
             WHERE statistic.player_id = ?
             """,
-            (player_id, day_start, day_end, player_id),
+            (
+                player_id,
+                day_start,
+                day_start,
+                day_end,
+                player_id,
+                day_end,
+                player_id,
+            ),
         )
         if row is None:
             return 0, None
