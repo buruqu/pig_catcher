@@ -930,17 +930,57 @@ footer strong {
   border-bottom: 1px solid #efd7e0;
 }
 
-.catalog-grid {
-  padding: 28px 38px 32px;
+.catalog-rarity-list {
+  padding: 24px 38px 32px;
+}
+
+.catalog-rarity-section + .catalog-rarity-section {
+  margin-top: 30px;
+}
+
+.catalog-rarity-header {
+  min-height: 58px;
+  margin-bottom: 14px;
+  padding: 0 2px 12px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  border-bottom: 2px solid color-mix(in srgb, var(--rarity-color) 32%, #eadfe3);
+}
+
+.catalog-rarity-header > div {
+  display: flex;
+  align-items: baseline;
+  gap: 13px;
+}
+
+.catalog-rarity-header h2 {
+  margin: 0;
+  color: #3a3035;
+  font-size: 24px;
+}
+
+.catalog-rarity-header__stars {
+  color: var(--rarity-color);
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.catalog-rarity-header strong {
+  color: var(--rarity-color);
+  font-size: 19px;
+}
+
+.catalog-rarity-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
 }
 
 .catalog-item {
   position: relative;
-  min-height: 238px;
-  padding: 145px 14px 14px;
+  min-height: 210px;
+  padding: 121px 11px 11px;
   overflow: hidden;
   background: #ffffff;
   border: 1px solid #eadfe3;
@@ -955,10 +995,10 @@ footer strong {
 
 .catalog-item__media {
   position: absolute;
-  left: 13px;
-  right: 13px;
-  top: 13px;
-  height: 120px;
+  left: 10px;
+  right: 10px;
+  top: 10px;
+  height: 99px;
   display: grid;
   place-items: center;
   overflow: hidden;
@@ -977,37 +1017,37 @@ footer strong {
 }
 
 .catalog-item h2 {
-  margin: 0 0 7px;
+  margin: 0 0 6px;
   overflow-wrap: anywhere;
   color: #3a3035;
-  font-size: 18px;
+  font-size: 16px;
   line-height: 1.14;
 }
 
 .catalog-item__stars {
   position: absolute;
-  right: 18px;
-  top: 18px;
+  right: 14px;
+  top: 14px;
   z-index: 1;
   padding: 4px 7px;
   color: var(--rarity-color);
   background: rgba(255, 255, 255, 0.92);
   border: 1px solid #eadfe3;
   border-radius: 6px;
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 800;
 }
 
 .catalog-item__facts {
   color: #725f68;
-  font-size: 13px;
-  line-height: 1.5;
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .catalog-item__collection {
-  margin-top: 7px;
+  margin-top: 6px;
   color: #a14568;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
 }
 

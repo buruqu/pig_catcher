@@ -370,7 +370,7 @@ async def test_complete_third_round_command_flow_and_duplicate_publication(
     )
     await plugin.handle_catalog(
         stream_id="stream-10001",
-        **_command_kwargs(query_message, arguments="1"),
+        **_command_kwargs(query_message, arguments=""),
     )
     await plugin.handle_records(
         stream_id="stream-10001",
@@ -443,7 +443,7 @@ async def test_complete_fourth_round_command_flow_and_duplicate_publication(
     )
     await plugin.handle_food_catalog(
         stream_id="stream-10001",
-        **_command_kwargs(query_message, arguments="1"),
+        **_command_kwargs(query_message, arguments=""),
     )
     assert len(context.send.images) == 5
 

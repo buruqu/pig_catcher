@@ -28,9 +28,8 @@ class InventoryQuery:
 
 @dataclass(frozen=True, slots=True)
 class CatalogQuery:
-    """猪猪图鉴页码、品质与未发现筛选。"""
+    """猪猪图鉴品质与未发现筛选。"""
 
-    page: int = 1
     rarity: int | None = None
     undiscovered_only: bool = False
 
@@ -169,12 +168,10 @@ def parse_food_inventory_query(arguments: str) -> InventoryQuery:
 
 
 def parse_catalog_query(arguments: str) -> CatalogQuery:
-    """解析 `/猪猪图鉴 [页码] [品质=数字|未收集]`。"""
+    """解析 `/猪猪图鉴 [品质=数字|未收集]`。"""
 
-    page = 1
     rarity: int | None = None
     undiscovered_only = False
-    page_seen = False
     filter_seen = False
     for token in str(arguments or "").split():
         if token.startswith("品质="):
@@ -187,12 +184,10 @@ def parse_catalog_query(arguments: str) -> CatalogQuery:
                 rarity = _rarity(value)
             filter_seen = True
             continue
-        if page_seen:
-            raise DomainValidationError(f"无法识别图鉴参数“{token}”。")
-        page = _positive_page(token)
-        page_seen = True
+        if token.isdecimal():
+            raise DomainValidationError("图鉴已改为按品质一次展示全部内容，不需要填写页码。")
+        raise DomainValidationError(f"无法识别图鉴参数“{token}”。")
     return CatalogQuery(
-        page=page,
         rarity=rarity,
         undiscovered_only=undiscovered_only,
     )

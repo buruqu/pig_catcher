@@ -1,6 +1,6 @@
 # MaiBot 抓猪插件
 
-这是“抓猪插件”的独立 MaiBot 插件仓库。当前正式版本为 `1.0.0`，六轮开发与生产验收已经完成。
+这是“抓猪插件”的独立 MaiBot 插件仓库。当前正式版本为 `1.1.0`，六轮开发与生产验收已经完成。
 
 ## 当前状态
 
@@ -41,6 +41,8 @@
 - 相关体型与重量、肥瘦率、官方价值、猪币、经验、等级和群纪录
 - 北京时间自然日每群每人最多抓 20 次、成功抓取后冷却 20 秒，以及跨午夜语义
 - 背包、详情、图鉴、档案和纪录查询
+- 猪猪与美食图鉴不再分页，按一至六星分区在一张完整长图中列出全部可见条目
+- 白名单群的群专属六星在发现前计入图鉴并显示保密占位，其他群完全不可见
 - 8 种道具定义；抓猪与做菜道具均可装备、取消，并只在兼容动作成功提交后原子消耗
 - 六档做菜矩阵、肥瘦食谱池、厨具加成和不可修改的六星猪 `90% 五星 / 10% 六星` 规则
 - 美食详情、背包、图鉴、食用及可扩展效果接口；未配置特殊效果时获得对应品质经验
@@ -78,6 +80,9 @@ uv sync --all-groups --locked
 .\.venv\Scripts\python.exe -m pytest
 .\.venv\Scripts\python.exe -m compileall -q plugin.py pig_catcher tests tools
 .\.venv\Scripts\ruff.exe check plugin.py pig_catcher tests tools
+.\.venv\Scripts\python.exe tools\accept_complete_catalogs.py `
+  --data-dir C:\path\to\plugin-data --output artifacts\complete-catalogs `
+  --scope-id qq:group-id
 ```
 
 正式版社交流程回归与第六轮故障恢复 UAT：

@@ -276,8 +276,6 @@ def catalog_model(
 ) -> CatalogViewModel:
     return CatalogViewModel(
         display_name="视觉验收成员",
-        page=2,
-        page_count=7,
         total_count=81,
         rarity=None,
         undiscovered_only=False,
@@ -652,8 +650,6 @@ async def accept(args: argparse.Namespace) -> dict[str, object]:
                 renderer.render_catalog(
                     CatalogViewModel(
                         display_name="图鉴筛选成员",
-                        page=1,
-                        page_count=1,
                         total_count=0,
                         rarity=6,
                         undiscovered_only=True,

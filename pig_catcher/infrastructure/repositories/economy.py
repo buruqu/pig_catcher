@@ -543,7 +543,6 @@ class EconomyRepository:
                       template.scope_type = 'group'
                       AND allowed.authorized = 1
                       AND allowed.consent_status = 'granted'
-                      AND catalog.player_id IS NOT NULL
                   )
               )
             """,
@@ -553,7 +552,7 @@ class EconomyRepository:
             return 0, 0
         return int(row["collected_count"]), int(row["total_count"])
 
-    async def food_catalog_page(
+    async def food_catalog_entries(
         self,
         session: DatabaseSession,
         *,
@@ -561,8 +560,6 @@ class EconomyRepository:
         scope_id: str,
         rarity: int | None,
         undiscovered_only: bool,
-        limit: int,
-        offset: int,
     ) -> tuple[int, list[dict[str, object]]]:
         filters: list[str] = []
         parameters: list[object] = [scope_id, player_id]
@@ -587,7 +584,6 @@ class EconomyRepository:
                       template.scope_type = 'group'
                       AND allowed.authorized = 1
                       AND allowed.consent_status = 'granted'
-                      AND catalog.player_id IS NOT NULL
                   )
               )
               {filter_sql}
@@ -618,9 +614,8 @@ class EconomyRepository:
                 CASE WHEN catalog.player_id IS NULL THEN 0 ELSE 1 END AS discovered
             {common_sql}
             ORDER BY template.rarity, template.display_name, template.template_id
-            LIMIT ? OFFSET ?
             """,
-            (*parameters, limit, offset),
+            parameters,
         )
         total = int(count_row["total_count"]) if count_row is not None else 0
         return total, [dict(row) for row in rows]

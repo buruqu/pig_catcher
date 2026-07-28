@@ -134,6 +134,7 @@ async def _database_with_catalog(
     food_rarities: tuple[int, ...] = (1, 2, 3),
     group_id: str = "100",
     effect_ids: dict[int, str] | None = None,
+    extra_entries: tuple[dict[str, object], ...] = (),
 ) -> PigCatcherDatabase:
     source = tmp_path / "source"
     source.mkdir()
@@ -150,6 +151,7 @@ async def _database_with_catalog(
                 effect_id=(effect_ids or {}).get(rarity, ""),
             )
         )
+    entries.extend(extra_entries)
     for index, entry in enumerate(entries):
         image_path = source / str(entry["image"])
         if not image_path.exists():
@@ -579,4 +581,63 @@ async def test_six_star_food_templates_are_group_isolated(tmp_path: Path) -> Non
         )
     assert len(allowed) == 1
     assert denied == []
+
+    service = EconomyService(database, CookingSection(), EconomySection())
+    authorized_catalog = await service.food_catalog(
+        _identity(group_id="100", user_id="201", message_id="authorized-food-catalog"),
+        rarity=None,
+        undiscovered_only=False,
+    )
+    group_entry = next(
+        entry
+        for entry in authorized_catalog.entries
+        if entry.template_id == "food-6-group"
+    )
+    assert group_entry.discovered is False
+    assert authorized_catalog.visible_catalog_total == 3
+
+    denied_catalog = await service.food_catalog(
+        _identity(group_id="999", message_id="denied-food-catalog"),
+        rarity=None,
+        undiscovered_only=False,
+    )
+    assert all(entry.template_id != "food-6-group" for entry in denied_catalog.entries)
+    assert denied_catalog.visible_catalog_total == 2
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_food_catalog_returns_every_visible_entry_without_page_limit(
+    tmp_path: Path,
+) -> None:
+    entries = tuple(
+        {
+            **_food_entry((index % 5) + 1),
+            "template_id": f"food-extra-{index:02d}",
+            "display_name": f"完整图鉴菜{index:02d}",
+            "image": f"food-extra-{index:02d}.png",
+        }
+        for index in range(17)
+    )
+    database = await _database_with_catalog(
+        tmp_path,
+        pig_rarities=(1,),
+        food_rarities=(),
+        extra_entries=entries,
+    )
+    service = EconomyService(
+        database,
+        CookingSection(catalog_page_size=6),
+        EconomySection(),
+    )
+    catalog = await service.food_catalog(
+        _identity(message_id="complete-food-catalog"),
+        rarity=None,
+        undiscovered_only=False,
+    )
+    assert catalog.total_count == 17
+    assert len(catalog.entries) == 17
+    assert [entry.rarity for entry in catalog.entries] == sorted(
+        entry.rarity for entry in catalog.entries
+    )
     await database.close()

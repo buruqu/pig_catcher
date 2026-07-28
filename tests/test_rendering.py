@@ -538,8 +538,6 @@ async def test_third_round_templates_render_all_business_views(
 
     catalog = CatalogViewModel(
         display_name="测试成员",
-        page=1,
-        page_count=1,
         total_count=2,
         rarity=None,
         undiscovered_only=False,
@@ -581,6 +579,9 @@ async def test_third_round_templates_render_all_business_views(
     catalog_html, _ = capability.calls[-1]
     assert "不得泄露的群友猪" not in catalog_html
     assert "尚未发现" in catalog_html
+    assert "2 星品质" in catalog_html
+    assert "6 星品质" in catalog_html
+    assert "第 1/1 页" not in catalog_html
 
     await renderer.render_records(
         RecordsViewModel(
@@ -737,8 +738,6 @@ async def test_fourth_round_templates_render_food_and_economy_views(
 
     catalog = FoodCatalogViewModel(
         display_name="测试成员",
-        page=1,
-        page_count=1,
         total_count=2,
         rarity=None,
         undiscovered_only=False,
@@ -773,6 +772,9 @@ async def test_fourth_round_templates_render_food_and_economy_views(
     catalog_html, _ = capability.calls[-1]
     assert "不得泄露的群专属菜" not in catalog_html
     assert "尚未发现" in catalog_html
+    assert "2 星品质" in catalog_html
+    assert "6 星品质" in catalog_html
+    assert "第 1/1 页" not in catalog_html
 
     await renderer.render_store(
         StoreViewModel(

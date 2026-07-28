@@ -219,12 +219,10 @@ def inventory_view(page: InventoryPage) -> InventoryViewModel:
 
 
 def catalog_view(page: CatalogPage) -> CatalogViewModel:
-    """Build a privacy-aware catalog page rendering view."""
+    """Build a privacy-aware complete catalog rendering view."""
 
     return CatalogViewModel(
         display_name=page.display_name,
-        page=page.page,
-        page_count=page.page_count,
         total_count=page.total_count,
         rarity=page.rarity,
         undiscovered_only=page.undiscovered_only,
@@ -400,12 +398,10 @@ def food_inventory_view(page: FoodInventoryPage) -> FoodInventoryViewModel:
 
 
 def food_catalog_view(page: FoodCatalogPage) -> FoodCatalogViewModel:
-    """Build one privacy-aware food catalog rendering view."""
+    """Build one privacy-aware complete food catalog rendering view."""
 
     return FoodCatalogViewModel(
         display_name=page.display_name,
-        page=page.page,
-        page_count=page.page_count,
         total_count=page.total_count,
         rarity=page.rarity,
         undiscovered_only=page.undiscovered_only,

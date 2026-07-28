@@ -312,6 +312,19 @@ async def test_six_star_is_drawn_only_in_its_authorized_group(tmp_path: Path) ->
         settings,
         random_source=SequenceRandom(*_catch_rolls(rarity_roll=0.999)),
     )
+    authorized_catalog = await group_service.catalog(
+        _identity(group_id="100", user_id="201", message_id="authorized-catalog"),
+        rarity=None,
+        undiscovered_only=False,
+    )
+    authorized_group_entry = next(
+        entry
+        for entry in authorized_catalog.entries
+        if entry.template_id == "group-six"
+    )
+    assert authorized_group_entry.discovered is False
+    assert authorized_catalog.visible_catalog_total == 2
+
     group_result = await group_service.catch(_identity(group_id="100"))
     assert group_result.pig.rarity == 6
     assert group_result.pig.template_id == "group-six"
@@ -328,11 +341,36 @@ async def test_six_star_is_drawn_only_in_its_authorized_group(tmp_path: Path) ->
     assert other_result.pig.template_id == "five-pig"
     other_catalog = await other_service.catalog(
         _identity(group_id="999", message_id="catalog"),
-        page=1,
         rarity=None,
         undiscovered_only=False,
     )
     assert all(entry.template_id != "group-six" for entry in other_catalog.entries)
+    assert other_catalog.visible_catalog_total == 1
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_catalog_returns_every_visible_entry_without_page_limit(
+    tmp_path: Path,
+) -> None:
+    database = await _database_with_catalog(
+        tmp_path,
+        [
+            _pig_entry(f"common-{index:02d}", rarity=(index % 5) + 1)
+            for index in range(17)
+        ],
+    )
+    service = GameplayService(database, CatchingSection(catalog_page_size=6))
+    catalog = await service.catalog(
+        _identity(message_id="complete-catalog"),
+        rarity=None,
+        undiscovered_only=False,
+    )
+    assert catalog.total_count == 17
+    assert len(catalog.entries) == 17
+    assert [entry.rarity for entry in catalog.entries] == sorted(
+        entry.rarity for entry in catalog.entries
+    )
     await database.close()
 
 

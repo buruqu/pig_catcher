@@ -221,11 +221,9 @@ class CatalogItemViewModel:
 
 @dataclass(frozen=True, slots=True)
 class CatalogViewModel:
-    """One pig catalog page."""
+    """One complete pig catalog."""
 
     display_name: str
-    page: int
-    page_count: int
     total_count: int
     rarity: int | None
     undiscovered_only: bool
@@ -366,11 +364,9 @@ class FoodCatalogItemViewModel:
 
 @dataclass(frozen=True, slots=True)
 class FoodCatalogViewModel:
-    """One food catalog page."""
+    """One complete food catalog."""
 
     display_name: str
-    page: int
-    page_count: int
     total_count: int
     rarity: int | None
     undiscovered_only: bool

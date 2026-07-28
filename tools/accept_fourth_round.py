@@ -138,8 +138,6 @@ def inventory_view(rows: Sequence[Mapping[str, object]]) -> FoodInventoryViewMod
 def catalog_view(rows: Sequence[Mapping[str, object]]) -> FoodCatalogViewModel:
     return FoodCatalogViewModel(
         display_name="第四轮图鉴验收成员",
-        page=1,
-        page_count=2,
         total_count=len(rows),
         rarity=None,
         undiscovered_only=False,

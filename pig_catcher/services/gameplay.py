@@ -233,13 +233,10 @@ class CatalogEntry:
 
 @dataclass(frozen=True, slots=True)
 class CatalogPage:
-    """A privacy-aware page of pig catalog slots."""
+    """A complete privacy-aware pig catalog."""
 
     display_name: str
-    page: int
-    page_count: int
     total_count: int
-    page_size: int
     rarity: int | None
     undiscovered_only: bool
     collected_count: int
@@ -574,19 +571,23 @@ def format_inventory_summary(result: InventoryPage) -> str:
 
 
 def format_catalog_summary(result: CatalogPage) -> str:
-    """Return a privacy-preserving text fallback for a catalog page."""
+    """Return a privacy-preserving text fallback for a complete catalog."""
 
     lines = [
         "【猪猪图鉴】",
         f"玩家：{result.display_name}",
         (
-            f"第 {result.page}/{result.page_count} 页；本筛选 {result.total_count} 项；"
+            f"按品质完整排列；本筛选 {result.total_count} 项；"
             f"总进度 {result.collected_count}/{result.visible_catalog_total}"
         ),
     ]
     if not result.entries:
         lines.append("当前没有符合条件的图鉴条目。")
+    current_rarity: int | None = None
     for entry in result.entries:
+        if entry.rarity != current_rarity:
+            current_rarity = entry.rarity
+            lines.append(f"【{current_rarity} 星品质】")
         if not entry.discovered:
             lines.append(f"{'★' * entry.rarity} ???｜尚未发现")
             continue
@@ -1200,13 +1201,11 @@ class GameplayService:
         self,
         identity: CommandIdentity,
         *,
-        page: int,
         rarity: int | None,
         undiscovered_only: bool,
     ) -> CatalogPage:
-        """Read one catalog page without exposing undiscovered group-only assets."""
+        """Read every visible catalog slot without leaking private asset details."""
 
-        page_size = self.catching.catalog_page_size
         now = iso_timestamp(self.clock.now())
         async with self.database.transaction() as session:
             await self.framework_repository.touch_identity(
@@ -1214,14 +1213,12 @@ class GameplayService:
                 identity=identity,
                 now=now,
             )
-            total, rows = await self.repository.catalog_page(
+            total, rows = await self.repository.catalog_entries(
                 session,
                 player_id=identity.player_id,
                 scope_id=identity.scope.value,
                 rarity=rarity,
                 undiscovered_only=undiscovered_only,
-                limit=page_size,
-                offset=(page - 1) * page_size,
             )
             collected, visible_total = await self.repository.visible_catalog_counts(
                 session,
@@ -1232,13 +1229,9 @@ class GameplayService:
                 session,
                 player_id=identity.player_id,
             )
-        pages = valid_page_count(page, total, page_size)
         return CatalogPage(
             display_name=identity.display_name,
-            page=page,
-            page_count=pages,
             total_count=total,
-            page_size=page_size,
             rarity=rarity,
             undiscovered_only=undiscovered_only,
             collected_count=collected,

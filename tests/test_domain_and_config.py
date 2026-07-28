@@ -8,6 +8,7 @@ import pytest
 from pydantic import ValidationError
 
 from pig_catcher.commands.help import format_help
+from pig_catcher.commands.parsers import parse_catalog_query
 from pig_catcher.config import AccessPolicy, PigCatcherConfig
 from pig_catcher.domain.enums import Rarity
 from pig_catcher.domain.errors import (
@@ -45,6 +46,14 @@ def test_asset_selector_supports_optional_short_code() -> None:
     selector = parse_asset_selector("粉红小香猪#A19F2C3D")
     assert selector.name == "粉红小香猪"
     assert selector.short_code == "A19F2C3D"
+
+
+def test_catalog_query_has_filters_but_no_page_number() -> None:
+    assert parse_catalog_query("").rarity is None
+    assert parse_catalog_query("品质=4").rarity == 4
+    assert parse_catalog_query("品质=未收集").undiscovered_only is True
+    with pytest.raises(DomainValidationError, match="不需要填写页码"):
+        parse_catalog_query("2")
 
 
 @pytest.mark.parametrize("value", ["#A19F2C3D", "猪#BAD", "猪#A19F2C3G"])

@@ -762,7 +762,6 @@ class PigCatcherPlugin(MaiBotPlugin):
             query = parse_catalog_query(matched_group(kwargs, "arguments"))
             result = await cast(GameplayService, self._gameplay_service).catalog(
                 identity,
-                page=query.page,
                 rarity=query.rarity,
                 undiscovered_only=query.undiscovered_only,
             )
@@ -1055,7 +1054,6 @@ class PigCatcherPlugin(MaiBotPlugin):
                 self._economy_service,
             ).food_catalog(
                 identity,
-                page=query.page,
                 rarity=query.rarity,
                 undiscovered_only=query.undiscovered_only,
             )

@@ -337,8 +337,12 @@ class CatchingSection(PluginConfigBase):
         default=12,
         ge=6,
         le=20,
-        description="猪猪图鉴每页显示数量",
-        json_schema_extra=_ui("图鉴每页数量", "默认 12，未发现项目使用统一保密占位"),
+        description="旧版猪猪图鉴分页数量，仅为配置兼容保留",
+        json_schema_extra=_ui(
+            "旧版图鉴每页数量",
+            "图鉴现按品质一次展示全部内容，此项仅兼容旧配置",
+            disabled=True,
+        ),
     )
     records_page_size: int = Field(
         default=10,
@@ -451,8 +455,12 @@ class CookingSection(PluginConfigBase):
         default=12,
         ge=6,
         le=20,
-        description="美食图鉴每页显示数量",
-        json_schema_extra=_ui("美食图鉴每页数量", "默认 12，未发现项目使用统一保密占位"),
+        description="旧版美食图鉴分页数量，仅为配置兼容保留",
+        json_schema_extra=_ui(
+            "旧版美食图鉴每页数量",
+            "美食图鉴现按品质一次展示全部内容，此项仅兼容旧配置",
+            disabled=True,
+        ),
     )
 
 

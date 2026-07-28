@@ -217,13 +217,10 @@ class FoodCatalogEntry:
 
 @dataclass(frozen=True, slots=True)
 class FoodCatalogPage:
-    """A privacy-aware page of food catalog slots."""
+    """A complete privacy-aware food catalog."""
 
     display_name: str
-    page: int
-    page_count: int
     total_count: int
-    page_size: int
     rarity: int | None
     undiscovered_only: bool
     collected_count: int
@@ -471,19 +468,23 @@ def format_food_inventory_summary(result: FoodInventoryPage) -> str:
 
 
 def format_food_catalog_summary(result: FoodCatalogPage) -> str:
-    """Return a privacy-preserving food catalog fallback."""
+    """Return a privacy-preserving fallback for a complete food catalog."""
 
     lines = [
         "【美食图鉴】",
         f"玩家：{result.display_name}",
         (
-            f"第 {result.page}/{result.page_count} 页；本筛选 {result.total_count} 项；"
+            f"按品质完整排列；本筛选 {result.total_count} 项；"
             f"总进度 {result.collected_count}/{result.visible_catalog_total}"
         ),
     ]
     if not result.entries:
         lines.append("当前没有符合条件的美食图鉴条目。")
+    current_rarity: int | None = None
     for entry in result.entries:
+        if entry.rarity != current_rarity:
+            current_rarity = entry.rarity
+            lines.append(f"【{current_rarity} 星品质】")
         if not entry.discovered:
             lines.append(f"{'★' * entry.rarity} ???｜尚未发现")
             continue
@@ -987,13 +988,11 @@ class EconomyService:
         self,
         identity: CommandIdentity,
         *,
-        page: int,
         rarity: int | None,
         undiscovered_only: bool,
     ) -> FoodCatalogPage:
-        """Read one privacy-aware food catalog page."""
+        """Read every visible food catalog slot with privacy masking."""
 
-        page_size = self.cooking.catalog_page_size
         now = iso_timestamp(self.clock.now())
         async with self.database.transaction() as session:
             await self.framework_repository.touch_identity(
@@ -1006,22 +1005,16 @@ class EconomyService:
                 player_id=identity.player_id,
                 scope_id=identity.scope.value,
             )
-            total, rows = await self.repository.food_catalog_page(
+            total, rows = await self.repository.food_catalog_entries(
                 session,
                 player_id=identity.player_id,
                 scope_id=identity.scope.value,
                 rarity=rarity,
                 undiscovered_only=undiscovered_only,
-                limit=page_size,
-                offset=(page - 1) * page_size,
             )
-        pages = valid_page_count(page, total, page_size)
         return FoodCatalogPage(
             display_name=identity.display_name,
-            page=page,
-            page_count=pages,
             total_count=total,
-            page_size=page_size,
             rarity=rarity,
             undiscovered_only=undiscovered_only,
             collected_count=collected,

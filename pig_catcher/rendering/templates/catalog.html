@@ -22,7 +22,7 @@
     </header>
 
     <section class="list-summary">
-      <p>第 {{ view.page }}/{{ view.page_count }} 页 · 当前筛选 {{ view.total_count }} 项</p>
+      <p>按品质完整排列 · 当前显示 {{ view.total_count }} 项</p>
       <div class="pill-row">
         <span class="pill">{{ view.rarity ~ " 星" if view.rarity is not none else "全部品质" }}</span>
         {% if view.undiscovered_only %}<span class="pill pill--strong">仅看未收集</span>{% endif %}
@@ -40,36 +40,48 @@
     {% endif %}
 
     {% if view.items %}
-    <section class="catalog-grid">
-      {% for item in view.items %}
-      <article class="catalog-item rarity-{{ item.rarity }}{% if not item.discovered %} catalog-item--unknown{% endif %}">
-        <span class="catalog-item__stars">{{ "★" * item.rarity }}</span>
-        <div class="catalog-item__media">
-          {% if not item.discovered %}
-          <span>?</span>
-          {% elif media_data_urls.get(item.key) %}
-          <img src="{{ media_data_urls[item.key] }}" alt="{{ item.display_name }}" style="object-fit: {{ item.image_fit }}">
-          {% elif item.is_animated and item.media_visible %}
-          <span>动态猪猪<br>详情查看</span>
-          {% elif not item.media_visible %}
-          <span>授权已撤回</span>
-          {% else %}
-          <span>暂无预览</span>
-          {% endif %}
+    <section class="catalog-rarity-list">
+      {% for rarity, rarity_items in view.items|groupby("rarity") %}
+      <section class="catalog-rarity-section rarity-{{ rarity }}">
+        <header class="catalog-rarity-header">
+          <div>
+            <span class="catalog-rarity-header__stars">{{ "★" * rarity }}</span>
+            <h2>{{ rarity }} 星品质</h2>
+          </div>
+          <strong>{{ rarity_items|selectattr("discovered")|list|length }}/{{ rarity_items|length }}</strong>
+        </header>
+        <div class="catalog-rarity-grid">
+          {% for item in rarity_items %}
+          <article class="catalog-item rarity-{{ item.rarity }}{% if not item.discovered %} catalog-item--unknown{% endif %}">
+            <span class="catalog-item__stars">{{ "★" * item.rarity }}</span>
+            <div class="catalog-item__media">
+              {% if not item.discovered %}
+              <span>?</span>
+              {% elif media_data_urls.get(item.key) %}
+              <img src="{{ media_data_urls[item.key] }}" alt="{{ item.display_name }}" style="object-fit: {{ item.image_fit }}">
+              {% elif item.is_animated and item.media_visible %}
+              <span>动态猪猪<br>详情查看</span>
+              {% elif not item.media_visible %}
+              <span>授权已撤回</span>
+              {% else %}
+              <span>暂无预览</span>
+              {% endif %}
+            </div>
+            <h2 style="font-size: {% if item.display_name|length > 50 %}9{% elif item.display_name|length > 32 %}11{% elif item.display_name|length > 20 %}13{% else %}16{% endif %}px">{{ item.display_name if item.discovered else "???" }}</h2>
+            <div class="catalog-item__facts">
+              {% if item.discovered %}
+              已抓 {{ item.acquired_count }} 次<br>
+              最佳 {{ "%.1f"|format(item.best_size or 0) }} cm / {{ "%.2f"|format(item.best_weight or 0) }} kg
+              {% else %}
+              尚未发现
+              {% endif %}
+            </div>
+            {% if item.discovered and item.collection_name %}
+            <div class="catalog-item__collection">{{ item.collection_name }}{% if item.character_name %} · {{ item.character_name }}{% endif %}</div>
+            {% endif %}
+          </article>
+          {% endfor %}
         </div>
-        <h2 style="font-size: {% if item.display_name|length > 50 %}9{% elif item.display_name|length > 32 %}12{% elif item.display_name|length > 20 %}15{% else %}18{% endif %}px">{{ item.display_name if item.discovered else "???" }}</h2>
-        <div class="catalog-item__facts">
-          {% if item.discovered %}
-          已抓 {{ item.acquired_count }} 次<br>
-          最佳 {{ "%.1f"|format(item.best_size or 0) }} cm / {{ "%.2f"|format(item.best_weight or 0) }} kg
-          {% else %}
-          尚未发现
-          {% endif %}
-        </div>
-        {% if item.discovered and item.collection_name %}
-        <div class="catalog-item__collection">{{ item.collection_name }}{% if item.character_name %} · {{ item.character_name }}{% endif %}</div>
-        {% endif %}
-      </article>
       {% endfor %}
     </section>
     {% else %}
@@ -77,8 +89,8 @@
     {% endif %}
 
     <footer class="game-footer">
-      <span>未发现条目不会泄露群专属六星素材</span>
-      <strong>{{ view.page }}/{{ view.page_count }}</strong>
+      <span>授权群专属六星在发现前仅显示保密占位</span>
+      <strong>{{ view.collected_count }}/{{ view.visible_catalog_total }}</strong>
     </footer>
   </main>
 </body>
