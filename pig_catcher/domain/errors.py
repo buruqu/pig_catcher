@@ -55,3 +55,35 @@ class RenderError(PigCatcherError):
 
 class CommandContextError(PigCatcherError, ValueError):
     """命令缺少群聊身份或消息上下文。"""
+
+
+class GameplayError(PigCatcherError):
+    """第三轮玩法中可直接向用户说明的业务错误。"""
+
+
+class NoDrawableTemplateError(GameplayError):
+    """当前群没有可用于抓取的猪模板。"""
+
+
+class DailyCatchLimitError(GameplayError):
+    """玩家已达到当前自然日抓取上限。"""
+
+
+class CatchCooldownError(GameplayError):
+    """玩家仍处于抓猪冷却。"""
+
+    def __init__(self, remaining_seconds: int) -> None:
+        self.remaining_seconds = max(1, int(remaining_seconds))
+        super().__init__(f"抓猪冷却中，还需等待 {self.remaining_seconds} 秒。")
+
+
+class PigNotFoundError(GameplayError):
+    """当前玩家的有效猪库存中找不到选择目标。"""
+
+
+class AmbiguousPigSelectorError(GameplayError):
+    """同名猪不唯一，需要短编号。"""
+
+
+class ItemInventoryError(GameplayError):
+    """玩家没有可装备或消耗的对应道具。"""

@@ -1,6 +1,6 @@
 # MaiBot 抓猪插件
 
-这是“抓猪插件”的独立 MaiBot 插件仓库。当前版本为 `0.2.0`，已完成第二轮 `2B` 正式素材接入期。
+这是“抓猪插件”的独立 MaiBot 插件仓库。当前版本为 `0.3.0`，已完成第三轮“抓猪与收藏”。
 
 ## 当前状态
 
@@ -8,16 +8,19 @@
 - 目标 MaiBot：`1.0.12`
 - 目标 SDK：`maibot-plugin-sdk >=2.7.0,<3.0.0`
 - Python：`>=3.12`，本机验收环境 `3.14.4`
-- 数据协议：Schema `2`、Asset Manifest `2`、Ruleset `1`
-- 当前群聊命令：仅 `/抓猪帮助 [主题]`
+- 数据协议：Schema `3`、Asset Manifest `2`、Ruleset `1`
+- 当前组件：9 个显式 `COMMAND`，不注册普通消息监听、Tool 或 LLM
+- 当前群聊命令：`/抓猪帮助`、`/抓猪`（别名 `/抓群友`）、`/抓猪档案`、
+  `/抓猪详情`、`/猪猪背包`、`/猪猪图鉴`、`/猪猪纪录`、`/使用道具`、`/取消道具`
 
-玩法命令尚未开放。帮助会列出后续完整命令格式，但会明确标注当前处于 `2B`，不会产生假抓取、假资产或假结算。
+帮助保持纯文字，便于直接复制命令；已开放的业务结果优先发送白色、淡粉红图片，
+图片渲染或发送失败时降级为完整文字，不回滚已提交的抓取或道具结算。
 
-## 2A 与 2B 已完成
+## 已完成功能
 
 - Manifest v2、SDK 生命周期、配置热更新和简体中文 WebUI 配置模型
 - 群与用户黑白名单，黑名单优先
-- 插件自有 SQLite、逐级迁移、外键、WAL、显式事务和在线备份
+- 插件自有 SQLite Schema 3、逐级迁移、外键、WAL、显式事务和在线备份
 - 消息 ID 幂等键与 `pending -> claimed -> sent/failed` 一次发送回执
 - 素材 Manifest、实际媒体格式、逐帧解码、路径、尺寸、重复 ID 和授权校验
 - 1 至 5 星公共素材与 6 星群专属素材的数据边界、授权和撤回
@@ -29,14 +32,23 @@
 - 98 项逐图检查、9 项逐帧动画检查及两个群的六星可见性实测
 - 图片生成或发送失败后的纯文字降级服务
 - 可替换随机源、时钟、身份、选择器和规则版本接口
-- pytest、Ruff、编译、严格 Manifest、宿主加载和 Chromium 视觉验收
+- 六档真实抓取、群内六星资格、缺失六星权重转入五星及随机快照
+- 相关体型与重量、肥瘦率、官方价值、猪币、经验、等级和群纪录
+- 北京时间自然日次数、跨午夜冷却、背包、详情、图鉴、档案和纪录查询
+- 8 种道具定义；已开放抓猪道具的装备、取消和成功抓取后原子消耗
+- 改变状态命令的进程内、并发和插件重启幂等保护
+- 抓取、档案、详情、背包、图鉴、纪录和道具回执的白粉图片
+- 单猪 GIF/动画 WebP 保持动态；列表不抽取静态首帧，改为明确动态标记
+- pytest、Ruff、编译、严格 Manifest、运行中宿主热重载、Chromium 和隔离命令 UAT
 
 ## 有意延后
 
-- 第三轮：真实抓猪、属性、背包、详情、图鉴、经验和群纪录
 - 第四轮：做菜、吃菜、商城、升级、猪币账本和官方售卖
 - 第五轮：赠送、两阶段交易、展示设置和排行榜
-- 第六轮：运行中 MaiBot 与真实 QQ 多群全流程验收
+- 第六轮：真实 QQ 多群全流程、故障注入、备份和恢复演练
+
+商城尚未开放，因此正常玩家当前还没有购买一次性道具的入口；第三轮道具命令和
+消耗语义已经完成，可承接第四轮商城写入的库存。
 
 ## 开发验证
 
@@ -49,7 +61,21 @@ uv sync --all-groups --locked
 .\.venv\Scripts\ruff.exe check plugin.py pig_catcher tests tools
 ```
 
-生成的本地视觉验收图位于忽略目录 `artifacts/`，不会进入插件发布包。可审计的 2B 清单定义保存在 `catalogs/2b/`；用户素材原件和运行副本保存在 Git 忽略目录及 `ctx.paths.data_dir`，避免群专属素材进入公共历史。
+第三轮视觉验收与隔离命令 UAT：
+
+```powershell
+uv run python .\tools\accept_third_round.py `
+  --data-dir C:\Users\Administrator\MaiBot\data\plugins\local.pig-catcher `
+  --output .\artifacts\third-round-visual
+
+uv run python .\tools\uat_third_round.py `
+  --data-dir C:\Users\Administrator\MaiBot\data\plugins\local.pig-catcher `
+  --output .\artifacts\third-round-uat
+```
+
+生成的本地验收图、隔离数据库和报告位于忽略目录 `artifacts/`，不会进入插件发布包。
+可审计的 2B 清单定义保存在 `catalogs/2b/`；用户素材原件和运行副本保存在 Git 忽略
+目录及 `ctx.paths.data_dir`，避免群专属素材进入公共历史。
 
 ## 设计文档
 

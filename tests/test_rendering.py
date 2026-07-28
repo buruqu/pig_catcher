@@ -15,9 +15,19 @@ from pig_catcher.domain.errors import RenderError
 from pig_catcher.rendering import (
     AnimatedCardComposer,
     AssetPreviewViewModel,
+    CatalogItemViewModel,
+    CatalogViewModel,
+    CollectionProgressViewModel,
     FrameworkPreviewViewModel,
+    InventoryItemViewModel,
+    InventoryViewModel,
+    ItemReceiptViewModel,
     MediaSlot,
+    PigCardViewModel,
     PigCatcherRenderer,
+    ProfileViewModel,
+    RecordItemViewModel,
+    RecordsViewModel,
     RenderDelivery,
     RenderOptions,
 )
@@ -388,3 +398,226 @@ async def test_animation_composer_uses_compatibility_timing_only_when_source_omi
     )
     assert result.frame_count == 3
     assert result.total_duration_ms == 270
+
+
+@pytest.mark.asyncio
+async def test_third_round_templates_render_all_business_views(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "pig.png"
+    Image.new("RGBA", (96, 96), "#F58CAD").save(source, format="PNG")
+    capability = FakeRender()
+    renderer = PigCatcherRenderer(capability, _options())
+    pig = PigCardViewModel(
+        mode_label="抓猪成功",
+        display_name="<script>超长测试猪</script>",
+        owner_display_name="测试成员",
+        rarity=4,
+        rarity_name="极品佳肴猪",
+        short_code="A19F2C3D",
+        description="一只用于第三轮渲染验收的猪。",
+        size_value=48.2,
+        size_percentile=0.71,
+        weight_value=87.4,
+        weight_percentile=0.66,
+        fat_ratio=52.0,
+        fat_label="均衡",
+        official_value=530,
+        acquired_at="2026-07-28 12:00",
+        coin_reward=30,
+        experience_reward=45,
+        coin_balance=120,
+        total_experience=600,
+        daily_count=2,
+        daily_limit=30,
+        catalog_new=True,
+        size_record=True,
+    )
+    await renderer.render_static_pig_card(pig, source)
+    pig_html, _ = capability.calls[-1]
+    assert "<script>超长测试猪</script>" not in pig_html
+    assert "&lt;script&gt;" in pig_html
+    assert "data:image/png;base64," in pig_html
+    assert "体型新纪录" in pig_html
+
+    collections = (
+        CollectionProgressViewModel(
+            collection_name="Poppin'Party",
+            collaboration_name="BanG Dream!",
+            collected_count=2,
+            available_count=2,
+            total_count=5,
+        ),
+    )
+    await renderer.render_profile(
+        ProfileViewModel(
+            display_name="测试成员",
+            level=3,
+            title="抓猪老手",
+            total_experience=600,
+            next_threshold=1800,
+            progress_percent=8.3,
+            coin_balance=120,
+            total_catches=9,
+            active_pigs=8,
+            catalog_count=5,
+            visible_catalog_total=81,
+            held_records=2,
+            daily_count=2,
+            daily_limit=30,
+            cooldown_remaining_seconds=17,
+            feed_level=1,
+            armed_item_name="巨物玉米",
+            armed_item_quantity=2,
+            collections=collections,
+        )
+    )
+    assert "Lv.3" in capability.calls[-1][0]
+    assert "Poppin&#39;Party" in capability.calls[-1][0]
+
+    inventory = InventoryViewModel(
+        display_name="测试成员",
+        page=1,
+        page_count=1,
+        total_count=2,
+        rarity=None,
+        sort="价值",
+        items=(
+            InventoryItemViewModel(
+                key="static",
+                display_name="静态猪",
+                short_code="AAAA0001",
+                rarity=2,
+                size_value=40.0,
+                weight_value=50.0,
+                fat_label="均衡",
+                official_value=70,
+                media_visible=True,
+                is_animated=False,
+                image_fit="contain",
+            ),
+            InventoryItemViewModel(
+                key="animated",
+                display_name="动画猪",
+                short_code="BBBB0002",
+                rarity=3,
+                size_value=50.0,
+                weight_value=60.0,
+                fat_label="偏肥",
+                official_value=180,
+                media_visible=True,
+                is_animated=True,
+                image_fit="contain",
+            ),
+        ),
+    )
+    await renderer.render_inventory(inventory, {"static": source})
+    inventory_html, _ = capability.calls[-1]
+    assert "动态猪猪" in inventory_html
+    assert inventory_html.count("data:image/png;base64,") == 1
+
+    catalog = CatalogViewModel(
+        display_name="测试成员",
+        page=1,
+        page_count=1,
+        total_count=2,
+        rarity=None,
+        undiscovered_only=False,
+        collected_count=1,
+        visible_catalog_total=81,
+        items=(
+            CatalogItemViewModel(
+                key="static",
+                display_name="静态猪",
+                rarity=2,
+                discovered=True,
+                acquired_count=3,
+                best_size=41.0,
+                best_weight=52.0,
+                collection_name="",
+                character_name="",
+                media_visible=True,
+                is_animated=False,
+                image_fit="contain",
+            ),
+            CatalogItemViewModel(
+                key="unknown",
+                display_name="不得泄露的群友猪",
+                rarity=6,
+                discovered=False,
+                acquired_count=0,
+                best_size=None,
+                best_weight=None,
+                collection_name="",
+                character_name="",
+                media_visible=False,
+                is_animated=False,
+                image_fit="contain",
+            ),
+        ),
+        collections=collections,
+    )
+    await renderer.render_catalog(catalog, {"static": source})
+    catalog_html, _ = capability.calls[-1]
+    assert "不得泄露的群友猪" not in catalog_html
+    assert "尚未发现" in catalog_html
+
+    await renderer.render_records(
+        RecordsViewModel(
+            group_name="测试群",
+            page=1,
+            page_count=1,
+            total_count=1,
+            items=(
+                RecordItemViewModel(
+                    record_label="体型",
+                    record_value=66.6,
+                    unit="cm",
+                    display_name="纪录猪",
+                    rarity=5,
+                    short_code="CCCC0003",
+                    holder_display_name="纪录保持者",
+                    achieved_at="2026-07-28 12:00",
+                ),
+            ),
+        )
+    )
+    assert "纪录保持者" in capability.calls[-1][0]
+
+    await renderer.render_item_receipt(
+        ItemReceiptViewModel(
+            operation="armed",
+            item_name="巨物玉米",
+            action_label="抓猪",
+            quantity=2,
+            effect_summary="体型百分位 +0.12",
+        )
+    )
+    assert "成功动作时才消耗" in capability.calls[-1][0]
+
+
+@pytest.mark.asyncio
+async def test_pig_card_base_exposes_animation_safe_slot() -> None:
+    renderer = PigCatcherRenderer(FakeRender(), _options())
+    base = await renderer.render_pig_card_base(
+        PigCardViewModel(
+            mode_label="猪猪详情",
+            display_name="动画猪",
+            owner_display_name="成员",
+            rarity=3,
+            rarity_name="优质家养猪",
+            short_code="A19F2C3D",
+            description="逐帧保真。",
+            size_value=40.0,
+            size_percentile=0.5,
+            weight_value=50.0,
+            weight_percentile=0.5,
+            fat_ratio=50.0,
+            fat_label="均衡",
+            official_value=150,
+            acquired_at="2026-07-28 12:00",
+            is_animated=True,
+            media_format="GIF",
+        )
+    )
+    assert base.media_slot == MediaSlot(x=38, y=164, width=480, height=480)

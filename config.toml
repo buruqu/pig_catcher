@@ -1,10 +1,16 @@
 [plugin]
 enabled = true
-config_version = "0.2.0"
-framework_phase = "2B"
+config_version = "0.3.0"
+framework_phase = "3"
 
 [features]
 help_enabled = true
+catching_enabled = true
+profile_enabled = true
+inventory_enabled = true
+catalog_enabled = true
+records_enabled = true
+items_enabled = true
 
 [access]
 group_whitelist = []
@@ -33,6 +39,10 @@ staging_max_age_hours = 24
 [catching]
 daily_limit = 30
 cooldown_seconds = 60
+daily_reset_timezone = "Asia/Shanghai"
+inventory_page_size = 8
+catalog_page_size = 12
+records_page_size = 10
 rarity_1_weight = 55.0
 rarity_2_weight = 25.0
 rarity_3_weight = 12.0

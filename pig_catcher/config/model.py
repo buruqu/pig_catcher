@@ -42,11 +42,11 @@ class PluginSection(PluginConfigBase):
         frozen=True,
         json_schema_extra=_ui("配置版本", "由插件维护，不需要手工修改", disabled=True),
     )
-    framework_phase: Literal["2B"] = Field(
+    framework_phase: Literal["3"] = Field(
         default=FRAMEWORK_PHASE,
         description="当前开发交付阶段",
         frozen=True,
-        json_schema_extra=_ui("框架阶段", "2B 已接入正式素材与动画管线，玩法命令仍按后续轮次开放", disabled=True),
+        json_schema_extra=_ui("开发阶段", "第三轮已开放抓猪、收藏、档案与群纪录", disabled=True),
     )
 
 
@@ -61,6 +61,36 @@ class FeaturesSection(PluginConfigBase):
         default=True,
         description="是否允许查看抓猪指令帮助",
         json_schema_extra=_ui("允许抓猪帮助", "对应 /抓猪帮助；本指令始终返回便于复制的纯文字"),
+    )
+    catching_enabled: bool = Field(
+        default=True,
+        description="是否允许抓取猪猪",
+        json_schema_extra=_ui("允许抓猪", "同时控制 /抓猪 和完全等价的 /抓群友"),
+    )
+    profile_enabled: bool = Field(
+        default=True,
+        description="是否允许查看个人抓猪档案",
+        json_schema_extra=_ui("允许抓猪档案", "对应 /抓猪档案，展示经验、猪币、次数与收藏进度"),
+    )
+    inventory_enabled: bool = Field(
+        default=True,
+        description="是否允许查看猪猪背包和详情",
+        json_schema_extra=_ui("允许背包与详情", "对应 /猪猪背包 和 /抓猪详情"),
+    )
+    catalog_enabled: bool = Field(
+        default=True,
+        description="是否允许查看猪猪图鉴",
+        json_schema_extra=_ui("允许猪猪图鉴", "对应 /猪猪图鉴；未发现群专属素材不会泄露"),
+    )
+    records_enabled: bool = Field(
+        default=True,
+        description="是否允许查看当前群猪猪纪录",
+        json_schema_extra=_ui("允许群纪录", "对应 /猪猪纪录；数据严格按平台和群隔离"),
+    )
+    items_enabled: bool = Field(
+        default=True,
+        description="是否允许装备和取消抓猪或做菜道具",
+        json_schema_extra=_ui("允许使用道具", "第三轮可装备抓猪道具；做菜道具随第四轮结算"),
     )
 
 
@@ -236,7 +266,7 @@ class CatchingSection(PluginConfigBase):
         ge=1,
         le=1000,
         description="每位玩家在每个群每天可成功抓取的次数",
-        json_schema_extra=_ui("每日抓猪次数", "当前设计默认 30 次；玩法命令将在后续阶段开放"),
+        json_schema_extra=_ui("每日抓猪次数", "默认 30 次；只统计当前群、按北京时间自然日重置"),
     )
     cooldown_seconds: int = Field(
         default=60,
@@ -244,6 +274,33 @@ class CatchingSection(PluginConfigBase):
         le=86400,
         description="同一玩家两次抓猪之间的最短秒数",
         json_schema_extra=_ui("抓猪冷却", "设置 0 表示不限制冷却，仍受每日次数约束"),
+    )
+    daily_reset_timezone: Literal["Asia/Shanghai"] = Field(
+        default="Asia/Shanghai",
+        frozen=True,
+        description="抓猪每日次数重置所使用的自然日时区",
+        json_schema_extra=_ui("每日重置时区", "固定按北京时间自然日统计，不依赖服务器时区", disabled=True),
+    )
+    inventory_page_size: int = Field(
+        default=8,
+        ge=4,
+        le=16,
+        description="猪猪背包每页显示数量",
+        json_schema_extra=_ui("背包每页数量", "默认 8，只影响展示，不改变资产数据"),
+    )
+    catalog_page_size: int = Field(
+        default=12,
+        ge=6,
+        le=20,
+        description="猪猪图鉴每页显示数量",
+        json_schema_extra=_ui("图鉴每页数量", "默认 12，未发现项目使用统一保密占位"),
+    )
+    records_page_size: int = Field(
+        default=10,
+        ge=5,
+        le=20,
+        description="群纪录每页显示数量",
+        json_schema_extra=_ui("纪录每页数量", "每个模板的体型与重量纪录分别占一行"),
     )
     rarity_1_weight: float = Field(
         default=55.0,
@@ -418,7 +475,7 @@ class RenderingSection(PluginConfigBase):
 
     enabled: bool = Field(
         default=True,
-        description="是否为后续业务结果生成图片",
+        description="是否为业务结果生成图片",
         json_schema_extra=_ui("启用图片展示", "/抓猪帮助仍然保持纯文字"),
     )
     fallback_to_text: bool = Field(
@@ -521,7 +578,7 @@ class MaintenanceSection(PluginConfigBase):
 
 
 class PigCatcherConfig(PluginConfigBase):
-    """抓猪插件完整 2B 配置。"""
+    """抓猪插件第三轮完整配置。"""
 
     plugin: PluginSection = Field(default_factory=PluginSection)
     features: FeaturesSection = Field(default_factory=FeaturesSection)

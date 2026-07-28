@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root { --font-family: {{ font_family }}; }
+    {{ theme_css | safe }}
+  </style>
+</head>
+<body>
+  <main class="game-sheet catalog-sheet" data-pig-catcher-root data-render-ready="true">
+    <header class="game-header">
+      <div class="game-header__copy">
+        <p class="game-header__eyebrow">猪猪图鉴 · 历史发现永久保留</p>
+        <h1 style="font-size: {% if view.display_name|length > 60 %}16{% elif view.display_name|length > 40 %}20{% elif view.display_name|length > 24 %}31{% else %}42{% endif %}px">{{ view.display_name }}</h1>
+      </div>
+      <div class="game-header__meta">
+        <span>总收集进度</span>
+        <strong>{{ view.collected_count }}/{{ view.visible_catalog_total }}</strong>
+      </div>
+    </header>
+
+    <section class="list-summary">
+      <p>第 {{ view.page }}/{{ view.page_count }} 页 · 当前筛选 {{ view.total_count }} 项</p>
+      <div class="pill-row">
+        <span class="pill">{{ view.rarity ~ " 星" if view.rarity is not none else "全部品质" }}</span>
+        {% if view.undiscovered_only %}<span class="pill pill--strong">仅看未收集</span>{% endif %}
+      </div>
+    </section>
+
+    {% if view.collections %}
+    <section class="catalog-collections">
+      <div class="pill-row">
+        {% for collection in view.collections %}
+        <span class="pill pill--mint">{{ collection.collection_name }} {{ collection.collected_count }}/{{ collection.total_count }}</span>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+    {% if view.items %}
+    <section class="catalog-grid">
+      {% for item in view.items %}
+      <article class="catalog-item rarity-{{ item.rarity }}{% if not item.discovered %} catalog-item--unknown{% endif %}">
+        <span class="catalog-item__stars">{{ "★" * item.rarity }}</span>
+        <div class="catalog-item__media">
+          {% if not item.discovered %}
+          <span>?</span>
+          {% elif media_data_urls.get(item.key) %}
+          <img src="{{ media_data_urls[item.key] }}" alt="{{ item.display_name }}" style="object-fit: {{ item.image_fit }}">
+          {% elif item.is_animated and item.media_visible %}
+          <span>动态猪猪<br>详情查看</span>
+          {% elif not item.media_visible %}
+          <span>授权已撤回</span>
+          {% else %}
+          <span>暂无预览</span>
+          {% endif %}
+        </div>
+        <h2 style="font-size: {% if item.display_name|length > 50 %}9{% elif item.display_name|length > 32 %}12{% elif item.display_name|length > 20 %}15{% else %}18{% endif %}px">{{ item.display_name if item.discovered else "???" }}</h2>
+        <div class="catalog-item__facts">
+          {% if item.discovered %}
+          已抓 {{ item.acquired_count }} 次<br>
+          最佳 {{ "%.1f"|format(item.best_size or 0) }} cm / {{ "%.2f"|format(item.best_weight or 0) }} kg
+          {% else %}
+          尚未发现
+          {% endif %}
+        </div>
+        {% if item.discovered and item.collection_name %}
+        <div class="catalog-item__collection">{{ item.collection_name }}{% if item.character_name %} · {{ item.character_name }}{% endif %}</div>
+        {% endif %}
+      </article>
+      {% endfor %}
+    </section>
+    {% else %}
+    <section style="padding:32px 38px"><div class="empty-state">当前没有符合条件的图鉴条目</div></section>
+    {% endif %}
+
+    <footer class="game-footer">
+      <span>未发现条目不会泄露群专属六星素材</span>
+      <strong>{{ view.page }}/{{ view.page_count }}</strong>
+    </footer>
+  </main>
+</body>
+</html>

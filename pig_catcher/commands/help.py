@@ -13,17 +13,20 @@ _TOPICS: dict[str, tuple[str, ...]] = {
     ),
     "背包": (
         "/猪猪背包 [页码] [品质=数字] [排序=方式]",
-        "/美食背包 [页码] [品质=数字] [排序=方式]",
         "/猪猪图鉴 [页码] [品质=数字|未收集]",
-        "/美食图鉴 [页码] [品质=数字|未收集]",
-        "/美食详情 <美食名#短编号>",
+        "/猪猪纪录 [页码]",
+    ),
+    "道具": (
+        "/使用道具 <道具名称>",
+        "/取消道具 <抓猪|做菜>",
     ),
     "做菜": (
         "/做菜 <猪名#短编号>",
         "/吃菜 <美食名#短编号>",
         "/使用美食 <美食名#短编号>",
-        "/使用道具 <道具名称>",
-        "/取消道具 <抓猪|做菜>",
+        "/美食背包 [页码] [品质=数字] [排序=方式]",
+        "/美食图鉴 [页码] [品质=数字|未收集]",
+        "/美食详情 <美食名#短编号>",
     ),
     "商城": (
         "/猪猪商城 [页码|分类]",
@@ -47,6 +50,8 @@ _TOPICS: dict[str, tuple[str, ...]] = {
     ),
 }
 
+_OPEN_TOPICS = frozenset({"抓猪", "背包", "道具"})
+
 _TOPIC_ALIASES = {
     "仓库": "背包",
     "图鉴": "背包",
@@ -55,20 +60,21 @@ _TOPIC_ALIASES = {
 
 
 def _topic_block(topic: str) -> str:
-    lines = [f"【{topic}指令】"]
+    suffix = "" if topic in _OPEN_TOPICS else "·尚未开放"
+    lines = [f"【{topic}指令{suffix}】"]
     lines.extend(_TOPICS[topic])
     return "\n".join(lines)
 
 
 def format_help(topic: str = "") -> str:
-    """按主题返回纯文字帮助，并明确当前尚未开放玩法。"""
+    """按主题返回便于复制的纯文字帮助，并标明开放边界。"""
 
     normalized = str(topic or "").strip()
     normalized = _TOPIC_ALIASES.get(normalized, normalized)
     notice = (
-        f"当前版本：v{PLUGIN_VERSION}（{FRAMEWORK_PHASE} 框架期）\n"
-        "当前仅开放 /抓猪帮助；玩法命令会在对应业务、测试和图片闭环后逐项开放，"
-        "现在不会产生假抓取、假资产或假结算。"
+        f"当前版本：v{PLUGIN_VERSION}（第 {FRAMEWORK_PHASE} 轮）\n"
+        "已开放抓猪、猪猪档案/详情、背包、图鉴、群纪录和道具装备；"
+        "做菜、商城、交易与排行仍在后续轮次。"
     )
     if normalized and normalized not in {"全部", *list(_TOPICS)}:
         topics = "、".join(_TOPICS)
@@ -89,7 +95,7 @@ def format_help(topic: str = "") -> str:
         "",
         notice,
         "",
-        "/抓猪帮助 [抓猪|背包|做菜|商城|交易|排行]",
+        "/抓猪帮助 [抓猪|背包|道具|做菜|商城|交易|排行]",
         "",
     ]
     for index, topic_name in enumerate(_TOPICS):

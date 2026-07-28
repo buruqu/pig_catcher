@@ -1,35 +1,66 @@
-"""MaiBot 抓猪插件 2B 正式素材框架入口。"""
+"""MaiBot 抓猪插件第三轮命令入口。"""
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, cast
 
 from maibot_sdk import CONFIG_RELOAD_SCOPE_SELF, Command, MaiBotPlugin
 
 from .pig_catcher.assets import AssetCatalogStorage
-from .pig_catcher.commands import extract_command_identity, format_help, matched_group
+from .pig_catcher.commands import (
+    extract_command_identity,
+    format_help,
+    matched_group,
+    parse_action_type,
+    parse_catalog_query,
+    parse_inventory_query,
+    parse_records_page,
+)
 from .pig_catcher.config import AccessPolicy, PigCatcherConfig
-from .pig_catcher.domain.errors import CommandContextError
+from .pig_catcher.domain.errors import CommandContextError, PigCatcherError
+from .pig_catcher.domain.models import CommandIdentity, CommandReceipt
 from .pig_catcher.infrastructure import PigCatcherDatabase, safe_database_path
 from .pig_catcher.rendering import (
     AnimatedCardComposer,
     PigCatcherRenderer,
     RenderDelivery,
+    RenderedImage,
     RenderOptions,
+    catalog_media_paths,
+    catalog_view,
+    inventory_media_paths,
+    inventory_view,
+    item_receipt_view,
+    pig_card_view,
+    pig_media_path,
+    profile_view,
+    records_view,
 )
 from .pig_catcher.services import (
     AssetCatalogService,
+    CatchResult,
     FrameworkService,
+    GameplayService,
     MaintenanceOptions,
     MaintenanceRunner,
+    PigView,
     ReceiptService,
+    format_catalog_summary,
+    format_catch_summary,
+    format_inventory_summary,
+    format_item_action_summary,
+    format_pig_detail_summary,
+    format_profile_summary,
+    format_records_summary,
 )
 from .pig_catcher.version import PLUGIN_VERSION
 
 
 class PigCatcherPlugin(MaiBotPlugin):
-    """开放帮助并承载正式素材、动画和后续玩法服务。"""
+    """Expose third-round catching and collection commands."""
 
     config_model = PigCatcherConfig
 
@@ -39,6 +70,7 @@ class PigCatcherPlugin(MaiBotPlugin):
         self._storage: AssetCatalogStorage | None = None
         self._asset_service: AssetCatalogService | None = None
         self._framework_service: FrameworkService | None = None
+        self._gameplay_service: GameplayService | None = None
         self._receipt_service: ReceiptService | None = None
         self._renderer: PigCatcherRenderer | None = None
         self._animation_composer: AnimatedCardComposer | None = None
@@ -68,6 +100,12 @@ class PigCatcherPlugin(MaiBotPlugin):
         """供后续抓取与图鉴卡片复用动画保真服务。"""
 
         return self._animation_composer
+
+    @property
+    def gameplay_service(self) -> GameplayService | None:
+        """Expose the active gameplay service for command-level acceptance."""
+
+        return self._gameplay_service
 
     async def on_load(self) -> None:
         if self.settings.plugin.enabled:
@@ -156,6 +194,7 @@ class PigCatcherPlugin(MaiBotPlugin):
             self._storage = storage
             self._asset_service = asset_service
             self._framework_service = FrameworkService(database)
+            self._gameplay_service = GameplayService(database, settings.catching)
             self._receipt_service = ReceiptService(database)
             self._renderer = renderer
             self._animation_composer = animation_composer
@@ -187,6 +226,7 @@ class PigCatcherPlugin(MaiBotPlugin):
         self._animation_composer = None
         self._renderer = None
         self._receipt_service = None
+        self._gameplay_service = None
         self._framework_service = None
         self._asset_service = None
         self._storage = None
@@ -211,6 +251,153 @@ class PigCatcherPlugin(MaiBotPlugin):
     ) -> tuple[bool, str, int]:
         sent = bool(await self.ctx.send.text(text, stream_id)) if stream_id else False
         return sent and success, text, 2 if success else 1
+
+    async def _prepare_command(
+        self,
+        stream_id: str,
+        kwargs: dict[str, Any],
+        *,
+        feature_enabled: bool,
+        feature_label: str,
+    ) -> tuple[CommandIdentity | None, tuple[bool, str, int] | None]:
+        if not self.settings.plugin.enabled:
+            rejected = await self._reply_text(
+                stream_id,
+                "抓猪插件当前已在管理面板中停用。",
+                success=False,
+            )
+            return None, rejected
+        try:
+            identity = extract_command_identity(stream_id, kwargs)
+        except CommandContextError as exc:
+            rejected = await self._reply_text(stream_id, str(exc), success=False)
+            return None, rejected
+        decision = self._access_policy().evaluate(
+            group_id=identity.scope.group_id,
+            user_id=identity.user_id,
+        )
+        if not decision.allowed:
+            if self.settings.access.notify_denied:
+                rejected = await self._reply_text(
+                    identity.stream_id,
+                    decision.reason,
+                    success=False,
+                )
+                return None, rejected
+            return None, (False, "", 0)
+        if not feature_enabled:
+            rejected = await self._reply_text(
+                identity.stream_id,
+                f"管理面板已关闭“{feature_label}”功能。",
+                success=False,
+            )
+            return None, rejected
+        if self._gameplay_service is None:
+            rejected = await self._reply_text(
+                identity.stream_id,
+                "抓猪玩法服务尚未就绪，请稍后再试。",
+                success=False,
+            )
+            return None, rejected
+        return identity, None
+
+    async def _deliver_query(
+        self,
+        *,
+        stream_id: str,
+        render: Callable[[], Awaitable[RenderedImage]],
+        fallback_text: str,
+    ) -> tuple[bool, str, int]:
+        if self._delivery is None:
+            return await self._reply_text(
+                stream_id,
+                fallback_text,
+                success=True,
+            )
+        sent = await self._delivery.send_image_or_text(
+            stream_id=stream_id,
+            render=render,
+            fallback_text=fallback_text,
+            rendering_enabled=self.settings.rendering.enabled,
+        )
+        return sent, fallback_text, 2 if sent else 1
+
+    async def _deliver_receipt(
+        self,
+        *,
+        stream_id: str,
+        receipt: CommandReceipt,
+        render: Callable[[], Awaitable[RenderedImage]],
+        fallback_text: str,
+    ) -> tuple[bool, str, int]:
+        receipts = self._receipt_service
+        if receipts is None:
+            return False, "抓猪回执服务尚未就绪。", 1
+        if not await receipts.claim_send(receipt.receipt_id):
+            return True, "该消息已处理，不重复公示。", 0
+        if self._delivery is None:
+            sent = bool(await self.ctx.send.text(fallback_text, stream_id))
+        else:
+            sent = await self._delivery.send_image_or_text(
+                stream_id=stream_id,
+                render=render,
+                fallback_text=fallback_text,
+                rendering_enabled=self.settings.rendering.enabled,
+            )
+        if sent:
+            marked = await receipts.mark_sent(receipt.receipt_id)
+            if not marked:
+                self.ctx.logger.error(
+                    "抓猪回执已发送但无法标记完成，receipt_id=%s",
+                    receipt.receipt_id,
+                )
+            return True, fallback_text, 2
+        await receipts.mark_failed(
+            receipt.receipt_id,
+            "图片和纯文字发送均未成功",
+        )
+        return False, fallback_text, 1
+
+    async def _render_pig_card(
+        self,
+        pig: PigView,
+        *,
+        mode_label: str,
+        catch: CatchResult | None = None,
+    ) -> RenderedImage:
+        renderer = self._renderer
+        if renderer is None:
+            raise RuntimeError("抓猪渲染器尚未就绪。")
+        view = pig_card_view(pig, mode_label=mode_label, catch=catch)
+        data_dir = Path(self.ctx.paths.data_dir).resolve()
+        source_path = pig_media_path(data_dir, pig)
+        if pig.media_visible and pig.is_animated:
+            composer = self._animation_composer
+            if composer is None or source_path is None:
+                raise RuntimeError("抓猪动画合成器或素材尚未就绪。")
+            base = await renderer.render_pig_card_base(view)
+            return await composer.compose(
+                base=base.image,
+                source_path=source_path,
+                slot=replace(base.media_slot, fit=pig.image_fit),
+            )
+        return await renderer.render_static_pig_card(view, source_path)
+
+    async def _command_error(
+        self,
+        *,
+        stream_id: str,
+        operation: str,
+        error: Exception,
+    ) -> tuple[bool, str, int]:
+        if isinstance(error, PigCatcherError):
+            return await self._reply_text(stream_id, str(error), success=False)
+        self.ctx.logger.exception("%s命令处理失败", operation)
+        return await self._reply_text(
+            stream_id,
+            f"{operation}暂时不可用，请稍后再试。",
+            success=False,
+        )
 
     @Command(
         "pig_catcher_help",
@@ -260,6 +447,323 @@ class PigCatcherPlugin(MaiBotPlugin):
                 stream_id,
                 "抓猪帮助暂时不可用，请稍后再试。",
                 success=False,
+            )
+
+    @Command(
+        "pig_catcher_catch",
+        description="在当前群抓取一只猪猪",
+        pattern=r"^/(?:抓猪|抓群友)\s*$",
+    )
+    async def handle_catch(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_command(
+            stream_id,
+            kwargs,
+            feature_enabled=self.settings.features.catching_enabled,
+            feature_label="抓猪",
+        )
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            result = await cast(GameplayService, self._gameplay_service).catch(identity)
+            fallback = result.receipt.text_summary or format_catch_summary(result)
+            return await self._deliver_receipt(
+                stream_id=identity.stream_id,
+                receipt=result.receipt,
+                render=lambda: self._render_pig_card(
+                    result.pig,
+                    mode_label="抓猪成功",
+                    catch=result,
+                ),
+                fallback_text=fallback,
+            )
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation="抓猪",
+                error=exc,
+            )
+
+    @Command(
+        "pig_catcher_profile",
+        description="查看当前群的个人抓猪档案",
+        pattern=r"^/抓猪档案\s*$",
+    )
+    async def handle_profile(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_command(
+            stream_id,
+            kwargs,
+            feature_enabled=self.settings.features.profile_enabled,
+            feature_label="抓猪档案",
+        )
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            result = await cast(GameplayService, self._gameplay_service).profile(identity)
+            renderer = cast(PigCatcherRenderer, self._renderer)
+            view = profile_view(result)
+            return await self._deliver_query(
+                stream_id=identity.stream_id,
+                render=lambda: renderer.render_profile(view),
+                fallback_text=format_profile_summary(result),
+            )
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation="抓猪档案",
+                error=exc,
+            )
+
+    @Command(
+        "pig_catcher_pig_detail",
+        description="查看一只当前持有猪猪的详情",
+        pattern=r"^/抓猪详情(?:\s+(?P<selector>.*?))?\s*$",
+    )
+    async def handle_pig_detail(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_command(
+            stream_id,
+            kwargs,
+            feature_enabled=self.settings.features.inventory_enabled,
+            feature_label="背包与详情",
+        )
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            selector = matched_group(kwargs, "selector")
+            pig = await cast(GameplayService, self._gameplay_service).pig_detail(
+                identity,
+                selector,
+            )
+            return await self._deliver_query(
+                stream_id=identity.stream_id,
+                render=lambda: self._render_pig_card(
+                    pig,
+                    mode_label="猪猪详情",
+                ),
+                fallback_text=format_pig_detail_summary(pig),
+            )
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation="抓猪详情",
+                error=exc,
+            )
+
+    @Command(
+        "pig_catcher_inventory",
+        description="查看当前群的个人猪猪背包",
+        pattern=r"^/猪猪背包(?:\s+(?P<arguments>.*?))?\s*$",
+    )
+    async def handle_inventory(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_command(
+            stream_id,
+            kwargs,
+            feature_enabled=self.settings.features.inventory_enabled,
+            feature_label="背包与详情",
+        )
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            query = parse_inventory_query(matched_group(kwargs, "arguments"))
+            result = await cast(GameplayService, self._gameplay_service).inventory(
+                identity,
+                page=query.page,
+                rarity=query.rarity,
+                sort=query.sort,
+            )
+            renderer = cast(PigCatcherRenderer, self._renderer)
+            view = inventory_view(result)
+            data_dir = Path(self.ctx.paths.data_dir).resolve()
+            return await self._deliver_query(
+                stream_id=identity.stream_id,
+                render=lambda: renderer.render_inventory(
+                    view,
+                    inventory_media_paths(data_dir, result),
+                ),
+                fallback_text=format_inventory_summary(result),
+            )
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation="猪猪背包",
+                error=exc,
+            )
+
+    @Command(
+        "pig_catcher_catalog",
+        description="查看当前群的个人猪猪图鉴",
+        pattern=r"^/猪猪图鉴(?:\s+(?P<arguments>.*?))?\s*$",
+    )
+    async def handle_catalog(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_command(
+            stream_id,
+            kwargs,
+            feature_enabled=self.settings.features.catalog_enabled,
+            feature_label="猪猪图鉴",
+        )
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            query = parse_catalog_query(matched_group(kwargs, "arguments"))
+            result = await cast(GameplayService, self._gameplay_service).catalog(
+                identity,
+                page=query.page,
+                rarity=query.rarity,
+                undiscovered_only=query.undiscovered_only,
+            )
+            renderer = cast(PigCatcherRenderer, self._renderer)
+            view = catalog_view(result)
+            data_dir = Path(self.ctx.paths.data_dir).resolve()
+            return await self._deliver_query(
+                stream_id=identity.stream_id,
+                render=lambda: renderer.render_catalog(
+                    view,
+                    catalog_media_paths(data_dir, result),
+                ),
+                fallback_text=format_catalog_summary(result),
+            )
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation="猪猪图鉴",
+                error=exc,
+            )
+
+    @Command(
+        "pig_catcher_records",
+        description="查看当前群的猪猪体型与重量纪录",
+        pattern=r"^/猪猪纪录(?:\s+(?P<arguments>.*?))?\s*$",
+    )
+    async def handle_records(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_command(
+            stream_id,
+            kwargs,
+            feature_enabled=self.settings.features.records_enabled,
+            feature_label="群纪录",
+        )
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            page = parse_records_page(matched_group(kwargs, "arguments"))
+            result = await cast(GameplayService, self._gameplay_service).records(
+                identity,
+                page=page,
+            )
+            renderer = cast(PigCatcherRenderer, self._renderer)
+            view = records_view(result)
+            return await self._deliver_query(
+                stream_id=identity.stream_id,
+                render=lambda: renderer.render_records(view),
+                fallback_text=format_records_summary(result),
+            )
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation="猪猪纪录",
+                error=exc,
+            )
+
+    @Command(
+        "pig_catcher_use_item",
+        description="装备一个拥有的抓猪或做菜道具",
+        pattern=r"^/使用道具(?:\s+(?P<item_name>.*?))?\s*$",
+    )
+    async def handle_use_item(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_command(
+            stream_id,
+            kwargs,
+            feature_enabled=self.settings.features.items_enabled,
+            feature_label="使用道具",
+        )
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            item_name = matched_group(kwargs, "item_name")
+            result = await cast(GameplayService, self._gameplay_service).arm_item(
+                identity,
+                item_name,
+            )
+            renderer = cast(PigCatcherRenderer, self._renderer)
+            view = item_receipt_view(result)
+            fallback = result.receipt.text_summary or format_item_action_summary(result)
+            return await self._deliver_receipt(
+                stream_id=identity.stream_id,
+                receipt=result.receipt,
+                render=lambda: renderer.render_item_receipt(view),
+                fallback_text=fallback,
+            )
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation="使用道具",
+                error=exc,
+            )
+
+    @Command(
+        "pig_catcher_cancel_item",
+        description="取消当前抓猪或做菜道具装备",
+        pattern=r"^/取消道具(?:\s+(?P<action>.*?))?\s*$",
+    )
+    async def handle_cancel_item(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_command(
+            stream_id,
+            kwargs,
+            feature_enabled=self.settings.features.items_enabled,
+            feature_label="使用道具",
+        )
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            action_type = parse_action_type(matched_group(kwargs, "action"))
+            result = await cast(GameplayService, self._gameplay_service).cancel_item(
+                identity,
+                action_type,
+            )
+            renderer = cast(PigCatcherRenderer, self._renderer)
+            view = item_receipt_view(result)
+            fallback = result.receipt.text_summary or format_item_action_summary(result)
+            return await self._deliver_receipt(
+                stream_id=identity.stream_id,
+                receipt=result.receipt,
+                render=lambda: renderer.render_item_receipt(view),
+                fallback_text=fallback,
+            )
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation="取消道具",
+                error=exc,
             )
 
 

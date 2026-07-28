@@ -132,7 +132,7 @@ def test_access_policy_blacklist_has_priority() -> None:
 
 def test_default_config_exposes_fixed_rules_and_chinese_schema() -> None:
     config = PigCatcherConfig()
-    assert config.plugin.framework_phase == "2B"
+    assert config.plugin.framework_phase == "3"
     assert config.cooking.six_star_to_five_percent == 90
     assert config.cooking.six_star_to_six_percent == 10
     schema = PigCatcherConfig.model_json_schema()
@@ -150,9 +150,10 @@ def test_config_rejects_unsafe_paths_and_css_controls() -> None:
         PigCatcherConfig(rendering={"font_family": "   "})
 
 
-def test_help_is_copyable_text_and_marks_gameplay_commands_unavailable() -> None:
+def test_help_is_copyable_text_and_marks_future_commands_unavailable() -> None:
     text = format_help("做菜")
     assert "/做菜 <猪名#短编号>" in text
     assert "粉红小香猪#A19F2C3D" in text
-    assert "当前仅开放 /抓猪帮助" in text
+    assert "做菜指令·尚未开放" in text
+    assert "已开放抓猪、猪猪档案/详情、背包、图鉴、群纪录和道具装备" in text
     assert "<img" not in text

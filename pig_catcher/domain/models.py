@@ -110,10 +110,12 @@ class CommandReceipt:
     receipt_id: str
     idempotency_key: str
     scope_id: str
+    player_id: str | None
     command_name: str
     request_fingerprint: str
     result_type: str
     result_object_id: str
+    result_json: str
     text_summary: str
     send_status: ReceiptSendStatus
     created_at: str

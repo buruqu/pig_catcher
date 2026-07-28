@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root { --font-family: {{ font_family }}; }
+    {{ theme_css | safe }}
+  </style>
+</head>
+<body>
+  <main class="game-sheet records-sheet" data-pig-catcher-root data-render-ready="true">
+    <header class="game-header">
+      <div class="game-header__copy">
+        <p class="game-header__eyebrow">猪猪纪录 · 同模板分别计算体型与重量</p>
+        <h1 style="font-size: {% if view.group_name|length > 60 %}16{% elif view.group_name|length > 40 %}20{% elif view.group_name|length > 24 %}31{% else %}42{% endif %}px">{{ view.group_name or "当前群" }}</h1>
+      </div>
+      <div class="game-header__meta">
+        <span>纪录数量</span>
+        <strong>{{ view.total_count }} 项</strong>
+      </div>
+    </header>
+
+    <section class="list-summary">
+      <p>第 {{ view.page }}/{{ view.page_count }} 页</p>
+      <div class="pill-row">
+        <span class="pill pill--blue">体型 cm</span>
+        <span class="pill pill--gold">重量 kg</span>
+      </div>
+    </section>
+
+    {% if view.items %}
+    <section class="records-list">
+      {% for item in view.items %}
+      <div class="record-row rarity-{{ item.rarity }}">
+        <div class="record-row__type">{{ item.record_label }}</div>
+        <div class="record-row__pig">
+          <strong style="font-size: {% if item.display_name|length > 48 %}12{% elif item.display_name|length > 28 %}15{% else %}19{% endif %}px">{{ "★" * item.rarity }} {{ item.display_name }}</strong>
+          <span>#{{ item.short_code }} · {{ item.achieved_at }}</span>
+        </div>
+        <div class="record-row__value">{{ "%.2f"|format(item.record_value) }} {{ item.unit }}</div>
+        <div class="record-row__holder">{{ item.holder_display_name }}</div>
+      </div>
+      {% endfor %}
+    </section>
+    {% else %}
+    <section style="padding:32px 38px"><div class="empty-state">本群还没有猪猪纪录</div></section>
+    {% endif %}
+
+    <footer class="game-footer">
+      <span>只有严格大于当前值才刷新纪录</span>
+      <strong>{{ view.page }}/{{ view.page_count }}</strong>
+    </footer>
+  </main>
+</body>
+</html>

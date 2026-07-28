@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root { --font-family: {{ font_family }}; }
+    {{ theme_css | safe }}
+  </style>
+</head>
+<body>
+  <main class="game-sheet inventory-sheet" data-pig-catcher-root data-render-ready="true">
+    <header class="game-header">
+      <div class="game-header__copy">
+        <p class="game-header__eyebrow">猪猪背包 · 仍在持有的实例</p>
+        <h1 style="font-size: {% if view.display_name|length > 60 %}16{% elif view.display_name|length > 40 %}20{% elif view.display_name|length > 24 %}31{% else %}42{% endif %}px">{{ view.display_name }}</h1>
+      </div>
+      <div class="game-header__meta">
+        <span>当前筛选</span>
+        <strong>{{ view.total_count }} 只</strong>
+      </div>
+    </header>
+
+    <section class="list-summary">
+      <p>第 {{ view.page }}/{{ view.page_count }} 页 · 排序：{{ view.sort }}</p>
+      <div class="pill-row">
+        <span class="pill">{{ view.rarity ~ " 星" if view.rarity is not none else "全部品质" }}</span>
+        <span class="pill pill--strong">选择器：名称#短编号</span>
+      </div>
+    </section>
+
+    {% if view.items %}
+    <section class="inventory-grid">
+      {% for item in view.items %}
+      <article class="inventory-item rarity-{{ item.rarity }}">
+        <div class="inventory-item__media">
+          {% if media_data_urls.get(item.key) %}
+          <img src="{{ media_data_urls[item.key] }}" alt="{{ item.display_name }}" style="object-fit: {{ item.image_fit }}">
+          {% elif item.is_animated and item.media_visible %}
+          <span>动态猪猪<br>详情查看</span>
+          {% elif not item.media_visible %}
+          <span>授权已撤回</span>
+          {% else %}
+          <span>暂无预览</span>
+          {% endif %}
+        </div>
+        <h2 style="font-size: {% if item.display_name|length > 45 %}12{% elif item.display_name|length > 28 %}15{% elif item.display_name|length > 18 %}18{% else %}21{% endif %}px">{{ item.display_name }}</h2>
+        <div class="inventory-item__code">{{ "★" * item.rarity }} · #{{ item.short_code }}</div>
+        <div class="inventory-item__facts">
+          <span>{{ "%.1f"|format(item.size_value) }} cm</span>
+          <span>{{ "%.2f"|format(item.weight_value) }} kg</span>
+          <span>{{ item.fat_label }}</span>
+          <span class="inventory-item__value">{{ item.official_value }} 猪币</span>
+        </div>
+      </article>
+      {% endfor %}
+    </section>
+    {% else %}
+    <section style="padding:32px 38px"><div class="empty-state">当前没有符合条件的猪猪</div></section>
+    {% endif %}
+
+    <footer class="game-footer">
+      <span>售卖、做菜和交易等后续动作必须使用精确选择器</span>
+      <strong>{{ view.page }}/{{ view.page_count }}</strong>
+    </footer>
+  </main>
+</body>
+</html>

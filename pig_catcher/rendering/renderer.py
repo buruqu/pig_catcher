@@ -15,14 +15,21 @@ from PIL import Image, UnidentifiedImageError
 from ..domain.errors import RenderError
 from .models import (
     AssetPreviewViewModel,
+    CatalogViewModel,
     FrameworkPreviewViewModel,
+    InventoryViewModel,
+    ItemReceiptViewModel,
     MediaSlot,
+    PigCardViewModel,
+    ProfileViewModel,
+    RecordsViewModel,
     RenderedAssetPreviewBase,
     RenderedImage,
     RenderOptions,
 )
 
 _ASSET_PREVIEW_SLOT = MediaSlot(x=38, y=154, width=500, height=500)
+_PIG_CARD_SLOT = MediaSlot(x=38, y=164, width=480, height=480)
 
 
 class HtmlRenderCapability(Protocol):
@@ -118,6 +125,139 @@ class PigCatcherRenderer:
     ) -> RenderedImage:
         """把单帧正式素材以内联 data URL 交给禁网 HTML 渲染。"""
 
+        template = self._environment.get_template("asset_preview.html")
+        html = template.render(
+            view=view,
+            theme_css=self._theme_css,
+            font_family=self.options.font_family,
+            media_data_url=self._source_data_url(source_path),
+        )
+        return await self._render_asset_html(html)
+
+    async def render_pig_card_base(
+        self,
+        view: PigCardViewModel,
+    ) -> RenderedAssetPreviewBase:
+        """Render a single-pig card without baking animated source media."""
+
+        image = await self._render_template(
+            "pig_card.html",
+            view=view,
+            media_data_url="",
+        )
+        self._validate_slot(_PIG_CARD_SLOT, image)
+        return RenderedAssetPreviewBase(image=image, media_slot=_PIG_CARD_SLOT)
+
+    async def render_static_pig_card(
+        self,
+        view: PigCardViewModel,
+        source_path: Path | None,
+    ) -> RenderedImage:
+        """Render one catch/detail card with static media or a privacy placeholder."""
+
+        media_data_url = ""
+        if view.media_visible:
+            if source_path is None:
+                raise RenderError("猪猪素材路径为空")
+            media_data_url = self._source_data_url(source_path)
+        return await self._render_template(
+            "pig_card.html",
+            view=view,
+            media_data_url=media_data_url,
+        )
+
+    async def render_profile(self, view: ProfileViewModel) -> RenderedImage:
+        """Render a player profile card."""
+
+        return await self._render_template("profile.html", view=view)
+
+    async def render_inventory(
+        self,
+        view: InventoryViewModel,
+        media_paths: Mapping[str, Path],
+    ) -> RenderedImage:
+        """Render one inventory page without flattening animated assets."""
+
+        media_data_urls = self._list_media_data_urls(
+            (
+                (item.key, item.media_visible, item.is_animated)
+                for item in view.items
+            ),
+            media_paths,
+        )
+        return await self._render_template(
+            "inventory.html",
+            view=view,
+            media_data_urls=media_data_urls,
+        )
+
+    async def render_catalog(
+        self,
+        view: CatalogViewModel,
+        media_paths: Mapping[str, Path],
+    ) -> RenderedImage:
+        """Render one privacy-aware catalog page."""
+
+        media_data_urls = self._list_media_data_urls(
+            (
+                (
+                    item.key,
+                    item.media_visible and item.discovered,
+                    item.is_animated,
+                )
+                for item in view.items
+            ),
+            media_paths,
+        )
+        return await self._render_template(
+            "catalog.html",
+            view=view,
+            media_data_urls=media_data_urls,
+        )
+
+    async def render_records(self, view: RecordsViewModel) -> RenderedImage:
+        """Render current-group size and weight records."""
+
+        return await self._render_template("records.html", view=view)
+
+    async def render_item_receipt(
+        self,
+        view: ItemReceiptViewModel,
+    ) -> RenderedImage:
+        """Render an item equip or cancellation receipt."""
+
+        return await self._render_template("item_receipt.html", view=view)
+
+    async def _render_template(
+        self,
+        template_name: str,
+        **context: object,
+    ) -> RenderedImage:
+        template = self._environment.get_template(template_name)
+        html = template.render(
+            **context,
+            theme_css=self._theme_css,
+            font_family=self.options.font_family,
+        )
+        return await self._render_asset_html(html)
+
+    def _list_media_data_urls(
+        self,
+        items: object,
+        media_paths: Mapping[str, Path],
+    ) -> dict[str, str]:
+        result: dict[str, str] = {}
+        for key, media_visible, is_animated in items:
+            if not media_visible or is_animated:
+                continue
+            path = media_paths.get(key)
+            if path is None:
+                raise RenderError(f"列表素材映射缺少项目：{key}")
+            result[key] = self._source_data_url(path)
+        return result
+
+    @staticmethod
+    def _source_data_url(source_path: Path) -> str:
         path = Path(source_path)
         if not path.is_file():
             raise RenderError(f"静态素材不存在：{path.name}")
@@ -125,33 +265,27 @@ class PigCatcherRenderer:
             payload = path.read_bytes()
             with Image.open(BytesIO(payload)) as source:
                 if int(getattr(source, "n_frames", 1)) > 1:
-                    raise RenderError("动画素材必须使用逐帧合成，不能截成静态预览")
+                    raise RenderError("动画素材必须使用逐帧合成，不能截成静态图片")
                 image_format = str(source.format or "").upper()
                 source.load()
         except RenderError:
             raise
         except (OSError, UnidentifiedImageError, Image.DecompressionBombError) as exc:
             raise RenderError(f"静态素材无法解码：{path.name}") from exc
-        mime_types = {
+        mime_type = {
             "PNG": "image/png",
             "JPEG": "image/jpeg",
             "WEBP": "image/webp",
             "GIF": "image/gif",
-        }
-        mime_type = mime_types.get(image_format)
+        }.get(image_format)
         if mime_type is None:
             raise RenderError(f"静态素材格式不受支持：{image_format or '未知'}")
-        template = self._environment.get_template("asset_preview.html")
-        html = template.render(
-            view=view,
-            theme_css=self._theme_css,
-            font_family=self.options.font_family,
-            media_data_url=(
-                f"data:{mime_type};base64,"
-                f"{base64.b64encode(payload).decode('ascii')}"
-            ),
-        )
-        return await self._render_asset_html(html)
+        return f"data:{mime_type};base64,{base64.b64encode(payload).decode('ascii')}"
+
+    @staticmethod
+    def _validate_slot(slot: MediaSlot, image: RenderedImage) -> None:
+        if slot.x + slot.width > image.width or slot.y + slot.height > image.height:
+            raise RenderError("图片底图尺寸不足以容纳固定素材区域")
 
     async def _render_asset_html(self, html: str) -> RenderedImage:
         try:
