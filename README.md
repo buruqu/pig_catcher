@@ -1,6 +1,6 @@
 # MaiBot 抓猪插件
 
-这是“抓猪插件”的独立 MaiBot 插件仓库。当前版本为 `0.5.0`，已完成第五轮“社交与排行”。
+这是“抓猪插件”的独立 MaiBot 插件仓库。当前正式版本为 `1.0.0`，六轮开发与生产验收已经完成。
 
 ## 当前状态
 
@@ -9,7 +9,7 @@
 - 目标 SDK：`maibot-plugin-sdk >=2.7.0,<3.0.0`
 - Python：`>=3.12`，本机验收环境 `3.14.4`
 - 数据协议：Schema `5`、Asset Manifest `2`、Ruleset `3`
-- 当前组件：27 个显式 `COMMAND`，不注册普通消息监听、Tool 或 LLM
+- 交付阶段：`6`；当前组件为 27 个显式 `COMMAND`，不注册普通消息监听、Tool 或 LLM
 - 当前群聊命令：`/抓猪帮助`、`/抓猪`（别名 `/抓群友`）、`/抓猪档案`、
   `/抓猪详情`、`/猪猪背包`、`/猪猪图鉴`、`/猪猪纪录`、`/使用道具`、`/取消道具`、
   `/做菜`、`/美食详情`、`/美食背包`、`/美食图鉴`、`/吃菜`（别名 `/使用美食`）、
@@ -35,6 +35,7 @@
 - 5 只 BanG Dream 联动猪的角色、乐队、官方资料与固定 `X/5` 收集进度
 - 98 项逐图检查、9 项逐帧动画检查及两个群的六星可见性实测
 - 图片生成或发送失败后的纯文字降级服务
+- 启用素材文件缺失时的白粉占位图片，数据与结算不受影响
 - 可替换随机源、时钟、身份、选择器和规则版本接口
 - 六档真实抓取、群内六星资格、缺失六星权重转入五星及随机快照
 - 相关体型与重量、肥瘦率、官方价值、猪币、经验、等级和群纪录
@@ -50,13 +51,20 @@
 - 特小猪 `4-16 cm / 0.35-6 kg`、大象 `120-260 cm / 350-1800 kg` 专属体格
 - `NEW`、特殊体型评价、全群绝对体型/重量纪录和巨物目击永久留档
 - 改变状态命令的进程内、并发和插件重启幂等保护
+- 每小时生产巡检 SQLite 完整性、全库账本、98 个启用素材文件和过期报价
 - 抓取、档案、猪与美食详情、背包、图鉴、纪录、商城、账本和经济回执的白粉图片
 - 单猪和单道美食 GIF/动画 WebP 保持动态；列表不抽取静态首帧，改为明确动态标记
-- pytest、Ruff、编译、严格 Manifest、运行中宿主热重载、Chromium 和隔离命令 UAT
+- pytest、Ruff、编译、严格 Manifest、运行中宿主重启、Chromium、隔离命令 UAT 和备份恢复演练
 
-## 有意延后
+## 正式运行
 
-- 第六轮：真实 QQ 多群全流程、故障注入、备份和恢复演练
+生产默认保持每群每人每天成功抓猪 `20` 次、每次成功后冷却 `20` 秒。自动备份每
+`24` 小时执行一次并保留最近 `7` 份；维护任务不会静默修复账本或素材异常，只会记录
+清晰日志并保留数据。
+
+第六轮已完成正式素材隔离副本上的图片发送失败、数据库写锁、素材缺失、重启恢复、
+双群隔离、账本对账和备份恢复演练。按用户决定，真实 QQ 群内的人机命令回归由用户
+上线后自行执行，不作为自动化结果冒充记录。
 
 正式美食素材当前未配置特殊 `effect_id`，因此 `/吃菜` 先提供稳定的品质经验收益；
 特殊效果和六星超级效果会在规则与素材定义明确后扩展，不影响现有库存与账本。
@@ -72,7 +80,7 @@ uv sync --all-groups --locked
 .\.venv\Scripts\ruff.exe check plugin.py pig_catcher tests tools
 ```
 
-第五轮视觉验收与隔离命令 UAT：
+正式版社交流程回归与第六轮故障恢复 UAT：
 
 ```powershell
 uv run python .\tools\accept_fifth_round.py `
@@ -81,7 +89,11 @@ uv run python .\tools\accept_fifth_round.py `
 
 uv run python .\tools\uat_fifth_round.py `
   --data-dir C:\Users\Administrator\MaiBot\data\plugins\local.pig-catcher `
-  --output .\artifacts\fifth-round-uat
+  --output .\artifacts\production-social-regression
+
+uv run python .\tools\uat_sixth_round.py `
+  --data-dir C:\Users\Administrator\MaiBot\data\plugins\local.pig-catcher `
+  --output .\artifacts\production-readiness
 ```
 
 生成的本地验收图、隔离数据库和报告位于忽略目录 `artifacts/`，不会进入插件发布包。

@@ -11,7 +11,7 @@ from pathlib import Path
 from ..assets import AssetCatalogStorage
 from ..domain.ports import Clock, SystemClock
 from ..infrastructure.database import PigCatcherDatabase
-from ..infrastructure.repositories import SocialRepository
+from ..infrastructure.repositories import OperationsRepository, SocialRepository
 from .command_state import iso_timestamp
 
 
@@ -36,6 +36,9 @@ class MaintenanceReport:
     removed_backups: int
     removed_staging_directories: int
     expired_trade_offers: int
+    ledger_mismatch_count: int
+    active_asset_file_count: int
+    missing_asset_file_count: int
 
 
 class MaintenanceRunner:
@@ -51,6 +54,7 @@ class MaintenanceRunner:
         logger: logging.Logger,
         clock: Clock | None = None,
         social_repository: SocialRepository | None = None,
+        operations_repository: OperationsRepository | None = None,
     ) -> None:
         self.database = database
         self.storage = storage
@@ -59,6 +63,7 @@ class MaintenanceRunner:
         self.logger = logger
         self.clock = clock or SystemClock()
         self.social_repository = social_repository or SocialRepository()
+        self.operations_repository = operations_repository or OperationsRepository()
         self.backups_dir = self.data_dir / "backups"
         self._stop_event = asyncio.Event()
         self._task: asyncio.Task[None] | None = None
@@ -87,6 +92,27 @@ class MaintenanceRunner:
                 report = await self.run_once()
                 if report.integrity_results and report.integrity_results != ("ok",):
                     self.logger.error("抓猪数据库完整性检查异常：%s", report.integrity_results)
+                if report.ledger_mismatch_count:
+                    self.logger.error(
+                        "抓猪全库账本对账异常：%s 位玩家余额与流水不一致",
+                        report.ledger_mismatch_count,
+                    )
+                if report.missing_asset_file_count:
+                    self.logger.error(
+                        "抓猪正式素材巡检异常：%s/%s 个启用素材文件缺失",
+                        report.missing_asset_file_count,
+                        report.active_asset_file_count,
+                    )
+                self.logger.info(
+                    "抓猪生产巡检完成：完整性=%s，账本异常=%s，素材缺失=%s/%s，"
+                    "过期报价=%s，备份=%s",
+                    ",".join(report.integrity_results) or "未检查",
+                    report.ledger_mismatch_count,
+                    report.missing_asset_file_count,
+                    report.active_asset_file_count,
+                    report.expired_trade_offers,
+                    report.backup_path.name if report.backup_path is not None else "未到周期",
+                )
             except Exception:
                 self.logger.exception("抓猪插件后台维护失败")
             try:
@@ -103,9 +129,19 @@ class MaintenanceRunner:
                 session,
                 now=iso_timestamp(self.clock.now()),
             )
+            ledger_mismatch_count = await self.operations_repository.balance_mismatch_count(
+                session
+            )
+            active_asset_paths = await self.operations_repository.active_asset_paths(
+                session
+            )
         integrity_results: tuple[str, ...] = ()
         if self.options.run_integrity_check:
             integrity_results = await self.database.integrity_check()
+        missing_asset_file_count = await asyncio.to_thread(
+            self._missing_asset_file_count,
+            active_asset_paths,
+        )
         removed_staging = await self.storage.cleanup_staging(older_than_hours=self.options.staging_max_age_hours)
         backup_path: Path | None = None
         removed_backups = 0
@@ -118,7 +154,25 @@ class MaintenanceRunner:
             removed_backups=removed_backups,
             removed_staging_directories=removed_staging,
             expired_trade_offers=expired_trade_offers,
+            ledger_mismatch_count=ledger_mismatch_count,
+            active_asset_file_count=len(active_asset_paths),
+            missing_asset_file_count=missing_asset_file_count,
         )
+
+    def _missing_asset_file_count(self, relative_paths: tuple[str, ...]) -> int:
+        missing = 0
+        for relative_path in relative_paths:
+            normalized = Path(relative_path)
+            candidate = (self.data_dir / normalized).resolve()
+            if (
+                not relative_path
+                or normalized.is_absolute()
+                or candidate == self.data_dir
+                or not candidate.is_relative_to(self.data_dir)
+                or not candidate.is_file()
+            ):
+                missing += 1
+        return missing
 
     def _backup_files(self) -> list[Path]:
         if not self.backups_dir.is_dir():

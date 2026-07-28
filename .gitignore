@@ -14,6 +14,7 @@ runtime/
 data/
 incoming_assets/
 artifacts/
+config_back/
 *.db
 *.db-shm
 *.db-wal

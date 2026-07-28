@@ -455,6 +455,10 @@ async def test_third_round_templates_render_all_business_views(
     assert "&lt;script&gt;" in pig_html
     assert "data:image/png;base64," in pig_html
     assert "体型新纪录" in pig_html
+    await renderer.render_static_pig_card(replace(pig, coin_reward=None), None)
+    missing_pig_html, _ = capability.calls[-1]
+    assert "素材文件暂时不可用" in missing_pig_html
+    assert "文件暂缺" in missing_pig_html
 
     collections = (
         CollectionProgressViewModel(
@@ -682,6 +686,10 @@ async def test_fourth_round_templates_render_food_and_economy_views(
     assert "主厨香料" in food_html
     assert "最终品质概率" in food_html
     assert "1★ 75.0%" in food_html
+    await renderer.render_static_food_card(replace(food, coin_reward=None), None)
+    missing_food_html, _ = capability.calls[-1]
+    assert "素材文件暂时不可用" in missing_food_html
+    assert "文件暂缺" in missing_food_html
 
     base = await renderer.render_food_card_base(
         replace(food, is_animated=True, media_format="GIF")

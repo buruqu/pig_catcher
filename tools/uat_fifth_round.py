@@ -15,6 +15,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from pig_catcher.domain.social import RANKING_TYPES  # noqa: E402
+from pig_catcher.version import PLUGIN_VERSION  # noqa: E402
 from tools.uat_third_round import (  # noqa: E402
     DeliveryCollector,
     FixedRandom,
@@ -614,7 +615,7 @@ async def run(args: argparse.Namespace) -> dict[str, object]:
 
     report = {
         "status": "passed",
-        "plugin_version": "0.5.0",
+        "plugin_version": PLUGIN_VERSION,
         "schema_version": 5,
         "component_count": 27,
         "commands": records,

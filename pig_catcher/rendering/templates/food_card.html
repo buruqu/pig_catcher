@@ -26,6 +26,8 @@
       <img src="{{ media_data_url }}" alt="{{ view.display_name }}" style="object-fit: {{ view.image_fit }}">
       {% elif not view.media_visible %}
       <div class="pig-card__media-placeholder">历史实例仍然保留<br>素材授权已撤回</div>
+      {% else %}
+      <div class="pig-card__media-placeholder">素材文件暂时不可用<br>业务数据仍然安全保留</div>
       {% endif %}
     </section>
 
@@ -94,7 +96,7 @@
       </div>
       <div class="pig-card__receipt-item">
         <span>素材状态</span>
-        <strong>{{ "可见" if view.media_visible else "授权已撤回" }}</strong>
+        <strong>{{ "可见" if media_data_url else ("授权已撤回" if not view.media_visible else "文件暂缺") }}</strong>
       </div>
       {% endif %}
     </section>

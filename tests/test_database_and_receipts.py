@@ -181,6 +181,9 @@ async def test_maintenance_cleans_staging_and_prunes_backups(tmp_path: Path) -> 
     assert report.removed_staging_directories == 1
     assert report.backup_path is not None
     assert report.backup_path.is_file()
+    assert report.ledger_mismatch_count == 0
+    assert report.active_asset_file_count == 0
+    assert report.missing_asset_file_count == 0
     assert len(list(backups.glob("pig-catcher-*.sqlite3"))) == 2
     await database.close()
 

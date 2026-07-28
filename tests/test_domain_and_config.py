@@ -132,7 +132,7 @@ def test_access_policy_blacklist_has_priority() -> None:
 
 def test_default_config_exposes_fixed_rules_and_chinese_schema() -> None:
     config = PigCatcherConfig()
-    assert config.plugin.framework_phase == "5"
+    assert config.plugin.framework_phase == "6"
     assert config.catching.daily_limit == 20
     assert config.catching.cooldown_seconds == 20
     assert config.cooking.six_star_to_five_percent == 90

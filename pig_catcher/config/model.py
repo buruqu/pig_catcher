@@ -42,11 +42,11 @@ class PluginSection(PluginConfigBase):
         frozen=True,
         json_schema_extra=_ui("配置版本", "由插件维护，不需要手工修改", disabled=True),
     )
-    framework_phase: Literal["5"] = Field(
+    framework_phase: Literal["6"] = Field(
         default=FRAMEWORK_PHASE,
         description="当前开发交付阶段",
         frozen=True,
-        json_schema_extra=_ui("开发阶段", "第五轮已开放赠送、双方交易、展示与排行", disabled=True),
+        json_schema_extra=_ui("交付阶段", "第六轮生产验收完成，当前为正式运行版", disabled=True),
     )
 
 

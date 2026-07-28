@@ -166,9 +166,8 @@ class PigCatcherRenderer:
 
         media_data_url = ""
         if view.media_visible:
-            if source_path is None:
-                raise RenderError("猪猪素材路径为空")
-            media_data_url = self._source_data_url(source_path)
+            if source_path is not None and source_path.is_file():
+                media_data_url = self._source_data_url(source_path)
         return await self._render_template(
             "pig_card.html",
             view=view,
@@ -260,9 +259,8 @@ class PigCatcherRenderer:
 
         media_data_url = ""
         if view.media_visible:
-            if source_path is None:
-                raise RenderError("美食素材路径为空")
-            media_data_url = self._source_data_url(source_path)
+            if source_path is not None and source_path.is_file():
+                media_data_url = self._source_data_url(source_path)
         return await self._render_template(
             "food_card.html",
             view=view,
@@ -382,8 +380,8 @@ class PigCatcherRenderer:
             if not media_visible or is_animated:
                 continue
             path = media_paths.get(key)
-            if path is None:
-                raise RenderError(f"列表素材映射缺少项目：{key}")
+            if path is None or not path.is_file():
+                continue
             result[key] = self._source_data_url(path)
         return result
 

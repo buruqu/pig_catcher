@@ -1,7 +1,7 @@
 [plugin]
 enabled = true
-config_version = "0.5.0"
-framework_phase = "5"
+config_version = "1.0.0"
+framework_phase = "6"
 
 [features]
 help_enabled = true

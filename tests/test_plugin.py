@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
+import sqlite3
 from io import BytesIO
 from pathlib import Path
 from typing import Any
@@ -64,7 +65,7 @@ async def test_config_reload_closes_and_reopens_runtime(tmp_path: Path) -> None:
     await plugin.on_unload()
 
 
-def test_plugin_registers_only_explicit_fifth_round_commands() -> None:
+def test_plugin_registers_only_explicit_production_commands() -> None:
     plugin = create_plugin()
     components = plugin.get_components()
     assert len(components) == 27
@@ -812,6 +813,165 @@ async def test_catch_render_failure_falls_back_once_without_rollback(
         "SELECT COUNT(*) AS count FROM pig_instances"
     )
     assert row is not None and row["count"] == 1
+    await plugin.on_unload()
+
+
+@pytest.mark.asyncio
+async def test_catch_image_send_failure_falls_back_once_across_restart(
+    tmp_path: Path,
+) -> None:
+    first_plugin, first_context = await create_test_plugin(
+        tmp_path,
+        config_updates={"catching": {"cooldown_seconds": 0}},
+    )
+    await _install_test_pig(first_plugin, tmp_path)
+    first_context.send.image_error = RuntimeError("qq image transport unavailable")
+    message = build_message(message_id="image-send-fallback")
+    result = await first_plugin.handle_catch(
+        stream_id="stream-10001",
+        **_command_kwargs(message),
+    )
+    assert result[0] is True
+    assert len(first_context.send.images) == 1
+    assert len(first_context.send.texts) == 1
+    assert "【抓猪成功】" in first_context.send.texts[0][1]
+    receipt = await first_plugin.database.fetch_one(
+        """
+        SELECT send_status
+        FROM command_receipts
+        WHERE command_name = 'pig-catcher.catch'
+        """
+    )
+    assert receipt is not None and receipt["send_status"] == "sent"
+    await first_plugin.on_unload()
+
+    second_plugin, second_context = await create_test_plugin(
+        tmp_path,
+        config_updates={"catching": {"cooldown_seconds": 0}},
+    )
+    duplicate = await second_plugin.handle_catch(
+        stream_id="stream-10001",
+        **_command_kwargs(message),
+    )
+    assert duplicate == (True, "该消息已处理，不重复公示。", 0)
+    assert second_context.send.images == []
+    assert second_context.send.texts == []
+    await second_plugin.on_unload()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("animated", [False, True])
+async def test_missing_pig_asset_uses_image_placeholder(
+    tmp_path: Path,
+    *,
+    animated: bool,
+) -> None:
+    plugin, context = await create_test_plugin(
+        tmp_path,
+        config_updates={"catching": {"cooldown_seconds": 0}},
+    )
+    await _install_test_pig(plugin, tmp_path, animated=animated)
+    row = await plugin.database.fetch_one(
+        "SELECT image_relpath FROM pig_templates WHERE template_id = 'command-pig'"
+    )
+    assert row is not None
+    source_path = (tmp_path / str(row["image_relpath"])).resolve()
+    assert source_path.is_relative_to(tmp_path.resolve())
+    source_path.unlink()
+
+    result = await plugin.handle_catch(
+        stream_id="stream-10001",
+        **_command_kwargs(build_message(message_id=f"missing-asset-{animated}")),
+    )
+    assert result[0] is True
+    assert len(context.send.images) == 1
+    assert context.send.texts == []
+    assert "素材文件暂时不可用" in context.render.calls[-1][0]
+    await plugin.on_unload()
+
+
+@pytest.mark.asyncio
+async def test_database_busy_rejects_catch_without_partial_state(
+    tmp_path: Path,
+) -> None:
+    plugin, context = await create_test_plugin(
+        tmp_path,
+        config_updates={
+            "storage": {"sqlite_busy_timeout_ms": 100},
+            "catching": {"cooldown_seconds": 0},
+        },
+    )
+    await _install_test_pig(plugin, tmp_path)
+    external = sqlite3.connect(tmp_path / "pig_catcher.sqlite3", isolation_level=None)
+    external.execute("PRAGMA busy_timeout = 100")
+    external.execute("BEGIN IMMEDIATE")
+    try:
+        result = await plugin.handle_catch(
+            stream_id="stream-10001",
+            **_command_kwargs(build_message(message_id="database-busy")),
+        )
+    finally:
+        external.rollback()
+        external.close()
+
+    assert result[0] is False
+    assert "抓猪暂时不可用" in result[1]
+    assert len(context.send.texts) == 1
+    counts = await plugin.database.fetch_one(
+        """
+        SELECT
+            (SELECT COUNT(*) FROM pig_instances) AS pigs,
+            (SELECT COUNT(*) FROM command_receipts) AS receipts
+        """
+    )
+    assert counts is not None and tuple(counts) == (0, 0)
+    await plugin.on_unload()
+
+
+@pytest.mark.asyncio
+async def test_maintenance_reports_ledger_and_asset_faults_without_repair(
+    tmp_path: Path,
+) -> None:
+    plugin, _ = await create_test_plugin(tmp_path)
+    await _install_test_pig(plugin, tmp_path)
+    await plugin._framework_service.touch_identity(
+        CommandIdentity(
+            scope=ScopeKey("qq", "10001"),
+            stream_id="stream-10001",
+            user_id="20001",
+            display_name="巡检测试成员",
+            message_id="maintenance-seed",
+            group_name="巡检测试群",
+        )
+    )
+    async with plugin.database.transaction() as session:
+        await session.execute(
+            """
+            UPDATE players
+            SET coin_balance = 9
+            WHERE player_id = 'qq:10001:20001'
+            """
+        )
+    row = await plugin.database.fetch_one(
+        "SELECT image_relpath FROM pig_templates WHERE template_id = 'command-pig'"
+    )
+    assert row is not None
+    source_path = (tmp_path / str(row["image_relpath"])).resolve()
+    source_path.unlink()
+
+    report = await plugin._maintenance.run_once()
+    assert report.integrity_results == ("ok",)
+    assert report.ledger_mismatch_count == 1
+    assert report.active_asset_file_count == 1
+    assert report.missing_asset_file_count == 1
+    player = await plugin.database.fetch_one(
+        """
+        SELECT coin_balance
+        FROM players
+        WHERE player_id = 'qq:10001:20001'
+        """
+    )
+    assert player is not None and player["coin_balance"] == 9
     await plugin.on_unload()
 
 

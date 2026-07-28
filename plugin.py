@@ -472,10 +472,15 @@ class PigCatcherPlugin(MaiBotPlugin):
         view = pig_card_view(pig, mode_label=mode_label, catch=catch)
         data_dir = Path(self.ctx.paths.data_dir).resolve()
         source_path = pig_media_path(data_dir, pig)
-        if pig.media_visible and pig.is_animated:
+        if (
+            pig.media_visible
+            and pig.is_animated
+            and source_path is not None
+            and source_path.is_file()
+        ):
             composer = self._animation_composer
-            if composer is None or source_path is None:
-                raise RuntimeError("抓猪动画合成器或素材尚未就绪。")
+            if composer is None:
+                raise RuntimeError("抓猪动画合成器尚未就绪。")
             base = await renderer.render_pig_card_base(view)
             return await composer.compose(
                 base=base.image,
@@ -497,10 +502,15 @@ class PigCatcherPlugin(MaiBotPlugin):
         view = food_card_view(food, mode_label=mode_label, cooking=cooking)
         data_dir = Path(self.ctx.paths.data_dir).resolve()
         source_path = food_media_path(data_dir, food)
-        if food.media_visible and food.is_animated:
+        if (
+            food.media_visible
+            and food.is_animated
+            and source_path is not None
+            and source_path.is_file()
+        ):
             composer = self._animation_composer
-            if composer is None or source_path is None:
-                raise RuntimeError("美食动画合成器或素材尚未就绪。")
+            if composer is None:
+                raise RuntimeError("美食动画合成器尚未就绪。")
             base = await renderer.render_food_card_base(view)
             return await composer.compose(
                 base=base.image,
