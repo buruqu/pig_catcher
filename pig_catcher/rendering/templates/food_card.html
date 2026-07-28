@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root { --font-family: {{ font_family }}; }
+    {{ theme_css | safe }}
+  </style>
+</head>
+<body>
+  <main class="game-sheet pig-card rarity-{{ view.rarity }}{% if view.description|length > 160 %} pig-card--long{% endif %}" data-pig-catcher-root data-render-ready="true">
+    <header class="game-header pig-card__header">
+      <div class="game-header__copy">
+        <p class="game-header__eyebrow">{{ view.mode_label }} · {{ view.owner_display_name }}</p>
+        <h1 style="font-size: {% if view.display_name|length > 50 %}21{% elif view.display_name|length > 30 %}27{% elif view.display_name|length > 18 %}34{% else %}42{% endif %}px">{{ view.display_name }}</h1>
+      </div>
+      <div class="game-header__meta">
+        <span>{{ view.rarity_name }}</span>
+        <strong>{{ "★" * view.rarity }}</strong>
+      </div>
+    </header>
+
+    <section class="pig-card__media" aria-label="美食素材">
+      {% if media_data_url %}
+      <img src="{{ media_data_url }}" alt="{{ view.display_name }}" style="object-fit: {{ view.image_fit }}">
+      {% elif not view.media_visible %}
+      <div class="pig-card__media-placeholder">历史实例仍然保留<br>素材授权已撤回</div>
+      {% endif %}
+    </section>
+
+    <section class="pig-card__detail">
+      <div class="pill-row" style="margin-bottom: 16px">
+        <span class="pill pill--strong">#{{ view.short_code }}</span>
+        <span class="pill">{{ view.media_format }}{% if view.is_animated %} · 动态{% endif %}</span>
+        {% if view.catalog_new_count %}<span class="pill pill--mint">新图鉴 {{ view.catalog_new_count }}</span>{% endif %}
+        {% if view.bonus_selector %}<span class="pill pill--gold">大份餐盒加餐</span>{% endif %}
+      </div>
+      <div class="pig-card__facts">
+        <div class="pig-card__fact">
+          <span>出餐份量</span>
+          <strong>{{ "%.2f"|format(view.portion_weight) }} kg</strong>
+        </div>
+        <div class="pig-card__fact">
+          <span>原料肥瘦</span>
+          <strong>{{ view.fat_label }}</strong>
+        </div>
+        <div class="pig-card__fact">
+          <span>官方价值</span>
+          <strong>{{ view.official_value }} 猪币</strong>
+        </div>
+        <div class="pig-card__fact">
+          <span>原料猪</span>
+          <strong style="font-size: {% if view.source_selector|length > 30 %}14{% elif view.source_selector|length > 20 %}17{% else %}20{% endif %}px">{{ view.source_selector }}</strong>
+        </div>
+      </div>
+      <p class="pig-card__description" style="font-size: {% if view.description|length > 350 %}13{% elif view.description|length > 250 %}14{% elif view.description|length > 160 %}15{% elif view.description|length > 115 %}16{% elif view.description|length > 80 %}17{% else %}19{% endif %}px;line-height:{% if view.description|length > 160 %}1.45{% else %}1.55{% endif %}">{{ view.description }}</p>
+      <p class="pig-card__subline">
+        效果：{{ view.effect_summary }} · 获得于 {{ view.acquired_at }}
+        {% if view.probability_summary %}<br>最终品质概率：{{ view.probability_summary }}{% endif %}
+      </p>
+    </section>
+
+    <section class="pig-card__receipt">
+      {% if view.coin_reward is not none %}
+      <div class="pig-card__receipt-item">
+        <span>本次奖励</span>
+        <strong>+{{ view.coin_reward }} 猪币</strong>
+      </div>
+      <div class="pig-card__receipt-item">
+        <span>成长</span>
+        <strong>+{{ view.experience_reward }} 经验</strong>
+      </div>
+      <div class="pig-card__receipt-item">
+        <span>厨具 / 道具</span>
+        <strong>Lv.{{ view.cookware_level }} · {{ view.item_name or "无" }}</strong>
+      </div>
+      <div class="pig-card__receipt-item">
+        <span>加餐 / 当前状态</span>
+        <strong style="font-size: {% if view.bonus_selector|length > 24 %}13{% else %}16{% endif %}px">{{ view.bonus_selector or "无" }} · {{ view.coin_balance }} 币</strong>
+      </div>
+      {% else %}
+      <div class="pig-card__receipt-item">
+        <span>实例编号</span>
+        <strong>{{ view.display_name }}#{{ view.short_code }}</strong>
+      </div>
+      <div class="pig-card__receipt-item">
+        <span>美食品质</span>
+        <strong>{{ view.rarity_name }}</strong>
+      </div>
+      <div class="pig-card__receipt-item">
+        <span>原料</span>
+        <strong>{{ view.source_selector }}</strong>
+      </div>
+      <div class="pig-card__receipt-item">
+        <span>素材状态</span>
+        <strong>{{ "可见" if view.media_visible else "授权已撤回" }}</strong>
+      </div>
+      {% endif %}
+    </section>
+
+    <footer class="game-footer" style="position:absolute;left:0;right:0;bottom:0">
+      <span>名称与短编号共同定位这份美食</span>
+      <strong>{{ view.mode_label }}</strong>
+    </footer>
+  </main>
+</body>
+</html>

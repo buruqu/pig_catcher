@@ -64,10 +64,10 @@ async def test_config_reload_closes_and_reopens_runtime(tmp_path: Path) -> None:
     await plugin.on_unload()
 
 
-def test_plugin_registers_only_explicit_third_round_commands() -> None:
+def test_plugin_registers_only_explicit_fourth_round_commands() -> None:
     plugin = create_plugin()
     components = plugin.get_components()
-    assert len(components) == 9
+    assert len(components) == 19
     assert {component["type"] for component in components} == {"COMMAND"}
     assert {component["name"] for component in components} == {
         "pig_catcher_help",
@@ -79,6 +79,16 @@ def test_plugin_registers_only_explicit_third_round_commands() -> None:
         "pig_catcher_records",
         "pig_catcher_use_item",
         "pig_catcher_cancel_item",
+        "pig_catcher_cook",
+        "pig_catcher_food_detail",
+        "pig_catcher_food_inventory",
+        "pig_catcher_food_catalog",
+        "pig_catcher_eat",
+        "pig_catcher_store",
+        "pig_catcher_purchase",
+        "pig_catcher_sell_pig",
+        "pig_catcher_sell_food",
+        "pig_catcher_ledger",
     }
     serialized = str(components)
     assert "EVENT_HANDLER" not in serialized
@@ -205,6 +215,7 @@ async def _install_test_pig(
     tmp_path: Path,
     *,
     animated: bool = False,
+    include_food: bool = False,
 ) -> None:
     source = tmp_path / "command-assets"
     source.mkdir()
@@ -228,6 +239,53 @@ async def _install_test_pig(
             source / image_name,
             format="PNG",
         )
+    entries = [
+        {
+            "template_id": "command-pig",
+            "kind": "pig",
+            "display_name": "命令测试猪",
+            "rarity": 1,
+            "scope": "common",
+            "group_scope_id": None,
+            "description": "用于命令级完整流程验收。",
+            "image": image_name,
+            "fit": "contain",
+            "source": "pytest",
+            "license": "test-only",
+            "consent_status": "not-required",
+            "length_min_cm": 30,
+            "length_max_cm": 60,
+            "weight_min_kg": 20,
+            "weight_max_kg": 90,
+            "fat_profile": "balanced",
+            "recipe_tags": ["测试"],
+        }
+    ]
+    if include_food:
+        for rarity in (1, 2, 3):
+            food_image = f"command-food-{rarity}.png"
+            Image.new("RGBA", (256, 256), "#F7A7C4").save(
+                source / food_image,
+                format="PNG",
+            )
+            entries.append(
+                {
+                    "template_id": f"command-food-{rarity}",
+                    "kind": "food",
+                    "display_name": f"命令测试菜{rarity}",
+                    "rarity": rarity,
+                    "scope": "common",
+                    "group_scope_id": None,
+                    "description": "用于第四轮命令级完整流程验收。",
+                    "image": food_image,
+                    "fit": "contain",
+                    "source": "pytest",
+                    "license": "test-only",
+                    "consent_status": "not-required",
+                    "recipe_tags": ["家常"],
+                    "effect_id": "",
+                }
+            )
     manifest = source / "assets.json"
     manifest.write_text(
         json.dumps(
@@ -235,28 +293,7 @@ async def _install_test_pig(
                 "manifest_version": 2,
                 "catalog_id": "command-tests",
                 "source_label": "pytest command catalog",
-                "entries": [
-                    {
-                        "template_id": "command-pig",
-                        "kind": "pig",
-                        "display_name": "命令测试猪",
-                        "rarity": 1,
-                        "scope": "common",
-                        "group_scope_id": None,
-                        "description": "用于命令级完整流程验收。",
-                        "image": image_name,
-                        "fit": "contain",
-                        "source": "pytest",
-                        "license": "test-only",
-                        "consent_status": "not-required",
-                        "length_min_cm": 30,
-                        "length_max_cm": 60,
-                        "weight_min_kg": 20,
-                        "weight_max_kg": 90,
-                        "fat_profile": "balanced",
-                        "recipe_tags": ["测试"],
-                    }
-                ],
+                "entries": entries,
             },
             ensure_ascii=False,
         ),
@@ -333,6 +370,267 @@ async def test_complete_third_round_command_flow_and_duplicate_publication(
     assert len(context.send.images) == 6
     assert len(context.render.calls) == 6
     assert all(call[1]["allow_network"] is False for call in context.render.calls)
+    await plugin.on_unload()
+
+
+@pytest.mark.asyncio
+async def test_complete_fourth_round_command_flow_and_duplicate_publication(
+    tmp_path: Path,
+) -> None:
+    plugin, context = await create_test_plugin(
+        tmp_path,
+        config_updates={"catching": {"cooldown_seconds": 0}},
+    )
+    await _install_test_pig(plugin, tmp_path, include_food=True)
+
+    await plugin.handle_catch(
+        stream_id="stream-10001",
+        **_command_kwargs(build_message(message_id="round4-catch-1")),
+    )
+    pig_row = await plugin.database.fetch_one(
+        """
+        SELECT display_name_snapshot, short_code
+        FROM pig_instances
+        WHERE owner_player_id = 'qq:10001:20001' AND state = 'active'
+        ORDER BY acquired_at DESC
+        LIMIT 1
+        """
+    )
+    assert pig_row is not None
+    pig_selector = f"{pig_row['display_name_snapshot']}#{pig_row['short_code']}"
+    cook_message = build_message(message_id="round4-cook-1")
+    cooked = await plugin.handle_cook(
+        stream_id="stream-10001",
+        **_command_kwargs(cook_message, selector=pig_selector),
+    )
+    assert cooked[0] is True
+    assert len(context.send.images) == 2
+    duplicate = await plugin.handle_cook(
+        stream_id="stream-10001",
+        **_command_kwargs(cook_message, selector=pig_selector),
+    )
+    assert duplicate == (True, "该消息已处理，不重复公示。", 0)
+    assert len(context.send.images) == 2
+
+    food_row = await plugin.database.fetch_one(
+        """
+        SELECT display_name_snapshot, short_code
+        FROM food_instances
+        WHERE owner_player_id = 'qq:10001:20001' AND state = 'active'
+        ORDER BY acquired_at DESC
+        LIMIT 1
+        """
+    )
+    assert food_row is not None
+    food_selector = f"{food_row['display_name_snapshot']}#{food_row['short_code']}"
+    query_message = build_message(message_id="round4-query")
+    await plugin.handle_food_detail(
+        stream_id="stream-10001",
+        **_command_kwargs(query_message, selector=food_selector),
+    )
+    await plugin.handle_food_inventory(
+        stream_id="stream-10001",
+        **_command_kwargs(query_message, arguments="1 排序=价值"),
+    )
+    await plugin.handle_food_catalog(
+        stream_id="stream-10001",
+        **_command_kwargs(query_message, arguments="1"),
+    )
+    assert len(context.send.images) == 5
+
+    eaten = await plugin.handle_eat(
+        stream_id="stream-10001",
+        **_command_kwargs(
+            build_message(message_id="round4-eat"),
+            selector=food_selector,
+        ),
+    )
+    assert eaten[0] is True
+    assert len(context.send.images) == 6
+
+    player = await plugin.database.fetch_one(
+        "SELECT coin_balance FROM players WHERE player_id = 'qq:10001:20001'"
+    )
+    assert player is not None
+    balance_after_seed = int(player["coin_balance"]) + 1000
+    async with plugin.database.transaction() as session:
+        await session.execute(
+            """
+            UPDATE players
+            SET coin_balance = coin_balance + 1000
+            WHERE player_id = 'qq:10001:20001'
+            """
+        )
+        await session.execute(
+            """
+            INSERT INTO currency_ledger(
+                ledger_entry_id, player_id, scope_id, amount, balance_after,
+                reason_code, reason_text, source_object_type, source_object_id,
+                idempotency_key, created_at
+            )
+            VALUES (
+                'round4-seed', 'qq:10001:20001', 'qq:10001', 1000, ?,
+                'test-grant', '命令测试入账', 'test', 'seed',
+                'round4-seed', '2026-07-28T00:00:00.000Z'
+            )
+            """,
+            (balance_after_seed,),
+        )
+
+    await plugin.handle_store(
+        stream_id="stream-10001",
+        **_command_kwargs(query_message, arguments="1 分类=全部"),
+    )
+    purchase_message = build_message(message_id="round4-purchase")
+    purchased = await plugin.handle_purchase(
+        stream_id="stream-10001",
+        **_command_kwargs(purchase_message, arguments="幸运猪哨 2"),
+    )
+    assert purchased[0] is True
+    purchase_duplicate = await plugin.handle_purchase(
+        stream_id="stream-10001",
+        **_command_kwargs(purchase_message, arguments="幸运猪哨 2"),
+    )
+    assert purchase_duplicate[2] == 0
+    assert len(context.send.images) == 8
+
+    await plugin.handle_catch(
+        stream_id="stream-10001",
+        **_command_kwargs(build_message(message_id="round4-catch-2")),
+    )
+    second_pig = await plugin.database.fetch_one(
+        """
+        SELECT display_name_snapshot, short_code
+        FROM pig_instances
+        WHERE owner_player_id = 'qq:10001:20001' AND state = 'active'
+        ORDER BY acquired_at DESC, pig_instance_id DESC
+        LIMIT 1
+        """
+    )
+    assert second_pig is not None
+    second_pig_selector = (
+        f"{second_pig['display_name_snapshot']}#{second_pig['short_code']}"
+    )
+    await plugin.handle_cook(
+        stream_id="stream-10001",
+        **_command_kwargs(
+            build_message(message_id="round4-cook-2"),
+            selector=second_pig_selector,
+        ),
+    )
+    second_food = await plugin.database.fetch_one(
+        """
+        SELECT display_name_snapshot, short_code
+        FROM food_instances
+        WHERE owner_player_id = 'qq:10001:20001' AND state = 'active'
+        ORDER BY acquired_at DESC, food_instance_id DESC
+        LIMIT 1
+        """
+    )
+    assert second_food is not None
+    second_food_selector = (
+        f"{second_food['display_name_snapshot']}#{second_food['short_code']}"
+    )
+    await plugin.handle_sell_food(
+        stream_id="stream-10001",
+        **_command_kwargs(
+            build_message(message_id="round4-sell-food"),
+            selector=second_food_selector,
+        ),
+    )
+
+    await plugin.handle_catch(
+        stream_id="stream-10001",
+        **_command_kwargs(build_message(message_id="round4-catch-3")),
+    )
+    third_pig = await plugin.database.fetch_one(
+        """
+        SELECT display_name_snapshot, short_code
+        FROM pig_instances
+        WHERE owner_player_id = 'qq:10001:20001' AND state = 'active'
+        ORDER BY acquired_at DESC, pig_instance_id DESC
+        LIMIT 1
+        """
+    )
+    assert third_pig is not None
+    third_pig_selector = (
+        f"{third_pig['display_name_snapshot']}#{third_pig['short_code']}"
+    )
+    await plugin.handle_sell_pig(
+        stream_id="stream-10001",
+        **_command_kwargs(
+            build_message(message_id="round4-sell-pig"),
+            selector=third_pig_selector,
+        ),
+    )
+    await plugin.handle_ledger(
+        stream_id="stream-10001",
+        **_command_kwargs(query_message, arguments="1"),
+    )
+    await plugin.handle_profile(
+        stream_id="stream-10001",
+        **_command_kwargs(query_message),
+    )
+    assert len(context.send.images) == 15
+    assert all(call[1]["allow_network"] is False for call in context.render.calls)
+    item = await plugin.database.fetch_one(
+        """
+        SELECT quantity
+        FROM item_inventory
+        WHERE player_id = 'qq:10001:20001' AND item_id = 'lucky-whistle'
+        """
+    )
+    assert item is not None and item["quantity"] == 2
+    await plugin.on_unload()
+
+
+@pytest.mark.asyncio
+async def test_cooking_render_failure_falls_back_once_without_rollback(
+    tmp_path: Path,
+) -> None:
+    plugin, context = await create_test_plugin(
+        tmp_path,
+        config_updates={"catching": {"cooldown_seconds": 0}},
+    )
+    await _install_test_pig(plugin, tmp_path, include_food=True)
+    await plugin.handle_catch(
+        stream_id="stream-10001",
+        **_command_kwargs(build_message(message_id="cook-fallback-catch")),
+    )
+    pig = await plugin.database.fetch_one(
+        """
+        SELECT display_name_snapshot, short_code
+        FROM pig_instances
+        WHERE state = 'active'
+        LIMIT 1
+        """
+    )
+    assert pig is not None
+    selector = f"{pig['display_name_snapshot']}#{pig['short_code']}"
+    context.render.error = RuntimeError("chromium unavailable")
+    message = build_message(message_id="cook-fallback")
+    result = await plugin.handle_cook(
+        stream_id="stream-10001",
+        **_command_kwargs(message, selector=selector),
+    )
+    assert result[0] is True
+    assert len(context.send.texts) == 1
+    assert "【做菜成功】" in context.send.texts[0][1]
+    duplicate = await plugin.handle_cook(
+        stream_id="stream-10001",
+        **_command_kwargs(message, selector=selector),
+    )
+    assert duplicate[2] == 0
+    assert len(context.send.texts) == 1
+    counts = await plugin.database.fetch_one(
+        """
+        SELECT
+            (SELECT COUNT(*) FROM food_instances) AS foods,
+            (SELECT COUNT(*) FROM command_receipts WHERE command_name = 'pig-catcher.cook') AS receipts
+        """
+    )
+    assert counts is not None
+    assert tuple(counts) == (1, 1)
     await plugin.on_unload()
 
 

@@ -41,12 +41,16 @@
     <section class="profile-sheet__stats">
       <div class="profile-stat"><span>当前持有</span><strong>{{ view.active_pigs }} 只</strong></div>
       <div class="profile-stat"><span>猪猪图鉴</span><strong>{{ view.catalog_count }}/{{ view.visible_catalog_total }}</strong></div>
+      <div class="profile-stat"><span>累计做菜</span><strong>{{ view.total_cooks }} 次</strong></div>
+      <div class="profile-stat"><span>当前美食</span><strong>{{ view.active_foods }} 份</strong></div>
+      <div class="profile-stat"><span>美食图鉴</span><strong>{{ view.food_catalog_count }}/{{ view.visible_food_catalog_total }}</strong></div>
       <div class="profile-stat"><span>持有群纪录</span><strong>{{ view.held_records }} 项</strong></div>
       <div class="profile-stat"><span>猪饲料</span><strong>Lv.{{ view.feed_level }}</strong></div>
+      <div class="profile-stat"><span>厨具</span><strong>Lv.{{ view.cookware_level }}</strong></div>
       <div class="profile-stat"><span>今日抓猪</span><strong>{{ view.daily_count }}/{{ view.daily_limit }}</strong></div>
       <div class="profile-stat"><span>当前冷却</span><strong>{{ view.cooldown_remaining_seconds }} 秒</strong></div>
-      <div class="profile-stat"><span>已装备道具</span><strong>{{ view.armed_item_name or "无" }}</strong></div>
-      <div class="profile-stat"><span>道具库存</span><strong>{{ view.armed_item_quantity if view.armed_item_name else "—" }}</strong></div>
+      <div class="profile-stat"><span>抓猪道具</span><strong>{{ view.armed_item_name or "无" }}</strong></div>
+      <div class="profile-stat"><span>做菜道具</span><strong>{{ view.armed_cooking_item_name or "无" }}</strong></div>
     </section>
 
     <section class="profile-sheet__collections">

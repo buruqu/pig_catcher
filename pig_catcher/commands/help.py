@@ -29,10 +29,11 @@ _TOPICS: dict[str, tuple[str, ...]] = {
         "/美食详情 <美食名#短编号>",
     ),
     "商城": (
-        "/猪猪商城 [页码|分类]",
+        "/猪猪商城 [页码] [分类=全部|抓猪|做菜|升级]",
         "/购买 <商品名称> [数量]",
         "/售卖猪猪 <猪名#短编号>",
         "/售卖美食 <美食名#短编号>",
+        "/猪币账本 [页码]",
     ),
     "交易": (
         "/猪猪赠送 <猪名#短编号> @成员",
@@ -50,7 +51,7 @@ _TOPICS: dict[str, tuple[str, ...]] = {
     ),
 }
 
-_OPEN_TOPICS = frozenset({"抓猪", "背包", "道具"})
+_OPEN_TOPICS = frozenset({"抓猪", "背包", "道具", "做菜", "商城"})
 
 _TOPIC_ALIASES = {
     "仓库": "背包",
@@ -73,8 +74,8 @@ def format_help(topic: str = "") -> str:
     normalized = _TOPIC_ALIASES.get(normalized, normalized)
     notice = (
         f"当前版本：v{PLUGIN_VERSION}（第 {FRAMEWORK_PHASE} 轮）\n"
-        "已开放抓猪、猪猪档案/详情、背包、图鉴、群纪录和道具装备；"
-        "做菜、商城、交易与排行仍在后续轮次。"
+        "已开放抓猪、收藏、做菜、美食、商城、升级、官方售卖和猪币账本；"
+        "赠送、交易与排行仍在后续轮次。"
     )
     if normalized and normalized not in {"全部", *list(_TOPICS)}:
         topics = "、".join(_TOPICS)

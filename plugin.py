@@ -1,4 +1,4 @@
-"""MaiBot 抓猪插件第三轮命令入口。"""
+"""MaiBot 抓猪插件第四轮显式命令入口。"""
 
 from __future__ import annotations
 
@@ -16,8 +16,12 @@ from .pig_catcher.commands import (
     matched_group,
     parse_action_type,
     parse_catalog_query,
+    parse_food_inventory_query,
     parse_inventory_query,
+    parse_ledger_page,
+    parse_purchase_query,
     parse_records_page,
+    parse_store_query,
 )
 from .pig_catcher.config import AccessPolicy, PigCatcherConfig
 from .pig_catcher.domain.errors import CommandContextError, PigCatcherError
@@ -31,17 +35,31 @@ from .pig_catcher.rendering import (
     RenderOptions,
     catalog_media_paths,
     catalog_view,
+    eat_receipt_view,
+    food_card_view,
+    food_catalog_media_paths,
+    food_catalog_view,
+    food_inventory_media_paths,
+    food_inventory_view,
+    food_media_path,
     inventory_media_paths,
     inventory_view,
     item_receipt_view,
+    ledger_view,
     pig_card_view,
     pig_media_path,
     profile_view,
+    purchase_receipt_view,
     records_view,
+    sale_receipt_view,
+    store_view,
 )
 from .pig_catcher.services import (
     AssetCatalogService,
     CatchResult,
+    CookingResult,
+    EconomyService,
+    FoodView,
     FrameworkService,
     GameplayService,
     MaintenanceOptions,
@@ -50,17 +68,26 @@ from .pig_catcher.services import (
     ReceiptService,
     format_catalog_summary,
     format_catch_summary,
+    format_cooking_summary,
+    format_eat_summary,
+    format_food_catalog_summary,
+    format_food_detail_summary,
+    format_food_inventory_summary,
     format_inventory_summary,
     format_item_action_summary,
+    format_ledger_summary,
     format_pig_detail_summary,
     format_profile_summary,
+    format_purchase_summary,
     format_records_summary,
+    format_sale_summary,
+    format_store_summary,
 )
 from .pig_catcher.version import PLUGIN_VERSION
 
 
 class PigCatcherPlugin(MaiBotPlugin):
-    """Expose third-round catching and collection commands."""
+    """Expose catching, cooking, collection, and economy commands."""
 
     config_model = PigCatcherConfig
 
@@ -71,6 +98,7 @@ class PigCatcherPlugin(MaiBotPlugin):
         self._asset_service: AssetCatalogService | None = None
         self._framework_service: FrameworkService | None = None
         self._gameplay_service: GameplayService | None = None
+        self._economy_service: EconomyService | None = None
         self._receipt_service: ReceiptService | None = None
         self._renderer: PigCatcherRenderer | None = None
         self._animation_composer: AnimatedCardComposer | None = None
@@ -106,6 +134,12 @@ class PigCatcherPlugin(MaiBotPlugin):
         """Expose the active gameplay service for command-level acceptance."""
 
         return self._gameplay_service
+
+    @property
+    def economy_service(self) -> EconomyService | None:
+        """Expose the active fourth-round service for command-level acceptance."""
+
+        return self._economy_service
 
     async def on_load(self) -> None:
         if self.settings.plugin.enabled:
@@ -195,6 +229,11 @@ class PigCatcherPlugin(MaiBotPlugin):
             self._asset_service = asset_service
             self._framework_service = FrameworkService(database)
             self._gameplay_service = GameplayService(database, settings.catching)
+            self._economy_service = EconomyService(
+                database,
+                settings.cooking,
+                settings.economy,
+            )
             self._receipt_service = ReceiptService(database)
             self._renderer = renderer
             self._animation_composer = animation_composer
@@ -226,6 +265,7 @@ class PigCatcherPlugin(MaiBotPlugin):
         self._animation_composer = None
         self._renderer = None
         self._receipt_service = None
+        self._economy_service = None
         self._gameplay_service = None
         self._framework_service = None
         self._asset_service = None
@@ -382,6 +422,31 @@ class PigCatcherPlugin(MaiBotPlugin):
                 slot=replace(base.media_slot, fit=pig.image_fit),
             )
         return await renderer.render_static_pig_card(view, source_path)
+
+    async def _render_food_card(
+        self,
+        food: FoodView,
+        *,
+        mode_label: str,
+        cooking: CookingResult | None = None,
+    ) -> RenderedImage:
+        renderer = self._renderer
+        if renderer is None:
+            raise RuntimeError("美食渲染器尚未就绪。")
+        view = food_card_view(food, mode_label=mode_label, cooking=cooking)
+        data_dir = Path(self.ctx.paths.data_dir).resolve()
+        source_path = food_media_path(data_dir, food)
+        if food.media_visible and food.is_animated:
+            composer = self._animation_composer
+            if composer is None or source_path is None:
+                raise RuntimeError("美食动画合成器或素材尚未就绪。")
+            base = await renderer.render_food_card_base(view)
+            return await composer.compose(
+                base=base.image,
+                source_path=source_path,
+                slot=replace(base.media_slot, fit=food.image_fit),
+            )
+        return await renderer.render_static_food_card(view, source_path)
 
     async def _command_error(
         self,
@@ -763,6 +828,418 @@ class PigCatcherPlugin(MaiBotPlugin):
             return await self._command_error(
                 stream_id=identity.stream_id,
                 operation="取消道具",
+                error=exc,
+            )
+
+    @Command(
+        "pig_catcher_cook",
+        description="把当前持有的一只猪制作成美食",
+        pattern=r"^/做菜(?:\s+(?P<selector>.*?))?\s*$",
+    )
+    async def handle_cook(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_command(
+            stream_id,
+            kwargs,
+            feature_enabled=self.settings.features.cooking_enabled,
+            feature_label="做菜",
+        )
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            result = await cast(EconomyService, self._economy_service).cook(
+                identity,
+                matched_group(kwargs, "selector"),
+            )
+            fallback = result.receipt.text_summary or format_cooking_summary(result)
+            return await self._deliver_receipt(
+                stream_id=identity.stream_id,
+                receipt=result.receipt,
+                render=lambda: self._render_food_card(
+                    result.foods[0],
+                    mode_label="做菜成功",
+                    cooking=result,
+                ),
+                fallback_text=fallback,
+            )
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation="做菜",
+                error=exc,
+            )
+
+    @Command(
+        "pig_catcher_food_detail",
+        description="查看一份当前持有美食的详情",
+        pattern=r"^/美食详情(?:\s+(?P<selector>.*?))?\s*$",
+    )
+    async def handle_food_detail(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_command(
+            stream_id,
+            kwargs,
+            feature_enabled=self.settings.features.food_inventory_enabled,
+            feature_label="美食背包与详情",
+        )
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            food = await cast(EconomyService, self._economy_service).food_detail(
+                identity,
+                matched_group(kwargs, "selector"),
+            )
+            return await self._deliver_query(
+                stream_id=identity.stream_id,
+                render=lambda: self._render_food_card(
+                    food,
+                    mode_label="美食详情",
+                ),
+                fallback_text=format_food_detail_summary(food),
+            )
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation="美食详情",
+                error=exc,
+            )
+
+    @Command(
+        "pig_catcher_food_inventory",
+        description="查看当前群的个人美食背包",
+        pattern=r"^/美食背包(?:\s+(?P<arguments>.*?))?\s*$",
+    )
+    async def handle_food_inventory(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_command(
+            stream_id,
+            kwargs,
+            feature_enabled=self.settings.features.food_inventory_enabled,
+            feature_label="美食背包与详情",
+        )
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            query = parse_food_inventory_query(
+                matched_group(kwargs, "arguments")
+            )
+            result = await cast(
+                EconomyService,
+                self._economy_service,
+            ).food_inventory(
+                identity,
+                page=query.page,
+                rarity=query.rarity,
+                sort=query.sort,
+            )
+            renderer = cast(PigCatcherRenderer, self._renderer)
+            view = food_inventory_view(result)
+            data_dir = Path(self.ctx.paths.data_dir).resolve()
+            return await self._deliver_query(
+                stream_id=identity.stream_id,
+                render=lambda: renderer.render_food_inventory(
+                    view,
+                    food_inventory_media_paths(data_dir, result),
+                ),
+                fallback_text=format_food_inventory_summary(result),
+            )
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation="美食背包",
+                error=exc,
+            )
+
+    @Command(
+        "pig_catcher_food_catalog",
+        description="查看当前群的个人美食图鉴",
+        pattern=r"^/美食图鉴(?:\s+(?P<arguments>.*?))?\s*$",
+    )
+    async def handle_food_catalog(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_command(
+            stream_id,
+            kwargs,
+            feature_enabled=self.settings.features.food_catalog_enabled,
+            feature_label="美食图鉴",
+        )
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            query = parse_catalog_query(matched_group(kwargs, "arguments"))
+            result = await cast(
+                EconomyService,
+                self._economy_service,
+            ).food_catalog(
+                identity,
+                page=query.page,
+                rarity=query.rarity,
+                undiscovered_only=query.undiscovered_only,
+            )
+            renderer = cast(PigCatcherRenderer, self._renderer)
+            view = food_catalog_view(result)
+            data_dir = Path(self.ctx.paths.data_dir).resolve()
+            return await self._deliver_query(
+                stream_id=identity.stream_id,
+                render=lambda: renderer.render_food_catalog(
+                    view,
+                    food_catalog_media_paths(data_dir, result),
+                ),
+                fallback_text=format_food_catalog_summary(result),
+            )
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation="美食图鉴",
+                error=exc,
+            )
+
+    @Command(
+        "pig_catcher_eat",
+        description="食用一份当前持有的美食",
+        pattern=r"^/(?:吃菜|使用美食)(?:\s+(?P<selector>.*?))?\s*$",
+    )
+    async def handle_eat(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_command(
+            stream_id,
+            kwargs,
+            feature_enabled=self.settings.features.eating_enabled,
+            feature_label="吃菜",
+        )
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            result = await cast(EconomyService, self._economy_service).eat(
+                identity,
+                matched_group(kwargs, "selector"),
+            )
+            renderer = cast(PigCatcherRenderer, self._renderer)
+            view = eat_receipt_view(result)
+            fallback = result.receipt.text_summary or format_eat_summary(result)
+            return await self._deliver_receipt(
+                stream_id=identity.stream_id,
+                receipt=result.receipt,
+                render=lambda: renderer.render_economy_receipt(view),
+                fallback_text=fallback,
+            )
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation="吃菜",
+                error=exc,
+            )
+
+    @Command(
+        "pig_catcher_store",
+        description="查看道具与永久升级商城",
+        pattern=r"^/猪猪商城(?:\s+(?P<arguments>.*?))?\s*$",
+    )
+    async def handle_store(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_command(
+            stream_id,
+            kwargs,
+            feature_enabled=self.settings.features.store_enabled,
+            feature_label="猪猪商城",
+        )
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            query = parse_store_query(matched_group(kwargs, "arguments"))
+            result = await cast(EconomyService, self._economy_service).store(
+                identity,
+                page=query.page,
+                category=query.category,
+            )
+            renderer = cast(PigCatcherRenderer, self._renderer)
+            view = store_view(result)
+            return await self._deliver_query(
+                stream_id=identity.stream_id,
+                render=lambda: renderer.render_store(view),
+                fallback_text=format_store_summary(result),
+            )
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation="猪猪商城",
+                error=exc,
+            )
+
+    @Command(
+        "pig_catcher_purchase",
+        description="购买商城中的道具或永久升级",
+        pattern=r"^/购买(?:\s+(?P<arguments>.*?))?\s*$",
+    )
+    async def handle_purchase(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_command(
+            stream_id,
+            kwargs,
+            feature_enabled=self.settings.features.store_enabled,
+            feature_label="商城购买",
+        )
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            query = parse_purchase_query(matched_group(kwargs, "arguments"))
+            result = await cast(EconomyService, self._economy_service).purchase(
+                identity,
+                query.product_name,
+                quantity=query.quantity,
+            )
+            renderer = cast(PigCatcherRenderer, self._renderer)
+            view = purchase_receipt_view(result)
+            fallback = result.receipt.text_summary or format_purchase_summary(
+                result
+            )
+            return await self._deliver_receipt(
+                stream_id=identity.stream_id,
+                receipt=result.receipt,
+                render=lambda: renderer.render_economy_receipt(view),
+                fallback_text=fallback,
+            )
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation="购买",
+                error=exc,
+            )
+
+    @Command(
+        "pig_catcher_sell_pig",
+        description="按官方价值售卖一只猪猪",
+        pattern=r"^/售卖猪猪(?:\s+(?P<selector>.*?))?\s*$",
+    )
+    async def handle_sell_pig(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_command(
+            stream_id,
+            kwargs,
+            feature_enabled=self.settings.features.selling_enabled,
+            feature_label="官方售卖",
+        )
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            result = await cast(EconomyService, self._economy_service).sell_pig(
+                identity,
+                matched_group(kwargs, "selector"),
+            )
+            renderer = cast(PigCatcherRenderer, self._renderer)
+            view = sale_receipt_view(result)
+            fallback = result.receipt.text_summary or format_sale_summary(result)
+            return await self._deliver_receipt(
+                stream_id=identity.stream_id,
+                receipt=result.receipt,
+                render=lambda: renderer.render_economy_receipt(view),
+                fallback_text=fallback,
+            )
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation="售卖猪猪",
+                error=exc,
+            )
+
+    @Command(
+        "pig_catcher_sell_food",
+        description="按官方价值售卖一份美食",
+        pattern=r"^/售卖美食(?:\s+(?P<selector>.*?))?\s*$",
+    )
+    async def handle_sell_food(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_command(
+            stream_id,
+            kwargs,
+            feature_enabled=self.settings.features.selling_enabled,
+            feature_label="官方售卖",
+        )
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            result = await cast(EconomyService, self._economy_service).sell_food(
+                identity,
+                matched_group(kwargs, "selector"),
+            )
+            renderer = cast(PigCatcherRenderer, self._renderer)
+            view = sale_receipt_view(result)
+            fallback = result.receipt.text_summary or format_sale_summary(result)
+            return await self._deliver_receipt(
+                stream_id=identity.stream_id,
+                receipt=result.receipt,
+                render=lambda: renderer.render_economy_receipt(view),
+                fallback_text=fallback,
+            )
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation="售卖美食",
+                error=exc,
+            )
+
+    @Command(
+        "pig_catcher_ledger",
+        description="查看当前群个人猪币流水",
+        pattern=r"^/猪币账本(?:\s+(?P<arguments>.*?))?\s*$",
+    )
+    async def handle_ledger(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_command(
+            stream_id,
+            kwargs,
+            feature_enabled=self.settings.features.ledger_enabled,
+            feature_label="猪币账本",
+        )
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            page = parse_ledger_page(matched_group(kwargs, "arguments"))
+            result = await cast(EconomyService, self._economy_service).ledger(
+                identity,
+                page=page,
+            )
+            renderer = cast(PigCatcherRenderer, self._renderer)
+            view = ledger_view(result)
+            return await self._deliver_query(
+                stream_id=identity.stream_id,
+                render=lambda: renderer.render_ledger(view),
+                fallback_text=format_ledger_summary(result),
+            )
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation="猪币账本",
                 error=exc,
             )
 

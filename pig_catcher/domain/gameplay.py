@@ -60,18 +60,19 @@ class ItemDefinition:
     item_id: str
     display_name: str
     action_type: str
+    price: int
     effect_summary: str
 
 
 ITEM_DEFINITIONS: tuple[ItemDefinition, ...] = (
-    ItemDefinition("lucky-whistle", "幸运猪哨", "catching", "3 至 5 星相对权重 +12%，6 星 +2%"),
-    ItemDefinition("giant-corn", "巨物玉米", "catching", "体型百分位 +0.12"),
-    ItemDefinition("fattening-bean-cake", "增膘豆饼", "catching", "肥瘦率 +15，重量百分位 +0.05"),
-    ItemDefinition("lean-green-feed", "精瘦青饲料", "catching", "肥瘦率 -15，体型百分位 +0.03"),
-    ItemDefinition("chef-spice", "主厨香料", "cooking", "做菜品质概率加成"),
-    ItemDefinition("precision-knife", "精准刀工券", "cooking", "优先偏瘦食谱"),
-    ItemDefinition("slow-cook-seasoning", "慢炖调料包", "cooking", "优先偏肥食谱"),
-    ItemDefinition("large-lunch-box", "大份餐盒", "cooking", "符合条件时可能额外出餐"),
+    ItemDefinition("lucky-whistle", "幸运猪哨", "catching", 180, "3 至 5 星相对权重 +12%，6 星 +2%"),
+    ItemDefinition("giant-corn", "巨物玉米", "catching", 140, "体型百分位 +0.12"),
+    ItemDefinition("fattening-bean-cake", "增膘豆饼", "catching", 100, "肥瘦率 +15，重量百分位 +0.05"),
+    ItemDefinition("lean-green-feed", "精瘦青饲料", "catching", 100, "肥瘦率 -15，体型百分位 +0.03"),
+    ItemDefinition("chef-spice", "主厨香料", "cooking", 180, "做菜品质概率加成"),
+    ItemDefinition("precision-knife", "精准刀工券", "cooking", 120, "优先偏瘦食谱"),
+    ItemDefinition("slow-cook-seasoning", "慢炖调料包", "cooking", 120, "优先偏肥食谱"),
+    ItemDefinition("large-lunch-box", "大份餐盒", "cooking", 240, "符合条件时可能额外出餐"),
 )
 
 ITEMS_BY_ID = {item.item_id: item for item in ITEM_DEFINITIONS}

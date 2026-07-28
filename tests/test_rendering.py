@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import logging
+from dataclasses import replace
 from io import BytesIO
 from pathlib import Path
 
@@ -18,10 +19,19 @@ from pig_catcher.rendering import (
     CatalogItemViewModel,
     CatalogViewModel,
     CollectionProgressViewModel,
+    EconomyReceiptRowViewModel,
+    EconomyReceiptViewModel,
+    FoodCardViewModel,
+    FoodCatalogItemViewModel,
+    FoodCatalogViewModel,
+    FoodInventoryItemViewModel,
+    FoodInventoryViewModel,
     FrameworkPreviewViewModel,
     InventoryItemViewModel,
     InventoryViewModel,
     ItemReceiptViewModel,
+    LedgerEntryViewModel,
+    LedgerViewModel,
     MediaSlot,
     PigCardViewModel,
     PigCatcherRenderer,
@@ -30,6 +40,8 @@ from pig_catcher.rendering import (
     RecordsViewModel,
     RenderDelivery,
     RenderOptions,
+    StoreProductViewModel,
+    StoreViewModel,
 )
 from pig_catcher.version import (
     ASSET_MANIFEST_VERSION,
@@ -621,3 +633,201 @@ async def test_pig_card_base_exposes_animation_safe_slot() -> None:
         )
     )
     assert base.media_slot == MediaSlot(x=38, y=164, width=480, height=480)
+
+
+@pytest.mark.asyncio
+async def test_fourth_round_templates_render_food_and_economy_views(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "food.png"
+    Image.new("RGBA", (96, 96), "#F7A7C4").save(source, format="PNG")
+    capability = FakeRender()
+    renderer = PigCatcherRenderer(capability, _options())
+    food = FoodCardViewModel(
+        mode_label="做菜成功",
+        display_name="<script>测试美食</script>",
+        owner_display_name="测试成员",
+        rarity=4,
+        rarity_name="极品佳肴",
+        short_code="D19F2C3D",
+        description="一份用于第四轮渲染验收的美食。",
+        portion_weight=12.34,
+        fat_label="均衡",
+        official_value=388,
+        acquired_at="2026-07-28 12:00",
+        source_selector="测试猪#A19F2C3D",
+        effect_summary="暂无额外效果",
+        image_fit="contain",
+        media_visible=True,
+        is_animated=False,
+        media_format="PNG",
+        coin_reward=45,
+        experience_reward=40,
+        coin_balance=500,
+        total_experience=900,
+        cookware_level=2,
+        item_name="主厨香料",
+        catalog_new_count=1,
+        probability_summary="1★ 75.0% · 2★ 22.0% · 3★ 3.0%",
+    )
+    await renderer.render_static_food_card(food, source)
+    food_html, _ = capability.calls[-1]
+    assert "<script>测试美食</script>" not in food_html
+    assert "&lt;script&gt;" in food_html
+    assert "data:image/png;base64," in food_html
+    assert "主厨香料" in food_html
+    assert "最终品质概率" in food_html
+    assert "1★ 75.0%" in food_html
+
+    base = await renderer.render_food_card_base(
+        replace(food, is_animated=True, media_format="GIF")
+    )
+    assert base.media_slot == MediaSlot(x=38, y=164, width=480, height=480)
+
+    inventory = FoodInventoryViewModel(
+        display_name="测试成员",
+        page=1,
+        page_count=1,
+        total_count=2,
+        rarity=None,
+        sort="价值",
+        items=(
+            FoodInventoryItemViewModel(
+                key="static",
+                display_name="静态菜",
+                short_code="AAAA0001",
+                rarity=2,
+                portion_weight=8.2,
+                fat_label="均衡",
+                official_value=40,
+                media_visible=True,
+                is_animated=False,
+                image_fit="contain",
+            ),
+            FoodInventoryItemViewModel(
+                key="animated",
+                display_name="动画菜",
+                short_code="BBBB0002",
+                rarity=3,
+                portion_weight=9.1,
+                fat_label="偏肥",
+                official_value=120,
+                media_visible=True,
+                is_animated=True,
+                image_fit="contain",
+            ),
+        ),
+    )
+    await renderer.render_food_inventory(inventory, {"static": source})
+    inventory_html, _ = capability.calls[-1]
+    assert "动态美食" in inventory_html
+    assert inventory_html.count("data:image/png;base64,") == 1
+
+    catalog = FoodCatalogViewModel(
+        display_name="测试成员",
+        page=1,
+        page_count=1,
+        total_count=2,
+        rarity=None,
+        undiscovered_only=False,
+        collected_count=1,
+        visible_catalog_total=13,
+        items=(
+            FoodCatalogItemViewModel(
+                key="static",
+                display_name="静态菜",
+                rarity=2,
+                discovered=True,
+                acquired_count=2,
+                best_portion_weight=8.2,
+                media_visible=True,
+                is_animated=False,
+                image_fit="contain",
+            ),
+            FoodCatalogItemViewModel(
+                key="secret",
+                display_name="不得泄露的群专属菜",
+                rarity=6,
+                discovered=False,
+                acquired_count=0,
+                best_portion_weight=None,
+                media_visible=False,
+                is_animated=False,
+                image_fit="contain",
+            ),
+        ),
+    )
+    await renderer.render_food_catalog(catalog, {"static": source})
+    catalog_html, _ = capability.calls[-1]
+    assert "不得泄露的群专属菜" not in catalog_html
+    assert "尚未发现" in catalog_html
+
+    await renderer.render_store(
+        StoreViewModel(
+            display_name="测试成员",
+            coin_balance=800,
+            page=1,
+            page_count=1,
+            total_count=2,
+            category="全部",
+            feed_level=1,
+            cookware_level=2,
+            products=(
+                StoreProductViewModel(
+                    display_name="幸运猪哨",
+                    category="抓猪道具",
+                    unit_price=180,
+                    effect_summary="品质概率加成",
+                    current_level=0,
+                    target_level=0,
+                ),
+                StoreProductViewModel(
+                    display_name="厨具升级",
+                    category="永久升级",
+                    unit_price=1200,
+                    effect_summary="购买后提升至 Lv.3",
+                    current_level=2,
+                    target_level=3,
+                ),
+            ),
+        )
+    )
+    assert "幸运猪哨" in capability.calls[-1][0]
+
+    await renderer.render_economy_receipt(
+        EconomyReceiptViewModel(
+            eyebrow="猪猪商城",
+            title="购买成功",
+            badge_label="剩余猪币",
+            badge_value="620",
+            summary="幸运猪哨 ×1",
+            rows=(
+                EconomyReceiptRowViewModel("单价", "180 猪币"),
+                EconomyReceiptRowViewModel("本次支付", "180 猪币"),
+                EconomyReceiptRowViewModel("库存", "1"),
+            ),
+            note="同一消息不会重复扣款。",
+        )
+    )
+    assert "一次且仅一次" in capability.calls[-1][0]
+
+    await renderer.render_ledger(
+        LedgerViewModel(
+            display_name="测试成员",
+            page=1,
+            page_count=1,
+            total_count=1,
+            coin_balance=620,
+            ledger_total=620,
+            items=(
+                LedgerEntryViewModel(
+                    amount_text="-180",
+                    positive=False,
+                    balance_after=620,
+                    reason_text="购买幸运猪哨×1",
+                    created_at="2026-07-28 12:00",
+                ),
+            ),
+        )
+    )
+    assert "对账状态" in capability.calls[-1][0]

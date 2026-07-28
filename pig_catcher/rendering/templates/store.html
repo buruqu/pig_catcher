@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root { --font-family: {{ font_family }}; }
+    {{ theme_css | safe }}
+  </style>
+</head>
+<body>
+  <main class="game-sheet store-sheet" data-pig-catcher-root data-render-ready="true">
+    <header class="game-header">
+      <div class="game-header__copy">
+        <p class="game-header__eyebrow">猪猪商城 · 道具与永久升级</p>
+        <h1 style="font-size: {% if view.display_name|length > 60 %}16{% elif view.display_name|length > 40 %}20{% elif view.display_name|length > 24 %}31{% else %}42{% endif %}px">{{ view.display_name }}</h1>
+      </div>
+      <div class="game-header__meta">
+        <span>猪币余额</span>
+        <strong>{{ view.coin_balance }}</strong>
+      </div>
+    </header>
+
+    <section class="store-summary">
+      <div>
+        <span>当前分类</span>
+        <strong>{{ view.category }}</strong>
+      </div>
+      <div>
+        <span>猪饲料</span>
+        <strong>Lv.{{ view.feed_level }}</strong>
+      </div>
+      <div>
+        <span>厨具</span>
+        <strong>Lv.{{ view.cookware_level }}</strong>
+      </div>
+      <div>
+        <span>页面</span>
+        <strong>{{ view.page }}/{{ view.page_count }}</strong>
+      </div>
+    </section>
+
+    {% if view.products %}
+    <section class="store-list">
+      {% for product in view.products %}
+      <article class="store-row">
+        <div class="store-row__copy">
+          <span>{{ product.category }}</span>
+          <h2 style="font-size: {% if product.display_name|length > 40 %}17{% elif product.display_name|length > 24 %}22{% else %}27{% endif %}px">{{ product.display_name }}</h2>
+          <p>{{ product.effect_summary }}</p>
+        </div>
+        <div class="store-row__price">
+          {% if product.unit_price > 0 %}
+          <strong>{{ product.unit_price }}</strong>
+          <span>猪币</span>
+          {% else %}
+          <strong>MAX</strong>
+          <span>已满级</span>
+          {% endif %}
+        </div>
+      </article>
+      {% endfor %}
+    </section>
+    {% else %}
+    <section style="padding:32px 38px"><div class="empty-state">当前分类没有商品</div></section>
+    {% endif %}
+
+    <footer class="game-footer">
+      <span>购买示例：/购买 幸运猪哨 2</span>
+      <strong>共 {{ view.total_count }} 项</strong>
+    </footer>
+  </main>
+</body>
+</html>

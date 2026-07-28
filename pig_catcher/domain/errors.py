@@ -87,3 +87,39 @@ class AmbiguousPigSelectorError(GameplayError):
 
 class ItemInventoryError(GameplayError):
     """玩家没有可装备或消耗的对应道具。"""
+
+
+class FoodNotFoundError(GameplayError):
+    """当前玩家的有效美食库存中找不到选择目标。"""
+
+
+class AmbiguousFoodSelectorError(GameplayError):
+    """同名美食不唯一，需要短编号。"""
+
+
+class CookingTemplateError(GameplayError):
+    """当前群缺少本次料理结果所需的美食模板。"""
+
+
+class AssetStateConflictError(GameplayError):
+    """资产已被消耗、售卖或锁定，不能执行当前操作。"""
+
+
+class InsufficientBalanceError(GameplayError):
+    """玩家猪币余额不足。"""
+
+
+class UpgradeLimitError(GameplayError):
+    """永久升级已经达到最高等级。"""
+
+
+class StoreProductError(GameplayError):
+    """商城商品或购买数量无效。"""
+
+
+class FoodEffectError(GameplayError):
+    """美食声明了当前规则版本无法安全应用的效果。"""
+
+
+class LedgerReconciliationError(GameplayError):
+    """玩家余额与不可变流水无法对账。"""

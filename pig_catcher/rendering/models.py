@@ -152,6 +152,13 @@ class ProfileViewModel:
     feed_level: int
     armed_item_name: str
     armed_item_quantity: int
+    cookware_level: int = 0
+    total_cooks: int = 0
+    active_foods: int = 0
+    food_catalog_count: int = 0
+    visible_food_catalog_total: int = 0
+    armed_cooking_item_name: str = ""
+    armed_cooking_item_quantity: int = 0
     collections: tuple[CollectionProgressViewModel, ...] = ()
 
 
@@ -253,3 +260,166 @@ class ItemReceiptViewModel:
     action_label: str
     quantity: int
     effect_summary: str
+
+
+@dataclass(frozen=True, slots=True)
+class FoodCardViewModel:
+    """Single food detail or cooking-result card."""
+
+    mode_label: str
+    display_name: str
+    owner_display_name: str
+    rarity: int
+    rarity_name: str
+    short_code: str
+    description: str
+    portion_weight: float
+    fat_label: str
+    official_value: int
+    acquired_at: str
+    source_selector: str
+    effect_summary: str
+    image_fit: str
+    media_visible: bool
+    is_animated: bool
+    media_format: str
+    coin_reward: int | None = None
+    experience_reward: int | None = None
+    coin_balance: int | None = None
+    total_experience: int | None = None
+    cookware_level: int | None = None
+    item_name: str = ""
+    catalog_new_count: int = 0
+    bonus_selector: str = ""
+    probability_summary: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class FoodInventoryItemViewModel:
+    """One stable food inventory tile."""
+
+    key: str
+    display_name: str
+    short_code: str
+    rarity: int
+    portion_weight: float
+    fat_label: str
+    official_value: int
+    media_visible: bool
+    is_animated: bool
+    image_fit: str
+
+
+@dataclass(frozen=True, slots=True)
+class FoodInventoryViewModel:
+    """One filtered food inventory page."""
+
+    display_name: str
+    page: int
+    page_count: int
+    total_count: int
+    rarity: int | None
+    sort: str
+    items: tuple[FoodInventoryItemViewModel, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class FoodCatalogItemViewModel:
+    """One privacy-aware food catalog tile."""
+
+    key: str
+    display_name: str
+    rarity: int
+    discovered: bool
+    acquired_count: int
+    best_portion_weight: float | None
+    media_visible: bool
+    is_animated: bool
+    image_fit: str
+
+
+@dataclass(frozen=True, slots=True)
+class FoodCatalogViewModel:
+    """One food catalog page."""
+
+    display_name: str
+    page: int
+    page_count: int
+    total_count: int
+    rarity: int | None
+    undiscovered_only: bool
+    collected_count: int
+    visible_catalog_total: int
+    items: tuple[FoodCatalogItemViewModel, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class StoreProductViewModel:
+    """One store product row."""
+
+    display_name: str
+    category: str
+    unit_price: int
+    effect_summary: str
+    current_level: int
+    target_level: int
+
+
+@dataclass(frozen=True, slots=True)
+class StoreViewModel:
+    """One current-player store page."""
+
+    display_name: str
+    coin_balance: int
+    page: int
+    page_count: int
+    total_count: int
+    category: str
+    feed_level: int
+    cookware_level: int
+    products: tuple[StoreProductViewModel, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class EconomyReceiptRowViewModel:
+    """One label/value row in an economy receipt."""
+
+    label: str
+    value: str
+
+
+@dataclass(frozen=True, slots=True)
+class EconomyReceiptViewModel:
+    """Purchase, eating, or official-sale success receipt."""
+
+    eyebrow: str
+    title: str
+    badge_label: str
+    badge_value: str
+    summary: str
+    rows: tuple[EconomyReceiptRowViewModel, ...]
+    note: str
+
+
+@dataclass(frozen=True, slots=True)
+class LedgerEntryViewModel:
+    """One rendered pig-coin ledger entry."""
+
+    amount_text: str
+    positive: bool
+    balance_after: int
+    reason_text: str
+    created_at: str
+
+
+@dataclass(frozen=True, slots=True)
+class LedgerViewModel:
+    """One reconciled ledger page."""
+
+    display_name: str
+    page: int
+    page_count: int
+    total_count: int
+    coin_balance: int
+    ledger_total: int
+    items: tuple[LedgerEntryViewModel, ...]

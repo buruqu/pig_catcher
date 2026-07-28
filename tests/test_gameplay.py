@@ -239,6 +239,42 @@ async def test_cooldown_daily_limit_and_duplicate_precedence(tmp_path: Path) -> 
 
 
 @pytest.mark.asyncio
+async def test_default_frequency_is_twenty_per_day_with_twenty_second_cooldown(
+    tmp_path: Path,
+) -> None:
+    database = await _database_with_catalog(
+        tmp_path,
+        [_pig_entry("one-pig", rarity=1)],
+    )
+    clock = MutableClock(datetime(2026, 7, 28, 4, 0, tzinfo=UTC))
+    service = GameplayService(
+        database,
+        CatchingSection(),
+        random_source=SequenceRandom(
+            *(
+                roll
+                for _ in range(20)
+                for roll in _catch_rolls()
+            )
+        ),
+        clock=clock,
+    )
+    await service.catch(_identity(message_id="default-1"))
+    with pytest.raises(CatchCooldownError, match="20"):
+        await service.catch(_identity(message_id="default-2"))
+    for index in range(2, 21):
+        clock.value += timedelta(seconds=20)
+        await service.catch(_identity(message_id=f"default-{index}"))
+    clock.value += timedelta(seconds=20)
+    with pytest.raises(DailyCatchLimitError, match="20/20"):
+        await service.catch(_identity(message_id="default-21"))
+    profile = await service.profile(_identity(message_id="default-profile"))
+    assert profile.daily_count == 20
+    assert profile.daily_limit == 20
+    await database.close()
+
+
+@pytest.mark.asyncio
 async def test_cooldown_does_not_reset_at_beijing_midnight(tmp_path: Path) -> None:
     database = await _database_with_catalog(
         tmp_path,

@@ -1,7 +1,7 @@
 [plugin]
 enabled = true
-config_version = "0.3.0"
-framework_phase = "3"
+config_version = "0.4.0"
+framework_phase = "4"
 
 [features]
 help_enabled = true
@@ -11,6 +11,13 @@ inventory_enabled = true
 catalog_enabled = true
 records_enabled = true
 items_enabled = true
+cooking_enabled = true
+food_inventory_enabled = true
+food_catalog_enabled = true
+eating_enabled = true
+store_enabled = true
+selling_enabled = true
+ledger_enabled = true
 
 [access]
 group_whitelist = []
@@ -37,8 +44,8 @@ max_animation_duration_ms = 30000
 staging_max_age_hours = 24
 
 [catching]
-daily_limit = 30
-cooldown_seconds = 60
+daily_limit = 20
+cooldown_seconds = 20
 daily_reset_timezone = "Asia/Shanghai"
 inventory_page_size = 8
 catalog_page_size = 12
@@ -56,11 +63,16 @@ missing_six_star_strategy = "transfer-to-five"
 max_cookware_level = 5
 six_star_to_five_percent = 90
 six_star_to_six_percent = 10
+inventory_page_size = 8
+catalog_page_size = 12
 
 [economy]
 max_upgrade_level = 5
 feed_upgrade_prices = [500, 1200, 2800, 6500, 15000]
 cookware_upgrade_prices = [500, 1200, 2800, 6500, 15000]
+store_page_size = 8
+ledger_page_size = 10
+max_purchase_quantity = 99
 
 [trading]
 gift_enabled = false

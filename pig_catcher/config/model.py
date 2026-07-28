@@ -42,11 +42,11 @@ class PluginSection(PluginConfigBase):
         frozen=True,
         json_schema_extra=_ui("配置版本", "由插件维护，不需要手工修改", disabled=True),
     )
-    framework_phase: Literal["3"] = Field(
+    framework_phase: Literal["4"] = Field(
         default=FRAMEWORK_PHASE,
         description="当前开发交付阶段",
         frozen=True,
-        json_schema_extra=_ui("开发阶段", "第三轮已开放抓猪、收藏、档案与群纪录", disabled=True),
+        json_schema_extra=_ui("开发阶段", "第四轮已开放做菜、美食、商城、售卖与账本", disabled=True),
     )
 
 
@@ -90,7 +90,42 @@ class FeaturesSection(PluginConfigBase):
     items_enabled: bool = Field(
         default=True,
         description="是否允许装备和取消抓猪或做菜道具",
-        json_schema_extra=_ui("允许使用道具", "第三轮可装备抓猪道具；做菜道具随第四轮结算"),
+        json_schema_extra=_ui("允许使用道具", "对应 /使用道具 和 /取消道具，兼容抓猪与做菜"),
+    )
+    cooking_enabled: bool = Field(
+        default=True,
+        description="是否允许把当前持有的猪制作成美食",
+        json_schema_extra=_ui("允许做菜", "对应 /做菜；成功后原料猪与做菜道具会原子消耗"),
+    )
+    food_inventory_enabled: bool = Field(
+        default=True,
+        description="是否允许查看美食背包和详情",
+        json_schema_extra=_ui("允许美食背包与详情", "对应 /美食背包 和 /美食详情"),
+    )
+    food_catalog_enabled: bool = Field(
+        default=True,
+        description="是否允许查看美食图鉴",
+        json_schema_extra=_ui("允许美食图鉴", "对应 /美食图鉴；未发现群专属美食不会泄露"),
+    )
+    eating_enabled: bool = Field(
+        default=True,
+        description="是否允许食用当前持有的美食",
+        json_schema_extra=_ui("允许吃菜", "对应 /吃菜 和 /使用美食；成功后美食会被消耗"),
+    )
+    store_enabled: bool = Field(
+        default=True,
+        description="是否允许查看商城并购买道具或永久升级",
+        json_schema_extra=_ui("允许商城与购买", "对应 /猪猪商城 和 /购买"),
+    )
+    selling_enabled: bool = Field(
+        default=True,
+        description="是否允许按官方价值售卖猪或美食",
+        json_schema_extra=_ui("允许官方售卖", "对应 /售卖猪猪 和 /售卖美食；图鉴不会减少"),
+    )
+    ledger_enabled: bool = Field(
+        default=True,
+        description="是否允许查看个人猪币流水和对账状态",
+        json_schema_extra=_ui("允许猪币账本", "对应 /猪币账本，仅显示当前群个人流水"),
     )
 
 
@@ -262,18 +297,18 @@ class CatchingSection(PluginConfigBase):
     __ui_order__ = 50
 
     daily_limit: int = Field(
-        default=30,
+        default=20,
         ge=1,
         le=1000,
         description="每位玩家在每个群每天可成功抓取的次数",
-        json_schema_extra=_ui("每日抓猪次数", "默认 30 次；只统计当前群、按北京时间自然日重置"),
+        json_schema_extra=_ui("每日抓猪次数", "默认 20 次；只统计当前群、按北京时间自然日重置"),
     )
     cooldown_seconds: int = Field(
-        default=60,
+        default=20,
         ge=0,
         le=86400,
         description="同一玩家两次抓猪之间的最短秒数",
-        json_schema_extra=_ui("抓猪冷却", "设置 0 表示不限制冷却，仍受每日次数约束"),
+        json_schema_extra=_ui("抓猪冷却", "默认 20 秒；设置 0 表示不限制冷却，仍受每日次数约束"),
     )
     daily_reset_timezone: Literal["Asia/Shanghai"] = Field(
         default="Asia/Shanghai",
@@ -395,6 +430,20 @@ class CookingSection(PluginConfigBase):
         description="六星猪做出六星菜的固定百分比",
         json_schema_extra=_ui("六星猪出六星菜", "固定 10%，且不会出现其他品质", disabled=True),
     )
+    inventory_page_size: int = Field(
+        default=8,
+        ge=4,
+        le=16,
+        description="美食背包每页显示数量",
+        json_schema_extra=_ui("美食背包每页数量", "默认 8，只影响展示，不改变资产数据"),
+    )
+    catalog_page_size: int = Field(
+        default=12,
+        ge=6,
+        le=20,
+        description="美食图鉴每页显示数量",
+        json_schema_extra=_ui("美食图鉴每页数量", "默认 12，未发现项目使用统一保密占位"),
+    )
 
 
 class EconomySection(PluginConfigBase):
@@ -424,6 +473,27 @@ class EconomySection(PluginConfigBase):
         description="厨具从一级到五级的购买价格",
         json_schema_extra=_ui("厨具升级价格", "按一级到五级顺序填写五个正整数"),
     )
+    store_page_size: int = Field(
+        default=8,
+        ge=4,
+        le=16,
+        description="商城每页显示的商品数量",
+        json_schema_extra=_ui("商城每页数量", "默认 8，分类筛选后重新分页"),
+    )
+    ledger_page_size: int = Field(
+        default=10,
+        ge=5,
+        le=20,
+        description="个人猪币账本每页显示的流水数量",
+        json_schema_extra=_ui("账本每页数量", "默认 10，并显示余额与流水合计对账结果"),
+    )
+    max_purchase_quantity: int = Field(
+        default=99,
+        ge=1,
+        le=10000,
+        description="一次购买消耗品允许的最大数量",
+        json_schema_extra=_ui("单次购买上限", "只限制一次性道具；永久升级每次固定购买一级"),
+    )
 
     @field_validator("feed_upgrade_prices", "cookware_upgrade_prices")
     @classmethod
@@ -443,12 +513,12 @@ class TradingSection(PluginConfigBase):
     gift_enabled: bool = Field(
         default=False,
         description="是否启用同群赠送",
-        json_schema_extra=_ui("启用赠送", "2B 尚未注册赠送命令，后续功能完成后再开启"),
+        json_schema_extra=_ui("启用赠送", "第五轮尚未注册赠送命令，完整实现后再开启"),
     )
     trade_enabled: bool = Field(
         default=False,
         description="是否启用两阶段玩家交易",
-        json_schema_extra=_ui("启用交易", "2B 尚未注册交易命令，后续功能完成后再开启"),
+        json_schema_extra=_ui("启用交易", "第五轮尚未注册交易命令，完整实现后再开启"),
     )
     max_trade_price: int = Field(
         default=1000000,
@@ -578,7 +648,7 @@ class MaintenanceSection(PluginConfigBase):
 
 
 class PigCatcherConfig(PluginConfigBase):
-    """抓猪插件第三轮完整配置。"""
+    """抓猪插件第四轮完整配置。"""
 
     plugin: PluginSection = Field(default_factory=PluginSection)
     features: FeaturesSection = Field(default_factory=FeaturesSection)

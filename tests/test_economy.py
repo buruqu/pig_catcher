@@ -1,0 +1,554 @@
+"""Fourth-round cooking and economy integration tests."""
+
+from __future__ import annotations
+
+import json
+from datetime import UTC, datetime
+from pathlib import Path
+
+import pytest
+from PIL import Image
+
+from pig_catcher.assets import AssetCatalogStorage
+from pig_catcher.config.model import CatchingSection, CookingSection, EconomySection
+from pig_catcher.domain.economy import adjusted_cooking_weights
+from pig_catcher.domain.errors import (
+    CookingTemplateError,
+    FoodEffectError,
+    InsufficientBalanceError,
+)
+from pig_catcher.domain.models import CommandIdentity, ScopeKey
+from pig_catcher.infrastructure import PigCatcherDatabase
+from pig_catcher.infrastructure.repositories import EconomyRepository, FrameworkRepository
+from pig_catcher.services import AssetCatalogService, EconomyService, GameplayService
+from pig_catcher.services.command_state import iso_timestamp
+
+
+class SequenceRandom:
+    """Deterministic random source that rejects unexpected draws."""
+
+    def __init__(self, *values: float) -> None:
+        self.values = list(values)
+
+    def random(self) -> float:
+        if not self.values:
+            raise AssertionError("deterministic random source was exhausted")
+        return self.values.pop(0)
+
+
+class FixedClock:
+    """Stable UTC clock."""
+
+    def __init__(self) -> None:
+        self.value = datetime(2026, 7, 28, 4, 0, tzinfo=UTC)
+
+    def now(self) -> datetime:
+        return self.value
+
+
+def _identity(
+    *,
+    group_id: str = "100",
+    user_id: str = "200",
+    message_id: str,
+) -> CommandIdentity:
+    return CommandIdentity(
+        scope=ScopeKey("qq", group_id),
+        stream_id=f"stream-{group_id}",
+        user_id=user_id,
+        display_name=f"成员{user_id}",
+        message_id=message_id,
+        group_name=f"测试群{group_id}",
+    )
+
+
+def _pig_entry(
+    rarity: int,
+    *,
+    group_id: str | None = None,
+) -> dict[str, object]:
+    group_only = group_id is not None
+    return {
+        "template_id": f"pig-{rarity}-{'group' if group_only else 'common'}",
+        "kind": "pig",
+        "display_name": f"{rarity}星测试猪",
+        "rarity": rarity,
+        "scope": "group" if group_only else "common",
+        "group_scope_id": f"qq:{group_id}" if group_only else None,
+        "description": "第四轮测试原料猪",
+        "image": f"pig-{rarity}.png",
+        "fit": "contain",
+        "source": "pytest synthetic asset",
+        "license": "test-only",
+        "consent_status": "granted" if group_only else "not-required",
+        "length_min_cm": 30,
+        "length_max_cm": 70,
+        "weight_min_kg": 20,
+        "weight_max_kg": 120,
+        "fat_profile": "balanced",
+        "recipe_tags": ["家常"],
+    }
+
+
+def _food_entry(
+    rarity: int,
+    *,
+    group_id: str | None = None,
+    effect_id: str = "",
+) -> dict[str, object]:
+    group_only = group_id is not None
+    return {
+        "template_id": f"food-{rarity}-{'group' if group_only else 'common'}",
+        "kind": "food",
+        "display_name": f"{rarity}星测试菜",
+        "rarity": rarity,
+        "scope": "group" if group_only else "common",
+        "group_scope_id": f"qq:{group_id}" if group_only else None,
+        "description": "第四轮测试美食",
+        "image": f"food-{rarity}.png",
+        "fit": "contain",
+        "source": "pytest synthetic asset",
+        "license": "test-only",
+        "consent_status": "granted" if group_only else "not-required",
+        "recipe_tags": ["家常"],
+        "effect_id": effect_id,
+    }
+
+
+async def _database_with_catalog(
+    tmp_path: Path,
+    *,
+    pig_rarities: tuple[int, ...] = (1,),
+    food_rarities: tuple[int, ...] = (1, 2, 3),
+    group_id: str = "100",
+    effect_ids: dict[int, str] | None = None,
+) -> PigCatcherDatabase:
+    source = tmp_path / "source"
+    source.mkdir()
+    entries: list[dict[str, object]] = []
+    for rarity in pig_rarities:
+        entries.append(
+            _pig_entry(rarity, group_id=group_id if rarity == 6 else None)
+        )
+    for rarity in food_rarities:
+        entries.append(
+            _food_entry(
+                rarity,
+                group_id=group_id if rarity == 6 else None,
+                effect_id=(effect_ids or {}).get(rarity, ""),
+            )
+        )
+    for index, entry in enumerate(entries):
+        image_path = source / str(entry["image"])
+        if not image_path.exists():
+            Image.new(
+                "RGBA",
+                (64, 64),
+                (255, 160 + index % 80, 190 + index % 60, 255),
+            ).save(image_path, format="PNG")
+    manifest = source / "assets.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "manifest_version": 2,
+                "catalog_id": "fourth-round-tests",
+                "source_label": "pytest fourth-round catalog",
+                "entries": entries,
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    data_dir = tmp_path / "data"
+    database = PigCatcherDatabase(data_dir / "pig.sqlite3")
+    await database.open()
+    await AssetCatalogService(
+        database,
+        AssetCatalogStorage(data_dir),
+        min_image_side=32,
+        max_image_bytes=1024 * 1024,
+    ).import_manifest(manifest)
+    return database
+
+
+async def _catch_one_star(
+    database: PigCatcherDatabase,
+    *,
+    clock: FixedClock,
+    message_id: str = "catch-1",
+    short_code: str = "A19F2C3D",
+) -> tuple[GameplayService, object]:
+    service = GameplayService(
+        database,
+        CatchingSection(cooldown_seconds=0),
+        random_source=SequenceRandom(0.0, 0.0, 0.5, 0.5, 0.5, 0.5, 0.5),
+        clock=clock,
+        id_factory=iter((f"pig-{message_id}", f"ledger-{message_id}")).__next__,
+        short_code_factory=lambda: short_code,
+    )
+    result = await service.catch(_identity(message_id=message_id))
+    return service, result
+
+
+async def _grant_coins(
+    database: PigCatcherDatabase,
+    identity: CommandIdentity,
+    amount: int,
+) -> None:
+    now = iso_timestamp(datetime(2026, 7, 28, 3, 0, tzinfo=UTC))
+    async with database.transaction() as session:
+        await FrameworkRepository().touch_identity(
+            session,
+            identity=identity,
+            now=now,
+        )
+        balance = await EconomyRepository().apply_currency_change(
+            session,
+            player_id=identity.player_id,
+            scope_id=identity.scope.value,
+            amount=amount,
+            reason_code="test-grant",
+            reason_text="测试入账",
+            source_object_type="test",
+            source_object_id="seed",
+            ledger_entry_id=f"seed-{identity.message_id}",
+            idempotency_key=f"seed-{identity.player_id}",
+            now=now,
+        )
+        assert balance == amount
+
+
+def test_cooking_weight_hard_boundaries() -> None:
+    for source_rarity in range(1, 6):
+        weights = adjusted_cooking_weights(
+            source_rarity,
+            size_percentile=1.0,
+            weight_percentile=1.0,
+            cookware_level=5,
+            chef_spice=True,
+        )
+        assert weights[5] == 0.0
+        assert sum(weights) == pytest.approx(100.0)
+    assert adjusted_cooking_weights(
+        6,
+        size_percentile=1.0,
+        weight_percentile=1.0,
+        cookware_level=5,
+        chef_spice=True,
+    ) == (0.0, 0.0, 0.0, 0.0, 90.0, 10.0)
+
+
+@pytest.mark.asyncio
+async def test_cooking_commits_once_and_rehydrates_after_restart(
+    tmp_path: Path,
+) -> None:
+    database = await _database_with_catalog(tmp_path)
+    clock = FixedClock()
+    _, caught = await _catch_one_star(database, clock=clock)
+    identity = _identity(message_id="cook-1")
+    first_service = EconomyService(
+        database,
+        CookingSection(),
+        EconomySection(),
+        random_source=SequenceRandom(0.0, 0.0, 0.5),
+        clock=clock,
+        id_factory=iter(("food-1", "cook-ledger-1")).__next__,
+        short_code_factory=lambda: "B19F2C3D",
+    )
+    first = await first_service.cook(identity, caught.pig.selector)
+    assert first.receipt_created is True
+    assert first.foods[0].rarity == 1
+    assert first.coin_balance == 5
+    assert first.total_experience == 9
+
+    duplicate = await first_service.cook(identity, caught.pig.selector)
+    assert duplicate.receipt_created is False
+    await database.close()
+    await database.open()
+    after_restart = await EconomyService(
+        database,
+        CookingSection(),
+        EconomySection(),
+        random_source=SequenceRandom(),
+        clock=clock,
+    ).cook(identity, caught.pig.selector)
+    assert after_restart.receipt_created is False
+
+    pig = await database.fetch_one(
+        "SELECT state FROM pig_instances WHERE pig_instance_id = ?",
+        (caught.pig.pig_instance_id,),
+    )
+    food_count = await database.fetch_one(
+        "SELECT COUNT(*) AS count FROM food_instances"
+    )
+    cook_receipts = await database.fetch_one(
+        "SELECT COUNT(*) AS count FROM command_receipts WHERE command_name = ?",
+        ("pig-catcher.cook",),
+    )
+    assert pig is not None and pig["state"] == "consumed-for-cooking"
+    assert food_count is not None and food_count["count"] == 1
+    assert cook_receipts is not None and cook_receipts["count"] == 1
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_missing_food_template_rolls_back_pig_and_item(
+    tmp_path: Path,
+) -> None:
+    database = await _database_with_catalog(
+        tmp_path,
+        food_rarities=(1,),
+    )
+    clock = FixedClock()
+    _, caught = await _catch_one_star(database, clock=clock)
+    identity = _identity(message_id="cook-missing")
+    now = iso_timestamp(clock.now())
+    async with database.transaction() as session:
+        await session.execute(
+            "INSERT INTO item_inventory(player_id, item_id, quantity, updated_at) "
+            "VALUES (?, 'chef-spice', 1, ?)",
+            (identity.player_id, now),
+        )
+        await session.execute(
+            "INSERT INTO armed_items(player_id, action_type, item_id, armed_at) "
+            "VALUES (?, 'cooking', 'chef-spice', ?)",
+            (identity.player_id, now),
+        )
+    service = EconomyService(
+        database,
+        CookingSection(),
+        EconomySection(),
+        random_source=SequenceRandom(0.99),
+        clock=clock,
+    )
+    with pytest.raises(CookingTemplateError, match="原料猪未消耗"):
+        await service.cook(identity, caught.pig.selector)
+    pig = await database.fetch_one(
+        "SELECT state FROM pig_instances WHERE pig_instance_id = ?",
+        (caught.pig.pig_instance_id,),
+    )
+    item = await database.fetch_one(
+        "SELECT quantity FROM item_inventory WHERE player_id = ? AND item_id = 'chef-spice'",
+        (identity.player_id,),
+    )
+    assert pig is not None and pig["state"] == "active"
+    assert item is not None and item["quantity"] == 1
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_large_lunch_box_produces_two_foods_and_consumes_once(
+    tmp_path: Path,
+) -> None:
+    database = await _database_with_catalog(tmp_path)
+    clock = FixedClock()
+    _, caught = await _catch_one_star(database, clock=clock)
+    identity = _identity(message_id="cook-lunch-box")
+    now = iso_timestamp(clock.now())
+    async with database.transaction() as session:
+        await session.execute(
+            "INSERT INTO item_inventory(player_id, item_id, quantity, updated_at) "
+            "VALUES (?, 'large-lunch-box', 1, ?)",
+            (identity.player_id, now),
+        )
+        await session.execute(
+            "INSERT INTO armed_items(player_id, action_type, item_id, armed_at) "
+            "VALUES (?, 'cooking', 'large-lunch-box', ?)",
+            (identity.player_id, now),
+        )
+    short_codes = iter(("B19F2C3D", "B19F2C3D", "C19F2C3D"))
+    service = EconomyService(
+        database,
+        CookingSection(),
+        EconomySection(),
+        random_source=SequenceRandom(0.0, 0.0, 0.4, 0.1, 0.8),
+        clock=clock,
+        id_factory=iter(("food-main", "food-bonus", "cook-ledger")).__next__,
+        short_code_factory=short_codes.__next__,
+    )
+    result = await service.cook(identity, caught.pig.selector)
+    assert result.bonus_serving is True
+    assert len(result.foods) == 2
+    assert [food.short_code for food in result.foods] == [
+        "B19F2C3D",
+        "C19F2C3D",
+    ]
+    assert result.foods[0].rarity == result.foods[1].rarity
+    assert result.coin_reward == 3
+    item = await database.fetch_one(
+        "SELECT quantity FROM item_inventory WHERE player_id = ? AND item_id = 'large-lunch-box'",
+        (identity.player_id,),
+    )
+    assert item is not None and item["quantity"] == 0
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_eating_unknown_effect_does_not_consume_then_blank_effect_is_idempotent(
+    tmp_path: Path,
+) -> None:
+    unknown_root = tmp_path / "unknown"
+    unknown_root.mkdir()
+    database = await _database_with_catalog(
+        unknown_root,
+        food_rarities=(1,),
+        effect_ids={1: "unknown-effect"},
+    )
+    clock = FixedClock()
+    _, caught = await _catch_one_star(database, clock=clock)
+    cooking = EconomyService(
+        database,
+        CookingSection(),
+        EconomySection(),
+        random_source=SequenceRandom(0.0, 0.0, 0.5),
+        clock=clock,
+        id_factory=iter(("food-unknown", "ledger-unknown")).__next__,
+        short_code_factory=lambda: "B19F2C3D",
+    )
+    cooked = await cooking.cook(
+        _identity(message_id="cook-unknown"),
+        caught.pig.selector,
+    )
+    with pytest.raises(FoodEffectError, match="不会消耗"):
+        await cooking.eat(
+            _identity(message_id="eat-unknown"),
+            cooked.foods[0].selector,
+        )
+    state = await database.fetch_one(
+        "SELECT state FROM food_instances WHERE food_instance_id = 'food-unknown'"
+    )
+    assert state is not None and state["state"] == "active"
+    await database.close()
+
+    blank_root = tmp_path / "blank"
+    blank_root.mkdir()
+    database = await _database_with_catalog(blank_root, food_rarities=(1,))
+    _, caught = await _catch_one_star(database, clock=clock)
+    service = EconomyService(
+        database,
+        CookingSection(),
+        EconomySection(),
+        random_source=SequenceRandom(0.0, 0.0, 0.5),
+        clock=clock,
+        id_factory=iter(("food-blank", "ledger-blank")).__next__,
+        short_code_factory=lambda: "D19F2C3D",
+    )
+    cooked = await service.cook(
+        _identity(message_id="cook-blank"),
+        caught.pig.selector,
+    )
+    eat_identity = _identity(message_id="eat-blank")
+    first = await service.eat(eat_identity, cooked.foods[0].selector)
+    duplicate = await service.eat(eat_identity, cooked.foods[0].selector)
+    assert first.base_experience == 2
+    assert duplicate.receipt_created is False
+    state = await database.fetch_one(
+        "SELECT state FROM food_instances WHERE food_instance_id = 'food-blank'"
+    )
+    assert state is not None and state["state"] == "consumed"
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_store_purchase_upgrade_insufficient_balance_and_ledger(
+    tmp_path: Path,
+) -> None:
+    database = await _database_with_catalog(tmp_path)
+    clock = FixedClock()
+    seed_identity = _identity(message_id="seed")
+    await _grant_coins(database, seed_identity, 1000)
+    service = EconomyService(
+        database,
+        CookingSection(),
+        EconomySection(),
+        clock=clock,
+        id_factory=iter(
+            ("purchase-ledger-1", "purchase-ledger-2", "purchase-ledger-3")
+        ).__next__,
+    )
+    store = await service.store(seed_identity, page=1, category="全部")
+    assert store.coin_balance == 1000
+    assert len(store.products) == 8
+
+    item_identity = _identity(message_id="buy-item")
+    item = await service.purchase(item_identity, "幸运猪哨", quantity=2)
+    assert item.balance_after == 640
+    assert item.inventory_quantity == 2
+    assert (await service.purchase(item_identity, "幸运猪哨", quantity=2)).receipt_created is False
+
+    upgrade = await service.purchase(
+        _identity(message_id="buy-upgrade"),
+        "厨具升级",
+        quantity=1,
+    )
+    assert upgrade.upgrade_level == 1
+    assert upgrade.balance_after == 140
+    with pytest.raises(InsufficientBalanceError):
+        await service.purchase(
+            _identity(message_id="buy-too-expensive"),
+            "猪饲料升级",
+            quantity=1,
+        )
+    inventory = await database.fetch_one(
+        "SELECT quantity FROM item_inventory WHERE player_id = ? AND item_id = 'lucky-whistle'",
+        (seed_identity.player_id,),
+    )
+    assert inventory is not None and inventory["quantity"] == 2
+    ledger = await service.ledger(seed_identity, page=1)
+    assert ledger.coin_balance == ledger.ledger_total == 140
+    assert ledger.total_count == 3
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_official_sales_credit_exact_value_once(
+    tmp_path: Path,
+) -> None:
+    database = await _database_with_catalog(tmp_path)
+    clock = FixedClock()
+    _, caught = await _catch_one_star(database, clock=clock)
+    service = EconomyService(
+        database,
+        CookingSection(),
+        EconomySection(),
+        clock=clock,
+        id_factory=iter(("sale-ledger",)).__next__,
+    )
+    identity = _identity(message_id="sell-pig")
+    first = await service.sell_pig(identity, caught.pig.selector)
+    duplicate = await service.sell_pig(identity, caught.pig.selector)
+    assert first.balance_after == 2 + caught.pig.official_value
+    assert duplicate.receipt_created is False
+    state = await database.fetch_one(
+        "SELECT state FROM pig_instances WHERE pig_instance_id = ?",
+        (caught.pig.pig_instance_id,),
+    )
+    assert state is not None and state["state"] == "sold"
+    ledger = await service.ledger(identity, page=1)
+    assert ledger.coin_balance == ledger.ledger_total
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_six_star_food_templates_are_group_isolated(tmp_path: Path) -> None:
+    database = await _database_with_catalog(
+        tmp_path,
+        pig_rarities=(1, 6),
+        food_rarities=(1, 5, 6),
+        group_id="100",
+    )
+    repository = EconomyRepository()
+    async with database.transaction() as session:
+        allowed = await repository.list_drawable_food_templates(
+            session,
+            scope_id="qq:100",
+            rarity=6,
+        )
+        denied = await repository.list_drawable_food_templates(
+            session,
+            scope_id="qq:999",
+            rarity=6,
+        )
+    assert len(allowed) == 1
+    assert denied == []
+    await database.close()

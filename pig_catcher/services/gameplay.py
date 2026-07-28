@@ -18,7 +18,6 @@ from ..domain.errors import (
     CatchCooldownError,
     DailyCatchLimitError,
     DomainValidationError,
-    GameplayError,
     ItemInventoryError,
     NoDrawableTemplateError,
     PigNotFoundError,
@@ -42,12 +41,19 @@ from ..domain.selectors import new_short_code, parse_asset_selector
 from ..infrastructure.database import DatabaseSession, PigCatcherDatabase
 from ..infrastructure.repositories import (
     AssetRepository,
+    EconomyRepository,
     FrameworkRepository,
     GameplayRepository,
     ReceiptRepository,
 )
 from ..version import RULESET_VERSION
 from .assets import CollectionProgress
+from .command_state import (
+    iso_timestamp,
+    receipt_payload,
+    valid_page_count,
+    validate_existing_receipt,
+)
 from .receipts import request_fingerprint
 
 _CATCH_COMMAND = "pig-catcher.catch"
@@ -161,6 +167,13 @@ class PlayerProfile:
     feed_level: int
     armed_item: ItemDefinition | None
     armed_item_quantity: int
+    cookware_level: int
+    total_cooks: int
+    active_foods: int
+    food_catalog_count: int
+    visible_food_catalog_total: int
+    armed_cooking_item: ItemDefinition | None
+    armed_cooking_item_quantity: int
     collections: tuple[CollectionProgress, ...]
 
 
@@ -271,10 +284,6 @@ def _safe_datetime(value: datetime) -> datetime:
     return value.astimezone(UTC)
 
 
-def _iso_timestamp(value: datetime) -> str:
-    return _safe_datetime(value).isoformat(timespec="milliseconds").replace("+00:00", "Z")
-
-
 def _parse_timestamp(value: str) -> datetime:
     try:
         parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
@@ -289,7 +298,7 @@ def _day_window(now: datetime, timezone_name: str) -> tuple[str, str]:
     local = _safe_datetime(now).astimezone(_BEIJING_TIMEZONE)
     local_start = datetime.combine(local.date(), time.min, tzinfo=_BEIJING_TIMEZONE)
     local_end = local_start + timedelta(days=1)
-    return _iso_timestamp(local_start), _iso_timestamp(local_end)
+    return iso_timestamp(local_start), iso_timestamp(local_end)
 
 
 def _cooldown_remaining(
@@ -304,22 +313,11 @@ def _cooldown_remaining(
     return max(0, math.ceil(cooldown_seconds - elapsed))
 
 
-def _page_count(total: int, page_size: int) -> int:
-    return max(1, math.ceil(total / page_size))
-
-
-def _require_valid_page(page: int, total: int, page_size: int) -> int:
-    pages = _page_count(total, page_size)
-    if page > pages:
-        raise GameplayError(f"页码超出范围，当前共有 {pages} 页。")
-    return pages
-
-
 def _optional_float(value: object) -> float | None:
     return float(value) if value is not None else None
 
 
-def _pig_from_row(row: Mapping[str, object]) -> PigView:
+def pig_view_from_row(row: Mapping[str, object]) -> PigView:
     return PigView(
         pig_instance_id=str(row["pig_instance_id"]),
         short_code=str(row["short_code"]),
@@ -389,33 +387,6 @@ def _collection_from_row(row: Mapping[str, object]) -> CollectionProgress:
     )
 
 
-def _receipt_payload(receipt: CommandReceipt) -> dict[str, Any]:
-    try:
-        payload = json.loads(receipt.result_json)
-    except (TypeError, json.JSONDecodeError) as exc:
-        raise ReceiptConflictError("幂等回执中的业务结果无法解析。") from exc
-    if not isinstance(payload, dict):
-        raise ReceiptConflictError("幂等回执中的业务结果不是对象。")
-    return payload
-
-
-def _validate_existing_receipt(
-    receipt: CommandReceipt,
-    *,
-    identity: CommandIdentity,
-    command_name: str,
-    request_payload: Mapping[str, Any],
-) -> None:
-    if (
-        receipt.scope_id != identity.scope.value
-        or receipt.player_id != identity.player_id
-        or receipt.command_name != command_name
-    ):
-        raise ReceiptConflictError("同一消息 ID 已被其他群、成员或命令使用。")
-    if receipt.request_fingerprint != request_fingerprint(request_payload):
-        raise ReceiptConflictError("同一消息 ID 对应了不同的业务参数。")
-
-
 def _format_collection_rows(rows: Sequence[Mapping[str, object]]) -> tuple[CollectionProgress, ...]:
     return tuple(_collection_from_row(row) for row in rows)
 
@@ -463,11 +434,15 @@ def format_profile_summary(profile: PlayerProfile) -> str:
         f"猪币：{profile.coin_balance}\n"
         f"累计抓取：{profile.total_catches}；当前持有：{profile.active_pigs}\n"
         f"猪猪图鉴：{profile.catalog_count}/{profile.visible_catalog_total}\n"
+        f"累计做菜：{profile.total_cooks}；当前美食：{profile.active_foods}\n"
+        f"美食图鉴：{profile.food_catalog_count}/{profile.visible_food_catalog_total}\n"
         f"当前持有群纪录：{profile.held_records}\n"
-        f"猪饲料：Lv.{profile.feed_level}\n"
+        f"猪饲料：Lv.{profile.feed_level}；厨具：Lv.{profile.cookware_level}\n"
         f"今日抓猪：{profile.daily_count}/{profile.daily_limit}\n"
         f"抓猪冷却：{profile.cooldown_remaining_seconds} 秒\n"
-        f"已装备抓猪道具：{armed}"
+        f"已装备抓猪道具：{armed}\n"
+        "已装备做菜道具："
+        f"{profile.armed_cooking_item.display_name if profile.armed_cooking_item else '无'}"
     )
 
 
@@ -587,6 +562,7 @@ class GameplayService:
         framework_repository: FrameworkRepository | None = None,
         receipt_repository: ReceiptRepository | None = None,
         asset_repository: AssetRepository | None = None,
+        economy_repository: EconomyRepository | None = None,
         random_source: RandomSource | None = None,
         clock: Clock | None = None,
         id_factory: Callable[[], str] | None = None,
@@ -598,6 +574,7 @@ class GameplayService:
         self.framework_repository = framework_repository or FrameworkRepository()
         self.receipt_repository = receipt_repository or ReceiptRepository()
         self.asset_repository = asset_repository or AssetRepository()
+        self.economy_repository = economy_repository or EconomyRepository()
         self.random_source = random_source or SystemRandomSource()
         self.clock = clock or SystemClock()
         self.id_factory = id_factory or (lambda: uuid4().hex)
@@ -609,7 +586,7 @@ class GameplayService:
         request_payload = {"command_version": 1}
         idempotency_key = MessageKeyFactory.build(identity, _CATCH_COMMAND)
         now_datetime = _safe_datetime(self.clock.now())
-        now = _iso_timestamp(now_datetime)
+        now = iso_timestamp(now_datetime)
         day_start, day_end = _day_window(
             now_datetime,
             self.catching.daily_reset_timezone,
@@ -617,7 +594,7 @@ class GameplayService:
         async with self.database.transaction() as session:
             existing = await self.receipt_repository.get_by_key(session, idempotency_key)
             if existing is not None:
-                _validate_existing_receipt(
+                validate_existing_receipt(
                     existing,
                     identity=identity,
                     command_name=_CATCH_COMMAND,
@@ -785,7 +762,7 @@ class GameplayService:
             )
             if pig_row is None:
                 raise RuntimeError("抓猪实例提交前无法读取。")
-            pig = _pig_from_row(pig_row)
+            pig = pig_view_from_row(pig_row)
             payload: dict[str, Any] = {
                 "daily_count": daily_count + 1,
                 "daily_limit": self.catching.daily_limit,
@@ -876,7 +853,7 @@ class GameplayService:
         """Read the current-group player profile."""
 
         now_datetime = _safe_datetime(self.clock.now())
-        now = _iso_timestamp(now_datetime)
+        now = iso_timestamp(now_datetime)
         day_start, day_end = _day_window(
             now_datetime,
             self.catching.daily_reset_timezone,
@@ -909,6 +886,32 @@ class GameplayService:
                 action_type="catching",
             )
             armed_item, armed_quantity = self._armed_item(armed_row, "catching")
+            cooking_armed_row = await self.repository.get_armed_item(
+                session,
+                player_id=identity.player_id,
+                action_type="cooking",
+            )
+            cooking_item, cooking_item_quantity = self._armed_item(
+                cooking_armed_row,
+                "cooking",
+            )
+            upgrades = await self.economy_repository.get_upgrade_levels(
+                session,
+                player_id=identity.player_id,
+            )
+            economy_row = await self.economy_repository.economy_profile_row(
+                session,
+                player_id=identity.player_id,
+            )
+            if economy_row is None:
+                raise RuntimeError("玩家经济档案初始化后无法读取。")
+            food_collected, food_total = (
+                await self.economy_repository.visible_food_catalog_counts(
+                    session,
+                    player_id=identity.player_id,
+                    scope_id=identity.scope.value,
+                )
+            )
             visible_collected, visible_total = await self.repository.visible_catalog_counts(
                 session,
                 player_id=identity.player_id,
@@ -939,6 +942,13 @@ class GameplayService:
             feed_level=feed_level,
             armed_item=armed_item,
             armed_item_quantity=armed_quantity,
+            cookware_level=upgrades["cookware"],
+            total_cooks=int(economy_row["total_cooks"]),
+            active_foods=int(economy_row["active_foods"]),
+            food_catalog_count=food_collected,
+            visible_food_catalog_total=food_total,
+            armed_cooking_item=cooking_item,
+            armed_cooking_item_quantity=cooking_item_quantity,
             collections=_format_collection_rows(collection_rows),
         )
 
@@ -946,7 +956,7 @@ class GameplayService:
         """Resolve exactly one active pig owned by the current-group player."""
 
         selector = parse_asset_selector(selector_text)
-        now = _iso_timestamp(self.clock.now())
+        now = iso_timestamp(self.clock.now())
         async with self.database.transaction() as session:
             await self.framework_repository.touch_identity(
                 session,
@@ -967,7 +977,7 @@ class GameplayService:
             raise AmbiguousPigSelectorError(
                 f"“{selector.name}”有多只，请带短编号重试：{candidates}"
             )
-        return _pig_from_row(rows[0])
+        return pig_view_from_row(rows[0])
 
     async def inventory(
         self,
@@ -980,7 +990,7 @@ class GameplayService:
         """Read one filtered page of active pigs."""
 
         page_size = self.catching.inventory_page_size
-        now = _iso_timestamp(self.clock.now())
+        now = iso_timestamp(self.clock.now())
         async with self.database.transaction() as session:
             await self.framework_repository.touch_identity(
                 session,
@@ -995,7 +1005,7 @@ class GameplayService:
                 limit=page_size,
                 offset=(page - 1) * page_size,
             )
-        pages = _require_valid_page(page, total, page_size)
+        pages = valid_page_count(page, total, page_size)
         return InventoryPage(
             display_name=identity.display_name,
             page=page,
@@ -1004,7 +1014,7 @@ class GameplayService:
             page_size=page_size,
             rarity=rarity,
             sort=sort,
-            pigs=tuple(_pig_from_row(row) for row in rows),
+            pigs=tuple(pig_view_from_row(row) for row in rows),
         )
 
     async def catalog(
@@ -1018,7 +1028,7 @@ class GameplayService:
         """Read one catalog page without exposing undiscovered group-only assets."""
 
         page_size = self.catching.catalog_page_size
-        now = _iso_timestamp(self.clock.now())
+        now = iso_timestamp(self.clock.now())
         async with self.database.transaction() as session:
             await self.framework_repository.touch_identity(
                 session,
@@ -1043,7 +1053,7 @@ class GameplayService:
                 session,
                 player_id=identity.player_id,
             )
-        pages = _require_valid_page(page, total, page_size)
+        pages = valid_page_count(page, total, page_size)
         return CatalogPage(
             display_name=identity.display_name,
             page=page,
@@ -1062,7 +1072,7 @@ class GameplayService:
         """Read current-group size and weight records."""
 
         page_size = self.catching.records_page_size
-        now = _iso_timestamp(self.clock.now())
+        now = iso_timestamp(self.clock.now())
         async with self.database.transaction() as session:
             await self.framework_repository.touch_identity(
                 session,
@@ -1075,7 +1085,7 @@ class GameplayService:
                 limit=page_size,
                 offset=(page - 1) * page_size,
             )
-        pages = _require_valid_page(page, total, page_size)
+        pages = valid_page_count(page, total, page_size)
         return RecordsPage(
             group_name=identity.group_name,
             page=page,
@@ -1102,17 +1112,17 @@ class GameplayService:
         item = item_by_name(item_name)
         request_payload = {"item_id": item.item_id}
         idempotency_key = MessageKeyFactory.build(identity, _ARM_ITEM_COMMAND)
-        now = _iso_timestamp(self.clock.now())
+        now = iso_timestamp(self.clock.now())
         async with self.database.transaction() as session:
             existing = await self.receipt_repository.get_by_key(session, idempotency_key)
             if existing is not None:
-                _validate_existing_receipt(
+                validate_existing_receipt(
                     existing,
                     identity=identity,
                     command_name=_ARM_ITEM_COMMAND,
                     request_payload=request_payload,
                 )
-                payload = _receipt_payload(existing)
+                payload = receipt_payload(existing)
                 stored_item = item_by_id(str(payload["item_id"]))
                 return ItemActionResult(
                     receipt=existing,
@@ -1198,17 +1208,17 @@ class GameplayService:
             raise DomainValidationError("动作只能是 catching 或 cooking。")
         request_payload = {"action_type": action_type}
         idempotency_key = MessageKeyFactory.build(identity, _CANCEL_ITEM_COMMAND)
-        now = _iso_timestamp(self.clock.now())
+        now = iso_timestamp(self.clock.now())
         async with self.database.transaction() as session:
             existing = await self.receipt_repository.get_by_key(session, idempotency_key)
             if existing is not None:
-                _validate_existing_receipt(
+                validate_existing_receipt(
                     existing,
                     identity=identity,
                     command_name=_CANCEL_ITEM_COMMAND,
                     request_payload=request_payload,
                 )
-                payload = _receipt_payload(existing)
+                payload = receipt_payload(existing)
                 stored_item = item_by_id(str(payload["item_id"]))
                 return ItemActionResult(
                     receipt=existing,
@@ -1298,12 +1308,12 @@ class GameplayService:
         )
         if row is None:
             raise ReceiptConflictError("抓猪回执关联的猪实例不存在。")
-        payload = _receipt_payload(receipt)
+        payload = receipt_payload(receipt)
         weights_raw = payload.get("weights", ())
         if not isinstance(weights_raw, list) or len(weights_raw) != 6:
             raise ReceiptConflictError("抓猪回执中的概率快照无效。")
         return CatchResult(
-            pig=_pig_from_row(row),
+            pig=pig_view_from_row(row),
             receipt=receipt,
             receipt_created=receipt_created,
             daily_count=int(payload["daily_count"]),

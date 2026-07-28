@@ -132,9 +132,13 @@ def test_access_policy_blacklist_has_priority() -> None:
 
 def test_default_config_exposes_fixed_rules_and_chinese_schema() -> None:
     config = PigCatcherConfig()
-    assert config.plugin.framework_phase == "3"
+    assert config.plugin.framework_phase == "4"
+    assert config.catching.daily_limit == 20
+    assert config.catching.cooldown_seconds == 20
     assert config.cooking.six_star_to_five_percent == 90
     assert config.cooking.six_star_to_six_percent == 10
+    assert config.features.cooking_enabled is True
+    assert config.features.ledger_enabled is True
     schema = PigCatcherConfig.model_json_schema()
     serialized = str(schema)
     assert "启用插件" in serialized
@@ -150,10 +154,11 @@ def test_config_rejects_unsafe_paths_and_css_controls() -> None:
         PigCatcherConfig(rendering={"font_family": "   "})
 
 
-def test_help_is_copyable_text_and_marks_future_commands_unavailable() -> None:
+def test_help_is_copyable_text_and_marks_fourth_round_open() -> None:
     text = format_help("做菜")
     assert "/做菜 <猪名#短编号>" in text
     assert "粉红小香猪#A19F2C3D" in text
-    assert "做菜指令·尚未开放" in text
-    assert "已开放抓猪、猪猪档案/详情、背包、图鉴、群纪录和道具装备" in text
+    assert "【做菜指令】" in text
+    assert "做菜指令·尚未开放" not in text
+    assert "已开放抓猪、收藏、做菜、美食、商城、升级、官方售卖和猪币账本" in text
     assert "<img" not in text

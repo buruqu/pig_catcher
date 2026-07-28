@@ -16,9 +16,14 @@ from ..domain.errors import RenderError
 from .models import (
     AssetPreviewViewModel,
     CatalogViewModel,
+    EconomyReceiptViewModel,
+    FoodCardViewModel,
+    FoodCatalogViewModel,
+    FoodInventoryViewModel,
     FrameworkPreviewViewModel,
     InventoryViewModel,
     ItemReceiptViewModel,
+    LedgerViewModel,
     MediaSlot,
     PigCardViewModel,
     ProfileViewModel,
@@ -26,10 +31,12 @@ from .models import (
     RenderedAssetPreviewBase,
     RenderedImage,
     RenderOptions,
+    StoreViewModel,
 )
 
 _ASSET_PREVIEW_SLOT = MediaSlot(x=38, y=154, width=500, height=500)
 _PIG_CARD_SLOT = MediaSlot(x=38, y=164, width=480, height=480)
+_FOOD_CARD_SLOT = MediaSlot(x=38, y=164, width=480, height=480)
 
 
 class HtmlRenderCapability(Protocol):
@@ -227,6 +234,100 @@ class PigCatcherRenderer:
         """Render an item equip or cancellation receipt."""
 
         return await self._render_template("item_receipt.html", view=view)
+
+    async def render_food_card_base(
+        self,
+        view: FoodCardViewModel,
+    ) -> RenderedAssetPreviewBase:
+        """Render a food card without baking animated source media."""
+
+        image = await self._render_template(
+            "food_card.html",
+            view=view,
+            media_data_url="",
+        )
+        self._validate_slot(_FOOD_CARD_SLOT, image)
+        return RenderedAssetPreviewBase(image=image, media_slot=_FOOD_CARD_SLOT)
+
+    async def render_static_food_card(
+        self,
+        view: FoodCardViewModel,
+        source_path: Path | None,
+    ) -> RenderedImage:
+        """Render one cooking/detail card with static media."""
+
+        media_data_url = ""
+        if view.media_visible:
+            if source_path is None:
+                raise RenderError("美食素材路径为空")
+            media_data_url = self._source_data_url(source_path)
+        return await self._render_template(
+            "food_card.html",
+            view=view,
+            media_data_url=media_data_url,
+        )
+
+    async def render_food_inventory(
+        self,
+        view: FoodInventoryViewModel,
+        media_paths: Mapping[str, Path],
+    ) -> RenderedImage:
+        """Render one food inventory page."""
+
+        media_data_urls = self._list_media_data_urls(
+            (
+                (item.key, item.media_visible, item.is_animated)
+                for item in view.items
+            ),
+            media_paths,
+        )
+        return await self._render_template(
+            "food_inventory.html",
+            view=view,
+            media_data_urls=media_data_urls,
+        )
+
+    async def render_food_catalog(
+        self,
+        view: FoodCatalogViewModel,
+        media_paths: Mapping[str, Path],
+    ) -> RenderedImage:
+        """Render one privacy-aware food catalog page."""
+
+        media_data_urls = self._list_media_data_urls(
+            (
+                (
+                    item.key,
+                    item.media_visible and item.discovered,
+                    item.is_animated,
+                )
+                for item in view.items
+            ),
+            media_paths,
+        )
+        return await self._render_template(
+            "food_catalog.html",
+            view=view,
+            media_data_urls=media_data_urls,
+        )
+
+    async def render_store(self, view: StoreViewModel) -> RenderedImage:
+        """Render one store page."""
+
+        return await self._render_template("store.html", view=view)
+
+    async def render_economy_receipt(
+        self,
+        view: EconomyReceiptViewModel,
+    ) -> RenderedImage:
+        """Render one purchase, eating, or sale receipt."""
+
+        return await self._render_template("economy_receipt.html", view=view)
+
+    async def render_ledger(self, view: LedgerViewModel) -> RenderedImage:
+        """Render one reconciled pig-coin ledger page."""
+
+        return await self._render_template("ledger.html", view=view)
 
     async def _render_template(
         self,
