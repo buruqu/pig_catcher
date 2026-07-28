@@ -11,8 +11,8 @@ from datetime import UTC, datetime, time, timedelta, timezone
 from typing import Any
 from uuid import uuid4
 
-from ..config.model import CatchingSection
-from ..domain.enums import Rarity, RecordType
+from ..config.model import CatchingSection, RankingSection
+from ..domain.enums import Rarity, RecordType, StatureProfile
 from ..domain.errors import (
     AmbiguousPigSelectorError,
     CatchCooldownError,
@@ -38,6 +38,7 @@ from ..domain.models import CommandIdentity, CommandReceipt
 from ..domain.ports import Clock, MessageKeyFactory, RandomSource, SystemClock, SystemRandomSource
 from ..domain.rules import catch_weights, choose_rarity, normalize_weights
 from ..domain.selectors import new_short_code, parse_asset_selector
+from ..domain.social import describe_body_scale
 from ..infrastructure.database import DatabaseSession, PigCatcherDatabase
 from ..infrastructure.repositories import (
     AssetRepository,
@@ -45,6 +46,7 @@ from ..infrastructure.repositories import (
     FrameworkRepository,
     GameplayRepository,
     ReceiptRepository,
+    SocialRepository,
 )
 from ..version import RULESET_VERSION
 from .assets import CollectionProgress
@@ -100,6 +102,13 @@ class PigView:
     character_name: str
     is_size_record: bool
     is_weight_record: bool
+    stature_profile: str = StatureProfile.STANDARD.value
+    is_global_size_record: bool = False
+    is_global_weight_record: bool = False
+    is_giant_sighting: bool = False
+    body_label: str = ""
+    body_description: str = ""
+    giant_score: float = 0.0
 
     @property
     def stars(self) -> str:
@@ -146,6 +155,9 @@ class CatchResult:
     item_id: str
     item_name: str
     weights: tuple[float, ...]
+    global_size_record: bool = False
+    global_weight_record: bool = False
+    giant_sighting: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -175,6 +187,8 @@ class PlayerProfile:
     armed_cooking_item: ItemDefinition | None
     armed_cooking_item_quantity: int
     collections: tuple[CollectionProgress, ...]
+    showcase_pig: str = ""
+    showcase_food: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -265,6 +279,24 @@ class RecordsPage:
     total_count: int
     page_size: int
     entries: tuple[RecordEntry, ...]
+    global_entries: tuple[RecordEntry, ...] = ()
+    giant_sightings: tuple[GiantSightingEntry, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class GiantSightingEntry:
+    """One immutable current-group absolute-threshold sighting."""
+
+    display_name: str
+    rarity: int
+    short_code: str
+    holder_display_name: str
+    size_value: float
+    weight_value: float
+    giant_score: float
+    size_qualified: bool
+    weight_qualified: bool
+    achieved_at: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -317,7 +349,24 @@ def _optional_float(value: object) -> float | None:
     return float(value) if value is not None else None
 
 
-def pig_view_from_row(row: Mapping[str, object]) -> PigView:
+def pig_view_from_row(
+    row: Mapping[str, object],
+    *,
+    giant_size_threshold_cm: float = 120.0,
+    giant_weight_threshold_kg: float = 350.0,
+) -> PigView:
+    stature_profile = str(
+        row.get("stature_profile") or StatureProfile.STANDARD.value
+    )
+    body = describe_body_scale(
+        stature_profile=stature_profile,
+        size_value=float(row["size_value"]),
+        size_percentile=float(row["size_percentile"]),
+        weight_value=float(row["weight_value"]),
+        weight_percentile=float(row["weight_percentile"]),
+        giant_size_threshold_cm=giant_size_threshold_cm,
+        giant_weight_threshold_kg=giant_weight_threshold_kg,
+    )
     return PigView(
         pig_instance_id=str(row["pig_instance_id"]),
         short_code=str(row["short_code"]),
@@ -345,8 +394,15 @@ def pig_view_from_row(row: Mapping[str, object]) -> PigView:
         collection_name=str(row.get("collection_name") or ""),
         collection_total=int(row.get("collection_total") or 0),
         character_name=str(row.get("character_name") or ""),
+        stature_profile=stature_profile,
         is_size_record=bool(row.get("is_size_record") or False),
         is_weight_record=bool(row.get("is_weight_record") or False),
+        is_global_size_record=bool(row.get("is_global_size_record") or False),
+        is_global_weight_record=bool(row.get("is_global_weight_record") or False),
+        is_giant_sighting=bool(row.get("is_giant_sighting") or False),
+        body_label=body.label,
+        body_description=body.description,
+        giant_score=body.giant_score,
     )
 
 
@@ -399,16 +455,30 @@ def format_catch_summary(result: CatchResult) -> str:
         records.append("体型新纪录")
     if result.weight_record:
         records.append("重量新纪录")
+    if result.global_size_record:
+        records.append("全群体型最高")
+    if result.global_weight_record:
+        records.append("全群重量最高")
+    if result.giant_sighting:
+        records.append("巨物目击已留档")
     record_text = "、".join(records) if records else "未刷新群纪录"
     item_text = result.item_name or "无"
+    new_text = "NEW｜首次收入图鉴\n" if result.catalog_new else ""
+    body_text = (
+        f"体格：{result.pig.body_label}｜{result.pig.body_description}\n"
+        if result.pig.body_label
+        else ""
+    )
     return (
         "【抓猪成功】\n"
         f"{result.pig.owner_display_name} 抓到了 {result.pig.stars} {result.pig.display_name}\n"
+        f"{new_text}"
         f"编号：{result.pig.selector}\n"
         f"品质：{result.pig.rarity_name}\n"
         f"体型：{result.pig.size_value:.1f} cm\n"
         f"重量：{result.pig.weight_value:.2f} kg\n"
         f"肥瘦率：{result.pig.fat_ratio:.1f}%（{result.pig.fat_label}）\n"
+        f"{body_text}"
         f"官方价值：{result.pig.official_value} 猪币\n"
         f"奖励：+{result.coin_reward} 猪币 / +{result.experience_reward} 经验\n"
         f"当前余额：{result.coin_balance} 猪币；累计经验：{result.total_experience}\n"
@@ -436,6 +506,8 @@ def format_profile_summary(profile: PlayerProfile) -> str:
         f"猪猪图鉴：{profile.catalog_count}/{profile.visible_catalog_total}\n"
         f"累计做菜：{profile.total_cooks}；当前美食：{profile.active_foods}\n"
         f"美食图鉴：{profile.food_catalog_count}/{profile.visible_food_catalog_total}\n"
+        f"猪猪展示：{profile.showcase_pig or '未设置'}\n"
+        f"美食展示：{profile.showcase_food or '未设置'}\n"
         f"当前持有群纪录：{profile.held_records}\n"
         f"猪饲料：Lv.{profile.feed_level}；厨具：Lv.{profile.cookware_level}\n"
         f"今日抓猪：{profile.daily_count}/{profile.daily_limit}\n"
@@ -454,6 +526,18 @@ def format_pig_detail_summary(pig: PigView) -> str:
         records.append("本群体型纪录")
     if pig.is_weight_record:
         records.append("本群重量纪录")
+    if pig.is_global_size_record:
+        records.append("全群体型最高")
+    if pig.is_global_weight_record:
+        records.append("全群重量最高")
+    if pig.is_giant_sighting:
+        records.append("巨物目击留档")
+    body = (
+        f"体格：{pig.body_label}（巨物分 {pig.giant_score:.1f}）\n"
+        f"体格评价：{pig.body_description}\n"
+        if pig.body_label
+        else ""
+    )
     return (
         "【猪猪详情】\n"
         f"{pig.stars} {pig.display_name}（{pig.rarity_name}）\n"
@@ -461,6 +545,7 @@ def format_pig_detail_summary(pig: PigView) -> str:
         f"体型：{pig.size_value:.1f} cm（百分位 {pig.size_percentile * 100:.1f}%）\n"
         f"重量：{pig.weight_value:.2f} kg（百分位 {pig.weight_percentile * 100:.1f}%）\n"
         f"肥瘦率：{pig.fat_ratio:.1f}%（{pig.fat_label}）\n"
+        f"{body}"
         f"官方价值：{pig.official_value} 猪币\n"
         f"群纪录：{'、'.join(records) if records else '无'}\n"
         f"获得时间：{pig.acquired_at}\n"
@@ -529,6 +614,24 @@ def format_records_summary(result: RecordsPage) -> str:
             f"{entry.record_label} {entry.record_value:.2f}{entry.unit}｜"
             f"{entry.holder_display_name}"
         )
+    if result.global_entries:
+        lines.append("—— 全群绝对纪录 ——")
+        for entry in result.global_entries:
+            lines.append(
+                f"{entry.record_label}最高｜{'★' * entry.rarity} "
+                f"{entry.display_name}#{entry.short_code}｜"
+                f"{entry.record_value:.2f}{entry.unit}｜"
+                f"{entry.holder_display_name}"
+            )
+    if result.giant_sightings:
+        lines.append("—— 最近巨物目击 ——")
+        for sighting in result.giant_sightings:
+            lines.append(
+                f"{'★' * sighting.rarity} "
+                f"{sighting.display_name}#{sighting.short_code}｜"
+                f"{sighting.size_value:.1f}cm / {sighting.weight_value:.2f}kg｜"
+                f"{sighting.giant_score:.1f}分｜{sighting.holder_display_name}"
+            )
     return "\n".join(lines)
 
 
@@ -558,11 +661,13 @@ class GameplayService:
         database: PigCatcherDatabase,
         catching: CatchingSection,
         *,
+        ranking: RankingSection | None = None,
         repository: GameplayRepository | None = None,
         framework_repository: FrameworkRepository | None = None,
         receipt_repository: ReceiptRepository | None = None,
         asset_repository: AssetRepository | None = None,
         economy_repository: EconomyRepository | None = None,
+        social_repository: SocialRepository | None = None,
         random_source: RandomSource | None = None,
         clock: Clock | None = None,
         id_factory: Callable[[], str] | None = None,
@@ -570,11 +675,13 @@ class GameplayService:
     ) -> None:
         self.database = database
         self.catching = catching
+        self.ranking = ranking or RankingSection()
         self.repository = repository or GameplayRepository()
         self.framework_repository = framework_repository or FrameworkRepository()
         self.receipt_repository = receipt_repository or ReceiptRepository()
         self.asset_repository = asset_repository or AssetRepository()
         self.economy_repository = economy_repository or EconomyRepository()
+        self.social_repository = social_repository or SocialRepository()
         self.random_source = random_source or SystemRandomSource()
         self.clock = clock or SystemClock()
         self.id_factory = id_factory or (lambda: uuid4().hex)
@@ -744,6 +851,51 @@ class GameplayService:
                 player_id=identity.player_id,
                 now=now,
             )
+            body = describe_body_scale(
+                stature_profile=str(
+                    template.get("stature_profile")
+                    or StatureProfile.STANDARD.value
+                ),
+                size_value=attributes.size_value,
+                size_percentile=attributes.size_percentile,
+                weight_value=attributes.weight_value,
+                weight_percentile=attributes.weight_percentile,
+                giant_size_threshold_cm=self.ranking.giant_size_threshold_cm,
+                giant_weight_threshold_kg=self.ranking.giant_weight_threshold_kg,
+            )
+            global_size_record = await self.social_repository.update_global_record(
+                session,
+                scope_id=identity.scope.value,
+                template_id=str(template["template_id"]),
+                record_type=RecordType.SIZE,
+                pig_instance_id=pig_instance_id,
+                record_value=attributes.size_value,
+                player_id=identity.player_id,
+                now=now,
+            )
+            global_weight_record = await self.social_repository.update_global_record(
+                session,
+                scope_id=identity.scope.value,
+                template_id=str(template["template_id"]),
+                record_type=RecordType.WEIGHT,
+                pig_instance_id=pig_instance_id,
+                record_value=attributes.weight_value,
+                player_id=identity.player_id,
+                now=now,
+            )
+            giant_sighting = await self.social_repository.insert_giant_sighting(
+                session,
+                pig_instance_id=pig_instance_id,
+                scope_id=identity.scope.value,
+                player_id=identity.player_id,
+                template_id=str(template["template_id"]),
+                size_value=attributes.size_value,
+                weight_value=attributes.weight_value,
+                giant_score=body.giant_score,
+                size_qualified=body.size_qualified,
+                weight_qualified=body.weight_qualified,
+                now=now,
+            )
             if armed_item is not None:
                 consumed = await self.repository.consume_armed_item(
                     session,
@@ -762,7 +914,7 @@ class GameplayService:
             )
             if pig_row is None:
                 raise RuntimeError("抓猪实例提交前无法读取。")
-            pig = pig_view_from_row(pig_row)
+            pig = self._pig_view(pig_row)
             payload: dict[str, Any] = {
                 "daily_count": daily_count + 1,
                 "daily_limit": self.catching.daily_limit,
@@ -773,6 +925,9 @@ class GameplayService:
                 "catalog_new": catalog_new,
                 "size_record": size_record,
                 "weight_record": weight_record,
+                "global_size_record": global_size_record,
+                "global_weight_record": global_weight_record,
+                "giant_sighting": giant_sighting,
                 "feed_level": feed_level,
                 "item_id": armed_item.item_id if armed_item is not None else "",
                 "item_name": armed_item.display_name if armed_item is not None else "",
@@ -810,6 +965,9 @@ class GameplayService:
                 item_id=armed_item.item_id if armed_item is not None else "",
                 item_name=armed_item.display_name if armed_item is not None else "",
                 weights=weights,
+                global_size_record=global_size_record,
+                global_weight_record=global_weight_record,
+                giant_sighting=giant_sighting,
             )
             summary = format_catch_summary(provisional)
             reservation = await self.receipt_repository.reserve(
@@ -847,6 +1005,9 @@ class GameplayService:
                 item_id=armed_item.item_id if armed_item is not None else "",
                 item_name=armed_item.display_name if armed_item is not None else "",
                 weights=weights,
+                global_size_record=global_size_record,
+                global_weight_record=global_weight_record,
+                giant_sighting=giant_sighting,
             )
 
     async def profile(self, identity: CommandIdentity) -> PlayerProfile:
@@ -921,6 +1082,10 @@ class GameplayService:
                 session,
                 player_id=identity.player_id,
             )
+            showcase_row = await self.social_repository.showcase_row(
+                session,
+                player_id=identity.player_id,
+            )
         experience = int(row["experience"])
         return PlayerProfile(
             display_name=str(row["display_name"]),
@@ -950,6 +1115,20 @@ class GameplayService:
             armed_cooking_item=cooking_item,
             armed_cooking_item_quantity=cooking_item_quantity,
             collections=_format_collection_rows(collection_rows),
+            showcase_pig=(
+                f"{showcase_row.get('pig_display_name')}#"
+                f"{showcase_row.get('pig_short_code')}"
+                if showcase_row.get("pig_display_name")
+                and showcase_row.get("pig_short_code")
+                else ""
+            ),
+            showcase_food=(
+                f"{showcase_row.get('food_display_name')}#"
+                f"{showcase_row.get('food_short_code')}"
+                if showcase_row.get("food_display_name")
+                and showcase_row.get("food_short_code")
+                else ""
+            ),
         )
 
     async def pig_detail(self, identity: CommandIdentity, selector_text: str) -> PigView:
@@ -977,7 +1156,7 @@ class GameplayService:
             raise AmbiguousPigSelectorError(
                 f"“{selector.name}”有多只，请带短编号重试：{candidates}"
             )
-        return pig_view_from_row(rows[0])
+        return self._pig_view(rows[0])
 
     async def inventory(
         self,
@@ -1014,7 +1193,7 @@ class GameplayService:
             page_size=page_size,
             rarity=rarity,
             sort=sort,
-            pigs=tuple(pig_view_from_row(row) for row in rows),
+            pigs=tuple(self._pig_view(row) for row in rows),
         )
 
     async def catalog(
@@ -1085,6 +1264,23 @@ class GameplayService:
                 limit=page_size,
                 offset=(page - 1) * page_size,
             )
+            global_rows = (
+                await self.social_repository.global_records(
+                    session,
+                    scope_id=identity.scope.value,
+                )
+                if page == 1
+                else []
+            )
+            sighting_rows = (
+                await self.social_repository.giant_sightings(
+                    session,
+                    scope_id=identity.scope.value,
+                    limit=self.ranking.giant_sightings_limit,
+                )
+                if page == 1
+                else []
+            )
         pages = valid_page_count(page, total, page_size)
         return RecordsPage(
             group_name=identity.group_name,
@@ -1103,6 +1299,33 @@ class GameplayService:
                     holder_display_name=str(row["holder_display_name"]),
                 )
                 for row in rows
+            ),
+            global_entries=tuple(
+                RecordEntry(
+                    record_type=str(row["record_type"]),
+                    record_value=float(row["record_value"]),
+                    achieved_at=str(row["achieved_at"]),
+                    display_name=str(row["display_name"]),
+                    rarity=int(row["rarity"]),
+                    short_code=str(row["short_code"]),
+                    holder_display_name=str(row["holder_display_name"]),
+                )
+                for row in global_rows
+            ),
+            giant_sightings=tuple(
+                GiantSightingEntry(
+                    display_name=str(row["display_name"]),
+                    rarity=int(row["rarity"]),
+                    short_code=str(row["short_code"]),
+                    holder_display_name=str(row["holder_display_name"]),
+                    size_value=float(row["size_value"]),
+                    weight_value=float(row["weight_value"]),
+                    giant_score=float(row["giant_score"]),
+                    size_qualified=bool(row["size_qualified"]),
+                    weight_qualified=bool(row["weight_qualified"]),
+                    achieved_at=str(row["achieved_at"]),
+                )
+                for row in sighting_rows
             ),
         )
 
@@ -1313,7 +1536,7 @@ class GameplayService:
         if not isinstance(weights_raw, list) or len(weights_raw) != 6:
             raise ReceiptConflictError("抓猪回执中的概率快照无效。")
         return CatchResult(
-            pig=pig_view_from_row(row),
+            pig=self._pig_view(row),
             receipt=receipt,
             receipt_created=receipt_created,
             daily_count=int(payload["daily_count"]),
@@ -1329,6 +1552,16 @@ class GameplayService:
             item_id=str(payload.get("item_id") or ""),
             item_name=str(payload.get("item_name") or ""),
             weights=tuple(float(value) for value in weights_raw),
+            global_size_record=bool(payload.get("global_size_record") or False),
+            global_weight_record=bool(payload.get("global_weight_record") or False),
+            giant_sighting=bool(payload.get("giant_sighting") or False),
+        )
+
+    def _pig_view(self, row: Mapping[str, object]) -> PigView:
+        return pig_view_from_row(
+            row,
+            giant_size_threshold_cm=self.ranking.giant_size_threshold_cm,
+            giant_weight_threshold_kg=self.ranking.giant_weight_threshold_kg,
         )
 
     @staticmethod

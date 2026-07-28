@@ -27,11 +27,13 @@ from .models import (
     MediaSlot,
     PigCardViewModel,
     ProfileViewModel,
+    RankingViewModel,
     RecordsViewModel,
     RenderedAssetPreviewBase,
     RenderedImage,
     RenderOptions,
     StoreViewModel,
+    TradeListViewModel,
 )
 
 _ASSET_PREVIEW_SLOT = MediaSlot(x=38, y=154, width=500, height=500)
@@ -328,6 +330,34 @@ class PigCatcherRenderer:
         """Render one reconciled pig-coin ledger page."""
 
         return await self._render_template("ledger.html", view=view)
+
+    async def render_trade_list(
+        self,
+        view: TradeListViewModel,
+    ) -> RenderedImage:
+        """Render one current-player bilateral trade page."""
+
+        return await self._render_template("trade_list.html", view=view)
+
+    async def render_ranking(
+        self,
+        view: RankingViewModel,
+        media_paths: Mapping[str, Path],
+    ) -> RenderedImage:
+        """Render one group leaderboard with static showcase media."""
+
+        media_data_urls = self._list_media_data_urls(
+            (
+                (item.key, item.media_visible, item.is_animated)
+                for item in view.items
+            ),
+            media_paths,
+        )
+        return await self._render_template(
+            "leaderboard.html",
+            view=view,
+            media_data_urls=media_data_urls,
+        )
 
     async def _render_template(
         self,

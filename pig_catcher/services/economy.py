@@ -24,7 +24,7 @@ from ..domain.economy import (
     recipe_affinity,
     upgrade_type_by_name,
 )
-from ..domain.enums import Rarity, ReceiptSendStatus, UpgradeType
+from ..domain.enums import AssetKind, Rarity, ReceiptSendStatus, UpgradeType
 from ..domain.errors import (
     AmbiguousFoodSelectorError,
     AmbiguousPigSelectorError,
@@ -51,6 +51,7 @@ from ..infrastructure.repositories import (
     FrameworkRepository,
     GameplayRepository,
     ReceiptRepository,
+    SocialRepository,
 )
 from ..version import RULESET_VERSION
 from .command_state import (
@@ -597,6 +598,7 @@ class EconomyService:
         gameplay_repository: GameplayRepository | None = None,
         framework_repository: FrameworkRepository | None = None,
         receipt_repository: ReceiptRepository | None = None,
+        social_repository: SocialRepository | None = None,
         random_source: RandomSource | None = None,
         clock: Clock | None = None,
         id_factory: Callable[[], str] | None = None,
@@ -610,6 +612,7 @@ class EconomyService:
         self.gameplay_repository = gameplay_repository or GameplayRepository()
         self.framework_repository = framework_repository or FrameworkRepository()
         self.receipt_repository = receipt_repository or ReceiptRepository()
+        self.social_repository = social_repository or SocialRepository()
         self.random_source = random_source or SystemRandomSource()
         self.clock = clock or SystemClock()
         self.id_factory = id_factory or (lambda: uuid4().hex)
@@ -619,6 +622,7 @@ class EconomyService:
     async def cook(self, identity: CommandIdentity, selector_text: str) -> CookingResult:
         """Atomically consume one pig and produce one or two foods."""
 
+        await self._expire_stale_offers()
         selector = parse_asset_selector(selector_text)
         request_payload = {
             "command_version": 1,
@@ -739,6 +743,13 @@ class EconomyService:
             )
             if not consumed:
                 raise AssetStateConflictError("原料猪已不在有效背包中，本次做菜未结算。")
+            await self.social_repository.clear_showcase_asset(
+                session,
+                player_id=identity.player_id,
+                asset_kind=AssetKind.PIG,
+                asset_instance_id=source.pig_instance_id,
+                now=now,
+            )
 
             snapshot_base = {
                 "ruleset_version": RULESET_VERSION,
@@ -823,6 +834,12 @@ class EconomyService:
                 session,
                 player_id=identity.player_id,
                 experience=experience_reward,
+                now=now,
+            )
+            await self.social_repository.increment_statistic(
+                session,
+                player_id=identity.player_id,
+                field="total_cooks",
                 now=now,
             )
             if armed_item is not None:
@@ -1015,6 +1032,7 @@ class EconomyService:
     async def eat(self, identity: CommandIdentity, selector_text: str) -> EatResult:
         """Consume one food after validating its registered effect."""
 
+        await self._expire_stale_offers()
         selector = parse_asset_selector(selector_text)
         request_payload = {
             "command_version": 1,
@@ -1053,6 +1071,13 @@ class EconomyService:
             )
             if not consumed:
                 raise AssetStateConflictError("美食已不在有效背包中，本次品鉴未结算。")
+            await self.social_repository.clear_showcase_asset(
+                session,
+                player_id=identity.player_id,
+                asset_kind=AssetKind.FOOD,
+                asset_instance_id=food.food_instance_id,
+                now=now,
+            )
             base_experience = EAT_EXPERIENCE_REWARDS[Rarity(food.rarity)]
             total_experience = await self.repository.add_experience(
                 session,
@@ -1432,6 +1457,7 @@ class EconomyService:
         asset_kind: str,
         command_name: str,
     ) -> SaleResult:
+        await self._expire_stale_offers()
         selector = parse_asset_selector(selector_text)
         request_payload = {
             "command_version": 1,
@@ -1491,6 +1517,17 @@ class EconomyService:
                 )
             if not changed:
                 raise AssetStateConflictError("资产已不在有效背包中，本次售卖未结算。")
+            await self.social_repository.clear_showcase_asset(
+                session,
+                player_id=identity.player_id,
+                asset_kind=(
+                    AssetKind.PIG
+                    if asset_kind == AssetKind.PIG.value
+                    else AssetKind.FOOD
+                ),
+                asset_instance_id=asset_id,
+                now=now,
+            )
             balance_after = await self.repository.apply_currency_change(
                 session,
                 player_id=identity.player_id,
@@ -1883,6 +1920,14 @@ class EconomyService:
         if not candidate or len(candidate) > 128:
             raise RuntimeError("实例 ID 生成器返回了无效值。")
         return candidate
+
+    async def _expire_stale_offers(self) -> int:
+        now = iso_timestamp(self.clock.now())
+        async with self.database.transaction() as session:
+            return await self.social_repository.expire_stale_offers(
+                session,
+                now=now,
+            )
 
     async def _new_unique_short_code(
         self,

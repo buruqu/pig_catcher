@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import Any
 
-from ..domain.errors import CommandContextError
+from ..domain.errors import CommandContextError, MentionTargetError
 from ..domain.models import CommandIdentity, ScopeKey
 
 
@@ -18,6 +19,74 @@ def matched_group(kwargs: Mapping[str, Any], name: str) -> str:
 
     groups = _mapping(kwargs.get("matched_groups"))
     return str(groups.get(name) or "").strip()
+
+
+@dataclass(frozen=True, slots=True)
+class MentionTarget:
+    """One explicit group-member mention carried by the command message."""
+
+    user_id: str
+    display_name: str
+
+
+def _mention_segments(value: object) -> list[Mapping[str, Any]]:
+    segments: list[Mapping[str, Any]] = []
+    if isinstance(value, list):
+        for item in value:
+            segments.extend(_mention_segments(item))
+        return segments
+    if not isinstance(value, Mapping):
+        return segments
+    if str(value.get("type") or "").strip().lower() == "at":
+        segments.append(value)
+    for key in ("components", "segments", "items"):
+        child = value.get(key)
+        if isinstance(child, list):
+            segments.extend(_mention_segments(child))
+    return segments
+
+
+def extract_mention_target(kwargs: Mapping[str, Any]) -> MentionTarget:
+    """Require exactly one structured @ target instead of trusting nickname text."""
+
+    message = _mapping(kwargs.get("message"))
+    raw_message = (
+        message.get("raw_message")
+        or kwargs.get("raw_message")
+        or message
+    )
+    mentions: dict[str, MentionTarget] = {}
+    for segment in _mention_segments(raw_message):
+        data = segment.get("data")
+        if isinstance(data, Mapping):
+            user_id = str(data.get("target_user_id") or "").strip()
+            display_name = str(
+                data.get("target_user_cardname")
+                or data.get("target_user_nickname")
+                or user_id
+            ).strip()
+        else:
+            user_id = str(
+                segment.get("target_user_id")
+                or segment.get("qq")
+                or data
+                or ""
+            ).strip()
+            display_name = str(
+                segment.get("target_user_cardname")
+                or segment.get("target_user_nickname")
+                or user_id
+            ).strip()
+        if user_id:
+            mentions[user_id] = MentionTarget(
+                user_id=user_id,
+                display_name=(display_name or user_id)[:128],
+            )
+    if not mentions:
+        raise MentionTargetError("请在命令中明确 @ 一位当前群成员。")
+    if len(mentions) != 1:
+        raise MentionTargetError("一次只能选择一位接收群友。")
+    return next(iter(mentions.values()))
 
 
 def extract_command_identity(stream_id: str, kwargs: Mapping[str, Any]) -> CommandIdentity:

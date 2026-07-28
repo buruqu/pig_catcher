@@ -18,8 +18,8 @@ def test_checked_in_config_parses_with_current_model() -> None:
     assert config.plugin.config_version == PLUGIN_VERSION
     assert config.plugin.framework_phase == FRAMEWORK_PHASE
     assert config.features.help_enabled is True
-    assert config.trading.gift_enabled is False
-    assert config.trading.trade_enabled is False
+    assert config.trading.gift_enabled is True
+    assert config.trading.trade_enabled is True
 
 
 def test_manifest_versions_dependencies_and_capabilities_are_narrow() -> None:

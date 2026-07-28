@@ -17,7 +17,15 @@ from .economy import (
     stable_recipe_factor,
     upgrade_type_by_name,
 )
-from .enums import AssetKind, ConsentStatus, FatProfile, Rarity, ReceiptSendStatus, TemplateScope
+from .enums import (
+    AssetKind,
+    ConsentStatus,
+    FatProfile,
+    Rarity,
+    ReceiptSendStatus,
+    StatureProfile,
+    TemplateScope,
+)
 from .gameplay import (
     CATCH_COIN_REWARDS,
     CATCH_EXPERIENCE_REWARDS,
@@ -35,10 +43,19 @@ from .gameplay import (
     level_progress,
 )
 from .models import AssetSelector, CommandIdentity, ScopeKey
+from .social import (
+    RANKING_TYPES,
+    BodyScale,
+    describe_body_scale,
+    giant_score,
+    normalize_ranking_type,
+    normalize_trade_id,
+)
 
 __all__ = [
     "AssetKind",
     "AssetSelector",
+    "BodyScale",
     "CATCH_COIN_REWARDS",
     "CATCH_EXPERIENCE_REWARDS",
     "COOK_COIN_REWARDS",
@@ -59,19 +76,25 @@ __all__ = [
     "PIG_RARITY_NAMES",
     "PigAttributes",
     "Rarity",
+    "RANKING_TYPES",
     "ReceiptSendStatus",
     "ScopeKey",
     "StoreProduct",
+    "StatureProfile",
     "TemplateScope",
     "UPGRADE_DISPLAY_NAMES",
     "adjusted_cooking_weights",
     "build_store_products",
     "generate_food_attributes",
     "generate_pig_attributes",
+    "describe_body_scale",
+    "giant_score",
     "item_by_id",
     "item_by_name",
     "item_product_by_name",
     "level_progress",
+    "normalize_ranking_type",
+    "normalize_trade_id",
     "recipe_affinity",
     "stable_recipe_factor",
     "upgrade_type_by_name",

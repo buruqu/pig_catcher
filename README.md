@@ -1,6 +1,6 @@
 # MaiBot 抓猪插件
 
-这是“抓猪插件”的独立 MaiBot 插件仓库。当前版本为 `0.4.0`，已完成第四轮“做菜与经济”。
+这是“抓猪插件”的独立 MaiBot 插件仓库。当前版本为 `0.5.0`，已完成第五轮“社交与排行”。
 
 ## 当前状态
 
@@ -8,12 +8,14 @@
 - 目标 MaiBot：`1.0.12`
 - 目标 SDK：`maibot-plugin-sdk >=2.7.0,<3.0.0`
 - Python：`>=3.12`，本机验收环境 `3.14.4`
-- 数据协议：Schema `4`、Asset Manifest `2`、Ruleset `2`
-- 当前组件：19 个显式 `COMMAND`，不注册普通消息监听、Tool 或 LLM
+- 数据协议：Schema `5`、Asset Manifest `2`、Ruleset `3`
+- 当前组件：27 个显式 `COMMAND`，不注册普通消息监听、Tool 或 LLM
 - 当前群聊命令：`/抓猪帮助`、`/抓猪`（别名 `/抓群友`）、`/抓猪档案`、
   `/抓猪详情`、`/猪猪背包`、`/猪猪图鉴`、`/猪猪纪录`、`/使用道具`、`/取消道具`、
   `/做菜`、`/美食详情`、`/美食背包`、`/美食图鉴`、`/吃菜`（别名 `/使用美食`）、
-  `/猪猪商城`、`/购买`、`/售卖猪猪`、`/售卖美食`、`/猪币账本`
+  `/猪猪商城`、`/购买`、`/售卖猪猪`、`/售卖美食`、`/猪币账本`、
+  `/猪猪赠送`、`/美食赠送`、`/猪猪交易`、`/美食交易`、`/接受交易`、
+  `/拒绝交易`、`/取消交易`、`/我的交易`、`/设置展示`、`/猪猪排行`
 
 帮助保持纯文字，便于直接复制命令；已开放的业务结果优先发送白色、淡粉红图片，
 图片渲染或发送失败时降级为完整文字，不回滚已提交的抓取、做菜、使用或经济结算。
@@ -22,7 +24,7 @@
 
 - Manifest v2、SDK 生命周期、配置热更新和简体中文 WebUI 配置模型
 - 群与用户黑白名单，黑名单优先
-- 插件自有 SQLite Schema 4、逐级迁移、外键、WAL、显式事务和在线备份
+- 插件自有 SQLite Schema 5、逐级迁移、外键、WAL、显式事务和在线备份
 - 消息 ID 幂等键与 `pending -> claimed -> sent/failed` 一次发送回执
 - 素材 Manifest、实际媒体格式、逐帧解码、路径、尺寸、重复 ID 和授权校验
 - 1 至 5 星公共素材与 6 星群专属素材的数据边界、授权和撤回
@@ -43,6 +45,10 @@
 - 美食详情、背包、图鉴、食用及可扩展效果接口；未配置特殊效果时获得对应品质经验
 - 猪猪商城、四种抓猪道具、四种做菜道具、饲料与厨具永久升级
 - 猪与美食按官方价值售卖，所有猪币变化写入不可变账本并可实时对账
+- 当前群原子赠送、五分钟双方确认交易、资产锁、过期自动解锁和双边零和账本
+- 猪猪/美食展示位与综合、抓猪、美食、价值、巨物、数量、猪币七类群排行
+- 特小猪 `4-16 cm / 0.35-6 kg`、大象 `120-260 cm / 350-1800 kg` 专属体格
+- `NEW`、特殊体型评价、全群绝对体型/重量纪录和巨物目击永久留档
 - 改变状态命令的进程内、并发和插件重启幂等保护
 - 抓取、档案、猪与美食详情、背包、图鉴、纪录、商城、账本和经济回执的白粉图片
 - 单猪和单道美食 GIF/动画 WebP 保持动态；列表不抽取静态首帧，改为明确动态标记
@@ -50,7 +56,6 @@
 
 ## 有意延后
 
-- 第五轮：赠送、两阶段交易、展示设置和排行榜
 - 第六轮：真实 QQ 多群全流程、故障注入、备份和恢复演练
 
 正式美食素材当前未配置特殊 `effect_id`，因此 `/吃菜` 先提供稳定的品质经验收益；
@@ -67,16 +72,16 @@ uv sync --all-groups --locked
 .\.venv\Scripts\ruff.exe check plugin.py pig_catcher tests tools
 ```
 
-第四轮视觉验收与隔离命令 UAT：
+第五轮视觉验收与隔离命令 UAT：
 
 ```powershell
-uv run python .\tools\accept_fourth_round.py `
+uv run python .\tools\accept_fifth_round.py `
   --data-dir C:\Users\Administrator\MaiBot\data\plugins\local.pig-catcher `
-  --output .\artifacts\fourth-round-visual
+  --output .\artifacts\fifth-round-visual
 
-uv run python .\tools\uat_fourth_round.py `
+uv run python .\tools\uat_fifth_round.py `
   --data-dir C:\Users\Administrator\MaiBot\data\plugins\local.pig-catcher `
-  --output .\artifacts\fourth-round-uat
+  --output .\artifacts\fifth-round-uat
 ```
 
 生成的本地验收图、隔离数据库和报告位于忽略目录 `artifacts/`，不会进入插件发布包。

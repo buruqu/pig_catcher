@@ -11,6 +11,8 @@ from pathlib import Path
 from ..assets import AssetCatalogStorage
 from ..domain.ports import Clock, SystemClock
 from ..infrastructure.database import PigCatcherDatabase
+from ..infrastructure.repositories import SocialRepository
+from .command_state import iso_timestamp
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,6 +35,7 @@ class MaintenanceReport:
     backup_path: Path | None
     removed_backups: int
     removed_staging_directories: int
+    expired_trade_offers: int
 
 
 class MaintenanceRunner:
@@ -47,6 +50,7 @@ class MaintenanceRunner:
         *,
         logger: logging.Logger,
         clock: Clock | None = None,
+        social_repository: SocialRepository | None = None,
     ) -> None:
         self.database = database
         self.storage = storage
@@ -54,6 +58,7 @@ class MaintenanceRunner:
         self.options = options
         self.logger = logger
         self.clock = clock or SystemClock()
+        self.social_repository = social_repository or SocialRepository()
         self.backups_dir = self.data_dir / "backups"
         self._stop_event = asyncio.Event()
         self._task: asyncio.Task[None] | None = None
@@ -93,6 +98,11 @@ class MaintenanceRunner:
                 continue
 
     async def run_once(self) -> MaintenanceReport:
+        async with self.database.transaction() as session:
+            expired_trade_offers = await self.social_repository.expire_stale_offers(
+                session,
+                now=iso_timestamp(self.clock.now()),
+            )
         integrity_results: tuple[str, ...] = ()
         if self.options.run_integrity_check:
             integrity_results = await self.database.integrity_check()
@@ -107,6 +117,7 @@ class MaintenanceRunner:
             backup_path=backup_path,
             removed_backups=removed_backups,
             removed_staging_directories=removed_staging,
+            expired_trade_offers=expired_trade_offers,
         )
 
     def _backup_files(self) -> list[Path]:

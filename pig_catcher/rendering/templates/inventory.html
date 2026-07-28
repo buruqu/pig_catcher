@@ -51,6 +51,7 @@
           <span>{{ "%.2f"|format(item.weight_value) }} kg</span>
           <span>{{ item.fat_label }}</span>
           <span class="inventory-item__value">{{ item.official_value }} 猪币</span>
+          {% if item.body_label %}<span class="inventory-item__value">{{ item.body_label }}</span>{% endif %}
         </div>
       </article>
       {% endfor %}

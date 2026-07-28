@@ -36,12 +36,16 @@ from pig_catcher.rendering import (
     PigCardViewModel,
     PigCatcherRenderer,
     ProfileViewModel,
+    RankingItemViewModel,
+    RankingViewModel,
     RecordItemViewModel,
     RecordsViewModel,
     RenderDelivery,
     RenderOptions,
     StoreProductViewModel,
     StoreViewModel,
+    TradeListItemViewModel,
+    TradeListViewModel,
 )
 from pig_catcher.version import (
     ASSET_MANIFEST_VERSION,
@@ -831,3 +835,121 @@ async def test_fourth_round_templates_render_food_and_economy_views(
         )
     )
     assert "对账状态" in capability.calls[-1][0]
+
+
+@pytest.mark.asyncio
+async def test_fifth_round_templates_render_body_trade_and_ranking_views(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "showcase.png"
+    Image.new("RGBA", (96, 96), "#F58CAD").save(source, format="PNG")
+    capability = FakeRender()
+    renderer = PigCatcherRenderer(capability, _options())
+    pig = PigCardViewModel(
+        mode_label="抓猪成功",
+        display_name="巨型测试猪",
+        owner_display_name="测试成员",
+        rarity=2,
+        rarity_name="美味家养猪",
+        short_code="A19F2C3D",
+        description="一只用于第五轮体型与全群纪录渲染验收的猪。",
+        size_value=180,
+        size_percentile=0.6,
+        weight_value=600,
+        weight_percentile=0.7,
+        fat_ratio=55,
+        fat_label="均衡",
+        official_value=1000,
+        acquired_at="2026-07-28 12:00",
+        catalog_new=True,
+        body_label="双项巨物",
+        body_description="体型与重量同时越过全群巨物线。",
+        giant_score=159.5,
+        global_size_record=True,
+        global_weight_record=True,
+        giant_sighting=True,
+    )
+    await renderer.render_static_pig_card(pig, source)
+    pig_html, _ = capability.calls[-1]
+    assert "NEW · 首次收集" in pig_html
+    assert "双项巨物" in pig_html
+    assert "全群体型最高" in pig_html
+    assert "巨物目击留档" in pig_html
+
+    await renderer.render_trade_list(
+        TradeListViewModel(
+            display_name="测试成员",
+            page=1,
+            page_count=1,
+            total_count=1,
+            status_label="待处理",
+            items=(
+                TradeListItemViewModel(
+                    trade_id="AAAABBBB",
+                    status_label="待处理",
+                    asset_name="巨型测试猪",
+                    asset_code="A19F2C3D",
+                    rarity=2,
+                    price=120,
+                    sender_name="卖方",
+                    recipient_name="买方",
+                    expires_at="2026-07-28 12:05",
+                ),
+            ),
+        )
+    )
+    trade_html, _ = capability.calls[-1]
+    assert "AAAABBBB" in trade_html
+    assert "卖方 → 买方" in trade_html
+    assert "报价锁定 5 分钟" in trade_html
+
+    await renderer.render_ranking(
+        RankingViewModel(
+            group_name="测试群",
+            ranking_type="巨物",
+            page=1,
+            page_count=1,
+            total_count=2,
+            items=(
+                RankingItemViewModel(
+                    key="static",
+                    rank=1,
+                    display_name="第一名",
+                    metric_text="巨物 159.5 分",
+                    pig_progress="2/2",
+                    food_progress="0/0",
+                    asset_count=2,
+                    coin_balance=120,
+                    showcase_name="巨型测试猪",
+                    showcase_detail="180.0 cm · 600.00 kg",
+                    showcase_rarity=2,
+                    showcase_kind="猪猪",
+                    media_visible=True,
+                    is_animated=False,
+                    image_fit="contain",
+                ),
+                RankingItemViewModel(
+                    key="animated",
+                    rank=2,
+                    display_name="第二名",
+                    metric_text="巨物 90.0 分",
+                    pig_progress="1/2",
+                    food_progress="0/0",
+                    asset_count=1,
+                    coin_balance=20,
+                    showcase_name="动态猪",
+                    showcase_detail="120.0 cm · 300.00 kg",
+                    showcase_rarity=3,
+                    showcase_kind="猪猪",
+                    media_visible=True,
+                    is_animated=True,
+                    image_fit="contain",
+                ),
+            ),
+        ),
+        {"static": source},
+    )
+    ranking_html, _ = capability.calls[-1]
+    assert "巨物 159.5 分" in ranking_html
+    assert "data:image/png;base64," in ranking_html
+    assert "GIF" in ranking_html and "动态展示" in ranking_html

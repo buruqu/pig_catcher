@@ -51,6 +51,8 @@
       <div class="profile-stat"><span>当前冷却</span><strong>{{ view.cooldown_remaining_seconds }} 秒</strong></div>
       <div class="profile-stat"><span>抓猪道具</span><strong>{{ view.armed_item_name or "无" }}</strong></div>
       <div class="profile-stat"><span>做菜道具</span><strong>{{ view.armed_cooking_item_name or "无" }}</strong></div>
+      <div class="profile-stat"><span>猪猪展示</span><strong style="font-size:17px">{{ view.showcase_pig or "未设置" }}</strong></div>
+      <div class="profile-stat"><span>美食展示</span><strong style="font-size:17px">{{ view.showcase_food or "未设置" }}</strong></div>
     </section>
 
     <section class="profile-sheet__collections">

@@ -10,8 +10,15 @@ import pytest
 from PIL import Image
 
 from pig_catcher.assets import AssetCatalogStorage
-from pig_catcher.config.model import CatchingSection, CookingSection, EconomySection
+from pig_catcher.config.model import (
+    CatchingSection,
+    CookingSection,
+    EconomySection,
+    RankingSection,
+    TradingSection,
+)
 from pig_catcher.domain.economy import adjusted_cooking_weights
+from pig_catcher.domain.enums import AssetKind
 from pig_catcher.domain.errors import (
     CookingTemplateError,
     FoodEffectError,
@@ -20,7 +27,12 @@ from pig_catcher.domain.errors import (
 from pig_catcher.domain.models import CommandIdentity, ScopeKey
 from pig_catcher.infrastructure import PigCatcherDatabase
 from pig_catcher.infrastructure.repositories import EconomyRepository, FrameworkRepository
-from pig_catcher.services import AssetCatalogService, EconomyService, GameplayService
+from pig_catcher.services import (
+    AssetCatalogService,
+    EconomyService,
+    GameplayService,
+    SocialService,
+)
 from pig_catcher.services.command_state import iso_timestamp
 
 
@@ -515,6 +527,17 @@ async def test_official_sales_credit_exact_value_once(
         id_factory=iter(("sale-ledger",)).__next__,
     )
     identity = _identity(message_id="sell-pig")
+    await SocialService(
+        database,
+        TradingSection(),
+        RankingSection(),
+        clock=clock,
+    ).set_showcase(
+        _identity(message_id="showcase-before-sale"),
+        asset_kind=AssetKind.PIG,
+        selector_text=caught.pig.selector,
+        clear=False,
+    )
     first = await service.sell_pig(identity, caught.pig.selector)
     duplicate = await service.sell_pig(identity, caught.pig.selector)
     assert first.balance_after == 2 + caught.pig.official_value
@@ -524,6 +547,11 @@ async def test_official_sales_credit_exact_value_once(
         (caught.pig.pig_instance_id,),
     )
     assert state is not None and state["state"] == "sold"
+    showcase = await database.fetch_one(
+        "SELECT pig_instance_id FROM display_preferences WHERE player_id = ?",
+        (identity.player_id,),
+    )
+    assert showcase is not None and showcase["pig_instance_id"] is None
     ledger = await service.ledger(identity, page=1)
     assert ledger.coin_balance == ledger.ledger_total
     await database.close()

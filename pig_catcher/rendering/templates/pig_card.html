@@ -33,9 +33,13 @@
       <div class="pill-row" style="margin-bottom: 16px">
         <span class="pill pill--strong">#{{ view.short_code }}</span>
         <span class="pill">{{ view.media_format }}{% if view.is_animated %} · 动态{% endif %}</span>
-        {% if view.catalog_new %}<span class="pill pill--mint">首次收集</span>{% endif %}
+        {% if view.catalog_new %}<span class="pill pill--mint">NEW · 首次收集</span>{% endif %}
+        {% if view.body_label %}<span class="pill pill--strong">{{ view.body_label }}</span>{% endif %}
         {% if view.size_record %}<span class="pill pill--blue">体型新纪录</span>{% endif %}
         {% if view.weight_record %}<span class="pill pill--gold">重量新纪录</span>{% endif %}
+        {% if view.global_size_record %}<span class="pill pill--blue">全群体型最高</span>{% endif %}
+        {% if view.global_weight_record %}<span class="pill pill--gold">全群重量最高</span>{% endif %}
+        {% if view.giant_sighting %}<span class="pill pill--pink">巨物目击留档</span>{% endif %}
       </div>
       <div class="pig-card__facts">
         <div class="pig-card__fact">
@@ -55,6 +59,12 @@
           <strong>{{ view.official_value }} 猪币</strong>
         </div>
       </div>
+      {% if view.body_label %}
+      <div class="pig-card__body-note">
+        <strong>{{ view.body_label }} · {{ "%.1f"|format(view.giant_score) }} 分</strong>
+        <span>{{ view.body_description }}</span>
+      </div>
+      {% endif %}
       <p class="pig-card__description" style="font-size: {% if view.description|length > 350 %}13{% elif view.description|length > 250 %}14{% elif view.description|length > 160 %}15{% elif view.description|length > 115 %}16{% elif view.description|length > 80 %}17{% else %}19{% endif %}px;line-height:{% if view.description|length > 160 %}1.45{% else %}1.55{% endif %}">{{ view.description }}</p>
       <p class="pig-card__subline">
         {% if view.collection_name %}{{ view.collection_name }}{% if view.character_name %} · {{ view.character_name }}{% endif %} · {% endif %}

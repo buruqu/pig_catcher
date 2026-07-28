@@ -117,6 +117,12 @@ class PigCardViewModel:
     catalog_new: bool = False
     size_record: bool = False
     weight_record: bool = False
+    body_label: str = ""
+    body_description: str = ""
+    giant_score: float = 0.0
+    global_size_record: bool = False
+    global_weight_record: bool = False
+    giant_sighting: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -160,6 +166,8 @@ class ProfileViewModel:
     armed_cooking_item_name: str = ""
     armed_cooking_item_quantity: int = 0
     collections: tuple[CollectionProgressViewModel, ...] = ()
+    showcase_pig: str = ""
+    showcase_food: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -177,6 +185,7 @@ class InventoryItemViewModel:
     media_visible: bool
     is_animated: bool
     image_fit: str
+    body_label: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -249,6 +258,23 @@ class RecordsViewModel:
     page_count: int
     total_count: int
     items: tuple[RecordItemViewModel, ...]
+    global_items: tuple[RecordItemViewModel, ...] = ()
+    giant_sightings: tuple[GiantSightingViewModel, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class GiantSightingViewModel:
+    """One recent group-wide giant sighting."""
+
+    display_name: str
+    rarity: int
+    short_code: str
+    holder_display_name: str
+    size_value: float
+    weight_value: float
+    giant_score: float
+    qualification_label: str
+    achieved_at: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -423,3 +449,63 @@ class LedgerViewModel:
     coin_balance: int
     ledger_total: int
     items: tuple[LedgerEntryViewModel, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class TradeListItemViewModel:
+    """One compact bilateral trade row."""
+
+    trade_id: str
+    status_label: str
+    asset_name: str
+    asset_code: str
+    rarity: int
+    price: int
+    sender_name: str
+    recipient_name: str
+    expires_at: str
+
+
+@dataclass(frozen=True, slots=True)
+class TradeListViewModel:
+    """One current-player trade page."""
+
+    display_name: str
+    page: int
+    page_count: int
+    total_count: int
+    status_label: str
+    items: tuple[TradeListItemViewModel, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class RankingItemViewModel:
+    """One group leaderboard row with one optional showcase asset."""
+
+    key: str
+    rank: int
+    display_name: str
+    metric_text: str
+    pig_progress: str
+    food_progress: str
+    asset_count: int
+    coin_balance: int
+    showcase_name: str
+    showcase_detail: str
+    showcase_rarity: int
+    showcase_kind: str
+    media_visible: bool
+    is_animated: bool
+    image_fit: str
+
+
+@dataclass(frozen=True, slots=True)
+class RankingViewModel:
+    """One original white-and-pale-pink group leaderboard."""
+
+    group_name: str
+    ranking_type: str
+    page: int
+    page_count: int
+    total_count: int
+    items: tuple[RankingItemViewModel, ...]

@@ -6,6 +6,7 @@ from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 
 from ..domain.errors import RenderError
+from ..domain.social import TRADE_STATUS_LABELS
 from ..services.economy import (
     CookingResult,
     EatResult,
@@ -26,6 +27,15 @@ from ..services.gameplay import (
     PlayerProfile,
     RecordsPage,
 )
+from ..services.social import (
+    GiftResult,
+    RankingEntry,
+    RankingPage,
+    ShowcaseAsset,
+    ShowcaseResult,
+    TradeActionResult,
+    TradePage,
+)
 from .models import (
     CatalogItemViewModel,
     CatalogViewModel,
@@ -37,6 +47,7 @@ from .models import (
     FoodCatalogViewModel,
     FoodInventoryItemViewModel,
     FoodInventoryViewModel,
+    GiantSightingViewModel,
     InventoryItemViewModel,
     InventoryViewModel,
     ItemReceiptViewModel,
@@ -44,10 +55,14 @@ from .models import (
     LedgerViewModel,
     PigCardViewModel,
     ProfileViewModel,
+    RankingItemViewModel,
+    RankingViewModel,
     RecordItemViewModel,
     RecordsViewModel,
     StoreProductViewModel,
     StoreViewModel,
+    TradeListItemViewModel,
+    TradeListViewModel,
 )
 
 _BEIJING_TIMEZONE = timezone(timedelta(hours=8), "Asia/Shanghai")
@@ -113,6 +128,22 @@ def pig_card_view(
         catalog_new=catch.catalog_new if catch is not None else False,
         size_record=catch.size_record if catch is not None else pig.is_size_record,
         weight_record=catch.weight_record if catch is not None else pig.is_weight_record,
+        body_label=pig.body_label,
+        body_description=pig.body_description,
+        giant_score=pig.giant_score,
+        global_size_record=(
+            catch.global_size_record
+            if catch is not None
+            else pig.is_global_size_record
+        ),
+        global_weight_record=(
+            catch.global_weight_record
+            if catch is not None
+            else pig.is_global_weight_record
+        ),
+        giant_sighting=(
+            catch.giant_sighting if catch is not None else pig.is_giant_sighting
+        ),
     )
 
 
@@ -152,6 +183,8 @@ def profile_view(profile: PlayerProfile) -> ProfileViewModel:
         ),
         armed_cooking_item_quantity=profile.armed_cooking_item_quantity,
         collections=tuple(_collection_view(item) for item in profile.collections),
+        showcase_pig=profile.showcase_pig,
+        showcase_food=profile.showcase_food,
     )
 
 
@@ -178,6 +211,7 @@ def inventory_view(page: InventoryPage) -> InventoryViewModel:
                 media_visible=pig.media_visible,
                 is_animated=pig.is_animated,
                 image_fit=pig.image_fit,
+                body_label=pig.body_label,
             )
             for pig in page.pigs
         ),
@@ -237,6 +271,39 @@ def records_view(page: RecordsPage) -> RecordsViewModel:
                 achieved_at=_display_time(entry.achieved_at),
             )
             for entry in page.entries
+        ),
+        global_items=tuple(
+            RecordItemViewModel(
+                record_label=entry.record_label,
+                record_value=entry.record_value,
+                unit=entry.unit,
+                display_name=entry.display_name,
+                rarity=entry.rarity,
+                short_code=entry.short_code,
+                holder_display_name=entry.holder_display_name,
+                achieved_at=_display_time(entry.achieved_at),
+            )
+            for entry in page.global_entries
+        ),
+        giant_sightings=tuple(
+            GiantSightingViewModel(
+                display_name=entry.display_name,
+                rarity=entry.rarity,
+                short_code=entry.short_code,
+                holder_display_name=entry.holder_display_name,
+                size_value=entry.size_value,
+                weight_value=entry.weight_value,
+                giant_score=entry.giant_score,
+                qualification_label=(
+                    "双项巨物"
+                    if entry.size_qualified and entry.weight_qualified
+                    else "体型巨物"
+                    if entry.size_qualified
+                    else "重量巨物"
+                ),
+                achieved_at=_display_time(entry.achieved_at),
+            )
+            for entry in page.giant_sightings
         ),
     )
 
@@ -475,6 +542,177 @@ def ledger_view(page: LedgerPage) -> LedgerViewModel:
     )
 
 
+def gift_receipt_view(result: GiftResult) -> EconomyReceiptViewModel:
+    """Build a rendered immediate-gift receipt."""
+
+    return EconomyReceiptViewModel(
+        eyebrow="群内赠送 · 原子转移",
+        title="赠送完成",
+        badge_label=result.asset.kind_label,
+        badge_value="★" * result.asset.rarity,
+        summary=(
+            f"{result.sender_display_name} 将 {result.asset.selector} "
+            f"赠送给 {result.recipient_display_name}"
+        ),
+        rows=(
+            EconomyReceiptRowViewModel("接收方", result.recipient_display_name),
+            EconomyReceiptRowViewModel("资产属性", result.asset.detail_text),
+            EconomyReceiptRowViewModel("官方价值", f"{result.asset.official_value} 猪币"),
+        ),
+        note="赠送不产生猪币或经验，资产已在当前群内完成转移。",
+    )
+
+
+def trade_receipt_view(result: TradeActionResult) -> EconomyReceiptViewModel:
+    """Build a rendered offer or bilateral-confirmation receipt."""
+
+    title = {
+        "created": "交易报价已创建",
+        "accepted": "双方交易已完成",
+        "rejected": "交易已拒绝",
+        "cancelled": "交易已取消",
+    }.get(result.operation, f"交易{result.trade.status_label}")
+    rows = [
+        EconomyReceiptRowViewModel("交易号", result.trade.trade_id),
+        EconomyReceiptRowViewModel(
+            "交易双方",
+            f"{result.trade.sender_display_name} → {result.trade.recipient_display_name}",
+        ),
+        EconomyReceiptRowViewModel("交易价格", f"{result.trade.price} 猪币"),
+        EconomyReceiptRowViewModel("有效期至", _display_time(result.trade.expires_at)),
+    ]
+    if result.buyer_balance is not None and result.seller_balance is not None:
+        rows.append(
+            EconomyReceiptRowViewModel(
+                "成交余额",
+                f"买方 {result.buyer_balance} / 卖方 {result.seller_balance}",
+            )
+        )
+    return EconomyReceiptViewModel(
+        eyebrow="双方确认交易 · 当前群",
+        title=title,
+        badge_label=result.trade.status_label,
+        badge_value=result.trade.trade_id,
+        summary=f"{'★' * result.trade.asset.rarity} {result.trade.asset.selector}",
+        rows=tuple(rows),
+        note=(
+            "接收方使用 /接受交易 交易号 完成付款；"
+            "未完成报价会在五分钟后自动解锁。"
+            if result.operation == "created"
+            else "交易状态已原子写入，重复命令不会再次转移资产或猪币。"
+        ),
+    )
+
+
+def showcase_receipt_view(result: ShowcaseResult) -> EconomyReceiptViewModel:
+    """Build a rendered showcase-slot update receipt."""
+
+    kind_label = "猪猪" if result.asset_kind.value == "pig" else "美食"
+    summary = (
+        f"已取消{kind_label}展示位"
+        if result.cleared
+        else f"已展示 {result.asset.selector if result.asset is not None else ''}"
+    )
+    return EconomyReceiptViewModel(
+        eyebrow="个人展示位 · 当前群",
+        title="展示位已更新",
+        badge_label=kind_label,
+        badge_value="已取消" if result.cleared else "已设置",
+        summary=summary,
+        rows=(
+            EconomyReceiptRowViewModel(
+                "展示资产",
+                result.asset.selector if result.asset is not None else "无",
+            ),
+            EconomyReceiptRowViewModel(
+                "展示品质",
+                "★" * result.asset.rarity if result.asset is not None else "无",
+            ),
+        ),
+        note="排行榜会优先展示该资产；取消后自动回退到当前持有的高价值资产。",
+    )
+
+
+def trade_list_view(page: TradePage) -> TradeListViewModel:
+    """Build a current-player bilateral trade list."""
+
+    return TradeListViewModel(
+        display_name=page.display_name,
+        page=page.page,
+        page_count=page.page_count,
+        total_count=page.total_count,
+        status_label=(
+            TRADE_STATUS_LABELS[page.status] if page.status is not None else "全部"
+        ),
+        items=tuple(
+            TradeListItemViewModel(
+                trade_id=entry.trade_id,
+                status_label=entry.status_label,
+                asset_name=entry.asset.display_name,
+                asset_code=entry.asset.short_code,
+                rarity=entry.asset.rarity,
+                price=entry.price,
+                sender_name=entry.sender_display_name,
+                recipient_name=entry.recipient_display_name,
+                expires_at=_display_time(entry.expires_at),
+            )
+            for entry in page.entries
+        ),
+    )
+
+
+def _ranking_showcase(
+    entry: RankingEntry,
+    ranking_type: str,
+) -> ShowcaseAsset | None:
+    if ranking_type == "美食":
+        return entry.showcase_food or entry.showcase_pig
+    if ranking_type == "巨物":
+        return entry.giant_pig or entry.showcase_pig
+    return entry.showcase_pig or entry.showcase_food
+
+
+def ranking_view(page: RankingPage) -> RankingViewModel:
+    """Build an original, compact white-and-pink leaderboard."""
+
+    items: list[RankingItemViewModel] = []
+    for entry in page.entries:
+        showcase = _ranking_showcase(entry, page.ranking_type)
+        items.append(
+            RankingItemViewModel(
+                key=entry.player_id,
+                rank=entry.rank,
+                display_name=entry.display_name,
+                metric_text=entry.metric_text,
+                pig_progress=f"{entry.pig_catalog_count}/{entry.pig_catalog_total}",
+                food_progress=f"{entry.food_catalog_count}/{entry.food_catalog_total}",
+                asset_count=entry.active_pigs + entry.active_foods,
+                coin_balance=entry.coin_balance,
+                showcase_name=showcase.display_name if showcase is not None else "",
+                showcase_detail=showcase.detail_text if showcase is not None else "",
+                showcase_rarity=showcase.rarity if showcase is not None else 0,
+                showcase_kind=(
+                    "猪猪"
+                    if showcase is not None and showcase.asset_kind.value == "pig"
+                    else "美食"
+                    if showcase is not None
+                    else ""
+                ),
+                media_visible=bool(showcase and showcase.media_visible),
+                is_animated=bool(showcase and showcase.is_animated),
+                image_fit=showcase.image_fit if showcase is not None else "contain",
+            )
+        )
+    return RankingViewModel(
+        group_name=page.group_name,
+        ranking_type=page.ranking_type,
+        page=page.page,
+        page_count=page.page_count,
+        total_count=page.total_count,
+        items=tuple(items),
+    )
+
+
 def media_path(data_dir: Path, relative_path: str) -> Path:
     """Resolve a persisted media path without allowing data-dir escape."""
 
@@ -551,3 +789,22 @@ def food_catalog_media_paths(
         for entry in page.entries
         if entry.discovered and not entry.is_animated
     }
+
+
+def ranking_media_paths(
+    data_dir: Path,
+    page: RankingPage,
+) -> dict[str, Path]:
+    """Resolve static leaderboard showcase media without flattening GIFs."""
+
+    result: dict[str, Path] = {}
+    for entry in page.entries:
+        showcase = _ranking_showcase(entry, page.ranking_type)
+        if (
+            showcase is None
+            or not showcase.media_visible
+            or showcase.is_animated
+        ):
+            continue
+        result[entry.player_id] = media_path(data_dir, showcase.image_relpath)
+    return result

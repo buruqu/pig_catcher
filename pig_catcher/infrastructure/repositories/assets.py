@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 
 from ...assets.models import StoredCatalog, ValidatedAsset, ValidatedManifest
-from ...domain.enums import AssetKind, ConsentStatus, TemplateScope
+from ...domain.enums import AssetKind, ConsentStatus, StatureProfile, TemplateScope
 from ...domain.errors import AssetImportError
 from ...domain.models import ScopeKey
 from ..database import DatabaseSession
@@ -156,7 +156,7 @@ class AssetRepository:
                 template_id, catalog_hash, template_version, display_name, rarity,
                 scope_type, description, image_relpath, image_sha256, image_fit,
                 length_min, length_max, weight_min, weight_max, fat_profile,
-                recipe_tags_json, source_label, license, consent_status,
+                stature_profile, recipe_tags_json, source_label, license, consent_status,
                 media_format, is_animated, frame_count, total_duration_ms,
                 loop_count, has_transparency, collaboration_name, collection_id,
                 collection_name, collection_slot, collection_total, character_id,
@@ -167,7 +167,7 @@ class AssetRepository:
                 :template_id, :catalog_hash, 1, :display_name, :rarity,
                 :scope_type, :description, :image_relpath, :image_sha256, :image_fit,
                 :length_min, :length_max, :weight_min, :weight_max, :fat_profile,
-                :recipe_tags_json, :source_label, :license, :consent_status,
+                :stature_profile, :recipe_tags_json, :source_label, :license, :consent_status,
                 :media_format, :is_animated, :frame_count, :total_duration_ms,
                 :loop_count, :has_transparency, :collaboration_name, :collection_id,
                 :collection_name, :collection_slot, :collection_total, :character_id,
@@ -191,6 +191,7 @@ class AssetRepository:
                 weight_min = excluded.weight_min,
                 weight_max = excluded.weight_max,
                 fat_profile = excluded.fat_profile,
+                stature_profile = excluded.stature_profile,
                 recipe_tags_json = excluded.recipe_tags_json,
                 source_label = excluded.source_label,
                 license = excluded.license,
@@ -227,6 +228,9 @@ class AssetRepository:
                 "weight_min": entry.weight_min_kg,
                 "weight_max": entry.weight_max_kg,
                 "fat_profile": entry.fat_profile.value,
+                "stature_profile": (
+                    entry.stature_profile or StatureProfile.STANDARD
+                ).value,
                 "recipe_tags_json": json.dumps(
                     entry.recipe_tags,
                     ensure_ascii=False,

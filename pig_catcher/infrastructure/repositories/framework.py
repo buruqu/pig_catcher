@@ -65,6 +65,14 @@ class FrameworkRepository:
                 now,
             ),
         )
+        await session.execute(
+            """
+            INSERT INTO player_statistics(player_id, updated_at)
+            VALUES (?, ?)
+            ON CONFLICT(player_id) DO NOTHING
+            """,
+            (identity.player_id, now),
+        )
 
     async def touch_identity(
         self,

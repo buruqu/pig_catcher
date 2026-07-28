@@ -123,3 +123,39 @@ class FoodEffectError(GameplayError):
 
 class LedgerReconciliationError(GameplayError):
     """玩家余额与不可变流水无法对账。"""
+
+
+class SocialError(GameplayError):
+    """第五轮赠送、交易、展示或排行的可说明错误。"""
+
+
+class MentionTargetError(SocialError):
+    """命令缺少唯一且有效的群成员 @。"""
+
+
+class SelfTransferError(SocialError):
+    """用户尝试向自己赠送或交易。"""
+
+
+class TradeNotFoundError(SocialError):
+    """当前群找不到指定交易。"""
+
+
+class TradePermissionError(SocialError):
+    """当前用户不是处理该交易所需的一方。"""
+
+
+class TradeStateError(SocialError):
+    """交易不再处于允许当前动作的状态。"""
+
+
+class TradeExpiredError(TradeStateError):
+    """交易已经过期并完成资产解锁。"""
+
+
+class TradePriceError(SocialError):
+    """交易价格不在配置允许范围内。"""
+
+
+class ShowcaseError(SocialError):
+    """展示物选择或状态无效。"""

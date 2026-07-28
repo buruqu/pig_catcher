@@ -29,6 +29,49 @@
       </div>
     </section>
 
+    {% if view.global_items %}
+    <section class="record-feature">
+      <div class="record-feature__heading">
+        <div><span>全群绝对纪录</span><strong>不分品种的体型与重量最高值</strong></div>
+        <b>{{ view.global_items|length }} 项</b>
+      </div>
+      <div class="records-list records-list--feature">
+        {% for item in view.global_items %}
+        <div class="record-row rarity-{{ item.rarity }}">
+          <div class="record-row__type">{{ item.record_label }}最高</div>
+          <div class="record-row__pig">
+            <strong>{{ "★" * item.rarity }} {{ item.display_name }}</strong>
+            <span>#{{ item.short_code }} · {{ item.achieved_at }}</span>
+          </div>
+          <div class="record-row__value">{{ "%.2f"|format(item.record_value) }} {{ item.unit }}</div>
+          <div class="record-row__holder">{{ item.holder_display_name }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+    {% if view.giant_sightings %}
+    <section class="record-feature record-feature--sightings">
+      <div class="record-feature__heading">
+        <div><span>最近巨物目击</span><strong>达到绝对体型或重量门槛后永久留档</strong></div>
+        <b>{{ view.giant_sightings|length }} 条</b>
+      </div>
+      <div class="giant-sighting-list">
+        {% for item in view.giant_sightings %}
+        <div class="giant-sighting-row rarity-{{ item.rarity }}">
+          <div class="giant-sighting-row__score">{{ "%.1f"|format(item.giant_score) }}</div>
+          <div>
+            <strong>{{ item.qualification_label }} · {{ "★" * item.rarity }} {{ item.display_name }}</strong>
+            <span>#{{ item.short_code }} · {{ item.holder_display_name }} · {{ item.achieved_at }}</span>
+          </div>
+          <b>{{ "%.1f"|format(item.size_value) }} cm<br>{{ "%.2f"|format(item.weight_value) }} kg</b>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
     {% if view.items %}
     <section class="records-list">
       {% for item in view.items %}

@@ -1,4 +1,4 @@
-"""MaiBot 抓猪插件第四轮显式命令入口。"""
+"""MaiBot 抓猪插件第五轮显式命令入口。"""
 
 from __future__ import annotations
 
@@ -11,20 +11,33 @@ from maibot_sdk import CONFIG_RELOAD_SCOPE_SELF, Command, MaiBotPlugin
 
 from .pig_catcher.assets import AssetCatalogStorage
 from .pig_catcher.commands import (
+    MentionTarget,
     extract_command_identity,
+    extract_mention_target,
     format_help,
     matched_group,
     parse_action_type,
     parse_catalog_query,
     parse_food_inventory_query,
+    parse_gift_query,
     parse_inventory_query,
     parse_ledger_page,
     parse_purchase_query,
+    parse_ranking_query,
     parse_records_page,
+    parse_showcase_query,
     parse_store_query,
+    parse_trade_id,
+    parse_trade_list_query,
+    parse_trade_offer_query,
 )
 from .pig_catcher.config import AccessPolicy, PigCatcherConfig
-from .pig_catcher.domain.errors import CommandContextError, PigCatcherError
+from .pig_catcher.domain.enums import AssetKind
+from .pig_catcher.domain.errors import (
+    CommandContextError,
+    MentionTargetError,
+    PigCatcherError,
+)
 from .pig_catcher.domain.models import CommandIdentity, CommandReceipt
 from .pig_catcher.infrastructure import PigCatcherDatabase, safe_database_path
 from .pig_catcher.rendering import (
@@ -42,6 +55,7 @@ from .pig_catcher.rendering import (
     food_inventory_media_paths,
     food_inventory_view,
     food_media_path,
+    gift_receipt_view,
     inventory_media_paths,
     inventory_view,
     item_receipt_view,
@@ -50,9 +64,14 @@ from .pig_catcher.rendering import (
     pig_media_path,
     profile_view,
     purchase_receipt_view,
+    ranking_media_paths,
+    ranking_view,
     records_view,
     sale_receipt_view,
+    showcase_receipt_view,
     store_view,
+    trade_list_view,
+    trade_receipt_view,
 )
 from .pig_catcher.services import (
     AssetCatalogService,
@@ -66,6 +85,7 @@ from .pig_catcher.services import (
     MaintenanceRunner,
     PigView,
     ReceiptService,
+    SocialService,
     format_catalog_summary,
     format_catch_summary,
     format_cooking_summary,
@@ -73,15 +93,20 @@ from .pig_catcher.services import (
     format_food_catalog_summary,
     format_food_detail_summary,
     format_food_inventory_summary,
+    format_gift_summary,
     format_inventory_summary,
     format_item_action_summary,
     format_ledger_summary,
     format_pig_detail_summary,
     format_profile_summary,
     format_purchase_summary,
+    format_ranking_summary,
     format_records_summary,
     format_sale_summary,
+    format_showcase_summary,
     format_store_summary,
+    format_trade_page_summary,
+    format_trade_summary,
 )
 from .pig_catcher.version import PLUGIN_VERSION
 
@@ -99,6 +124,7 @@ class PigCatcherPlugin(MaiBotPlugin):
         self._framework_service: FrameworkService | None = None
         self._gameplay_service: GameplayService | None = None
         self._economy_service: EconomyService | None = None
+        self._social_service: SocialService | None = None
         self._receipt_service: ReceiptService | None = None
         self._renderer: PigCatcherRenderer | None = None
         self._animation_composer: AnimatedCardComposer | None = None
@@ -140,6 +166,12 @@ class PigCatcherPlugin(MaiBotPlugin):
         """Expose the active fourth-round service for command-level acceptance."""
 
         return self._economy_service
+
+    @property
+    def social_service(self) -> SocialService | None:
+        """Expose the active fifth-round service for command-level acceptance."""
+
+        return self._social_service
 
     async def on_load(self) -> None:
         if self.settings.plugin.enabled:
@@ -228,11 +260,20 @@ class PigCatcherPlugin(MaiBotPlugin):
             self._storage = storage
             self._asset_service = asset_service
             self._framework_service = FrameworkService(database)
-            self._gameplay_service = GameplayService(database, settings.catching)
+            self._gameplay_service = GameplayService(
+                database,
+                settings.catching,
+                ranking=settings.ranking,
+            )
             self._economy_service = EconomyService(
                 database,
                 settings.cooking,
                 settings.economy,
+            )
+            self._social_service = SocialService(
+                database,
+                settings.trading,
+                settings.ranking,
             )
             self._receipt_service = ReceiptService(database)
             self._renderer = renderer
@@ -266,6 +307,7 @@ class PigCatcherPlugin(MaiBotPlugin):
         self._renderer = None
         self._receipt_service = None
         self._economy_service = None
+        self._social_service = None
         self._gameplay_service = None
         self._framework_service = None
         self._asset_service = None
@@ -280,6 +322,25 @@ class PigCatcherPlugin(MaiBotPlugin):
             user_whitelist=settings.user_whitelist,
             user_blacklist=settings.user_blacklist,
             denied_message=settings.denied_message,
+        )
+
+    def _recipient_identity(
+        self,
+        actor: CommandIdentity,
+        target: MentionTarget,
+    ) -> CommandIdentity:
+        decision = self._access_policy().evaluate(
+            group_id=actor.scope.group_id,
+            user_id=target.user_id,
+        )
+        if not decision.allowed:
+            raise MentionTargetError("被提及成员未启用抓猪插件，不能接收资产或报价。")
+        return CommandIdentity(
+            scope=actor.scope,
+            stream_id=actor.stream_id,
+            user_id=target.user_id,
+            display_name=target.display_name,
+            group_name=actor.group_name,
         )
 
     async def _reply_text(
@@ -1240,6 +1301,355 @@ class PigCatcherPlugin(MaiBotPlugin):
             return await self._command_error(
                 stream_id=identity.stream_id,
                 operation="猪币账本",
+                error=exc,
+            )
+
+    @Command(
+        "pig_catcher_gift",
+        description="把当前持有的猪猪或美食赠送给同群成员",
+        pattern=r"^/(?P<kind>猪猪|美食)赠送(?:\s+(?P<arguments>.*?))?\s*$",
+    )
+    async def handle_gift(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_command(
+            stream_id,
+            kwargs,
+            feature_enabled=self.settings.trading.gift_enabled,
+            feature_label="群内赠送",
+        )
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            target = extract_mention_target(kwargs)
+            recipient = self._recipient_identity(identity, target)
+            query = parse_gift_query(
+                matched_group(kwargs, "arguments"),
+                target_display_name=target.display_name,
+                target_user_id=target.user_id,
+            )
+            kind = (
+                AssetKind.PIG
+                if matched_group(kwargs, "kind") == "猪猪"
+                else AssetKind.FOOD
+            )
+            result = await cast(SocialService, self._social_service).gift(
+                identity,
+                recipient,
+                asset_kind=kind,
+                selector_text=query.selector,
+            )
+            renderer = cast(PigCatcherRenderer, self._renderer)
+            fallback = result.receipt.text_summary or format_gift_summary(result)
+            return await self._deliver_receipt(
+                stream_id=identity.stream_id,
+                receipt=result.receipt,
+                render=lambda: renderer.render_economy_receipt(
+                    gift_receipt_view(result)
+                ),
+                fallback_text=fallback,
+            )
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation="群内赠送",
+                error=exc,
+            )
+
+    @Command(
+        "pig_catcher_trade_offer",
+        description="向同群成员发起一笔五分钟双方确认交易",
+        pattern=r"^/(?P<kind>猪猪|美食)交易(?:\s+(?P<arguments>.*?))?\s*$",
+    )
+    async def handle_trade_offer(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_command(
+            stream_id,
+            kwargs,
+            feature_enabled=self.settings.trading.trade_enabled,
+            feature_label="双方确认交易",
+        )
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            target = extract_mention_target(kwargs)
+            recipient = self._recipient_identity(identity, target)
+            query = parse_trade_offer_query(
+                matched_group(kwargs, "arguments"),
+                target_display_name=target.display_name,
+                target_user_id=target.user_id,
+            )
+            kind = (
+                AssetKind.PIG
+                if matched_group(kwargs, "kind") == "猪猪"
+                else AssetKind.FOOD
+            )
+            result = await cast(
+                SocialService,
+                self._social_service,
+            ).create_trade(
+                identity,
+                recipient,
+                asset_kind=kind,
+                selector_text=query.selector,
+                price=query.price,
+            )
+            renderer = cast(PigCatcherRenderer, self._renderer)
+            fallback = result.receipt.text_summary or format_trade_summary(result)
+            return await self._deliver_receipt(
+                stream_id=identity.stream_id,
+                receipt=result.receipt,
+                render=lambda: renderer.render_economy_receipt(
+                    trade_receipt_view(result)
+                ),
+                fallback_text=fallback,
+            )
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation="创建交易",
+                error=exc,
+            )
+
+    @Command(
+        "pig_catcher_trade_accept",
+        description="接收方确认并完成一笔当前群交易",
+        pattern=r"^/接受交易(?:\s+(?P<arguments>.*?))?\s*$",
+    )
+    async def handle_trade_accept(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        return await self._handle_trade_resolution(
+            stream_id,
+            kwargs,
+            operation="接受交易",
+            action=lambda service, identity, trade_id: service.accept_trade(
+                identity,
+                trade_id,
+            ),
+        )
+
+    @Command(
+        "pig_catcher_trade_reject",
+        description="接收方拒绝一笔当前群交易",
+        pattern=r"^/拒绝交易(?:\s+(?P<arguments>.*?))?\s*$",
+    )
+    async def handle_trade_reject(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        return await self._handle_trade_resolution(
+            stream_id,
+            kwargs,
+            operation="拒绝交易",
+            action=lambda service, identity, trade_id: service.reject_trade(
+                identity,
+                trade_id,
+            ),
+        )
+
+    @Command(
+        "pig_catcher_trade_cancel",
+        description="发起方取消一笔当前群交易",
+        pattern=r"^/取消交易(?:\s+(?P<arguments>.*?))?\s*$",
+    )
+    async def handle_trade_cancel(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        return await self._handle_trade_resolution(
+            stream_id,
+            kwargs,
+            operation="取消交易",
+            action=lambda service, identity, trade_id: service.cancel_trade(
+                identity,
+                trade_id,
+            ),
+        )
+
+    async def _handle_trade_resolution(
+        self,
+        stream_id: str,
+        kwargs: dict[str, Any],
+        *,
+        operation: str,
+        action: Callable[
+            [SocialService, CommandIdentity, str],
+            Awaitable[Any],
+        ],
+    ) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_command(
+            stream_id,
+            kwargs,
+            feature_enabled=self.settings.trading.trade_enabled,
+            feature_label="双方确认交易",
+        )
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            trade_id = parse_trade_id(matched_group(kwargs, "arguments"))
+            result = await action(
+                cast(SocialService, self._social_service),
+                identity,
+                trade_id,
+            )
+            renderer = cast(PigCatcherRenderer, self._renderer)
+            fallback = result.receipt.text_summary or format_trade_summary(result)
+            return await self._deliver_receipt(
+                stream_id=identity.stream_id,
+                receipt=result.receipt,
+                render=lambda: renderer.render_economy_receipt(
+                    trade_receipt_view(result)
+                ),
+                fallback_text=fallback,
+            )
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation=operation,
+                error=exc,
+            )
+
+    @Command(
+        "pig_catcher_trade_list",
+        description="查看个人在当前群的交易记录",
+        pattern=r"^/我的交易(?:\s+(?P<arguments>.*?))?\s*$",
+    )
+    async def handle_trade_list(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_command(
+            stream_id,
+            kwargs,
+            feature_enabled=self.settings.trading.trade_enabled,
+            feature_label="双方确认交易",
+        )
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            query = parse_trade_list_query(matched_group(kwargs, "arguments"))
+            result = await cast(
+                SocialService,
+                self._social_service,
+            ).trade_page(
+                identity,
+                page=query.page,
+                status=query.status,
+            )
+            renderer = cast(PigCatcherRenderer, self._renderer)
+            return await self._deliver_query(
+                stream_id=identity.stream_id,
+                render=lambda: renderer.render_trade_list(
+                    trade_list_view(result)
+                ),
+                fallback_text=format_trade_page_summary(result),
+            )
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation="我的交易",
+                error=exc,
+            )
+
+    @Command(
+        "pig_catcher_showcase",
+        description="设置或取消当前群个人猪猪和美食展示位",
+        pattern=r"^/设置展示(?:\s+(?P<arguments>.*?))?\s*$",
+    )
+    async def handle_showcase(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_command(
+            stream_id,
+            kwargs,
+            feature_enabled=self.settings.features.showcase_enabled,
+            feature_label="设置展示",
+        )
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            query = parse_showcase_query(matched_group(kwargs, "arguments"))
+            result = await cast(
+                SocialService,
+                self._social_service,
+            ).set_showcase(
+                identity,
+                asset_kind=query.asset_kind,
+                selector_text=query.selector,
+                clear=query.clear,
+            )
+            renderer = cast(PigCatcherRenderer, self._renderer)
+            fallback = result.receipt.text_summary or format_showcase_summary(result)
+            return await self._deliver_receipt(
+                stream_id=identity.stream_id,
+                receipt=result.receipt,
+                render=lambda: renderer.render_economy_receipt(
+                    showcase_receipt_view(result)
+                ),
+                fallback_text=fallback,
+            )
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation="设置展示",
+                error=exc,
+            )
+
+    @Command(
+        "pig_catcher_ranking",
+        description="查看当前群综合、抓猪、美食、价值、巨物、数量或猪币排行",
+        pattern=r"^/猪猪排行(?:\s+(?P<arguments>.*?))?\s*$",
+    )
+    async def handle_ranking(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_command(
+            stream_id,
+            kwargs,
+            feature_enabled=self.settings.features.ranking_enabled,
+            feature_label="猪猪排行",
+        )
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            query = parse_ranking_query(matched_group(kwargs, "arguments"))
+            result = await cast(
+                SocialService,
+                self._social_service,
+            ).ranking(
+                identity,
+                ranking_type=query.ranking_type,
+                page=query.page,
+            )
+            renderer = cast(PigCatcherRenderer, self._renderer)
+            data_dir = Path(self.ctx.paths.data_dir).resolve()
+            return await self._deliver_query(
+                stream_id=identity.stream_id,
+                render=lambda: renderer.render_ranking(
+                    ranking_view(result),
+                    ranking_media_paths(data_dir, result),
+                ),
+                fallback_text=format_ranking_summary(result),
+            )
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation="猪猪排行",
                 error=exc,
             )
 

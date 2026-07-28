@@ -42,11 +42,11 @@ class PluginSection(PluginConfigBase):
         frozen=True,
         json_schema_extra=_ui("配置版本", "由插件维护，不需要手工修改", disabled=True),
     )
-    framework_phase: Literal["4"] = Field(
+    framework_phase: Literal["5"] = Field(
         default=FRAMEWORK_PHASE,
         description="当前开发交付阶段",
         frozen=True,
-        json_schema_extra=_ui("开发阶段", "第四轮已开放做菜、美食、商城、售卖与账本", disabled=True),
+        json_schema_extra=_ui("开发阶段", "第五轮已开放赠送、双方交易、展示与排行", disabled=True),
     )
 
 
@@ -126,6 +126,16 @@ class FeaturesSection(PluginConfigBase):
         default=True,
         description="是否允许查看个人猪币流水和对账状态",
         json_schema_extra=_ui("允许猪币账本", "对应 /猪币账本，仅显示当前群个人流水"),
+    )
+    showcase_enabled: bool = Field(
+        default=True,
+        description="是否允许设置排行榜展示猪和展示美食",
+        json_schema_extra=_ui("允许设置展示", "对应 /设置展示；展示物始终限制在当前群个人资产"),
+    )
+    ranking_enabled: bool = Field(
+        default=True,
+        description="是否允许查看当前群七类排行榜",
+        json_schema_extra=_ui("允许猪猪排行", "对应 /猪猪排行；不支持跨群查询"),
     )
 
 
@@ -504,21 +514,21 @@ class EconomySection(PluginConfigBase):
 
 
 class TradingSection(PluginConfigBase):
-    """未来赠送与交易的安全边界。"""
+    """同群赠送与双方确认交易的安全边界。"""
 
     __ui_label__ = "赠送与交易"
     __ui_icon__ = "handshake"
     __ui_order__ = 80
 
     gift_enabled: bool = Field(
-        default=False,
+        default=True,
         description="是否启用同群赠送",
-        json_schema_extra=_ui("启用赠送", "第五轮尚未注册赠送命令，完整实现后再开启"),
+        json_schema_extra=_ui("启用赠送", "启用 /猪猪赠送 和 /美食赠送；赠送立即原子转移"),
     )
     trade_enabled: bool = Field(
-        default=False,
+        default=True,
         description="是否启用两阶段玩家交易",
-        json_schema_extra=_ui("启用交易", "第五轮尚未注册交易命令，完整实现后再开启"),
+        json_schema_extra=_ui("启用交易", "启用报价、接受、拒绝、取消和我的交易"),
     )
     max_trade_price: int = Field(
         default=1000000,
@@ -533,6 +543,64 @@ class TradingSection(PluginConfigBase):
         le=1440,
         description="待处理交易报价的有效分钟数",
         json_schema_extra=_ui("报价有效期", "过期后由维护流程解锁物品"),
+    )
+    trade_page_size: int = Field(
+        default=8,
+        ge=4,
+        le=16,
+        description="我的交易列表每页显示数量",
+        json_schema_extra=_ui("交易列表每页数量", "默认 8，按创建时间倒序展示"),
+    )
+
+
+class RankingSection(PluginConfigBase):
+    """群纪录、体格标签和排行榜规则。"""
+
+    __ui_label__ = "展示与排行"
+    __ui_icon__ = "trophy"
+    __ui_order__ = 85
+
+    ranking_page_size: int = Field(
+        default=10,
+        ge=5,
+        le=20,
+        description="每页排行榜显示人数",
+        json_schema_extra=_ui("排行每页人数", "默认 10；第一页突出前三名，其余使用紧凑账簿行"),
+    )
+    pig_catalog_weight_percent: int = Field(
+        default=60,
+        ge=0,
+        le=100,
+        description="综合榜中猪猪图鉴完成率权重",
+        json_schema_extra=_ui("猪猪图鉴权重", "默认 60%，与美食图鉴权重之和必须为 100%"),
+    )
+    food_catalog_weight_percent: int = Field(
+        default=40,
+        ge=0,
+        le=100,
+        description="综合榜中美食图鉴完成率权重",
+        json_schema_extra=_ui("美食图鉴权重", "默认 40%，与猪猪图鉴权重之和必须为 100%"),
+    )
+    giant_size_threshold_cm: float = Field(
+        default=120.0,
+        gt=0,
+        le=10000,
+        description="写入全群巨物目击记录的绝对体型门槛",
+        json_schema_extra=_ui("巨物体型门槛", "默认 120 cm；达到体型或重量任一门槛就会留档"),
+    )
+    giant_weight_threshold_kg: float = Field(
+        default=350.0,
+        gt=0,
+        le=100000,
+        description="写入全群巨物目击记录的绝对重量门槛",
+        json_schema_extra=_ui("巨物重量门槛", "默认 350 kg；双项同时达到会显示更高整活等级"),
+    )
+    giant_sightings_limit: int = Field(
+        default=6,
+        ge=1,
+        le=20,
+        description="群纪录首页显示的最近巨物目击数量",
+        json_schema_extra=_ui("巨物目击展示数", "只影响 /猪猪纪录 首页，不删除历史记录"),
     )
 
 
@@ -648,7 +716,7 @@ class MaintenanceSection(PluginConfigBase):
 
 
 class PigCatcherConfig(PluginConfigBase):
-    """抓猪插件第四轮完整配置。"""
+    """抓猪插件第五轮完整配置。"""
 
     plugin: PluginSection = Field(default_factory=PluginSection)
     features: FeaturesSection = Field(default_factory=FeaturesSection)
@@ -659,6 +727,7 @@ class PigCatcherConfig(PluginConfigBase):
     cooking: CookingSection = Field(default_factory=CookingSection)
     economy: EconomySection = Field(default_factory=EconomySection)
     trading: TradingSection = Field(default_factory=TradingSection)
+    ranking: RankingSection = Field(default_factory=RankingSection)
     rendering: RenderingSection = Field(default_factory=RenderingSection)
     maintenance: MaintenanceSection = Field(default_factory=MaintenanceSection)
 
@@ -667,4 +736,10 @@ class PigCatcherConfig(PluginConfigBase):
         self.catching.weights()
         if self.cooking.six_star_to_five_percent + self.cooking.six_star_to_six_percent != 100:
             raise ValueError("六星猪料理概率必须合计 100%")
+        if (
+            self.ranking.pig_catalog_weight_percent
+            + self.ranking.food_catalog_weight_percent
+            != 100
+        ):
+            raise ValueError("综合榜的猪猪与美食图鉴权重必须合计 100%")
         return self

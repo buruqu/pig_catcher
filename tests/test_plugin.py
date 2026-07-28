@@ -64,10 +64,10 @@ async def test_config_reload_closes_and_reopens_runtime(tmp_path: Path) -> None:
     await plugin.on_unload()
 
 
-def test_plugin_registers_only_explicit_fourth_round_commands() -> None:
+def test_plugin_registers_only_explicit_fifth_round_commands() -> None:
     plugin = create_plugin()
     components = plugin.get_components()
-    assert len(components) == 19
+    assert len(components) == 27
     assert {component["type"] for component in components} == {"COMMAND"}
     assert {component["name"] for component in components} == {
         "pig_catcher_help",
@@ -89,6 +89,14 @@ def test_plugin_registers_only_explicit_fourth_round_commands() -> None:
         "pig_catcher_sell_pig",
         "pig_catcher_sell_food",
         "pig_catcher_ledger",
+        "pig_catcher_gift",
+        "pig_catcher_trade_offer",
+        "pig_catcher_trade_accept",
+        "pig_catcher_trade_reject",
+        "pig_catcher_trade_cancel",
+        "pig_catcher_trade_list",
+        "pig_catcher_showcase",
+        "pig_catcher_ranking",
     }
     serialized = str(components)
     assert "EVENT_HANDLER" not in serialized
@@ -581,6 +589,147 @@ async def test_complete_fourth_round_command_flow_and_duplicate_publication(
         """
     )
     assert item is not None and item["quantity"] == 2
+    await plugin.on_unload()
+
+
+@pytest.mark.asyncio
+async def test_complete_fifth_round_command_flow_with_structured_mention(
+    tmp_path: Path,
+) -> None:
+    plugin, context = await create_test_plugin(
+        tmp_path,
+        config_updates={"catching": {"cooldown_seconds": 0}},
+    )
+    await _install_test_pig(plugin, tmp_path)
+    for index in range(2):
+        caught = await plugin.handle_catch(
+            stream_id="stream-10001",
+            **_command_kwargs(build_message(message_id=f"round5-catch-{index}")),
+        )
+        assert caught[0] is True
+    rows = await plugin.database.fetch_all(
+        """
+        SELECT pig_instance_id, display_name_snapshot, short_code
+        FROM pig_instances
+        WHERE owner_player_id = 'qq:10001:20001' AND state = 'active'
+        ORDER BY acquired_at, pig_instance_id
+        """
+    )
+    assert len(rows) == 2
+    selectors = [
+        f"{row['display_name_snapshot']}#{row['short_code']}" for row in rows
+    ]
+
+    gift_message = build_message(message_id="round5-gift")
+    gift_message["raw_message"] = [
+        {"type": "text", "data": f"/猪猪赠送 {selectors[0]} "},
+        {
+            "type": "at",
+            "data": {
+                "target_user_id": "20002",
+                "target_user_cardname": "接收成员",
+            },
+        },
+    ]
+    gifted = await plugin.handle_gift(
+        stream_id="stream-10001",
+        **_command_kwargs(
+            gift_message,
+            kind="猪猪",
+            arguments=f"{selectors[0]} @接收成员",
+        ),
+    )
+    assert gifted[0] is True
+    duplicate = await plugin.handle_gift(
+        stream_id="stream-10001",
+        **_command_kwargs(
+            gift_message,
+            kind="猪猪",
+            arguments=f"{selectors[0]} @接收成员",
+        ),
+    )
+    assert duplicate == (True, "该消息已处理，不重复公示。", 0)
+
+    async with plugin.database.transaction() as session:
+        await session.execute(
+            """
+            UPDATE players
+            SET coin_balance = 500, updated_at = '2026-07-28T04:00:00.000Z'
+            WHERE player_id = 'qq:10001:20002'
+            """
+        )
+        await session.execute(
+            """
+            INSERT INTO currency_ledger(
+                ledger_entry_id, player_id, scope_id, amount, balance_after,
+                reason_code, reason_text, source_object_type, source_object_id,
+                idempotency_key, created_at
+            )
+            VALUES(
+                'round5-seed', 'qq:10001:20002', 'qq:10001', 500, 500,
+                'test-grant', '第五轮命令测试入账', 'test', 'seed',
+                'round5-seed', '2026-07-28T04:00:00.000Z'
+            )
+            """
+        )
+
+    offer_message = build_message(message_id="round5-offer")
+    offer_message["raw_message"] = gift_message["raw_message"]
+    offered = await plugin.handle_trade_offer(
+        stream_id="stream-10001",
+        **_command_kwargs(
+            offer_message,
+            kind="猪猪",
+            arguments=f"{selectors[1]} @接收成员 120",
+        ),
+    )
+    assert offered[0] is True
+    offer = await plugin.database.fetch_one(
+        "SELECT trade_id FROM trade_offers WHERE status = 'pending'"
+    )
+    assert offer is not None
+    trade_id = str(offer["trade_id"])
+
+    buyer_message = build_message(
+        user_id="20002",
+        display_name="接收成员",
+        message_id="round5-accept",
+    )
+    accepted = await plugin.handle_trade_accept(
+        stream_id="stream-10001",
+        **_command_kwargs(buyer_message, arguments=trade_id),
+    )
+    assert accepted[0] is True
+    await plugin.handle_trade_list(
+        stream_id="stream-10001",
+        **_command_kwargs(buyer_message, arguments="全部 1"),
+    )
+    await plugin.handle_showcase(
+        stream_id="stream-10001",
+        **_command_kwargs(
+            {**buyer_message, "message_id": "round5-showcase"},
+            arguments=f"猪猪 {selectors[0]}",
+        ),
+    )
+    ranked = await plugin.handle_ranking(
+        stream_id="stream-10001",
+        **_command_kwargs(
+            {**buyer_message, "message_id": "round5-ranking"},
+            arguments="综合 1",
+        ),
+    )
+    assert ranked[0] is True
+    assert len(context.send.images) == 8
+    assert all(call[1]["allow_network"] is False for call in context.render.calls)
+
+    ownership = await plugin.database.fetch_one(
+        """
+        SELECT COUNT(*) AS count
+        FROM pig_instances
+        WHERE owner_player_id = 'qq:10001:20002' AND state = 'active'
+        """
+    )
+    assert ownership is not None and ownership["count"] == 2
     await plugin.on_unload()
 
 

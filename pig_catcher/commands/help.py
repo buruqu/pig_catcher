@@ -43,15 +43,16 @@ _TOPICS: dict[str, tuple[str, ...]] = {
         "/接受交易 <交易号>",
         "/拒绝交易 <交易号>",
         "/取消交易 <交易号>",
-        "/我的交易 [状态]",
+        "/我的交易 [全部|待处理|已完成|已拒绝|已取消|已过期] [页码]",
     ),
     "排行": (
         "/猪猪排行 [综合|抓猪|美食|价值|巨物|数量|猪币] [页码]",
         "/设置展示 <猪猪|美食> <名称#短编号>",
+        "/设置展示 <猪猪|美食> 取消",
     ),
 }
 
-_OPEN_TOPICS = frozenset({"抓猪", "背包", "道具", "做菜", "商城"})
+_OPEN_TOPICS = frozenset(_TOPICS)
 
 _TOPIC_ALIASES = {
     "仓库": "背包",
@@ -74,8 +75,8 @@ def format_help(topic: str = "") -> str:
     normalized = _TOPIC_ALIASES.get(normalized, normalized)
     notice = (
         f"当前版本：v{PLUGIN_VERSION}（第 {FRAMEWORK_PHASE} 轮）\n"
-        "已开放抓猪、收藏、做菜、美食、商城、升级、官方售卖和猪币账本；"
-        "赠送、交易与排行仍在后续轮次。"
+        "已开放抓猪、收藏、做菜、美食、商城、赠送、双方确认交易、"
+        "展示位和七类群排行。"
     )
     if normalized and normalized not in {"全部", *list(_TOPICS)}:
         topics = "、".join(_TOPICS)
@@ -88,7 +89,8 @@ def format_help(topic: str = "") -> str:
             f"{notice}\n\n"
             f"{_topic_block(normalized)}\n\n"
             "资产选择器格式：名称#8位短编号\n"
-            "示例：/抓猪详情 粉红小香猪#A19F2C3D"
+            "示例：/抓猪详情 粉红小香猪#A19F2C3D\n"
+            "赠送与报价必须明确 @ 一位当前群成员。"
         )
 
     lines = [
@@ -108,6 +110,7 @@ def format_help(topic: str = "") -> str:
             "",
             "资产选择器格式：名称#8位短编号",
             "示例：/做菜 粉红小香猪#A19F2C3D",
+            "交易示例：/猪猪交易 粉红小香猪#A19F2C3D @群友 100",
             "",
             "所有玩法仅响应显式斜杠命令，不读取普通聊天，也不使用 LLM。",
         ]

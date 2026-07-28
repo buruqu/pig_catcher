@@ -51,6 +51,14 @@ class FatProfile(StrEnum):
     FATTY = "fatty"
 
 
+class StatureProfile(StrEnum):
+    """猪模板在绝对体型上的设定画像。"""
+
+    MINI = "mini"
+    STANDARD = "standard"
+    GIANT = "giant"
+
+
 class AssetState(StrEnum):
     """猪或美食实例的生命周期状态。"""
 

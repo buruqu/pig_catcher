@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from ..domain.enums import AssetKind, TradeStatus
 from ..domain.errors import DomainValidationError
+from ..domain.social import (
+    normalize_ranking_type,
+    normalize_trade_id,
+    trade_status_from_label,
+)
 
 INVENTORY_SORTS = frozenset({"获得时间", "品质", "价值", "体型", "重量", "名称"})
 FOOD_INVENTORY_SORTS = frozenset({"获得时间", "品质", "价值", "份量", "名称"})
@@ -43,6 +49,46 @@ class PurchaseQuery:
 
     product_name: str
     quantity: int = 1
+
+
+@dataclass(frozen=True, slots=True)
+class GiftQuery:
+    """One exact asset selector after removing the structured @ marker."""
+
+    selector: str
+
+
+@dataclass(frozen=True, slots=True)
+class TradeOfferQuery:
+    """One exact asset selector and a positive agreed price."""
+
+    selector: str
+    price: int
+
+
+@dataclass(frozen=True, slots=True)
+class TradeListQuery:
+    """Status-filtered personal trade list."""
+
+    page: int = 1
+    status: TradeStatus | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ShowcaseQuery:
+    """Set or clear one pig or food showcase slot."""
+
+    asset_kind: AssetKind
+    selector: str
+    clear: bool
+
+
+@dataclass(frozen=True, slots=True)
+class RankingQuery:
+    """Current-group ranking type and page."""
+
+    ranking_type: str = "综合"
+    page: int = 1
 
 
 def _positive_page(value: str) -> int:
@@ -227,3 +273,137 @@ def parse_action_type(value: str) -> str:
         return mapping[normalized]
     except KeyError as exc:
         raise DomainValidationError("动作只能填写“抓猪”或“做菜”。") from exc
+
+
+def _remove_mention_marker(
+    arguments: str,
+    *,
+    display_name: str,
+    user_id: str,
+) -> str:
+    normalized = str(arguments or "").strip()
+    markers = tuple(
+        marker
+        for marker in (
+            f"@{display_name.strip()}",
+            f"@{user_id.strip()}",
+        )
+        if len(marker) > 1
+    )
+    for marker in markers:
+        normalized = normalized.replace(marker, " ", 1)
+    return " ".join(normalized.split())
+
+
+def parse_gift_query(
+    arguments: str,
+    *,
+    target_display_name: str,
+    target_user_id: str,
+) -> GiftQuery:
+    """Parse `/猪猪赠送 <选择器> @用户` and its food equivalent."""
+
+    selector = _remove_mention_marker(
+        arguments,
+        display_name=target_display_name,
+        user_id=target_user_id,
+    )
+    if not selector:
+        raise DomainValidationError("请填写要赠送的资产，例如：/猪猪赠送 猪#A1B2C3D4 @群友")
+    return GiftQuery(selector=selector)
+
+
+def parse_trade_offer_query(
+    arguments: str,
+    *,
+    target_display_name: str,
+    target_user_id: str,
+) -> TradeOfferQuery:
+    """Parse `/猪猪交易 <选择器> @用户 <猪币>` and its food equivalent."""
+
+    normalized = _remove_mention_marker(
+        arguments,
+        display_name=target_display_name,
+        user_id=target_user_id,
+    )
+    selector, separator, price_text = normalized.rpartition(" ")
+    if not separator or not selector:
+        raise DomainValidationError(
+            "请填写资产、接收群友和价格，例如：/猪猪交易 猪#A1B2C3D4 @群友 100"
+        )
+    try:
+        price = int(price_text)
+    except ValueError as exc:
+        raise DomainValidationError("交易价格必须是正整数猪币。") from exc
+    if price <= 0:
+        raise DomainValidationError("交易价格必须是正整数猪币。")
+    return TradeOfferQuery(selector=selector.strip(), price=price)
+
+
+def parse_trade_id(arguments: str) -> str:
+    """Parse one copyable trade number."""
+
+    return normalize_trade_id(arguments)
+
+
+def parse_trade_list_query(arguments: str) -> TradeListQuery:
+    """Parse `/我的交易 [全部|待处理|已完成|已拒绝|已取消|已过期] [页码]`."""
+
+    page = 1
+    status: TradeStatus | None = None
+    status_seen = False
+    page_seen = False
+    for token in str(arguments or "").split():
+        if token in {"全部", "待处理", "已完成", "已拒绝", "已取消", "已过期"}:
+            if status_seen:
+                raise DomainValidationError("交易状态不能重复填写。")
+            status = trade_status_from_label(token)
+            status_seen = True
+            continue
+        if page_seen:
+            raise DomainValidationError(f"无法识别我的交易参数“{token}”。")
+        page = _positive_page(token)
+        page_seen = True
+    return TradeListQuery(page=page, status=status)
+
+
+def parse_showcase_query(arguments: str) -> ShowcaseQuery:
+    """Parse `/设置展示 <猪猪|美食> <选择器|取消>`."""
+
+    kind_text, separator, selector = str(arguments or "").strip().partition(" ")
+    kind_map = {"猪猪": AssetKind.PIG, "美食": AssetKind.FOOD}
+    if kind_text not in kind_map or not separator or not selector.strip():
+        raise DomainValidationError(
+            "格式：/设置展示 <猪猪|美食> <名称#短编号|取消>"
+        )
+    normalized_selector = selector.strip()
+    return ShowcaseQuery(
+        asset_kind=kind_map[kind_text],
+        selector="" if normalized_selector == "取消" else normalized_selector,
+        clear=normalized_selector == "取消",
+    )
+
+
+def parse_ranking_query(arguments: str) -> RankingQuery:
+    """Parse `/猪猪排行 [综合|抓猪|美食|价值|巨物|数量|猪币] [页码]`."""
+
+    ranking_type = "综合"
+    page = 1
+    type_seen = False
+    page_seen = False
+    for token in str(arguments or "").split():
+        try:
+            candidate = normalize_ranking_type(token)
+        except DomainValidationError:
+            candidate = ""
+        if candidate:
+            if type_seen:
+                raise DomainValidationError("排行类型不能重复填写。")
+            ranking_type = candidate
+            type_seen = True
+            continue
+        if page_seen:
+            raise DomainValidationError(f"无法识别排行参数“{token}”。")
+        page = _positive_page(token)
+        page_seen = True
+    return RankingQuery(ranking_type=ranking_type, page=page)

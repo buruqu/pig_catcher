@@ -63,16 +63,15 @@ class GameplayRepository:
             SELECT
                 (
                     SELECT COUNT(*)
-                    FROM pig_instances
-                    WHERE owner_player_id = ?
-                      AND acquired_at >= ?
-                      AND acquired_at < ?
+                    FROM command_receipts
+                    WHERE player_id = ?
+                      AND command_name = 'pig-catcher.catch'
+                      AND created_at >= ?
+                      AND created_at < ?
                 ) AS daily_count,
-                (
-                    SELECT MAX(acquired_at)
-                    FROM pig_instances
-                    WHERE owner_player_id = ?
-                ) AS last_acquired_at
+                statistic.last_catch_at AS last_acquired_at
+            FROM player_statistics AS statistic
+            WHERE statistic.player_id = ?
             """,
             (player_id, day_start, day_end, player_id),
         )
@@ -205,6 +204,17 @@ class GameplayRepository:
                 now,
             ),
         )
+        await session.execute(
+            """
+            UPDATE player_statistics
+            SET
+                total_catches = total_catches + 1,
+                last_catch_at = ?,
+                updated_at = ?
+            WHERE player_id = ?
+            """,
+            (now, now, player_id),
+        )
         return balance, experience
 
     async def upsert_pig_catalog(
@@ -326,6 +336,7 @@ class GameplayRepository:
                 template.is_animated,
                 template.frame_count,
                 template.scope_type,
+                template.stature_profile,
                 template.collection_name,
                 template.collection_total,
                 template.character_name,
@@ -342,6 +353,23 @@ class GameplayRepository:
                     WHERE record.pig_instance_id = instance.pig_instance_id
                       AND record.record_type = 'weight'
                 ) AS is_weight_record,
+                EXISTS(
+                    SELECT 1
+                    FROM group_global_records AS record
+                    WHERE record.pig_instance_id = instance.pig_instance_id
+                      AND record.record_type = 'size'
+                ) AS is_global_size_record,
+                EXISTS(
+                    SELECT 1
+                    FROM group_global_records AS record
+                    WHERE record.pig_instance_id = instance.pig_instance_id
+                      AND record.record_type = 'weight'
+                ) AS is_global_weight_record,
+                EXISTS(
+                    SELECT 1
+                    FROM giant_sightings AS sighting
+                    WHERE sighting.pig_instance_id = instance.pig_instance_id
+                ) AS is_giant_sighting,
                 CASE
                     WHEN template.scope_type = 'common' THEN 1
                     WHEN EXISTS(
@@ -414,16 +442,12 @@ class GameplayRepository:
                 player.display_name,
                 player.coin_balance,
                 player.experience,
+                statistic.total_catches,
                 (
                     SELECT COUNT(*)
                     FROM pig_instances AS instance
                     WHERE instance.owner_player_id = player.player_id
-                ) AS total_catches,
-                (
-                    SELECT COUNT(*)
-                    FROM pig_instances AS instance
-                    WHERE instance.owner_player_id = player.player_id
-                      AND instance.state = 'active'
+                      AND instance.state IN ('active', 'locked-for-trade')
                 ) AS active_pigs,
                 (
                     SELECT COUNT(*)
@@ -436,6 +460,8 @@ class GameplayRepository:
                     WHERE record.player_id = player.player_id
                 ) AS held_records
             FROM players AS player
+            JOIN player_statistics AS statistic
+              ON statistic.player_id = player.player_id
             WHERE player.player_id = ?
             """,
             (player_id,),
@@ -530,6 +556,24 @@ class GameplayRepository:
                 template.media_format,
                 template.is_animated,
                 template.frame_count,
+                template.stature_profile,
+                EXISTS(
+                    SELECT 1
+                    FROM group_global_records AS record
+                    WHERE record.pig_instance_id = instance.pig_instance_id
+                      AND record.record_type = 'size'
+                ) AS is_global_size_record,
+                EXISTS(
+                    SELECT 1
+                    FROM group_global_records AS record
+                    WHERE record.pig_instance_id = instance.pig_instance_id
+                      AND record.record_type = 'weight'
+                ) AS is_global_weight_record,
+                EXISTS(
+                    SELECT 1
+                    FROM giant_sightings AS sighting
+                    WHERE sighting.pig_instance_id = instance.pig_instance_id
+                ) AS is_giant_sighting,
                 CASE
                     WHEN template.scope_type = 'common' THEN 1
                     WHEN EXISTS(

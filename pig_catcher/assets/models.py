@@ -8,7 +8,15 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from ..domain.enums import AssetKind, ConsentStatus, FatProfile, FitMode, Rarity, TemplateScope
+from ..domain.enums import (
+    AssetKind,
+    ConsentStatus,
+    FatProfile,
+    FitMode,
+    Rarity,
+    StatureProfile,
+    TemplateScope,
+)
 from ..domain.models import ScopeKey
 from ..version import ASSET_MANIFEST_VERSION
 
@@ -56,6 +64,7 @@ class AssetManifestEntry(BaseModel):
     weight_min_kg: float | None = Field(default=None, gt=0, le=100000)
     weight_max_kg: float | None = Field(default=None, gt=0, le=100000)
     fat_profile: FatProfile | None = None
+    stature_profile: StatureProfile | None = None
     recipe_tags: list[str] = Field(default_factory=list, max_length=20)
     effect_id: str = Field(default="", max_length=80)
     collection: CollectionMetadata | None = None
@@ -124,9 +133,10 @@ class AssetManifestEntry(BaseModel):
                 self.weight_min_kg,
                 self.weight_max_kg,
                 self.fat_profile,
+                self.stature_profile,
             )
         ):
-            raise ValueError("美食素材不能填写猪的体型、重量或肥瘦画像")
+            raise ValueError("美食素材不能填写猪的体型、重量、肥瘦或体格画像")
         if self.kind is AssetKind.FOOD and self.collection is not None:
             raise ValueError("美食素材不能加入猪猪联动收藏系列")
         return self

@@ -1,9 +1,9 @@
 {
   "manifest_version": 2,
   "id": "local.pig-catcher",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "name": "抓猪插件",
-  "description": "面向群聊的抓猪收集、做菜、图鉴、猪币与安全交易游戏。本版本开放第四轮做菜与经济玩法。",
+  "description": "面向群聊的抓猪收集、做菜、图鉴、猪币与安全交易游戏。本版本开放赠送、双方确认交易、展示位、巨物纪录与七类群排行。",
   "author": {
     "name": "buruqu",
     "url": "https://github.com/buruqu"

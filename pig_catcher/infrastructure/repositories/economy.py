@@ -645,15 +645,12 @@ class EconomyRepository:
                     SELECT COUNT(*)
                     FROM food_instances AS instance
                     WHERE instance.owner_player_id = player.player_id
-                      AND instance.state = 'active'
+                      AND instance.state IN ('active', 'locked-for-trade')
                 ) AS active_foods,
-                (
-                    SELECT COUNT(*)
-                    FROM command_receipts AS receipt
-                    WHERE receipt.player_id = player.player_id
-                      AND receipt.command_name = 'pig-catcher.cook'
-                ) AS total_cooks
+                statistic.total_cooks
             FROM players AS player
+            JOIN player_statistics AS statistic
+              ON statistic.player_id = player.player_id
             WHERE player.player_id = ?
             """,
             (player_id,),
