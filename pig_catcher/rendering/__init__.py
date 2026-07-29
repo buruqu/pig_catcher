@@ -1,6 +1,7 @@
 """白底淡粉图片渲染与发送降级。"""
 
 from .adapters import (
+    batch_sale_receipt_view,
     catalog_media_paths,
     catalog_view,
     eat_receipt_view,
@@ -104,6 +105,7 @@ __all__ = [
     "TradeListItemViewModel",
     "TradeListViewModel",
     "catalog_media_paths",
+    "batch_sale_receipt_view",
     "catalog_view",
     "eat_receipt_view",
     "food_card_view",

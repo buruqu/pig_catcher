@@ -68,7 +68,7 @@ async def test_config_reload_closes_and_reopens_runtime(tmp_path: Path) -> None:
 def test_plugin_registers_only_explicit_production_commands() -> None:
     plugin = create_plugin()
     components = plugin.get_components()
-    assert len(components) == 27
+    assert len(components) == 29
     assert {component["type"] for component in components} == {"COMMAND"}
     assert {component["name"] for component in components} == {
         "pig_catcher_help",
@@ -87,8 +87,10 @@ def test_plugin_registers_only_explicit_production_commands() -> None:
         "pig_catcher_eat",
         "pig_catcher_store",
         "pig_catcher_purchase",
+        "pig_catcher_upgrade",
         "pig_catcher_sell_pig",
         "pig_catcher_sell_food",
+        "pig_catcher_batch_sell",
         "pig_catcher_ledger",
         "pig_catcher_gift",
         "pig_catcher_trade_offer",
@@ -488,7 +490,7 @@ async def test_complete_fourth_round_command_flow_and_duplicate_publication(
 
     await plugin.handle_store(
         stream_id="stream-10001",
-        **_command_kwargs(query_message, arguments="1 分类=全部"),
+        **_command_kwargs(query_message, arguments="分类=全部"),
     )
     purchase_message = build_message(message_id="round4-purchase")
     purchased = await plugin.handle_purchase(

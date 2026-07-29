@@ -123,6 +123,9 @@ class PigCardViewModel:
     global_size_record: bool = False
     global_weight_record: bool = False
     giant_sighting: bool = False
+    size_label: str = ""
+    weight_label: str = ""
+    effect_summaries: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -316,6 +319,7 @@ class FoodCardViewModel:
     catalog_new_count: int = 0
     bonus_selector: str = ""
     probability_summary: str = ""
+    effect_summaries: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -360,6 +364,7 @@ class FoodCatalogItemViewModel:
     media_visible: bool
     is_animated: bool
     image_fit: str
+    effect_summary: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -385,6 +390,7 @@ class StoreProductViewModel:
     effect_summary: str
     current_level: int
     target_level: int
+    command: str = ""
 
 
 @dataclass(frozen=True, slots=True)

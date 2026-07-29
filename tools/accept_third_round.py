@@ -218,8 +218,10 @@ def pig_card(
         description=description[:500],
         size_value=size,
         size_percentile=0.62,
+        size_label="标准体型",
         weight_value=weight,
         weight_percentile=0.58,
+        weight_label="匀称",
         fat_ratio=53.4,
         fat_label="均衡",
         official_value=588,
@@ -235,7 +237,7 @@ def pig_card(
         coin_balance=1260 if mode_label == "抓猪成功" else None,
         total_experience=720 if mode_label == "抓猪成功" else None,
         daily_count=12 if mode_label == "抓猪成功" else None,
-        daily_limit=30 if mode_label == "抓猪成功" else None,
+        daily_limit=20 if mode_label == "抓猪成功" else None,
         item_name="巨物玉米" if mode_label == "抓猪成功" else "",
         catalog_new=True,
         size_record=True,
@@ -609,10 +611,10 @@ async def accept(args: argparse.Namespace) -> dict[str, object]:
                 ),
             )
 
-            inventory = inventory_model(selected_rows[:8])
+            inventory = inventory_model(selected_rows[:12])
             inventory_paths = {
                 str(row["template_id"]): data_dir / str(row["image_relpath"])
-                for row in selected_rows[:8]
+                for row in selected_rows[:12]
                 if not bool(row["is_animated"])
             }
             await save(

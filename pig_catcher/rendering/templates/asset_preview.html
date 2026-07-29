@@ -45,7 +45,7 @@
 
     <footer class="asset-preview__footer">
       <span>白色收藏册 · 淡粉称重票据</span>
-      <strong>动画逐帧保留</strong>
+      <strong>{{ "动画逐帧保留" if view.frame_count > 1 else "原始图片保留" }}</strong>
     </footer>
   </main>
 </body>

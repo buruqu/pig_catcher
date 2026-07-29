@@ -360,6 +360,74 @@ def _write_animated_gif(
 
 
 @pytest.mark.asyncio
+async def test_animated_inventory_and_catalog_use_static_middle_frame_preview(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "animated.gif"
+    _write_animated_gif(source, durations=[80, 120, 200])
+    source_hash = hashlib.sha256(source.read_bytes()).hexdigest()
+    capability = FakeRender()
+    renderer = PigCatcherRenderer(capability, _options())
+    inventory = InventoryViewModel(
+        display_name="测试成员",
+        page=1,
+        page_count=1,
+        total_count=1,
+        rarity=None,
+        sort="价值",
+        items=(
+            InventoryItemViewModel(
+                key="animated",
+                display_name="动画猪",
+                short_code="AAAA0001",
+                rarity=3,
+                size_value=50.0,
+                weight_value=60.0,
+                fat_label="均衡",
+                official_value=180,
+                media_visible=True,
+                is_animated=True,
+                image_fit="contain",
+            ),
+        ),
+    )
+    await renderer.render_inventory(inventory, {"animated": source})
+    inventory_html, _ = capability.calls[-1]
+    assert "data:image/png;base64," in inventory_html
+    assert "动态猪猪<br>详情查看" not in inventory_html
+
+    catalog = CatalogViewModel(
+        display_name="测试成员",
+        total_count=1,
+        rarity=None,
+        undiscovered_only=False,
+        collected_count=1,
+        visible_catalog_total=1,
+        items=(
+            CatalogItemViewModel(
+                key="animated",
+                display_name="动画猪",
+                rarity=3,
+                discovered=True,
+                acquired_count=1,
+                best_size=50.0,
+                best_weight=60.0,
+                collection_name="",
+                character_name="",
+                media_visible=True,
+                is_animated=True,
+                image_fit="contain",
+            ),
+        ),
+    )
+    await renderer.render_catalog(catalog, {"animated": source})
+    catalog_html, _ = capability.calls[-1]
+    assert "data:image/png;base64," in catalog_html
+    assert "动态猪猪<br>详情查看" not in catalog_html
+    assert hashlib.sha256(source.read_bytes()).hexdigest() == source_hash
+
+
+@pytest.mark.asyncio
 async def test_animation_composer_preserves_frames_timing_loop_and_source_bytes(
     tmp_path: Path,
 ) -> None:
@@ -754,6 +822,7 @@ async def test_fourth_round_templates_render_food_and_economy_views(
                 media_visible=True,
                 is_animated=False,
                 image_fit="contain",
+                effect_summary="下一次抓猪更容易遇到高星猪猪。",
             ),
             FoodCatalogItemViewModel(
                 key="secret",
@@ -774,6 +843,7 @@ async def test_fourth_round_templates_render_food_and_economy_views(
     assert "尚未发现" in catalog_html
     assert "2 星品质" in catalog_html
     assert "6 星品质" in catalog_html
+    assert "下一次抓猪更容易遇到高星猪猪" in catalog_html
     assert "第 1/1 页" not in catalog_html
 
     await renderer.render_store(

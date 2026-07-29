@@ -15,9 +15,9 @@
         <p class="game-header__eyebrow">{{ view.mode_label }} · {{ view.owner_display_name }}</p>
         <h1 style="font-size: {% if view.display_name|length > 50 %}21{% elif view.display_name|length > 30 %}27{% elif view.display_name|length > 18 %}34{% else %}42{% endif %}px">{{ view.display_name }}</h1>
       </div>
-      <div class="game-header__meta">
-        <span>{{ view.rarity_name }}</span>
-        <strong>{{ "★" * view.rarity }}</strong>
+      <div class="game-header__meta" style="min-width:290px;padding:18px 24px">
+        <span style="font-size:18px;font-weight:800">{{ view.rarity_name }}</span>
+        <strong style="font-size:38px;line-height:1.1">{{ "★" * view.rarity }}</strong>
       </div>
     </header>
 
@@ -45,16 +45,16 @@
       </div>
       <div class="pig-card__facts">
         <div class="pig-card__fact">
-          <span>体型 · {{ "%.1f"|format(view.size_percentile * 100) }} 百分位</span>
+          <span>体长{% if view.size_label %} · {{ view.size_label }}{% endif %}</span>
           <strong>{{ "%.1f"|format(view.size_value) }} cm</strong>
         </div>
         <div class="pig-card__fact">
-          <span>重量 · {{ "%.1f"|format(view.weight_percentile * 100) }} 百分位</span>
+          <span>体重{% if view.weight_label %} · {{ view.weight_label }}{% endif %}</span>
           <strong>{{ "%.2f"|format(view.weight_value) }} kg</strong>
         </div>
         <div class="pig-card__fact">
-          <span>肥瘦率 · {{ view.fat_label }}</span>
-          <strong>{{ "%.1f"|format(view.fat_ratio) }}%</strong>
+          <span>体态</span>
+          <strong>{{ view.fat_label }}</strong>
         </div>
         <div class="pig-card__fact">
           <span>官方价值</span>
@@ -71,6 +71,7 @@
       <p class="pig-card__subline">
         {% if view.collection_name %}{{ view.collection_name }}{% if view.character_name %} · {{ view.character_name }}{% endif %} · {% endif %}
         获得于 {{ view.acquired_at }}
+        {% if view.effect_summaries %}<br>美食加成：{{ view.effect_summaries | join("；") }}{% endif %}
       </p>
     </section>
 

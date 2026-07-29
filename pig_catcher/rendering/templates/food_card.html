@@ -15,9 +15,9 @@
         <p class="game-header__eyebrow">{{ view.mode_label }} · {{ view.owner_display_name }}</p>
         <h1 style="font-size: {% if view.display_name|length > 50 %}21{% elif view.display_name|length > 30 %}27{% elif view.display_name|length > 18 %}34{% else %}42{% endif %}px">{{ view.display_name }}</h1>
       </div>
-      <div class="game-header__meta">
-        <span>{{ view.rarity_name }}</span>
-        <strong>{{ "★" * view.rarity }}</strong>
+      <div class="game-header__meta" style="min-width:290px;padding:18px 24px">
+        <span style="font-size:18px;font-weight:800">{{ view.rarity_name }}</span>
+        <strong style="font-size:38px;line-height:1.1">{{ "★" * view.rarity }}</strong>
       </div>
     </header>
 
@@ -60,6 +60,7 @@
       <p class="pig-card__subline">
         效果：{{ view.effect_summary }} · 获得于 {{ view.acquired_at }}
         {% if view.probability_summary %}<br>最终品质概率：{{ view.probability_summary }}{% endif %}
+        {% if view.effect_summaries %}<br>本次美食加成：{{ view.effect_summaries | join("；") }}{% endif %}
       </p>
     </section>
 

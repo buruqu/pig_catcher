@@ -90,6 +90,7 @@ def manifest_entry(
         "consent_status": "granted" if group_scope_id else "not-required",
         "recipe_tags": definition.get("recipe_tags", []),
         "effect_id": definition.get("effect_id", ""),
+        "effect_params": definition.get("effect_params", {}),
         "collection": definition.get("collection"),
     }
     if kind == "pig":
@@ -166,7 +167,7 @@ def build_package(
         )
 
     manifest = {
-        "manifest_version": 2,
+        "manifest_version": 3,
         "catalog_id": definitions["catalog_id"],
         "source_label": definitions["source_label"],
         "entries": manifest_entries,

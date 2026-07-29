@@ -23,7 +23,7 @@ class InventoryQuery:
 
     page: int = 1
     rarity: int | None = None
-    sort: str = "获得时间"
+    sort: str = "价值"
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,6 +48,13 @@ class PurchaseQuery:
 
     product_name: str
     quantity: int = 1
+
+
+@dataclass(frozen=True, slots=True)
+class BatchSaleQuery:
+    """Asset type for one low-rarity batch sale."""
+
+    asset_kind: AssetKind
 
 
 @dataclass(frozen=True, slots=True)
@@ -119,7 +126,7 @@ def _parse_inventory_query(
 
     page = 1
     rarity: int | None = None
-    sort = "获得时间"
+    sort = "价值"
     page_seen = False
     rarity_seen = False
     sort_seen = False
@@ -201,11 +208,10 @@ def parse_records_page(arguments: str) -> int:
 
 
 def parse_store_query(arguments: str) -> StoreQuery:
-    """解析 `/猪猪商城 [页码] [分类=全部|抓猪|做菜|升级]`。"""
+    """解析单页 `/猪猪商城 [分类=全部|抓猪|做菜|升级]`。"""
 
     page = 1
     category = "全部"
-    page_seen = False
     category_seen = False
     for token in str(arguments or "").split():
         if token.startswith("分类="):
@@ -222,10 +228,9 @@ def parse_store_query(arguments: str) -> StoreQuery:
             category = candidate
             category_seen = True
             continue
-        if page_seen:
-            raise DomainValidationError(f"无法识别商城参数“{token}”。")
-        page = _positive_page(token)
-        page_seen = True
+        if token.isdecimal():
+            raise DomainValidationError("猪猪商城已改为单页展示，不需要填写页码。")
+        raise DomainValidationError(f"无法识别商城参数“{token}”。")
     return StoreQuery(page=page, category=category)
 
 
@@ -250,6 +255,44 @@ def parse_purchase_query(arguments: str) -> PurchaseQuery:
     if quantity < 1:
         raise DomainValidationError("购买数量必须是正整数。")
     return PurchaseQuery(product_name=product_name, quantity=quantity)
+
+
+def parse_upgrade_name(arguments: str) -> str:
+    """解析 `/升级 <猪饲料|厨具>`。"""
+
+    normalized = str(arguments or "").strip()
+    aliases = {
+        "猪饲料": "猪饲料",
+        "饲料": "猪饲料",
+        "猪饲料升级": "猪饲料",
+        "厨具": "厨具",
+        "厨具升级": "厨具",
+    }
+    try:
+        return aliases[normalized]
+    except KeyError as exc:
+        raise DomainValidationError(
+            "格式：/升级 猪饲料 或 /升级 厨具。"
+        ) from exc
+
+
+def parse_batch_sale_query(arguments: str) -> BatchSaleQuery:
+    """解析 `/批量售卖 <猪猪|美食>`，固定处理全部一至三星资产。"""
+
+    normalized = str(arguments or "").strip()
+    mapping = {
+        "猪猪": AssetKind.PIG,
+        "猪": AssetKind.PIG,
+        "美食": AssetKind.FOOD,
+        "菜": AssetKind.FOOD,
+    }
+    try:
+        asset_kind = mapping[normalized]
+    except KeyError as exc:
+        raise DomainValidationError(
+            "格式：/批量售卖 猪猪 或 /批量售卖 美食。"
+        ) from exc
+    return BatchSaleQuery(asset_kind=asset_kind)
 
 
 def parse_ledger_page(arguments: str) -> int:

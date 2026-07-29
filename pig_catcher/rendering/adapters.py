@@ -6,8 +6,11 @@ from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 
 from ..domain.errors import RenderError
+from ..domain.food_effects import effect_summary
+from ..domain.gameplay import size_label, weight_label
 from ..domain.social import TRADE_STATUS_LABELS
 from ..services.economy import (
+    BatchSaleResult,
     CookingResult,
     EatResult,
     FoodCatalogPage,
@@ -143,6 +146,11 @@ def pig_card_view(
         ),
         giant_sighting=(
             catch.giant_sighting if catch is not None else pig.is_giant_sighting
+        ),
+        size_label=size_label(pig.size_percentile),
+        weight_label=weight_label(pig.weight_percentile),
+        effect_summaries=(
+            catch.effect_summaries if catch is not None else ()
         ),
     )
 
@@ -342,7 +350,7 @@ def food_card_view(
         official_value=food.official_value,
         acquired_at=_display_time(food.acquired_at),
         source_selector=food.source_selector,
-        effect_summary=food.effect_id or "暂无额外效果",
+        effect_summary=effect_summary(food.effect_id, food.effect_params),
         image_fit=food.image_fit,
         media_visible=food.media_visible,
         is_animated=food.is_animated,
@@ -365,6 +373,9 @@ def food_card_view(
         bonus_selector=bonus_selector,
         probability_summary=(
             cooking.probability_summary if cooking is not None else ""
+        ),
+        effect_summaries=(
+            cooking.effect_summaries if cooking is not None else ()
         ),
     )
 
@@ -418,6 +429,11 @@ def food_catalog_view(page: FoodCatalogPage) -> FoodCatalogViewModel:
                 media_visible=entry.discovered,
                 is_animated=entry.is_animated,
                 image_fit=entry.image_fit,
+                effect_summary=(
+                    effect_summary(entry.effect_id, entry.effect_params)
+                    if entry.discovered and entry.effect_id
+                    else ""
+                ),
             )
             for entry in page.entries
         ),
@@ -444,6 +460,11 @@ def store_view(page: StorePage) -> StoreViewModel:
                 effect_summary=product.effect_summary,
                 current_level=product.current_level,
                 target_level=product.target_level,
+                command=(
+                    f"/升级 {'猪饲料' if product.product_id == 'upgrade-feed' else '厨具'}"
+                    if product.product_type == "upgrade"
+                    else f"/购买 {product.display_name}"
+                ),
             )
             for product in page.products
         ),
@@ -470,6 +491,25 @@ def purchase_receipt_view(result: PurchaseResult) -> EconomyReceiptViewModel:
             EconomyReceiptRowViewModel("获得", acquired),
         ),
         note="同一消息重复投递不会再次扣款或发货。",
+    )
+
+
+def batch_sale_receipt_view(result: BatchSaleResult) -> EconomyReceiptViewModel:
+    """Build one low-rarity batch-sale receipt."""
+
+    kind = "猪猪" if result.asset_kind == "pig" else "美食"
+    return EconomyReceiptViewModel(
+        eyebrow="官方回收 · 原子批量结算",
+        title="批量售卖成功",
+        badge_label="当前余额",
+        badge_value=str(result.balance_after),
+        summary=f"1 至 {result.max_rarity} 星{kind} ×{result.asset_count}",
+        rows=(
+            EconomyReceiptRowViewModel("售出数量", f"{result.asset_count} 件"),
+            EconomyReceiptRowViewModel("本次收入", f"{result.total_value} 猪币"),
+            EconomyReceiptRowViewModel("处理范围", f"1 至 {result.max_rarity} 星"),
+        ),
+        note="交易锁定资产未被处理；历史图鉴不会减少。",
     )
 
 
@@ -742,22 +782,22 @@ def food_media_path(data_dir: Path, food: FoodView) -> Path | None:
 
 
 def inventory_media_paths(data_dir: Path, page: InventoryPage) -> dict[str, Path]:
-    """Resolve only static visible inventory media."""
+    """Resolve visible inventory media; GIFs are previewed by the renderer."""
 
     return {
         pig.pig_instance_id: media_path(data_dir, pig.image_relpath)
         for pig in page.pigs
-        if pig.media_visible and not pig.is_animated
+        if pig.media_visible
     }
 
 
 def catalog_media_paths(data_dir: Path, page: CatalogPage) -> dict[str, Path]:
-    """Resolve only discovered static catalog media."""
+    """Resolve discovered catalog media, including animated sources."""
 
     return {
         entry.template_id: media_path(data_dir, entry.image_relpath)
         for entry in page.entries
-        if entry.discovered and not entry.is_animated
+        if entry.discovered
     }
 
 
@@ -765,12 +805,12 @@ def food_inventory_media_paths(
     data_dir: Path,
     page: FoodInventoryPage,
 ) -> dict[str, Path]:
-    """Resolve only static visible food inventory media."""
+    """Resolve visible food inventory media, including animated sources."""
 
     return {
         food.food_instance_id: media_path(data_dir, food.image_relpath)
         for food in page.foods
-        if food.media_visible and not food.is_animated
+        if food.media_visible
     }
 
 
@@ -778,12 +818,12 @@ def food_catalog_media_paths(
     data_dir: Path,
     page: FoodCatalogPage,
 ) -> dict[str, Path]:
-    """Resolve only discovered static food catalog media."""
+    """Resolve discovered food catalog media, including animated sources."""
 
     return {
         entry.template_id: media_path(data_dir, entry.image_relpath)
         for entry in page.entries
-        if entry.discovered and not entry.is_animated
+        if entry.discovered
     }
 
 
@@ -791,7 +831,7 @@ def ranking_media_paths(
     data_dir: Path,
     page: RankingPage,
 ) -> dict[str, Path]:
-    """Resolve static leaderboard showcase media without flattening GIFs."""
+    """Resolve leaderboard media; GIFs use a deterministic preview frame."""
 
     result: dict[str, Path] = {}
     for entry in page.entries:
@@ -799,7 +839,6 @@ def ranking_media_paths(
         if (
             showcase is None
             or not showcase.media_visible
-            or showcase.is_animated
         ):
             continue
         result[entry.player_id] = media_path(data_dir, showcase.image_relpath)

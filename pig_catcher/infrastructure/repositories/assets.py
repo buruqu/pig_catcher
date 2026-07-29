@@ -305,7 +305,7 @@ class AssetRepository:
             VALUES (
                 :template_id, :catalog_hash, 1, :display_name, :rarity,
                 :scope_type, :description, :image_relpath, :image_sha256, :image_fit,
-                :recipe_tags_json, :effect_id, '{}', :source_label,
+                :recipe_tags_json, :effect_id, :effect_params_json, :source_label,
                 :license, :consent_status, :media_format, :is_animated, :frame_count,
                 :total_duration_ms, :loop_count, :has_transparency,
                 :enabled, :created_at, :updated_at
@@ -324,6 +324,7 @@ class AssetRepository:
                 image_fit = excluded.image_fit,
                 recipe_tags_json = excluded.recipe_tags_json,
                 effect_id = excluded.effect_id,
+                effect_params_json = excluded.effect_params_json,
                 source_label = excluded.source_label,
                 license = excluded.license,
                 consent_status = excluded.consent_status,
@@ -352,6 +353,12 @@ class AssetRepository:
                     separators=(",", ":"),
                 ),
                 "effect_id": entry.effect_id,
+                "effect_params_json": json.dumps(
+                    entry.effect_params,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ),
                 "source_label": entry.source,
                 "license": entry.license,
                 "consent_status": entry.consent_status.value,

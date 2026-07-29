@@ -23,6 +23,7 @@ from ..domain.errors import (
     PigNotFoundError,
     ReceiptConflictError,
 )
+from ..domain.food_effects import active_effect_from_row, apply_catch_effects
 from ..domain.gameplay import (
     CATCH_COIN_REWARDS,
     CATCH_EXPERIENCE_REWARDS,
@@ -33,6 +34,8 @@ from ..domain.gameplay import (
     item_by_id,
     item_by_name,
     level_progress,
+    size_label,
+    weight_label,
 )
 from ..domain.models import CommandIdentity, CommandReceipt
 from ..domain.ports import Clock, MessageKeyFactory, RandomSource, SystemClock, SystemRandomSource
@@ -155,6 +158,7 @@ class CatchResult:
     item_id: str
     item_name: str
     weights: tuple[float, ...]
+    effect_summaries: tuple[str, ...] = ()
     global_size_record: bool = False
     global_weight_record: bool = False
     giant_sighting: bool = False
@@ -466,6 +470,11 @@ def format_catch_summary(result: CatchResult) -> str:
         if result.pig.body_label
         else ""
     )
+    effect_text = (
+        f"\n美食加成：{'；'.join(result.effect_summaries)}"
+        if result.effect_summaries
+        else ""
+    )
     return (
         "【抓猪成功】\n"
         f"{result.pig.owner_display_name} 抓到了 {result.pig.stars} {result.pig.display_name}\n"
@@ -474,14 +483,14 @@ def format_catch_summary(result: CatchResult) -> str:
         f"品质：{result.pig.rarity_name}\n"
         f"体型：{result.pig.size_value:.1f} cm\n"
         f"重量：{result.pig.weight_value:.2f} kg\n"
-        f"肥瘦率：{result.pig.fat_ratio:.1f}%（{result.pig.fat_label}）\n"
+        f"体态：{result.pig.fat_label}\n"
         f"{body_text}"
         f"官方价值：{result.pig.official_value} 猪币\n"
         f"奖励：+{result.coin_reward} 猪币 / +{result.experience_reward} 经验\n"
         f"当前余额：{result.coin_balance} 猪币；累计经验：{result.total_experience}\n"
         f"今日抓猪：{result.daily_count}/{result.daily_limit}\n"
         f"本次道具：{item_text}\n"
-        f"群纪录：{record_text}"
+        f"群纪录：{record_text}{effect_text}"
     )
 
 
@@ -489,9 +498,9 @@ def format_profile_summary(profile: PlayerProfile) -> str:
     """Return a complete text fallback for the player profile."""
 
     next_text = (
-        "已达最高阶段"
+        "已达当前最高等级"
         if profile.level.next_threshold is None
-        else f"距下一阶段 {profile.level.next_threshold - profile.total_experience} 经验"
+        else f"距下一等级 {profile.level.next_threshold - profile.total_experience} 经验"
     )
     armed = profile.armed_item.display_name if profile.armed_item is not None else "无"
     return (
@@ -539,9 +548,9 @@ def format_pig_detail_summary(pig: PigView) -> str:
         "【猪猪详情】\n"
         f"{pig.stars} {pig.display_name}（{pig.rarity_name}）\n"
         f"编号：{pig.selector}\n"
-        f"体型：{pig.size_value:.1f} cm（百分位 {pig.size_percentile * 100:.1f}%）\n"
-        f"重量：{pig.weight_value:.2f} kg（百分位 {pig.weight_percentile * 100:.1f}%）\n"
-        f"肥瘦率：{pig.fat_ratio:.1f}%（{pig.fat_label}）\n"
+        f"体型：{pig.size_value:.1f} cm（{size_label(pig.size_percentile)}）\n"
+        f"重量：{pig.weight_value:.2f} kg（{weight_label(pig.weight_percentile)}）\n"
+        f"体态：{pig.fat_label}\n"
         f"{body}"
         f"官方价值：{pig.official_value} 猪币\n"
         f"群纪录：{'、'.join(records) if records else '无'}\n"
@@ -721,10 +730,24 @@ class GameplayService:
                 day_start=day_start,
                 day_end=day_end,
             )
-            if daily_count >= self.catching.daily_limit:
+            extra_granted, extra_consumed = (
+                await self.economy_repository.extra_catch_grants(
+                    session,
+                    player_id=identity.player_id,
+                    now=now,
+                )
+            )
+            daily_limit = self.catching.daily_limit + extra_granted
+            if daily_count >= daily_limit:
                 raise DailyCatchLimitError(
-                    f"今天已经抓了 {daily_count}/{self.catching.daily_limit} 次，"
+                    f"今天已经抓了 {daily_count}/{daily_limit} 次，"
                     "请在北京时间次日 00:00 后再来。"
+                )
+            using_extra_catch = daily_count >= self.catching.daily_limit
+            if using_extra_catch and extra_consumed >= extra_granted:
+                raise DailyCatchLimitError(
+                    f"今天已经抓了 {daily_count}/{daily_limit} 次，"
+                    "额外抓猪机会已用完。"
                 )
             remaining = _cooldown_remaining(
                 now=now_datetime,
@@ -758,6 +781,16 @@ class GameplayService:
                     armed_item is not None and armed_item.item_id == "lucky-whistle"
                 ),
             )
+            active_effects = tuple(
+                active_effect_from_row(row)
+                for row in await self.economy_repository.list_active_food_effects(
+                    session,
+                    player_id=identity.player_id,
+                    now=now,
+                )
+            )
+            effect_application = apply_catch_effects(weights, active_effects)
+            weights = effect_application.weights
             rarity_roll = self.random_source.random()
             rarity = choose_rarity(weights, rarity_roll)
             candidates = buckets[rarity]
@@ -773,6 +806,7 @@ class GameplayService:
                 fat_profile=str(template["fat_profile"]),
                 random_values=attribute_rolls,
                 item_id=armed_item.item_id if armed_item is not None else "",
+                stature_bias=effect_application.stature_bias,
             )
             pig_instance_id = self._new_identifier()
             short_code = await self._new_unique_short_code(session)
@@ -785,6 +819,13 @@ class GameplayService:
                 "rarity_roll": rarity_roll,
                 "template_roll": template_roll,
                 "attribute_rolls": list(attribute_rolls),
+                "food_effect_entry_ids": list(
+                    effect_application.consumed_entry_ids
+                ),
+                "food_effect_summaries": list(effect_application.summaries),
+                "stature_bias": effect_application.stature_bias,
+                "extra_catch_granted": extra_granted,
+                "extra_catch_used": using_extra_catch,
             }
             await self.repository.insert_pig_instance(
                 session,
@@ -909,6 +950,19 @@ class GameplayService:
                     raise ItemInventoryError(
                         f"已装备的“{armed_item.display_name}”库存不足，本次抓猪未结算。"
                     )
+            if effect_application.consumed_entry_ids:
+                await self.economy_repository.consume_food_effects(
+                    session,
+                    player_id=identity.player_id,
+                    effect_entry_ids=effect_application.consumed_entry_ids,
+                    now=now,
+                )
+            if using_extra_catch:
+                await self.economy_repository.consume_extra_catch(
+                    session,
+                    player_id=identity.player_id,
+                    now=now,
+                )
             pig_row = await self.repository.get_pig_by_instance_id(
                 session,
                 pig_instance_id=pig_instance_id,
@@ -918,7 +972,7 @@ class GameplayService:
             pig = self._pig_view(pig_row)
             payload: dict[str, Any] = {
                 "daily_count": daily_count + 1,
-                "daily_limit": self.catching.daily_limit,
+                "daily_limit": daily_limit,
                 "coin_reward": coin_reward,
                 "experience_reward": experience_reward,
                 "coin_balance": coin_balance,
@@ -933,6 +987,7 @@ class GameplayService:
                 "item_id": armed_item.item_id if armed_item is not None else "",
                 "item_name": armed_item.display_name if armed_item is not None else "",
                 "weights": [round(value, 8) for value in weights],
+                "effect_summaries": list(effect_application.summaries),
             }
             provisional_receipt = CommandReceipt(
                 receipt_id="",
@@ -954,7 +1009,7 @@ class GameplayService:
                 receipt=provisional_receipt,
                 receipt_created=True,
                 daily_count=daily_count + 1,
-                daily_limit=self.catching.daily_limit,
+                daily_limit=daily_limit,
                 coin_reward=coin_reward,
                 experience_reward=experience_reward,
                 coin_balance=coin_balance,
@@ -966,6 +1021,7 @@ class GameplayService:
                 item_id=armed_item.item_id if armed_item is not None else "",
                 item_name=armed_item.display_name if armed_item is not None else "",
                 weights=weights,
+                effect_summaries=effect_application.summaries,
                 global_size_record=global_size_record,
                 global_weight_record=global_weight_record,
                 giant_sighting=giant_sighting,
@@ -994,7 +1050,7 @@ class GameplayService:
                 receipt=reservation.receipt,
                 receipt_created=reservation.created,
                 daily_count=daily_count + 1,
-                daily_limit=self.catching.daily_limit,
+                daily_limit=daily_limit,
                 coin_reward=coin_reward,
                 experience_reward=experience_reward,
                 coin_balance=coin_balance,
@@ -1006,6 +1062,7 @@ class GameplayService:
                 item_id=armed_item.item_id if armed_item is not None else "",
                 item_name=armed_item.display_name if armed_item is not None else "",
                 weights=weights,
+                effect_summaries=effect_application.summaries,
                 global_size_record=global_size_record,
                 global_weight_record=global_weight_record,
                 giant_sighting=giant_sighting,
@@ -1037,6 +1094,11 @@ class GameplayService:
                 player_id=identity.player_id,
                 day_start=day_start,
                 day_end=day_end,
+            )
+            extra_granted, _ = await self.economy_repository.extra_catch_grants(
+                session,
+                player_id=identity.player_id,
+                now=now,
             )
             feed_level = await self.repository.get_feed_level(
                 session,
@@ -1099,7 +1161,7 @@ class GameplayService:
             visible_catalog_total=visible_total,
             held_records=int(row["held_records"]),
             daily_count=daily_count,
-            daily_limit=self.catching.daily_limit,
+            daily_limit=self.catching.daily_limit + extra_granted,
             cooldown_remaining_seconds=_cooldown_remaining(
                 now=now_datetime,
                 last_acquired_at=last_acquired_at,
@@ -1545,6 +1607,11 @@ class GameplayService:
             item_id=str(payload.get("item_id") or ""),
             item_name=str(payload.get("item_name") or ""),
             weights=tuple(float(value) for value in weights_raw),
+            effect_summaries=tuple(
+                str(value)
+                for value in payload.get("effect_summaries", [])
+                if str(value).strip()
+            ),
             global_size_record=bool(payload.get("global_size_record") or False),
             global_weight_record=bool(payload.get("global_weight_record") or False),
             giant_sighting=bool(payload.get("giant_sighting") or False),

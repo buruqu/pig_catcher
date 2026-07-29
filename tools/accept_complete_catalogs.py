@@ -17,6 +17,7 @@ from playwright.async_api import async_playwright
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from pig_catcher.domain.food_effects import effect_summary  # noqa: E402
 from pig_catcher.rendering import (  # noqa: E402
     CatalogItemViewModel,
     CatalogViewModel,
@@ -63,7 +64,7 @@ def _load_rows(
         fields = """
             template.template_id, template.display_name, template.rarity,
             template.image_relpath, template.image_fit, template.is_animated,
-            template.scope_type
+            template.scope_type, template.effect_id, template.effect_params_json
         """
     else:
         raise ValueError(f"Unsupported catalog kind: {kind}")
@@ -160,6 +161,15 @@ def _food_view(rows: Sequence[Mapping[str, object]]) -> FoodCatalogViewModel:
             media_visible=str(row["scope_type"]) == "common",
             is_animated=bool(row["is_animated"]),
             image_fit=str(row["image_fit"]),
+            effect_summary=(
+                effect_summary(
+                    str(row.get("effect_id") or ""),
+                    json.loads(str(row.get("effect_params_json") or "{}")),
+                )
+                if str(row["scope_type"]) == "common"
+                and str(row.get("effect_id") or "")
+                else ""
+            ),
         )
         for index, row in enumerate(rows)
     )

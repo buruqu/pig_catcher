@@ -5,7 +5,8 @@ from __future__ import annotations
 import json
 import re
 from collections.abc import Callable, Collection, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import uuid4
 
@@ -40,6 +41,13 @@ from ..domain.errors import (
     StoreProductError,
     UpgradeLimitError,
 )
+from ..domain.food_effects import (
+    EXTRA_CATCHES,
+    active_effect_from_row,
+    apply_cooking_effects,
+    effect_summary,
+    resolve_food_effect,
+)
 from ..domain.gameplay import ItemDefinition, item_by_id
 from ..domain.models import CommandIdentity, CommandReceipt
 from ..domain.ports import Clock, MessageKeyFactory, RandomSource, SystemClock, SystemRandomSource
@@ -66,8 +74,11 @@ from .receipts import request_fingerprint
 _COOK_COMMAND = "pig-catcher.cook"
 _EAT_COMMAND = "pig-catcher.eat"
 _PURCHASE_COMMAND = "pig-catcher.purchase"
+_UPGRADE_COMMAND = "pig-catcher.upgrade"
 _SELL_PIG_COMMAND = "pig-catcher.sell-pig"
 _SELL_FOOD_COMMAND = "pig-catcher.sell-food"
+_BATCH_SELL_PIG_COMMAND = "pig-catcher.batch-sell-pig"
+_BATCH_SELL_FOOD_COMMAND = "pig-catcher.batch-sell-food"
 _SHORT_CODE_PATTERN = re.compile(r"^[A-F0-9]{8}$")
 _FAT_LABELS = {
     "lean": "偏瘦",
@@ -144,6 +155,10 @@ class FoodEffectOutcome:
     summary: str
     experience_bonus: int = 0
     coin_bonus: int = 0
+    queued_effect_id: str = ""
+    queued_effect_params: Mapping[str, object] = field(default_factory=dict)
+    granted_uses: int = 0
+    expires_at: str = ""
 
 
 FoodEffectHandler = Callable[[FoodView, Mapping[str, object]], FoodEffectOutcome]
@@ -167,6 +182,7 @@ class CookingResult:
     item_name: str
     weights: tuple[float, ...]
     bonus_serving: bool
+    effect_summaries: tuple[str, ...] = ()
 
     @property
     def probability_summary(self) -> str:
@@ -213,6 +229,7 @@ class FoodCatalogEntry:
     last_acquired_at: str
     recipe_tags: tuple[str, ...]
     effect_id: str
+    effect_params: Mapping[str, object]
 
 
 @dataclass(frozen=True, slots=True)
@@ -289,6 +306,19 @@ class SaleResult:
     balance_after: int
     pig: PigView | None = None
     food: FoodView | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class BatchSaleResult:
+    """Committed sale of every unlocked one-to-three-star asset of one kind."""
+
+    receipt: CommandReceipt
+    receipt_created: bool
+    asset_kind: str
+    asset_count: int
+    max_rarity: int
+    total_value: int
+    balance_after: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -403,6 +433,10 @@ def _catalog_entry_from_row(row: Mapping[str, object]) -> FoodCatalogEntry:
             label="美食图鉴食谱标签",
         ),
         effect_id=str(row.get("effect_id") or ""),
+        effect_params=_json_object(
+            row.get("effect_params_json"),
+            label="美食图鉴效果参数",
+        ),
     )
 
 
@@ -416,6 +450,11 @@ def format_cooking_summary(result: CookingResult) -> str:
         else ""
     )
     item = result.item_name or "无"
+    effect_text = (
+        f"\n美食加成：{'；'.join(result.effect_summaries)}"
+        if result.effect_summaries
+        else ""
+    )
     return (
         "【做菜成功】\n"
         f"原料：{result.source_pig.selector}（{result.source_pig.stars}）\n"
@@ -425,14 +464,14 @@ def format_cooking_summary(result: CookingResult) -> str:
         f"奖励：+{result.coin_reward} 猪币 / +{result.experience_reward} 经验\n"
         f"当前余额：{result.coin_balance} 猪币；累计经验：{result.total_experience}\n"
         f"厨具：Lv.{result.cookware_level}；本次道具：{item}\n"
-        f"最终品质概率：{result.probability_summary}"
+        f"最终品质概率：{result.probability_summary}{effect_text}"
     )
 
 
 def format_food_detail_summary(food: FoodView) -> str:
     """Return a complete text fallback for one food."""
 
-    effect = food.effect_id or "暂无额外效果"
+    effect = effect_summary(food.effect_id, food.effect_params)
     return (
         "【美食详情】\n"
         f"{food.stars} {food.display_name}（{food.rarity_name}）\n"
@@ -520,17 +559,21 @@ def format_store_summary(result: StorePage) -> str:
     lines = [
         "【猪猪商城】",
         f"玩家：{result.display_name}；余额：{result.coin_balance} 猪币",
-        (
-            f"分类：{result.category}；第 {result.page}/{result.page_count} 页；"
-            f"共 {result.total_count} 项"
-        ),
+        f"分类：{result.category}；单页展示全部 {result.total_count} 项",
         f"猪饲料 Lv.{result.feed_level}；厨具 Lv.{result.cookware_level}",
     ]
     if not result.products:
         lines.append("当前分类没有商品。")
     for product in result.products:
         price = "已满级" if product.unit_price <= 0 else f"{product.unit_price} 猪币"
-        lines.append(f"{product.display_name}｜{price}｜{product.effect_summary}")
+        command = (
+            f"/升级 {'猪饲料' if product.product_id == 'upgrade-feed' else '厨具'}"
+            if product.product_type == "upgrade"
+            else f"/购买 {product.display_name}"
+        )
+        lines.append(
+            f"{product.display_name}｜{price}｜{product.effect_summary}｜{command}"
+        )
     return "\n".join(lines)
 
 
@@ -560,6 +603,20 @@ def format_sale_summary(result: SaleResult) -> str:
         f"售得：{result.official_value} 猪币\n"
         f"当前余额：{result.balance_after}\n"
         "该资产已离开背包，已解锁图鉴记录不会减少。"
+    )
+
+
+def format_batch_sale_summary(result: BatchSaleResult) -> str:
+    """Return a complete batch-sale fallback."""
+
+    kind = "猪猪" if result.asset_kind == "pig" else "美食"
+    return (
+        "【批量售卖成功】\n"
+        f"范围：1 至 {result.max_rarity} 星{kind}\n"
+        f"售出：{result.asset_count} 件\n"
+        f"收入：{result.total_value} 猪币\n"
+        f"当前余额：{result.balance_after}\n"
+        "交易锁定的资产未被处理，已解锁图鉴记录不会减少。"
     )
 
 
@@ -624,12 +681,20 @@ class EconomyService:
         """Atomically consume one pig and produce one or two foods."""
 
         await self._expire_stale_offers()
-        selector = parse_asset_selector(selector_text)
-        request_payload = {
-            "command_version": 1,
-            "name": selector.name,
-            "short_code": selector.short_code or "",
-        }
+        normalized_selector = str(selector_text or "").strip()
+        if normalized_selector:
+            selector = parse_asset_selector(normalized_selector)
+            request_payload = {
+                "command_version": 2,
+                "selection": "exact",
+                "name": selector.name,
+                "short_code": selector.short_code or "",
+            }
+        else:
+            request_payload = {
+                "command_version": 2,
+                "selection": "cheapest-low-rarity",
+            }
         idempotency_key = MessageKeyFactory.build(identity, _COOK_COMMAND)
         now = iso_timestamp(self.clock.now())
         async with self.database.transaction() as session:
@@ -652,7 +717,11 @@ class EconomyService:
                 identity=identity,
                 now=now,
             )
-            source = await self._resolve_pig(session, identity, selector_text)
+            source = await self._resolve_pig_for_action(
+                session,
+                identity,
+                normalized_selector,
+            )
             upgrades = await self.repository.get_upgrade_levels(
                 session,
                 player_id=identity.player_id,
@@ -673,6 +742,20 @@ class EconomyService:
                     armed_item is not None and armed_item.item_id == "chef-spice"
                 ),
             )
+            active_effects = tuple(
+                active_effect_from_row(row)
+                for row in await self.repository.list_active_food_effects(
+                    session,
+                    player_id=identity.player_id,
+                    now=now,
+                )
+            )
+            effect_application = apply_cooking_effects(
+                weights,
+                active_effects,
+                source_rarity=source.rarity,
+            )
+            weights = effect_application.weights
             rarity_roll = self.random_source.random()
             output_rarity = choose_rarity(weights, rarity_roll)
             templates = await self.repository.list_drawable_food_templates(
@@ -764,6 +847,10 @@ class EconomyService:
                 "desired_affinity": desired_affinity,
                 "bonus_roll": bonus_roll,
                 "bonus_serving": bonus_serving,
+                "food_effect_entry_ids": list(
+                    effect_application.consumed_entry_ids
+                ),
+                "food_effect_summaries": list(effect_application.summaries),
             }
             catalog_new_count = 0
             for index, (food_id, short_code, attributes) in enumerate(
@@ -855,6 +942,13 @@ class EconomyService:
                     raise ItemInventoryError(
                         f"已装备的“{armed_item.display_name}”库存不足，本次做菜未结算。"
                     )
+            if effect_application.consumed_entry_ids:
+                await self.repository.consume_food_effects(
+                    session,
+                    player_id=identity.player_id,
+                    effect_entry_ids=effect_application.consumed_entry_ids,
+                    now=now,
+                )
             foods = tuple(
                 [
                     await self._food_by_id(session, food_id)
@@ -874,6 +968,7 @@ class EconomyService:
                 "item_name": armed_item.display_name if armed_item is not None else "",
                 "weights": [round(value, 8) for value in weights],
                 "bonus_serving": bonus_serving,
+                "effect_summaries": list(effect_application.summaries),
             }
             provisional = CookingResult(
                 source_pig=source,
@@ -899,6 +994,7 @@ class EconomyService:
                 item_name=armed_item.display_name if armed_item is not None else "",
                 weights=weights,
                 bonus_serving=bonus_serving,
+                effect_summaries=effect_application.summaries,
             )
             reservation = await self._reserve(
                 session,
@@ -927,6 +1023,7 @@ class EconomyService:
                 item_name=armed_item.display_name if armed_item is not None else "",
                 weights=weights,
                 bonus_serving=bonus_serving,
+                effect_summaries=effect_application.summaries,
             )
 
     async def food_detail(
@@ -1026,14 +1123,23 @@ class EconomyService:
         """Consume one food after validating its registered effect."""
 
         await self._expire_stale_offers()
-        selector = parse_asset_selector(selector_text)
-        request_payload = {
-            "command_version": 1,
-            "name": selector.name,
-            "short_code": selector.short_code or "",
-        }
+        normalized_selector = str(selector_text or "").strip()
+        if normalized_selector:
+            selector = parse_asset_selector(normalized_selector)
+            request_payload = {
+                "command_version": 2,
+                "selection": "exact",
+                "name": selector.name,
+                "short_code": selector.short_code or "",
+            }
+        else:
+            request_payload = {
+                "command_version": 2,
+                "selection": "cheapest-low-rarity",
+            }
         idempotency_key = MessageKeyFactory.build(identity, _EAT_COMMAND)
-        now = iso_timestamp(self.clock.now())
+        now_datetime = self.clock.now()
+        now = iso_timestamp(now_datetime)
         async with self.database.transaction() as session:
             existing = await self.receipt_repository.get_by_key(session, idempotency_key)
             if existing is not None:
@@ -1053,7 +1159,11 @@ class EconomyService:
                 identity=identity,
                 now=now,
             )
-            food = await self._resolve_food(session, identity, selector_text)
+            food = await self._resolve_food_for_action(
+                session,
+                identity,
+                normalized_selector,
+            )
             effect = self._food_effect(food)
             consumed = await self.repository.consume_food(
                 session,
@@ -1071,6 +1181,28 @@ class EconomyService:
                 asset_instance_id=food.food_instance_id,
                 now=now,
             )
+            effect_entry_id = ""
+            effect_expires_at = effect.expires_at
+            if effect.queued_effect_id:
+                effect_entry_id = self._new_identifier()
+                if effect.queued_effect_id == EXTRA_CATCHES:
+                    effect_expires_at = self._daily_effect_expiry(now_datetime)
+                await self.repository.insert_food_effect(
+                    session,
+                    effect_entry_id=effect_entry_id,
+                    player_id=identity.player_id,
+                    source_food_instance_id=food.food_instance_id,
+                    effect_id=effect.queued_effect_id,
+                    params_json=json.dumps(
+                        dict(effect.queued_effect_params),
+                        ensure_ascii=False,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    ),
+                    granted_uses=effect.granted_uses,
+                    expires_at=effect_expires_at or None,
+                    now=now,
+                )
             base_experience = EAT_EXPERIENCE_REWARDS[Rarity(food.rarity)]
             total_experience = await self.repository.add_experience(
                 session,
@@ -1108,6 +1240,11 @@ class EconomyService:
                 "effect_summary": effect.summary,
                 "effect_experience_bonus": effect.experience_bonus,
                 "effect_coin_bonus": effect.coin_bonus,
+                "effect_entry_id": effect_entry_id,
+                "queued_effect_id": effect.queued_effect_id,
+                "queued_effect_params": dict(effect.queued_effect_params),
+                "effect_granted_uses": effect.granted_uses,
+                "effect_expires_at": effect_expires_at,
                 "total_experience": total_experience,
                 "coin_balance": coin_balance,
             }
@@ -1158,10 +1295,12 @@ class EconomyService:
         page: int,
         category: str,
     ) -> StorePage:
-        """Read the current player's store and next upgrade prices."""
+        """Read all current store products on one page."""
 
         if category not in _STORE_CATEGORIES:
             raise StoreProductError("商城分类只能是：全部、抓猪、做菜、升级。")
+        if page != 1:
+            raise StoreProductError("猪猪商城已改为单页展示，不需要填写页码。")
         now = iso_timestamp(self.clock.now())
         async with self.database.transaction() as session:
             await self.framework_repository.touch_identity(
@@ -1191,20 +1330,18 @@ class EconomyService:
             for product in products
             if resolved is None or product.category == resolved
         )
-        page_size = self.economy.store_page_size
-        pages = valid_page_count(page, len(filtered), page_size)
-        offset = (page - 1) * page_size
+        page_size = max(1, len(filtered))
         return StorePage(
             display_name=identity.display_name,
             coin_balance=int(profile["coin_balance"]),
             page=page,
-            page_count=pages,
+            page_count=1,
             total_count=len(filtered),
             page_size=page_size,
             category=category,
             feed_level=upgrades["feed"],
             cookware_level=upgrades["cookware"],
-            products=filtered[offset : offset + page_size],
+            products=filtered,
         )
 
     async def purchase(
@@ -1214,7 +1351,44 @@ class EconomyService:
         *,
         quantity: int,
     ) -> PurchaseResult:
-        """Atomically debit coins and grant one product."""
+        """Buy consumable items; permanent upgrades use :meth:`upgrade`."""
+
+        if upgrade_type_by_name(product_name) is not None:
+            raise StoreProductError(
+                "永久升级请使用 /升级 猪饲料 或 /升级 厨具。"
+            )
+        return await self._purchase_product(
+            identity,
+            product_name,
+            quantity=quantity,
+            command_name=_PURCHASE_COMMAND,
+        )
+
+    async def upgrade(
+        self,
+        identity: CommandIdentity,
+        upgrade_name: str,
+    ) -> PurchaseResult:
+        """Buy exactly one permanent feed or cookware level."""
+
+        if upgrade_type_by_name(upgrade_name) is None:
+            raise StoreProductError("升级名称只能填写“猪饲料”或“厨具”。")
+        return await self._purchase_product(
+            identity,
+            upgrade_name,
+            quantity=1,
+            command_name=_UPGRADE_COMMAND,
+        )
+
+    async def _purchase_product(
+        self,
+        identity: CommandIdentity,
+        product_name: str,
+        *,
+        quantity: int,
+        command_name: str,
+    ) -> PurchaseResult:
+        """Atomically debit coins and grant one validated store product."""
 
         normalized_name = str(product_name or "").strip()
         if not normalized_name:
@@ -1237,7 +1411,7 @@ class EconomyService:
             "product_id": product_id,
             "quantity": quantity,
         }
-        idempotency_key = MessageKeyFactory.build(identity, _PURCHASE_COMMAND)
+        idempotency_key = MessageKeyFactory.build(identity, command_name)
         now = iso_timestamp(self.clock.now())
         async with self.database.transaction() as session:
             existing = await self.receipt_repository.get_by_key(session, idempotency_key)
@@ -1245,7 +1419,7 @@ class EconomyService:
                 validate_existing_receipt(
                     existing,
                     identity=identity,
-                    command_name=_PURCHASE_COMMAND,
+                    command_name=command_name,
                     request_payload=request_payload,
                 )
                 return self._purchase_from_receipt(existing, receipt_created=False)
@@ -1340,7 +1514,7 @@ class EconomyService:
                 self._provisional_receipt(
                     idempotency_key=idempotency_key,
                     identity=identity,
-                    command_name=_PURCHASE_COMMAND,
+                    command_name=command_name,
                     request_payload=request_payload,
                     result_type="purchase",
                     result_object_id=product_id,
@@ -1354,7 +1528,7 @@ class EconomyService:
                 session,
                 identity=identity,
                 idempotency_key=idempotency_key,
-                command_name=_PURCHASE_COMMAND,
+                command_name=command_name,
                 request_payload=request_payload,
                 result_type="purchase",
                 result_object_id=product_id,
@@ -1391,6 +1565,132 @@ class EconomyService:
             asset_kind="food",
             command_name=_SELL_FOOD_COMMAND,
         )
+
+    async def batch_sell_low_rarity(
+        self,
+        identity: CommandIdentity,
+        *,
+        asset_kind: str,
+        max_rarity: int = 3,
+    ) -> BatchSaleResult:
+        """Sell every unlocked low-rarity pig or food in one transaction."""
+
+        if asset_kind not in {"pig", "food"}:
+            raise StoreProductError("批量售卖类型只能是“猪猪”或“美食”。")
+        if not 1 <= int(max_rarity) <= 3:
+            raise StoreProductError("批量售卖只允许处理 1 至 3 星资产。")
+        await self._expire_stale_offers()
+        command_name = (
+            _BATCH_SELL_PIG_COMMAND
+            if asset_kind == "pig"
+            else _BATCH_SELL_FOOD_COMMAND
+        )
+        request_payload = {
+            "command_version": 1,
+            "asset_kind": asset_kind,
+            "max_rarity": int(max_rarity),
+        }
+        idempotency_key = MessageKeyFactory.build(identity, command_name)
+        now = iso_timestamp(self.clock.now())
+        async with self.database.transaction() as session:
+            existing = await self.receipt_repository.get_by_key(
+                session,
+                idempotency_key,
+            )
+            if existing is not None:
+                validate_existing_receipt(
+                    existing,
+                    identity=identity,
+                    command_name=command_name,
+                    request_payload=request_payload,
+                )
+                return self._batch_sale_from_receipt(
+                    existing,
+                    receipt_created=False,
+                )
+            await self.framework_repository.touch_identity(
+                session,
+                identity=identity,
+                now=now,
+            )
+            count, total_value = await self.repository.batch_sell_low_rarity(
+                session,
+                player_id=identity.player_id,
+                scope_id=identity.scope.value,
+                asset_kind=asset_kind,
+                max_rarity=int(max_rarity),
+                now=now,
+            )
+            if count == 0:
+                noun = "猪猪" if asset_kind == "pig" else "美食"
+                error = (
+                    f"背包中没有可批量售卖的 1 至 {max_rarity} 星{noun}；"
+                    "交易锁定资产不会被处理。"
+                )
+                if asset_kind == "pig":
+                    raise PigNotFoundError(error)
+                raise FoodNotFoundError(error)
+            balance_after = await self.repository.apply_currency_change(
+                session,
+                player_id=identity.player_id,
+                scope_id=identity.scope.value,
+                amount=total_value,
+                reason_code=f"batch-sell-{asset_kind}",
+                reason_text=f"批量售卖低星{'猪猪' if asset_kind == 'pig' else '美食'}",
+                source_object_type=asset_kind,
+                source_object_id=f"rarity-1-{max_rarity}",
+                ledger_entry_id=self._new_identifier(),
+                idempotency_key=f"{idempotency_key}:coin",
+                now=now,
+            )
+            if balance_after is None:
+                raise RuntimeError("批量售卖正数收益无法写入玩家余额。")
+            payload = {
+                "asset_kind": asset_kind,
+                "asset_count": count,
+                "max_rarity": int(max_rarity),
+                "total_value": total_value,
+                "balance_after": balance_after,
+            }
+            provisional = BatchSaleResult(
+                receipt=self._provisional_receipt(
+                    idempotency_key=idempotency_key,
+                    identity=identity,
+                    command_name=command_name,
+                    request_payload=request_payload,
+                    result_type="batch-sale",
+                    result_object_id=f"{asset_kind}:rarity-1-{max_rarity}",
+                    result_payload=payload,
+                    now=now,
+                ),
+                receipt_created=True,
+                asset_kind=asset_kind,
+                asset_count=count,
+                max_rarity=int(max_rarity),
+                total_value=total_value,
+                balance_after=balance_after,
+            )
+            receipt = await self._reserve(
+                session,
+                identity=identity,
+                idempotency_key=idempotency_key,
+                command_name=command_name,
+                request_payload=request_payload,
+                result_type="batch-sale",
+                result_object_id=f"{asset_kind}:rarity-1-{max_rarity}",
+                result_payload=payload,
+                text_summary=format_batch_sale_summary(provisional),
+                now=now,
+            )
+            return BatchSaleResult(
+                receipt=receipt,
+                receipt_created=True,
+                asset_kind=asset_kind,
+                asset_count=count,
+                max_rarity=int(max_rarity),
+                total_value=total_value,
+                balance_after=balance_after,
+            )
 
     async def ledger(self, identity: CommandIdentity, *, page: int) -> LedgerPage:
         """Read the immutable current-group ledger after reconciling it."""
@@ -1451,12 +1751,20 @@ class EconomyService:
         command_name: str,
     ) -> SaleResult:
         await self._expire_stale_offers()
-        selector = parse_asset_selector(selector_text)
-        request_payload = {
-            "command_version": 1,
-            "name": selector.name,
-            "short_code": selector.short_code or "",
-        }
+        normalized_selector = str(selector_text or "").strip()
+        if normalized_selector:
+            selector = parse_asset_selector(normalized_selector)
+            request_payload = {
+                "command_version": 2,
+                "selection": "exact",
+                "name": selector.name,
+                "short_code": selector.short_code or "",
+            }
+        else:
+            request_payload = {
+                "command_version": 2,
+                "selection": "cheapest-low-rarity",
+            }
         idempotency_key = MessageKeyFactory.build(identity, command_name)
         now = iso_timestamp(self.clock.now())
         async with self.database.transaction() as session:
@@ -1481,7 +1789,11 @@ class EconomyService:
             pig: PigView | None = None
             food: FoodView | None = None
             if asset_kind == "pig":
-                pig = await self._resolve_pig(session, identity, selector_text)
+                pig = await self._resolve_pig_for_action(
+                    session,
+                    identity,
+                    normalized_selector,
+                )
                 asset_id = pig.pig_instance_id
                 display_name = pig.display_name
                 selector_value = pig.selector
@@ -1495,7 +1807,11 @@ class EconomyService:
                     now=now,
                 )
             else:
-                food = await self._resolve_food(session, identity, selector_text)
+                food = await self._resolve_food_for_action(
+                    session,
+                    identity,
+                    normalized_selector,
+                )
                 asset_id = food.food_instance_id
                 display_name = food.display_name
                 selector_value = food.selector
@@ -1637,6 +1953,54 @@ class EconomyService:
             )
         return food_view_from_row(rows[0])
 
+    async def _resolve_pig_for_action(
+        self,
+        session: DatabaseSession,
+        identity: CommandIdentity,
+        selector_text: str,
+    ) -> PigView:
+        if selector_text:
+            return await self._resolve_pig(session, identity, selector_text)
+        pig_instance_id = await self.repository.cheapest_active_asset_id(
+            session,
+            player_id=identity.player_id,
+            scope_id=identity.scope.value,
+            asset_kind="pig",
+            max_rarity=3,
+        )
+        if pig_instance_id is None:
+            raise PigNotFoundError(
+                "背包中没有可自动处理的 1 至 3 星猪猪；4 星以上请填写名称#短编号。"
+            )
+        row = await self.gameplay_repository.get_pig_by_instance_id(
+            session,
+            pig_instance_id=pig_instance_id,
+        )
+        if row is None:
+            raise PigNotFoundError("自动选择的猪猪已不可用，请重试。")
+        return pig_view_from_row(row)
+
+    async def _resolve_food_for_action(
+        self,
+        session: DatabaseSession,
+        identity: CommandIdentity,
+        selector_text: str,
+    ) -> FoodView:
+        if selector_text:
+            return await self._resolve_food(session, identity, selector_text)
+        food_instance_id = await self.repository.cheapest_active_asset_id(
+            session,
+            player_id=identity.player_id,
+            scope_id=identity.scope.value,
+            asset_kind="food",
+            max_rarity=3,
+        )
+        if food_instance_id is None:
+            raise FoodNotFoundError(
+                "背包中没有可自动处理的 1 至 3 星美食；4 星以上请填写名称#短编号。"
+            )
+        return await self._food_by_id(session, food_instance_id)
+
     async def _food_by_id(
         self,
         session: DatabaseSession,
@@ -1653,7 +2017,18 @@ class EconomyService:
     def _food_effect(self, food: FoodView) -> FoodEffectOutcome:
         effect_id = food.effect_id.strip()
         if not effect_id:
-            return FoodEffectOutcome("暂无额外效果，本次仅获得品鉴经验。")
+            return FoodEffectOutcome("基础效果：本次获得品鉴经验。")
+        try:
+            grant = resolve_food_effect(effect_id, food.effect_params)
+        except FoodEffectError:
+            grant = None
+        if grant is not None:
+            return FoodEffectOutcome(
+                summary=grant.summary,
+                queued_effect_id=grant.effect_id,
+                queued_effect_params=grant.params,
+                granted_uses=grant.granted_uses,
+            )
         handler = self.effect_handlers.get(effect_id)
         if handler is None:
             raise FoodEffectError(
@@ -1711,6 +2086,11 @@ class EconomyService:
             item_name=str(payload.get("item_name") or ""),
             weights=tuple(float(value) for value in raw_weights),
             bonus_serving=bool(payload["bonus_serving"]),
+            effect_summaries=tuple(
+                str(value)
+                for value in payload.get("effect_summaries", [])
+                if str(value).strip()
+            ),
         )
 
     async def _eat_from_receipt(
@@ -1734,6 +2114,14 @@ class EconomyService:
                 summary=str(payload["effect_summary"]),
                 experience_bonus=int(payload["effect_experience_bonus"]),
                 coin_bonus=int(payload["effect_coin_bonus"]),
+                queued_effect_id=str(payload.get("queued_effect_id") or ""),
+                queued_effect_params=(
+                    dict(payload["queued_effect_params"])
+                    if isinstance(payload.get("queued_effect_params"), dict)
+                    else {}
+                ),
+                granted_uses=int(payload.get("effect_granted_uses") or 0),
+                expires_at=str(payload.get("effect_expires_at") or ""),
             ),
             total_experience=int(payload["total_experience"]),
             coin_balance=int(payload["coin_balance"]),
@@ -1771,6 +2159,23 @@ class EconomyService:
             inventory_quantity=int(payload["inventory_quantity"]),
             upgrade_type=str(payload["upgrade_type"]),
             upgrade_level=int(payload["upgrade_level"]),
+        )
+
+    @staticmethod
+    def _batch_sale_from_receipt(
+        receipt: CommandReceipt,
+        *,
+        receipt_created: bool,
+    ) -> BatchSaleResult:
+        payload = receipt_payload(receipt)
+        return BatchSaleResult(
+            receipt=receipt,
+            receipt_created=receipt_created,
+            asset_kind=str(payload["asset_kind"]),
+            asset_count=int(payload["asset_count"]),
+            max_rarity=int(payload["max_rarity"]),
+            total_value=int(payload["total_value"]),
+            balance_after=int(payload["balance_after"]),
         )
 
     async def _sale_from_receipt(
@@ -1913,6 +2318,18 @@ class EconomyService:
         if not candidate or len(candidate) > 128:
             raise RuntimeError("实例 ID 生成器返回了无效值。")
         return candidate
+
+    @staticmethod
+    def _daily_effect_expiry(now: datetime) -> str:
+        beijing_timezone = timezone(timedelta(hours=8), "Asia/Shanghai")
+        local = now.astimezone(beijing_timezone)
+        next_day = (local + timedelta(days=1)).date()
+        expiry = datetime.combine(
+            next_day,
+            datetime.min.time(),
+            tzinfo=beijing_timezone,
+        )
+        return iso_timestamp(expiry)
 
     async def _expire_stale_offers(self) -> int:
         now = iso_timestamp(self.clock.now())

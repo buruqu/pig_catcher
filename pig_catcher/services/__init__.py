@@ -2,6 +2,7 @@
 
 from .assets import AssetCatalogService, CatalogImportResult, CollectionProgress
 from .economy import (
+    BatchSaleResult,
     CookingResult,
     EatResult,
     EconomyService,
@@ -15,6 +16,7 @@ from .economy import (
     PurchaseResult,
     SaleResult,
     StorePage,
+    format_batch_sale_summary,
     format_cooking_summary,
     format_eat_summary,
     format_food_catalog_summary,
@@ -68,6 +70,7 @@ from .social import (
 
 __all__ = [
     "AssetCatalogService",
+    "BatchSaleResult",
     "CatalogImportResult",
     "CollectionProgress",
     "CookingResult",
@@ -110,6 +113,7 @@ __all__ = [
     "TradePage",
     "TradeView",
     "format_catalog_summary",
+    "format_batch_sale_summary",
     "format_catch_summary",
     "format_cooking_summary",
     "format_eat_summary",

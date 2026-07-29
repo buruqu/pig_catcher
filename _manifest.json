@@ -1,9 +1,9 @@
 {
   "manifest_version": 2,
   "id": "local.pig-catcher",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "name": "抓猪插件",
-  "description": "面向群聊的抓猪收集、做菜、图鉴、猪币与安全交易游戏。正式版包含完整玩法、群隔离、故障降级、自动备份与运行巡检。",
+  "description": "面向群聊的抓猪收集、做菜、图鉴、猪币与安全交易游戏。包含高星美食效果、成长等级、便捷低星处理、群隔离、故障降级、自动备份与运行巡检。",
   "author": {
     "name": "buruqu",
     "url": "https://github.com/buruqu"

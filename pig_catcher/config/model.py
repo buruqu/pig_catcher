@@ -115,12 +115,15 @@ class FeaturesSection(PluginConfigBase):
     store_enabled: bool = Field(
         default=True,
         description="是否允许查看商城并购买道具或永久升级",
-        json_schema_extra=_ui("允许商城与购买", "对应 /猪猪商城 和 /购买"),
+        json_schema_extra=_ui("允许商城与购买", "对应 /猪猪商城、/购买 和 /升级"),
     )
     selling_enabled: bool = Field(
         default=True,
         description="是否允许按官方价值售卖猪或美食",
-        json_schema_extra=_ui("允许官方售卖", "对应 /售卖猪猪 和 /售卖美食；图鉴不会减少"),
+        json_schema_extra=_ui(
+            "允许官方售卖",
+            "对应 /售卖猪猪、/售卖美食 和 /批量售卖；图鉴不会减少",
+        ),
     )
     ledger_enabled: bool = Field(
         default=True,
@@ -327,11 +330,11 @@ class CatchingSection(PluginConfigBase):
         json_schema_extra=_ui("每日重置时区", "固定按北京时间自然日统计，不依赖服务器时区", disabled=True),
     )
     inventory_page_size: int = Field(
-        default=8,
+        default=12,
         ge=4,
         le=16,
         description="猪猪背包每页显示数量",
-        json_schema_extra=_ui("背包每页数量", "默认 8，只影响展示，不改变资产数据"),
+        json_schema_extra=_ui("背包每页数量", "默认 12，只影响展示，不改变资产数据"),
     )
     catalog_page_size: int = Field(
         default=12,
@@ -436,20 +439,28 @@ class CookingSection(PluginConfigBase):
         default=90,
         frozen=True,
         description="六星猪做出五星菜的固定百分比",
-        json_schema_extra=_ui("六星猪出五星菜", "固定 90%，任何属性和道具都不能改变", disabled=True),
+        json_schema_extra=_ui(
+            "六星猪出五星菜",
+            "基础概率固定 90%；仅一次性高星美食效果可临时调整",
+            disabled=True,
+        ),
     )
     six_star_to_six_percent: Literal[10] = Field(
         default=10,
         frozen=True,
         description="六星猪做出六星菜的固定百分比",
-        json_schema_extra=_ui("六星猪出六星菜", "固定 10%，且不会出现其他品质", disabled=True),
+        json_schema_extra=_ui(
+            "六星猪出六星菜",
+            "基础概率固定 10%，且不会出现其他品质；特定美食可单次提升",
+            disabled=True,
+        ),
     )
     inventory_page_size: int = Field(
-        default=8,
+        default=12,
         ge=4,
         le=16,
         description="美食背包每页显示数量",
-        json_schema_extra=_ui("美食背包每页数量", "默认 8，只影响展示，不改变资产数据"),
+        json_schema_extra=_ui("美食背包每页数量", "默认 12，只影响展示，不改变资产数据"),
     )
     catalog_page_size: int = Field(
         default=12,
@@ -492,11 +503,15 @@ class EconomySection(PluginConfigBase):
         json_schema_extra=_ui("厨具升级价格", "按一级到五级顺序填写五个正整数"),
     )
     store_page_size: int = Field(
-        default=8,
+        default=16,
         ge=4,
         le=16,
-        description="商城每页显示的商品数量",
-        json_schema_extra=_ui("商城每页数量", "默认 8，分类筛选后重新分页"),
+        description="旧版商城分页数量，仅为配置兼容保留",
+        json_schema_extra=_ui(
+            "旧版商城每页数量",
+            "商城现固定单页显示全部商品，此项仅兼容旧配置",
+            disabled=True,
+        ),
     )
     ledger_page_size: int = Field(
         default=10,

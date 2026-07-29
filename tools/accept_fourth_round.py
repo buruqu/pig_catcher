@@ -114,7 +114,7 @@ def inventory_view(rows: Sequence[Mapping[str, object]]) -> FoodInventoryViewMod
         display_name="很长但必须完整显示的第四轮美食收藏验收成员",
         page=1,
         page_count=2,
-        total_count=15,
+        total_count=len(rows),
         rarity=None,
         sort="价值",
         items=tuple(
@@ -130,7 +130,7 @@ def inventory_view(rows: Sequence[Mapping[str, object]]) -> FoodInventoryViewMod
                 is_animated=bool(row["is_animated"]),
                 image_fit=str(row["image_fit"]),
             )
-            for index, row in enumerate(rows[:8])
+            for index, row in enumerate(rows[:12])
         ),
     )
 
@@ -162,20 +162,22 @@ def catalog_view(rows: Sequence[Mapping[str, object]]) -> FoodCatalogViewModel:
 
 def store_view() -> StoreViewModel:
     definitions = (
-        ("幸运猪哨", "抓猪道具", 180, "3 至 5 星相对权重 +12%，6 星 +2%"),
-        ("巨物玉米", "抓猪道具", 140, "体型百分位 +0.12"),
-        ("增膘豆饼", "抓猪道具", 100, "肥瘦率 +15，重量百分位 +0.05"),
-        ("精瘦青饲料", "抓猪道具", 100, "肥瘦率 -15，体型百分位 +0.03"),
-        ("主厨香料", "做菜道具", 180, "做菜品质概率加成"),
-        ("精准刀工券", "做菜道具", 120, "优先偏瘦食谱"),
-        ("慢炖调料包", "做菜道具", 120, "优先偏肥食谱"),
-        ("大份餐盒", "做菜道具", 240, "符合条件时 25% 概率额外出餐"),
+        ("幸运猪哨", "抓猪道具", 180, "下一次抓猪更容易遇到高星猪猪", "/购买 幸运猪哨"),
+        ("巨物玉米", "抓猪道具", 140, "下一次抓猪更容易遇到大体型猪猪", "/购买 巨物玉米"),
+        ("增膘豆饼", "抓猪道具", 100, "下一次抓猪的猪猪更肥、更重", "/购买 增膘豆饼"),
+        ("精瘦青饲料", "抓猪道具", 100, "下一次抓猪的猪猪更精瘦、体型略大", "/购买 精瘦青饲料"),
+        ("主厨香料", "做菜道具", 180, "下一次做菜更容易提升品质", "/购买 主厨香料"),
+        ("精准刀工券", "做菜道具", 120, "下一次做菜优先偏瘦食谱", "/购买 精准刀工券"),
+        ("慢炖调料包", "做菜道具", 120, "下一次做菜优先偏肥食谱", "/购买 慢炖调料包"),
+        ("大份餐盒", "做菜道具", 240, "符合条件时有机会额外出餐", "/购买 大份餐盒"),
+        ("猪饲料升级", "永久升级", 260, "Lv.2 → Lv.3，永久改善高星抓猪权重", "/升级 猪饲料"),
+        ("厨具升级", "永久升级", 520, "Lv.3 → Lv.4，永久改善做菜品质", "/升级 厨具"),
     )
     return StoreViewModel(
         display_name="第四轮商城验收成员",
         coin_balance=16888,
         page=1,
-        page_count=2,
+        page_count=1,
         total_count=10,
         category="全部",
         feed_level=2,
@@ -188,8 +190,9 @@ def store_view() -> StoreViewModel:
                 effect_summary=effect,
                 current_level=0,
                 target_level=0,
+                command=command,
             )
-            for name, category, price, effect in definitions
+            for name, category, price, effect, command in definitions
         ),
     )
 
@@ -409,8 +412,7 @@ async def run(args: argparse.Namespace) -> dict[str, object]:
                 inventory,
                 {
                     str(row["template_id"]): data_dir / str(row["image_relpath"])
-                    for row in rows[:8]
-                    if not bool(row["is_animated"])
+                    for row in rows[:12]
                 },
             ),
         )
@@ -437,7 +439,6 @@ async def run(args: argparse.Namespace) -> dict[str, object]:
                 {
                     str(row["template_id"]): data_dir / str(row["image_relpath"])
                     for row in rows[:10]
-                    if not bool(row["is_animated"])
                 },
             ),
         )

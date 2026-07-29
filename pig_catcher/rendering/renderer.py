@@ -184,7 +184,7 @@ class PigCatcherRenderer:
         view: InventoryViewModel,
         media_paths: Mapping[str, Path],
     ) -> RenderedImage:
-        """Render one inventory page without flattening animated assets."""
+        """Render one inventory page with deterministic animated-media previews."""
 
         media_data_urls = self._list_media_data_urls(
             (
@@ -377,13 +377,38 @@ class PigCatcherRenderer:
     ) -> dict[str, str]:
         result: dict[str, str] = {}
         for key, media_visible, is_animated in items:
-            if not media_visible or is_animated:
+            if not media_visible:
                 continue
             path = media_paths.get(key)
             if path is None or not path.is_file():
                 continue
-            result[key] = self._source_data_url(path)
+            result[key] = (
+                self._animated_preview_data_url(path)
+                if is_animated
+                else self._source_data_url(path)
+            )
         return result
+
+    @staticmethod
+    def _animated_preview_data_url(source_path: Path) -> str:
+        """Extract a deterministic middle frame for compact list renderings."""
+
+        path = Path(source_path)
+        if not path.is_file():
+            raise RenderError(f"动画素材不存在：{path.name}")
+        try:
+            with Image.open(path) as source:
+                frame_count = int(getattr(source, "n_frames", 1))
+                source.seek(max(0, frame_count // 2))
+                frame = source.convert("RGBA")
+                payload = BytesIO()
+                frame.save(payload, format="PNG", optimize=True)
+        except (OSError, EOFError, UnidentifiedImageError, Image.DecompressionBombError) as exc:
+            raise RenderError(f"动画素材无法提取预览帧：{path.name}") from exc
+        return (
+            "data:image/png;base64,"
+            f"{base64.b64encode(payload.getvalue()).decode('ascii')}"
+        )
 
     @staticmethod
     def _source_data_url(source_path: Path) -> str:

@@ -47,12 +47,12 @@ COOK_EXPERIENCE_REWARDS: dict[Rarity, int] = {
 }
 
 EAT_EXPERIENCE_REWARDS: dict[Rarity, int] = {
-    Rarity.ONE: 2,
-    Rarity.TWO: 5,
-    Rarity.THREE: 10,
-    Rarity.FOUR: 22,
-    Rarity.FIVE: 45,
-    Rarity.SIX: 100,
+    Rarity.ONE: 8,
+    Rarity.TWO: 18,
+    Rarity.THREE: 40,
+    Rarity.FOUR: 65,
+    Rarity.FIVE: 110,
+    Rarity.SIX: 200,
 }
 
 UPGRADE_DISPLAY_NAMES: dict[UpgradeType, str] = {

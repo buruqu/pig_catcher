@@ -21,6 +21,7 @@ from pig_catcher.domain.economy import adjusted_cooking_weights
 from pig_catcher.domain.enums import AssetKind
 from pig_catcher.domain.errors import (
     CookingTemplateError,
+    DailyCatchLimitError,
     FoodEffectError,
     InsufficientBalanceError,
 )
@@ -107,6 +108,7 @@ def _food_entry(
     *,
     group_id: str | None = None,
     effect_id: str = "",
+    effect_params: dict[str, object] | None = None,
 ) -> dict[str, object]:
     group_only = group_id is not None
     return {
@@ -124,6 +126,7 @@ def _food_entry(
         "consent_status": "granted" if group_only else "not-required",
         "recipe_tags": ["家常"],
         "effect_id": effect_id,
+        "effect_params": effect_params or {},
     }
 
 
@@ -134,6 +137,7 @@ async def _database_with_catalog(
     food_rarities: tuple[int, ...] = (1, 2, 3),
     group_id: str = "100",
     effect_ids: dict[int, str] | None = None,
+    effect_params: dict[int, dict[str, object]] | None = None,
     extra_entries: tuple[dict[str, object], ...] = (),
 ) -> PigCatcherDatabase:
     source = tmp_path / "source"
@@ -149,6 +153,7 @@ async def _database_with_catalog(
                 rarity,
                 group_id=group_id if rarity == 6 else None,
                 effect_id=(effect_ids or {}).get(rarity, ""),
+                effect_params=(effect_params or {}).get(rarity),
             )
         )
     entries.extend(extra_entries)
@@ -454,12 +459,272 @@ async def test_eating_unknown_effect_does_not_consume_then_blank_effect_is_idemp
     eat_identity = _identity(message_id="eat-blank")
     first = await service.eat(eat_identity, cooked.foods[0].selector)
     duplicate = await service.eat(eat_identity, cooked.foods[0].selector)
-    assert first.base_experience == 2
+    assert first.base_experience == 8
     assert duplicate.receipt_created is False
     state = await database.fetch_one(
         "SELECT state FROM food_instances WHERE food_instance_id = 'food-blank'"
     )
     assert state is not None and state["state"] == "consumed"
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_high_rarity_food_effect_survives_restart_and_is_consumed_once(
+    tmp_path: Path,
+) -> None:
+    database = await _database_with_catalog(
+        tmp_path,
+        pig_rarities=(1, 2, 3, 4, 5),
+        food_rarities=(4,),
+        effect_ids={4: "next-catch-quality"},
+        effect_params={4: {"multiplier": 1.35}},
+    )
+    clock = FixedClock()
+    source_catching = GameplayService(
+        database,
+        CatchingSection(cooldown_seconds=0),
+        random_source=SequenceRandom(0.94, 0.0, 0.5, 0.5, 0.5, 0.5, 0.5),
+        clock=clock,
+        id_factory=iter(("effect-source-pig", "effect-source-ledger")).__next__,
+        short_code_factory=lambda: "E19F2C3D",
+    )
+    source = await source_catching.catch(_identity(message_id="effect-source"))
+    assert source.pig.rarity == 4
+
+    economy = EconomyService(
+        database,
+        CookingSection(),
+        EconomySection(),
+        random_source=SequenceRandom(0.5, 0.0, 0.5),
+        clock=clock,
+        id_factory=iter(
+            ("effect-food", "effect-cook-ledger", "effect-queue-entry")
+        ).__next__,
+        short_code_factory=lambda: "F19F2C3D",
+    )
+    cooked = await economy.cook(
+        _identity(message_id="effect-cook"),
+        source.pig.selector,
+    )
+    eaten = await economy.eat(
+        _identity(message_id="effect-eat"),
+        cooked.foods[0].selector,
+    )
+    assert eaten.effect.queued_effect_id == "next-catch-quality"
+    queued = await database.fetch_one(
+        """
+        SELECT consumed_uses
+        FROM player_food_effects
+        WHERE effect_entry_id = 'effect-queue-entry'
+        """
+    )
+    assert queued is not None and queued["consumed_uses"] == 0
+
+    restarted_catching = GameplayService(
+        database,
+        CatchingSection(cooldown_seconds=0),
+        random_source=SequenceRandom(0.0, 0.0, 0.5, 0.5, 0.5, 0.5, 0.5),
+        clock=clock,
+        id_factory=iter(("effect-next-pig", "effect-next-ledger")).__next__,
+        short_code_factory=lambda: "A29F2C3D",
+    )
+    catch_identity = _identity(message_id="effect-next-catch")
+    boosted = await restarted_catching.catch(catch_identity)
+    duplicate = await restarted_catching.catch(catch_identity)
+    assert boosted.effect_summaries
+    assert duplicate.receipt_created is False
+    consumed = await database.fetch_one(
+        """
+        SELECT consumed_uses
+        FROM player_food_effects
+        WHERE effect_entry_id = 'effect-queue-entry'
+        """
+    )
+    assert consumed is not None and consumed["consumed_uses"] == 1
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_extra_catch_food_extends_today_limit_and_consumes_only_bonus_uses(
+    tmp_path: Path,
+) -> None:
+    database = await _database_with_catalog(
+        tmp_path,
+        pig_rarities=(5,),
+        food_rarities=(5,),
+        effect_ids={5: "extra-catches"},
+        effect_params={5: {"count": 2}},
+    )
+    clock = FixedClock()
+    source_catching = GameplayService(
+        database,
+        CatchingSection(daily_limit=1, cooldown_seconds=0),
+        random_source=SequenceRandom(0.0, 0.0, 0.5, 0.5, 0.5, 0.5, 0.5),
+        clock=clock,
+        id_factory=iter(("quota-source-pig", "quota-source-ledger")).__next__,
+        short_code_factory=lambda: "B29F2C3D",
+    )
+    source = await source_catching.catch(_identity(message_id="quota-source"))
+    economy = EconomyService(
+        database,
+        CookingSection(),
+        EconomySection(),
+        random_source=SequenceRandom(0.5, 0.0, 0.5),
+        clock=clock,
+        id_factory=iter(
+            ("quota-food", "quota-cook-ledger", "quota-effect")
+        ).__next__,
+        short_code_factory=lambda: "C29F2C3D",
+    )
+    cooked = await economy.cook(
+        _identity(message_id="quota-cook"),
+        source.pig.selector,
+    )
+    await economy.eat(
+        _identity(message_id="quota-eat"),
+        cooked.foods[0].selector,
+    )
+
+    values = (
+        0.0,
+        0.0,
+        0.5,
+        0.5,
+        0.5,
+        0.5,
+        0.5,
+    ) * 2
+    bonus_catching = GameplayService(
+        database,
+        CatchingSection(daily_limit=1, cooldown_seconds=0),
+        random_source=SequenceRandom(*values),
+        clock=clock,
+        id_factory=iter(
+            (
+                "quota-bonus-pig-1",
+                "quota-bonus-ledger-1",
+                "quota-bonus-pig-2",
+                "quota-bonus-ledger-2",
+            )
+        ).__next__,
+        short_code_factory=iter(("D29F2C3D", "E29F2C3D")).__next__,
+    )
+    first = await bonus_catching.catch(_identity(message_id="quota-bonus-1"))
+    second = await bonus_catching.catch(_identity(message_id="quota-bonus-2"))
+    assert (first.daily_count, first.daily_limit) == (2, 3)
+    assert (second.daily_count, second.daily_limit) == (3, 3)
+    with pytest.raises(DailyCatchLimitError):
+        await bonus_catching.catch(_identity(message_id="quota-bonus-3"))
+    effect = await database.fetch_one(
+        """
+        SELECT granted_uses, consumed_uses
+        FROM player_food_effects
+        WHERE effect_entry_id = 'quota-effect'
+        """
+    )
+    assert effect is not None
+    assert (effect["granted_uses"], effect["consumed_uses"]) == (2, 2)
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_empty_selector_sells_cheapest_low_star_then_batch_sells_rest_once(
+    tmp_path: Path,
+) -> None:
+    database = await _database_with_catalog(
+        tmp_path,
+        pig_rarities=(1,),
+        food_rarities=(1,),
+    )
+    clock = FixedClock()
+    rolls = (
+        0.0,
+        0.0,
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.0,
+        0.0,
+        0.5,
+        0.5,
+        0.5,
+        0.5,
+        0.5,
+        0.0,
+        0.0,
+        0.9,
+        0.9,
+        0.9,
+        0.9,
+        0.9,
+    )
+    catching = GameplayService(
+        database,
+        CatchingSection(cooldown_seconds=0),
+        random_source=SequenceRandom(*rolls),
+        clock=clock,
+        id_factory=iter(
+            (
+                "cheap-pig-1",
+                "cheap-ledger-1",
+                "cheap-pig-2",
+                "cheap-ledger-2",
+                "cheap-pig-3",
+                "cheap-ledger-3",
+            )
+        ).__next__,
+        short_code_factory=iter(
+            ("F29F2C3D", "A39F2C3D", "B39F2C3D")
+        ).__next__,
+    )
+    for index in range(3):
+        await catching.catch(_identity(message_id=f"cheap-catch-{index}"))
+    cheapest = await database.fetch_one(
+        """
+        SELECT pig_instance_id
+        FROM pig_instances
+        WHERE owner_player_id = 'qq:100:200' AND state = 'active'
+        ORDER BY official_value, acquired_at, pig_instance_id
+        LIMIT 1
+        """
+    )
+    assert cheapest is not None
+
+    economy = EconomyService(
+        database,
+        CookingSection(),
+        EconomySection(),
+        clock=clock,
+        id_factory=iter(("cheap-sale-ledger", "batch-sale-ledger")).__next__,
+    )
+    sold = await economy.sell_pig(
+        _identity(message_id="cheap-auto-sale"),
+        "",
+    )
+    assert sold.pig is not None
+    assert sold.pig.pig_instance_id == cheapest["pig_instance_id"]
+
+    batch_identity = _identity(message_id="cheap-batch-sale")
+    batch = await economy.batch_sell_low_rarity(
+        batch_identity,
+        asset_kind="pig",
+    )
+    duplicate = await economy.batch_sell_low_rarity(
+        batch_identity,
+        asset_kind="pig",
+    )
+    assert batch.asset_count == 2
+    assert duplicate.receipt_created is False
+    active = await database.fetch_one(
+        """
+        SELECT COUNT(*) AS asset_count
+        FROM pig_instances
+        WHERE owner_player_id = 'qq:100:200' AND state = 'active'
+        """
+    )
+    assert active is not None and active["asset_count"] == 0
     await database.close()
 
 
@@ -482,7 +747,7 @@ async def test_store_purchase_upgrade_insufficient_balance_and_ledger(
     )
     store = await service.store(seed_identity, page=1, category="全部")
     assert store.coin_balance == 1000
-    assert len(store.products) == 8
+    assert len(store.products) == 10
 
     item_identity = _identity(message_id="buy-item")
     item = await service.purchase(item_identity, "幸运猪哨", quantity=2)
@@ -490,18 +755,16 @@ async def test_store_purchase_upgrade_insufficient_balance_and_ledger(
     assert item.inventory_quantity == 2
     assert (await service.purchase(item_identity, "幸运猪哨", quantity=2)).receipt_created is False
 
-    upgrade = await service.purchase(
+    upgrade = await service.upgrade(
         _identity(message_id="buy-upgrade"),
-        "厨具升级",
-        quantity=1,
+        "厨具",
     )
     assert upgrade.upgrade_level == 1
     assert upgrade.balance_after == 140
     with pytest.raises(InsufficientBalanceError):
-        await service.purchase(
+        await service.upgrade(
             _identity(message_id="buy-too-expensive"),
-            "猪饲料升级",
-            quantity=1,
+            "猪饲料",
         )
     inventory = await database.fetch_one(
         "SELECT quantity FROM item_inventory WHERE player_id = ? AND item_id = 'lucky-whistle'",

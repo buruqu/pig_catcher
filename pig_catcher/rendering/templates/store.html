@@ -35,8 +35,8 @@
         <strong>Lv.{{ view.cookware_level }}</strong>
       </div>
       <div>
-        <span>页面</span>
-        <strong>{{ view.page }}/{{ view.page_count }}</strong>
+        <span>展示</span>
+        <strong>全部 {{ view.total_count }} 项</strong>
       </div>
     </section>
 
@@ -48,6 +48,7 @@
           <span>{{ product.category }}</span>
           <h2 style="font-size: {% if product.display_name|length > 40 %}17{% elif product.display_name|length > 24 %}22{% else %}27{% endif %}px">{{ product.display_name }}</h2>
           <p>{{ product.effect_summary }}</p>
+          <p style="color:#9b516d;font-weight:800">{{ product.command }}</p>
         </div>
         <div class="store-row__price">
           {% if product.unit_price > 0 %}
@@ -66,7 +67,7 @@
     {% endif %}
 
     <footer class="game-footer">
-      <span>购买示例：/购买 幸运猪哨 2</span>
+      <span>消耗品用 /购买；永久成长用 /升级</span>
       <strong>共 {{ view.total_count }} 项</strong>
     </footer>
   </main>

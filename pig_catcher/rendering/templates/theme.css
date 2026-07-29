@@ -1051,6 +1051,14 @@ footer strong {
   font-weight: 700;
 }
 
+.catalog-item__effect {
+  margin-top: 6px;
+  color: #9a526e;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
 .records-list {
   padding: 22px 38px 28px;
 }

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import isqrt
 
 from .enums import FatProfile, Rarity
 from .errors import DomainValidationError
@@ -52,6 +53,8 @@ LEVEL_THRESHOLDS: tuple[tuple[str, int], ...] = (
     ("抓群友", 20000),
 )
 
+LEVEL_EXPERIENCE_FACTOR = 50
+
 
 @dataclass(frozen=True, slots=True)
 class ItemDefinition:
@@ -65,11 +68,11 @@ class ItemDefinition:
 
 
 ITEM_DEFINITIONS: tuple[ItemDefinition, ...] = (
-    ItemDefinition("lucky-whistle", "幸运猪哨", "catching", 180, "3 至 5 星相对权重 +12%，6 星 +2%"),
-    ItemDefinition("giant-corn", "巨物玉米", "catching", 140, "体型百分位 +0.12"),
-    ItemDefinition("fattening-bean-cake", "增膘豆饼", "catching", 100, "肥瘦率 +15，重量百分位 +0.05"),
-    ItemDefinition("lean-green-feed", "精瘦青饲料", "catching", 100, "肥瘦率 -15，体型百分位 +0.03"),
-    ItemDefinition("chef-spice", "主厨香料", "cooking", 180, "做菜品质概率加成"),
+    ItemDefinition("lucky-whistle", "幸运猪哨", "catching", 180, "下一次抓猪更容易遇到高星猪猪"),
+    ItemDefinition("giant-corn", "巨物玉米", "catching", 140, "下一次抓猪更容易遇到大体型猪猪"),
+    ItemDefinition("fattening-bean-cake", "增膘豆饼", "catching", 100, "下一次抓猪的猪猪更肥、更重"),
+    ItemDefinition("lean-green-feed", "精瘦青饲料", "catching", 100, "下一次抓猪的猪猪更精瘦、体型略大"),
+    ItemDefinition("chef-spice", "主厨香料", "cooking", 180, "下一次做菜更容易提升品质"),
     ItemDefinition("precision-knife", "精准刀工券", "cooking", 120, "优先偏瘦食谱"),
     ItemDefinition("slow-cook-seasoning", "慢炖调料包", "cooking", 120, "优先偏肥食谱"),
     ItemDefinition("large-lunch-box", "大份餐盒", "cooking", 240, "符合条件时可能额外出餐"),
@@ -101,7 +104,7 @@ class PigAttributes:
 
 @dataclass(frozen=True, slots=True)
 class LevelProgress:
-    """累计经验对应的六阶段称号与下一阶段进度。"""
+    """累计经验对应的数值等级、荣誉称号与下一等级进度。"""
 
     level: int
     title: str
@@ -160,6 +163,7 @@ def generate_pig_attributes(
     fat_profile: FatProfile | str,
     random_values: tuple[float, float, float, float, float],
     item_id: str = "",
+    stature_bias: float = 0.0,
 ) -> PigAttributes:
     """用中心更常见的相关分布生成体型、重量、肥瘦率和价值。"""
 
@@ -185,6 +189,11 @@ def generate_pig_attributes(
         FatProfile.FATTY: (45.0, 95.0),
     }[resolved_profile]
     fat_ratio = profile_range[0] + (profile_range[1] - profile_range[0]) * fifth
+    bias = float(stature_bias)
+    if not -0.35 <= bias <= 0.35:
+        raise DomainValidationError("体型效果偏移必须位于 -0.35 至 0.35。")
+    size_percentile = _clamp(size_percentile + bias, 0.0, 1.0)
+    weight_percentile = _clamp(weight_percentile + bias * 0.65, 0.0, 1.0)
 
     if item_id:
         item = item_by_id(item_id)
@@ -215,26 +224,54 @@ def generate_pig_attributes(
 
 
 def level_progress(experience: int) -> LevelProgress:
-    """把非负累计经验映射到固定六阶段称号。"""
+    """把经验映射到无概率加成的数值等级与独立荣誉称号。"""
 
     normalized = int(experience)
     if normalized < 0:
         raise DomainValidationError("累计经验不能为负数。")
-    selected_index = 0
+    title_index = 0
     for index, (_, threshold) in enumerate(LEVEL_THRESHOLDS):
         if normalized < threshold:
             break
-        selected_index = index
-    title, threshold = LEVEL_THRESHOLDS[selected_index]
-    next_threshold = (
-        LEVEL_THRESHOLDS[selected_index + 1][1]
-        if selected_index + 1 < len(LEVEL_THRESHOLDS)
-        else None
-    )
+        title_index = index
+    title = LEVEL_THRESHOLDS[title_index][0]
+    level = isqrt(normalized // LEVEL_EXPERIENCE_FACTOR) + 1
+    threshold = LEVEL_EXPERIENCE_FACTOR * (level - 1) ** 2
+    next_threshold = LEVEL_EXPERIENCE_FACTOR * level**2
     return LevelProgress(
-        level=selected_index + 1,
+        level=level,
         title=title,
         experience=normalized,
         current_threshold=threshold,
         next_threshold=next_threshold,
     )
+
+
+def size_label(percentile: float) -> str:
+    """Describe a size percentile without exposing implementation-oriented numbers."""
+
+    value = float(percentile)
+    if value < 0.12:
+        return "迷你个体"
+    if value < 0.32:
+        return "小巧"
+    if value < 0.72:
+        return "标准体型"
+    if value < 0.90:
+        return "壮硕"
+    return "超大个体"
+
+
+def weight_label(percentile: float) -> str:
+    """Describe a weight percentile in player-facing language."""
+
+    value = float(percentile)
+    if value < 0.15:
+        return "轻盈"
+    if value < 0.35:
+        return "偏轻"
+    if value < 0.72:
+        return "匀称"
+    if value < 0.90:
+        return "厚实"
+    return "重量级"

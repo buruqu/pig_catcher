@@ -17,6 +17,8 @@ from ..domain.enums import (
     StatureProfile,
     TemplateScope,
 )
+from ..domain.errors import FoodEffectError
+from ..domain.food_effects import SUPPORTED_EFFECT_IDS, resolve_food_effect
 from ..domain.models import ScopeKey
 from ..version import ASSET_MANIFEST_VERSION
 
@@ -67,6 +69,10 @@ class AssetManifestEntry(BaseModel):
     stature_profile: StatureProfile | None = None
     recipe_tags: list[str] = Field(default_factory=list, max_length=20)
     effect_id: str = Field(default="", max_length=80)
+    effect_params: dict[str, str | int | float | bool] = Field(
+        default_factory=dict,
+        max_length=20,
+    )
     collection: CollectionMetadata | None = None
 
     @field_validator("image")
@@ -125,6 +131,8 @@ class AssetManifestEntry(BaseModel):
                 raise ValueError("猪素材最大体型不能小于最小体型")
             if float(self.weight_max_kg) < float(self.weight_min_kg):
                 raise ValueError("猪素材最大重量不能小于最小重量")
+            if self.effect_id or self.effect_params:
+                raise ValueError("猪素材不能声明美食效果")
         elif any(
             value is not None
             for value in (
@@ -139,6 +147,14 @@ class AssetManifestEntry(BaseModel):
             raise ValueError("美食素材不能填写猪的体型、重量、肥瘦或体格画像")
         if self.kind is AssetKind.FOOD and self.collection is not None:
             raise ValueError("美食素材不能加入猪猪联动收藏系列")
+        if self.kind is AssetKind.FOOD:
+            if self.effect_params and not self.effect_id:
+                raise ValueError("美食填写 effect_params 时必须同时填写 effect_id")
+            if self.effect_id in SUPPORTED_EFFECT_IDS:
+                try:
+                    resolve_food_effect(self.effect_id, self.effect_params)
+                except FoodEffectError as exc:
+                    raise ValueError(str(exc)) from exc
         return self
 
 
@@ -147,7 +163,7 @@ class AssetManifest(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True, str_strip_whitespace=True)
 
-    manifest_version: Literal[1, 2] = ASSET_MANIFEST_VERSION
+    manifest_version: Literal[1, 2, 3] = ASSET_MANIFEST_VERSION
     catalog_id: str = Field(pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$", min_length=2, max_length=80)
     source_label: str = Field(min_length=1, max_length=200)
     entries: list[AssetManifestEntry] = Field(min_length=1, max_length=5000)

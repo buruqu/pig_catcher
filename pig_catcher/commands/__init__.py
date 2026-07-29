@@ -8,6 +8,7 @@ from .context import (
 )
 from .help import format_help
 from .parsers import (
+    BatchSaleQuery,
     CatalogQuery,
     GiftQuery,
     InventoryQuery,
@@ -18,6 +19,7 @@ from .parsers import (
     TradeListQuery,
     TradeOfferQuery,
     parse_action_type,
+    parse_batch_sale_query,
     parse_catalog_query,
     parse_food_inventory_query,
     parse_gift_query,
@@ -31,9 +33,11 @@ from .parsers import (
     parse_trade_id,
     parse_trade_list_query,
     parse_trade_offer_query,
+    parse_upgrade_name,
 )
 
 __all__ = [
+    "BatchSaleQuery",
     "CatalogQuery",
     "GiftQuery",
     "InventoryQuery",
@@ -49,6 +53,7 @@ __all__ = [
     "matched_group",
     "MentionTarget",
     "parse_action_type",
+    "parse_batch_sale_query",
     "parse_catalog_query",
     "parse_food_inventory_query",
     "parse_gift_query",
@@ -62,4 +67,5 @@ __all__ = [
     "parse_trade_id",
     "parse_trade_list_query",
     "parse_trade_offer_query",
+    "parse_upgrade_name",
 ]

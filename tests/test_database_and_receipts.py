@@ -44,6 +44,7 @@ async def test_empty_database_migrates_and_passes_integrity_check(tmp_path: Path
         "food_templates",
         "command_receipts",
         "currency_ledger",
+        "player_food_effects",
         "trade_offers",
     } <= names
     await database.close()
@@ -86,6 +87,14 @@ async def test_existing_v1_database_migrates_media_and_collection_columns(
         "collection_id",
         "character_name",
     } <= names
+    effect_table = await database.fetch_one(
+        """
+        SELECT name
+        FROM sqlite_master
+        WHERE type = 'table' AND name = 'player_food_effects'
+        """
+    )
+    assert effect_table is not None
     await database.close()
 
 

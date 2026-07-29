@@ -251,7 +251,7 @@ async def run(args: argparse.Namespace) -> dict[str, object]:
             "food catalog",
             plugin.handle_food_catalog(
                 stream_id=f"uat-round4-{args.authorized_group}",
-                **command_kwargs(query, arguments="1"),
+                **command_kwargs(query, arguments=""),
             ),
         )
         await invoke(
@@ -270,6 +270,60 @@ async def run(args: argparse.Namespace) -> dict[str, object]:
                 ),
             ),
         )
+        plugin.gameplay_service.random_source = FixedRandom(
+            [0.999999, 0.0, 0.5, 0.5, 0.5, 0.5, 0.5]
+        )
+        await invoke(
+            records,
+            collector,
+            "catch six for queued food effect",
+            plugin.handle_catch(
+                stream_id=f"uat-round4-{args.authorized_group}",
+                **command_kwargs(
+                    message(
+                        group_id=args.authorized_group,
+                        user_id=authorized_user,
+                        message_id="round4-effect-catch-six",
+                    )
+                ),
+            ),
+        )
+        effect_source_selector, effect_source_rarity = await active_selector(
+            plugin,
+            table="pig_instances",
+            player_id=authorized_player,
+        )
+        if effect_source_rarity != 6:
+            raise AssertionError("Queued six-star food effect has no compatible source.")
+        plugin.economy_service.random_source = FixedRandom([0.999999, 0.0, 0.5])
+        await invoke(
+            records,
+            collector,
+            "consume queued six-star food effect",
+            plugin.handle_cook(
+                stream_id=f"uat-round4-{args.authorized_group}",
+                **command_kwargs(
+                    message(
+                        group_id=args.authorized_group,
+                        user_id=authorized_user,
+                        message_id="round4-effect-cook-six",
+                    ),
+                    selector=effect_source_selector,
+                ),
+            ),
+        )
+        consumed_effect = await plugin.database.fetch_one(
+            """
+            SELECT consumed_uses
+            FROM player_food_effects
+            WHERE player_id = ? AND effect_id = 'next-six-star-cook'
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            (authorized_player,),
+        )
+        if consumed_effect is None or int(consumed_effect["consumed_uses"]) != 1:
+            raise AssertionError("Queued six-star food effect was not consumed once.")
 
         await seed_coins(
             plugin,
@@ -283,7 +337,7 @@ async def run(args: argparse.Namespace) -> dict[str, object]:
             "store",
             plugin.handle_store(
                 stream_id=f"uat-round4-{args.authorized_group}",
-                **command_kwargs(query, arguments="1 分类=全部"),
+                **command_kwargs(query, arguments=""),
             ),
         )
         purchase_message = message(
@@ -309,6 +363,22 @@ async def run(args: argparse.Namespace) -> dict[str, object]:
                 **command_kwargs(purchase_message, arguments="幸运猪哨 2"),
             ),
             expected_new_deliveries=0,
+        )
+        await invoke(
+            records,
+            collector,
+            "upgrade feed",
+            plugin.handle_upgrade(
+                stream_id=f"uat-round4-{args.authorized_group}",
+                **command_kwargs(
+                    message(
+                        group_id=args.authorized_group,
+                        user_id=authorized_user,
+                        message_id="round4-upgrade-feed",
+                    ),
+                    arguments="猪饲料",
+                ),
+            ),
         )
         await invoke(
             records,
@@ -427,6 +497,160 @@ async def run(args: argparse.Namespace) -> dict[str, object]:
                         message_id="round4-sell-food",
                     ),
                     selector=sale_food_selector,
+                ),
+            ),
+        )
+
+        async def catch_low(label: str, message_id: str) -> None:
+            plugin.gameplay_service.random_source = FixedRandom(
+                [0.0, 0.0, 0.25, 0.25, 0.25, 0.25, 0.25]
+            )
+            await invoke(
+                records,
+                collector,
+                label,
+                plugin.handle_catch(
+                    stream_id=f"uat-round4-{args.authorized_group}",
+                    **command_kwargs(
+                        message(
+                            group_id=args.authorized_group,
+                            user_id=authorized_user,
+                            message_id=message_id,
+                        )
+                    ),
+                ),
+            )
+
+        await catch_low("catch low for auto cook", "round4-auto-cook-source")
+        await catch_low("catch low for auto sale", "round4-auto-sale-source")
+        plugin.economy_service.random_source = FixedRandom([0.0, 0.0, 0.5])
+        await invoke(
+            records,
+            collector,
+            "auto cook cheapest low pig",
+            plugin.handle_cook(
+                stream_id=f"uat-round4-{args.authorized_group}",
+                **command_kwargs(
+                    message(
+                        group_id=args.authorized_group,
+                        user_id=authorized_user,
+                        message_id="round4-auto-cook",
+                    )
+                ),
+            ),
+        )
+        await invoke(
+            records,
+            collector,
+            "auto sell cheapest low food",
+            plugin.handle_sell_food(
+                stream_id=f"uat-round4-{args.authorized_group}",
+                **command_kwargs(
+                    message(
+                        group_id=args.authorized_group,
+                        user_id=authorized_user,
+                        message_id="round4-auto-sell-food",
+                    )
+                ),
+            ),
+        )
+        await invoke(
+            records,
+            collector,
+            "auto sell cheapest low pig",
+            plugin.handle_sell_pig(
+                stream_id=f"uat-round4-{args.authorized_group}",
+                **command_kwargs(
+                    message(
+                        group_id=args.authorized_group,
+                        user_id=authorized_user,
+                        message_id="round4-auto-sell-pig",
+                    )
+                ),
+            ),
+        )
+
+        await catch_low("catch low pig batch one", "round4-batch-pig-1")
+        await catch_low("catch low pig batch two", "round4-batch-pig-2")
+        await invoke(
+            records,
+            collector,
+            "batch sell low pigs",
+            plugin.handle_batch_sell(
+                stream_id=f"uat-round4-{args.authorized_group}",
+                **command_kwargs(
+                    message(
+                        group_id=args.authorized_group,
+                        user_id=authorized_user,
+                        message_id="round4-batch-sell-pigs",
+                    ),
+                    arguments="猪猪",
+                ),
+            ),
+        )
+
+        await catch_low("catch low food source one", "round4-batch-food-source-1")
+        plugin.economy_service.random_source = FixedRandom([0.0, 0.0, 0.5])
+        await invoke(
+            records,
+            collector,
+            "auto cook low food one",
+            plugin.handle_cook(
+                stream_id=f"uat-round4-{args.authorized_group}",
+                **command_kwargs(
+                    message(
+                        group_id=args.authorized_group,
+                        user_id=authorized_user,
+                        message_id="round4-batch-cook-food-1",
+                    )
+                ),
+            ),
+        )
+        await catch_low("catch low food source two", "round4-batch-food-source-2")
+        plugin.economy_service.random_source = FixedRandom([0.0, 0.0, 0.5])
+        await invoke(
+            records,
+            collector,
+            "auto cook low food two",
+            plugin.handle_cook(
+                stream_id=f"uat-round4-{args.authorized_group}",
+                **command_kwargs(
+                    message(
+                        group_id=args.authorized_group,
+                        user_id=authorized_user,
+                        message_id="round4-batch-cook-food-2",
+                    )
+                ),
+            ),
+        )
+        await invoke(
+            records,
+            collector,
+            "auto eat cheapest low food",
+            plugin.handle_eat(
+                stream_id=f"uat-round4-{args.authorized_group}",
+                **command_kwargs(
+                    message(
+                        group_id=args.authorized_group,
+                        user_id=authorized_user,
+                        message_id="round4-auto-eat-food",
+                    )
+                ),
+            ),
+        )
+        await invoke(
+            records,
+            collector,
+            "batch sell low foods",
+            plugin.handle_batch_sell(
+                stream_id=f"uat-round4-{args.authorized_group}",
+                **command_kwargs(
+                    message(
+                        group_id=args.authorized_group,
+                        user_id=authorized_user,
+                        message_id="round4-batch-sell-foods",
+                    ),
+                    arguments="美食",
                 ),
             ),
         )

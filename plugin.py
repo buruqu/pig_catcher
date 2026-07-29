@@ -17,6 +17,7 @@ from .pig_catcher.commands import (
     format_help,
     matched_group,
     parse_action_type,
+    parse_batch_sale_query,
     parse_catalog_query,
     parse_food_inventory_query,
     parse_gift_query,
@@ -30,6 +31,7 @@ from .pig_catcher.commands import (
     parse_trade_id,
     parse_trade_list_query,
     parse_trade_offer_query,
+    parse_upgrade_name,
 )
 from .pig_catcher.config import AccessPolicy, PigCatcherConfig
 from .pig_catcher.domain.enums import AssetKind
@@ -46,6 +48,7 @@ from .pig_catcher.rendering import (
     RenderDelivery,
     RenderedImage,
     RenderOptions,
+    batch_sale_receipt_view,
     catalog_media_paths,
     catalog_view,
     eat_receipt_view,
@@ -86,6 +89,7 @@ from .pig_catcher.services import (
     PigView,
     ReceiptService,
     SocialService,
+    format_batch_sale_summary,
     format_catalog_summary,
     format_catch_summary,
     format_cooking_summary,
@@ -1155,7 +1159,7 @@ class PigCatcherPlugin(MaiBotPlugin):
 
     @Command(
         "pig_catcher_purchase",
-        description="购买商城中的道具或永久升级",
+        description="购买商城中的消耗品",
         pattern=r"^/购买(?:\s+(?P<arguments>.*?))?\s*$",
     )
     async def handle_purchase(
@@ -1193,6 +1197,48 @@ class PigCatcherPlugin(MaiBotPlugin):
             return await self._command_error(
                 stream_id=identity.stream_id,
                 operation="购买",
+                error=exc,
+            )
+
+    @Command(
+        "pig_catcher_upgrade",
+        description="升级永久猪饲料或厨具",
+        pattern=r"^/升级(?:\s+(?P<arguments>.*?))?\s*$",
+    )
+    async def handle_upgrade(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_command(
+            stream_id,
+            kwargs,
+            feature_enabled=self.settings.features.store_enabled,
+            feature_label="永久升级",
+        )
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            upgrade_name = parse_upgrade_name(matched_group(kwargs, "arguments"))
+            result = await cast(EconomyService, self._economy_service).upgrade(
+                identity,
+                upgrade_name,
+            )
+            renderer = cast(PigCatcherRenderer, self._renderer)
+            view = purchase_receipt_view(result)
+            fallback = result.receipt.text_summary or format_purchase_summary(
+                result
+            )
+            return await self._deliver_receipt(
+                stream_id=identity.stream_id,
+                receipt=result.receipt,
+                render=lambda: renderer.render_economy_receipt(view),
+                fallback_text=fallback,
+            )
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation="升级",
                 error=exc,
             )
 
@@ -1271,6 +1317,52 @@ class PigCatcherPlugin(MaiBotPlugin):
             return await self._command_error(
                 stream_id=identity.stream_id,
                 operation="售卖美食",
+                error=exc,
+            )
+
+    @Command(
+        "pig_catcher_batch_sell",
+        description="批量售卖全部一至三星猪猪或美食",
+        pattern=r"^/批量售卖(?:\s+(?P<arguments>.*?))?\s*$",
+    )
+    async def handle_batch_sell(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_command(
+            stream_id,
+            kwargs,
+            feature_enabled=self.settings.features.selling_enabled,
+            feature_label="批量售卖",
+        )
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            query = parse_batch_sale_query(matched_group(kwargs, "arguments"))
+            result = await cast(
+                EconomyService,
+                self._economy_service,
+            ).batch_sell_low_rarity(
+                identity,
+                asset_kind=query.asset_kind.value,
+                max_rarity=3,
+            )
+            renderer = cast(PigCatcherRenderer, self._renderer)
+            view = batch_sale_receipt_view(result)
+            fallback = result.receipt.text_summary or format_batch_sale_summary(
+                result
+            )
+            return await self._deliver_receipt(
+                stream_id=identity.stream_id,
+                receipt=result.receipt,
+                render=lambda: renderer.render_economy_receipt(view),
+                fallback_text=fallback,
+            )
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation="批量售卖",
                 error=exc,
             )
 

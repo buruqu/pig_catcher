@@ -8,15 +8,28 @@ import pytest
 from pydantic import ValidationError
 
 from pig_catcher.commands.help import format_help
-from pig_catcher.commands.parsers import parse_catalog_query
+from pig_catcher.commands.parsers import (
+    parse_batch_sale_query,
+    parse_catalog_query,
+    parse_store_query,
+    parse_upgrade_name,
+)
 from pig_catcher.config import AccessPolicy, PigCatcherConfig
 from pig_catcher.domain.enums import Rarity
 from pig_catcher.domain.errors import (
     DomainValidationError,
+    FoodEffectError,
     MissingMessageIdError,
     ScopeValidationError,
     SelectorValidationError,
 )
+from pig_catcher.domain.food_effects import (
+    ActiveFoodEffect,
+    apply_catch_effects,
+    apply_cooking_effects,
+    resolve_food_effect,
+)
+from pig_catcher.domain.gameplay import level_progress, size_label, weight_label
 from pig_catcher.domain.models import CommandIdentity, ScopeKey
 from pig_catcher.domain.ports import MessageKeyFactory
 from pig_catcher.domain.rules import (
@@ -54,6 +67,17 @@ def test_catalog_query_has_filters_but_no_page_number() -> None:
     assert parse_catalog_query("品质=未收集").undiscovered_only is True
     with pytest.raises(DomainValidationError, match="不需要填写页码"):
         parse_catalog_query("2")
+
+
+def test_store_upgrade_and_batch_sale_parsers_match_new_commands() -> None:
+    assert parse_store_query("").page == 1
+    assert parse_store_query("分类=做菜").category == "做菜"
+    with pytest.raises(DomainValidationError, match="单页"):
+        parse_store_query("2")
+    assert parse_upgrade_name("饲料") == "猪饲料"
+    assert parse_upgrade_name("厨具升级") == "厨具"
+    assert parse_batch_sale_query("猪猪").asset_kind.value == "pig"
+    assert parse_batch_sale_query("美食").asset_kind.value == "food"
 
 
 @pytest.mark.parametrize("value", ["#A19F2C3D", "猪#BAD", "猪#A19F2C3G"])
@@ -99,6 +123,100 @@ def test_feed_and_lucky_item_improve_high_rarity_share() -> None:
 def test_six_star_cooking_rule_is_fixed() -> None:
     assert cooking_weights(Rarity.SIX) == (0.0, 0.0, 0.0, 0.0, 90.0, 10.0)
     assert all(weights[5] == 0 for rarity, weights in ((r, cooking_weights(r)) for r in range(1, 6)))
+
+
+def test_food_effects_are_one_shot_explicit_probability_adjustments() -> None:
+    catch_effect = ActiveFoodEffect(
+        effect_entry_id="catch-effect",
+        effect_id="next-catch-quality",
+        params={"multiplier": 1.35},
+        granted_uses=1,
+        consumed_uses=0,
+        expires_at="",
+        created_at="2026-07-29T00:00:00.000Z",
+    )
+    catch_application = apply_catch_effects(BASE_CATCH_WEIGHTS, [catch_effect])
+    assert sum(catch_application.weights[3:]) > sum(BASE_CATCH_WEIGHTS[3:])
+    assert catch_application.consumed_entry_ids == ("catch-effect",)
+
+    cook_effect = ActiveFoodEffect(
+        effect_entry_id="six-star-effect",
+        effect_id="next-six-star-cook",
+        params={"six_star_percent": 20},
+        granted_uses=1,
+        consumed_uses=0,
+        expires_at="",
+        created_at="2026-07-29T00:00:00.000Z",
+    )
+    cook_application = apply_cooking_effects(
+        cooking_weights(6),
+        [cook_effect],
+        source_rarity=6,
+    )
+    assert cook_application.weights == (0.0, 0.0, 0.0, 0.0, 80.0, 20.0)
+    assert cook_application.consumed_entry_ids == ("six-star-effect",)
+
+
+def test_cooking_effects_wait_for_a_compatible_source_rarity() -> None:
+    regular = ActiveFoodEffect(
+        effect_entry_id="regular-effect",
+        effect_id="next-cook-quality",
+        params={"shift_percent": 8},
+        granted_uses=1,
+        consumed_uses=0,
+        expires_at="",
+        created_at="2026-07-29T00:00:00.000Z",
+    )
+    custom = ActiveFoodEffect(
+        effect_entry_id="custom-effect",
+        effect_id="next-six-star-cook",
+        params={"six_star_percent": 20},
+        granted_uses=1,
+        consumed_uses=0,
+        expires_at="",
+        created_at="2026-07-29T00:00:01.000Z",
+    )
+    six_star = apply_cooking_effects(
+        cooking_weights(6),
+        [regular, custom],
+        source_rarity=6,
+    )
+    assert six_star.weights == (0.0, 0.0, 0.0, 0.0, 80.0, 20.0)
+    assert six_star.consumed_entry_ids == ("custom-effect",)
+
+    regular_source = apply_cooking_effects(
+        cooking_weights(3),
+        [regular, custom],
+        source_rarity=3,
+    )
+    assert regular_source.consumed_entry_ids == ("regular-effect",)
+    assert regular_source.weights[2] > cooking_weights(3)[2]
+
+
+def test_food_rarity_effect_cannot_bypass_six_star_cooking_rule() -> None:
+    with pytest.raises(FoodEffectError):
+        resolve_food_effect(
+            "next-food-rarity",
+            {"rarity": 6, "multiplier": 1.5},
+        )
+
+
+def test_numeric_level_and_honor_title_are_separate_cosmetic_progress() -> None:
+    assert level_progress(0).level == 1
+    assert level_progress(50).level == 2
+    assert level_progress(200).level == 3
+    assert level_progress(50).title == "被猪拱"
+    assert level_progress(100).title == "抓猪萌新"
+    assert level_progress(200).next_threshold == 450
+    huge_level = 10**100
+    assert level_progress(50 * huge_level**2).level == huge_level + 1
+
+
+def test_pig_attribute_labels_are_plain_language() -> None:
+    assert size_label(0.05) == "迷你个体"
+    assert size_label(0.95) == "超大个体"
+    assert weight_label(0.05) == "轻盈"
+    assert weight_label(0.95) == "重量级"
 
 
 def test_choose_rarity_uses_left_closed_intervals() -> None:
@@ -169,7 +287,9 @@ def test_config_rejects_unsafe_paths_and_css_controls() -> None:
 
 def test_help_is_copyable_text_and_marks_fifth_round_open() -> None:
     text = format_help("做菜")
-    assert "/做菜 <猪名#短编号>" in text
+    assert "/做菜 [猪名#短编号]" in text
+    assert "/升级 <猪饲料|厨具>" in format_help("商城")
+    assert "/批量售卖 <猪猪|美食>" in format_help("商城")
     assert "粉红小香猪#A19F2C3D" in text
     assert "【做菜指令】" in text
     assert "做菜指令·尚未开放" not in text

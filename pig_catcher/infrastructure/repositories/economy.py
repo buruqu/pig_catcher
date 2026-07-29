@@ -68,6 +68,149 @@ class EconomyRepository:
             levels[str(row["upgrade_type"])] = int(row["level"])
         return levels
 
+    async def list_active_food_effects(
+        self,
+        session: DatabaseSession,
+        *,
+        player_id: str,
+        now: str,
+    ) -> list[dict[str, object]]:
+        """Return queued, non-expired effects in FIFO order."""
+
+        rows = await session.fetch_all(
+            """
+            SELECT
+                effect_entry_id, effect_id, params_json, granted_uses,
+                consumed_uses, expires_at, created_at
+            FROM player_food_effects
+            WHERE player_id = ?
+              AND consumed_uses < granted_uses
+              AND (expires_at IS NULL OR expires_at > ?)
+            ORDER BY created_at, effect_entry_id
+            """,
+            (player_id, now),
+        )
+        return [dict(row) for row in rows]
+
+    async def insert_food_effect(
+        self,
+        session: DatabaseSession,
+        *,
+        effect_entry_id: str,
+        player_id: str,
+        source_food_instance_id: str,
+        effect_id: str,
+        params_json: str,
+        granted_uses: int,
+        expires_at: str | None,
+        now: str,
+    ) -> None:
+        await session.execute(
+            """
+            INSERT INTO player_food_effects(
+                effect_entry_id, player_id, source_food_instance_id,
+                effect_id, params_json, granted_uses, consumed_uses,
+                expires_at, created_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
+            """,
+            (
+                effect_entry_id,
+                player_id,
+                source_food_instance_id,
+                effect_id,
+                params_json,
+                granted_uses,
+                expires_at,
+                now,
+                now,
+            ),
+        )
+
+    async def consume_food_effects(
+        self,
+        session: DatabaseSession,
+        *,
+        player_id: str,
+        effect_entry_ids: tuple[str, ...],
+        now: str,
+    ) -> None:
+        """Consume one use from every selected effect or fail the transaction."""
+
+        for effect_entry_id in effect_entry_ids:
+            cursor = await session.execute(
+                """
+                UPDATE player_food_effects
+                SET consumed_uses = consumed_uses + 1,
+                    updated_at = ?
+                WHERE effect_entry_id = ?
+                  AND player_id = ?
+                  AND consumed_uses < granted_uses
+                  AND (expires_at IS NULL OR expires_at > ?)
+                """,
+                (now, effect_entry_id, player_id, now),
+            )
+            if cursor.rowcount != 1:
+                raise RuntimeError("待触发美食效果状态已变化，本次操作未结算。")
+
+    async def extra_catch_grants(
+        self,
+        session: DatabaseSession,
+        *,
+        player_id: str,
+        now: str,
+    ) -> tuple[int, int]:
+        """Return today's total granted and already consumed extra catches."""
+
+        row = await session.fetch_one(
+            """
+            SELECT
+                COALESCE(SUM(granted_uses), 0) AS granted,
+                COALESCE(SUM(consumed_uses), 0) AS consumed
+            FROM player_food_effects
+            WHERE player_id = ?
+              AND effect_id = 'extra-catches'
+              AND expires_at > ?
+            """,
+            (player_id, now),
+        )
+        if row is None:
+            return 0, 0
+        return int(row["granted"]), int(row["consumed"])
+
+    async def consume_extra_catch(
+        self,
+        session: DatabaseSession,
+        *,
+        player_id: str,
+        now: str,
+    ) -> str:
+        """Consume the oldest available extra-catch use."""
+
+        row = await session.fetch_one(
+            """
+            SELECT effect_entry_id
+            FROM player_food_effects
+            WHERE player_id = ?
+              AND effect_id = 'extra-catches'
+              AND consumed_uses < granted_uses
+              AND expires_at > ?
+            ORDER BY created_at, effect_entry_id
+            LIMIT 1
+            """,
+            (player_id, now),
+        )
+        if row is None:
+            raise RuntimeError("额外抓猪次数已不可用，本次抓猪未结算。")
+        effect_entry_id = str(row["effect_entry_id"])
+        await self.consume_food_effects(
+            session,
+            player_id=player_id,
+            effect_entry_ids=(effect_entry_id,),
+            now=now,
+        )
+        return effect_entry_id
+
     async def find_active_foods(
         self,
         session: DatabaseSession,
@@ -102,6 +245,105 @@ class EconomyRepository:
             if result is not None:
                 results.append(result)
         return results
+
+    async def cheapest_active_asset_id(
+        self,
+        session: DatabaseSession,
+        *,
+        player_id: str,
+        scope_id: str,
+        asset_kind: str,
+        max_rarity: int = 3,
+    ) -> str | None:
+        """Select the cheapest unlocked low-rarity pig or food deterministically."""
+
+        if asset_kind not in {"pig", "food"}:
+            raise ValueError("asset_kind must be pig or food")
+        table = "pig_instances" if asset_kind == "pig" else "food_instances"
+        id_column = "pig_instance_id" if asset_kind == "pig" else "food_instance_id"
+        row = await session.fetch_one(
+            f"""
+            SELECT {id_column} AS asset_id
+            FROM {table}
+            WHERE owner_player_id = ?
+              AND scope_id = ?
+              AND state = 'active'
+              AND locked_trade_id IS NULL
+              AND rarity <= ?
+            ORDER BY official_value, acquired_at, {id_column}
+            LIMIT 1
+            """,
+            (player_id, scope_id, max_rarity),
+        )
+        return str(row["asset_id"]) if row is not None else None
+
+    async def batch_sell_low_rarity(
+        self,
+        session: DatabaseSession,
+        *,
+        player_id: str,
+        scope_id: str,
+        asset_kind: str,
+        max_rarity: int,
+        now: str,
+    ) -> tuple[int, int]:
+        """Sell all unlocked assets at or below one rarity and return count/value."""
+
+        if asset_kind not in {"pig", "food"}:
+            raise ValueError("asset_kind must be pig or food")
+        table = "pig_instances" if asset_kind == "pig" else "food_instances"
+        id_column = "pig_instance_id" if asset_kind == "pig" else "food_instance_id"
+        row = await session.fetch_one(
+            f"""
+            SELECT COUNT(*) AS asset_count, COALESCE(SUM(official_value), 0) AS total_value
+            FROM {table}
+            WHERE owner_player_id = ?
+              AND scope_id = ?
+              AND state = 'active'
+              AND locked_trade_id IS NULL
+              AND rarity <= ?
+            """,
+            (player_id, scope_id, max_rarity),
+        )
+        count = int(row["asset_count"]) if row is not None else 0
+        total_value = int(row["total_value"]) if row is not None else 0
+        if count == 0:
+            return 0, 0
+        cursor = await session.execute(
+            f"""
+            UPDATE {table}
+            SET state = 'sold', disposed_at = ?, updated_at = ?
+            WHERE owner_player_id = ?
+              AND scope_id = ?
+              AND state = 'active'
+              AND locked_trade_id IS NULL
+              AND rarity <= ?
+            """,
+            (now, now, player_id, scope_id, max_rarity),
+        )
+        if cursor.rowcount != count:
+            raise RuntimeError("批量售卖资产数量发生变化，本次操作未结算。")
+        showcase_column = (
+            "pig_instance_id" if asset_kind == "pig" else "food_instance_id"
+        )
+        await session.execute(
+            f"""
+            UPDATE display_preferences
+            SET {showcase_column} = NULL, updated_at = ?
+            WHERE player_id = ?
+              AND {showcase_column} IN (
+                  SELECT {id_column}
+                  FROM {table}
+                  WHERE owner_player_id = ?
+                    AND scope_id = ?
+                    AND state = 'sold'
+                    AND disposed_at = ?
+                    AND rarity <= ?
+              )
+            """,
+            (now, player_id, player_id, scope_id, now, max_rarity),
+        )
+        return count, total_value
 
     async def get_food_by_instance_id(
         self,

@@ -15,11 +15,11 @@ def _entries() -> list[dict[str, object]]:
     return list(payload["entries"])
 
 
-def test_formal_catalog_has_all_98_named_assets_and_stable_ids() -> None:
+def test_formal_catalog_has_all_102_named_assets_and_stable_ids() -> None:
     entries = _entries()
-    assert len(entries) == 98
-    assert len({entry["template_id"] for entry in entries}) == 98
-    assert len({entry["source_path"] for entry in entries}) == 98
+    assert len(entries) == 102
+    assert len({entry["template_id"] for entry in entries}) == 102
+    assert len({entry["source_path"] for entry in entries}) == 102
     assert all(str(entry["description"]).strip() for entry in entries)
     pig_counts = Counter(
         int(entry["rarity"])
@@ -32,7 +32,19 @@ def test_formal_catalog_has_all_98_named_assets_and_stable_ids() -> None:
         if entry["kind"] == "food"
     )
     assert pig_counts == {1: 20, 2: 20, 3: 19, 4: 13, 5: 9, 6: 2}
-    assert food_counts == {1: 1, 2: 4, 3: 5, 4: 2, 5: 1, 6: 2}
+    assert food_counts == {1: 1, 2: 4, 3: 5, 4: 4, 5: 3, 6: 2}
+
+
+def test_high_rarity_food_effects_cover_new_gameplay_families() -> None:
+    foods = {
+        entry["display_name"]: entry
+        for entry in _entries()
+        if entry["kind"] == "food"
+    }
+    assert foods["猪咪虾寿司"]["effect_id"] == "next-catch-quality"
+    assert foods["猪猪玉子烧"]["effect_id"] == "next-cook-quality"
+    assert foods["猪寿司拼盘"]["effect_params"] == {"count": 2}
+    assert foods["一猪六吃"]["effect_params"] == {"six_star_percent": 20}
 
 
 def test_group_custom_assets_are_confined_and_keep_user_text() -> None:
