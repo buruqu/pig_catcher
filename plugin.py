@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from dataclasses import replace
 from pathlib import Path
+from re import escape
 from typing import Any, cast
 
 from maibot_sdk import CONFIG_RELOAD_SCOPE_SELF, Command, MaiBotPlugin
@@ -40,6 +41,7 @@ from .pig_catcher.domain.errors import (
     MentionTargetError,
     PigCatcherError,
 )
+from .pig_catcher.domain.gameplay import ITEM_DEFINITIONS
 from .pig_catcher.domain.models import CommandIdentity, CommandReceipt
 from .pig_catcher.infrastructure import PigCatcherDatabase, safe_database_path
 from .pig_catcher.rendering import (
@@ -113,6 +115,17 @@ from .pig_catcher.services import (
     format_trade_summary,
 )
 from .pig_catcher.version import PLUGIN_VERSION
+
+_PURCHASE_PRODUCT_PATTERN = "(?:" + "|".join(
+    escape(item.display_name) for item in ITEM_DEFINITIONS
+) + ")"
+_PURCHASE_COMMAND_PATTERN = (
+    rf"^/购买(?:\s+(?P<arguments>{_PURCHASE_PRODUCT_PATTERN}(?:\s+.*?)?))?\s*$"
+)
+_UPGRADE_TARGET_PATTERN = r"(?:猪饲料|饲料|猪饲料升级|厨具|厨具升级)"
+_UPGRADE_COMMAND_PATTERN = (
+    rf"^/升级(?:\s+(?P<arguments>{_UPGRADE_TARGET_PATTERN}))?\s*$"
+)
 
 
 class PigCatcherPlugin(MaiBotPlugin):
@@ -1160,7 +1173,7 @@ class PigCatcherPlugin(MaiBotPlugin):
     @Command(
         "pig_catcher_purchase",
         description="购买商城中的消耗品",
-        pattern=r"^/购买(?:\s+(?P<arguments>.*?))?\s*$",
+        pattern=_PURCHASE_COMMAND_PATTERN,
     )
     async def handle_purchase(
         self,
@@ -1203,7 +1216,7 @@ class PigCatcherPlugin(MaiBotPlugin):
     @Command(
         "pig_catcher_upgrade",
         description="升级永久猪饲料或厨具",
-        pattern=r"^/升级(?:\s+(?P<arguments>.*?))?\s*$",
+        pattern=_UPGRADE_COMMAND_PATTERN,
     )
     async def handle_upgrade(
         self,

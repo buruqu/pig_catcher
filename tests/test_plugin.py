@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
+import re
 import sqlite3
 from io import BytesIO
 from pathlib import Path
@@ -105,6 +106,29 @@ def test_plugin_registers_only_explicit_production_commands() -> None:
     assert "EVENT_HANDLER" not in serialized
     assert "LLM" not in serialized
     assert "TOOL" not in serialized
+
+
+def test_store_command_patterns_do_not_claim_livehouse_commands() -> None:
+    components = {
+        component["name"]: component
+        for component in create_plugin().get_components()
+    }
+    purchase_pattern = components["pig_catcher_purchase"]["metadata"][
+        "command_pattern"
+    ]
+    upgrade_pattern = components["pig_catcher_upgrade"]["metadata"][
+        "command_pattern"
+    ]
+
+    assert re.search(purchase_pattern, "/购买 幸运猪哨 2")
+    assert re.search(upgrade_pattern, "/升级 猪饲料")
+    assert re.search(upgrade_pattern, "/升级 厨具")
+    assert re.search(purchase_pattern, "/购买")  # 保留缺参时的格式提示。
+    assert re.search(upgrade_pattern, "/升级")
+
+    assert re.search(purchase_pattern, "/购买 练习券 2") is None
+    assert re.search(upgrade_pattern, "/升级 #3 满级") is None
+    assert re.search(upgrade_pattern, "/升级 户山香澄") is None
 
 
 def test_plugin_exposes_fully_chinese_webui_schema() -> None:
