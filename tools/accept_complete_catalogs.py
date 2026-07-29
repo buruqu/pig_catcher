@@ -26,7 +26,7 @@ from pig_catcher.rendering import (  # noqa: E402
     FoodCatalogViewModel,
     PigCatcherRenderer,
 )
-from tools.accept_third_round import (  # noqa: E402
+from tools.accept_catching_and_collection_views import (  # noqa: E402
     PlaywrightRenderCapability,
     render_options,
     write_image,

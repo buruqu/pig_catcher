@@ -7,7 +7,7 @@ from collections import Counter
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFINITIONS = PROJECT_ROOT / "catalogs" / "2b" / "catalog-definitions.json"
+DEFINITIONS = PROJECT_ROOT / "catalogs" / "formal" / "pig-and-food-definitions.json"
 
 
 def _entries() -> list[dict[str, object]]:

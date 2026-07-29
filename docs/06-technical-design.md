@@ -76,7 +76,8 @@ pig_catcher/
       model.py
       access.py
   tests/
-  catalogs/2b/                 # 正式元数据定义，进入 Git
+  catalogs/formal/             # 正式猪猪与美食元数据，进入 Git
+  asset_library/current/       # 当前可导入素材包，仅本机保留
   tools/                       # 素材打包、导入与验收
   artifacts/                  # 仅本地视觉验收，Git 忽略
 ```

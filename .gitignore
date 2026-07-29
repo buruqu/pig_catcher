@@ -12,9 +12,9 @@ build/
 logs/
 runtime/
 data/
-incoming_assets/
 artifacts/
 config_back/
+asset_library/current/
 *.db
 *.db-shm
 *.db-wal

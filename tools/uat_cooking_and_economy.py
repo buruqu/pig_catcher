@@ -1,4 +1,4 @@
-"""Run isolated fourth-round command UAT against the formal catalog."""
+"""Run isolated cooking and economy command UAT against the formal catalog."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from playwright.async_api import async_playwright
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from tools.uat_third_round import (  # noqa: E402
+from tools.uat_catching_and_collection import (  # noqa: E402
     DeliveryCollector,
     FixedRandom,
     LocalContext,

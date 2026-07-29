@@ -117,12 +117,12 @@
 
 | 编号 | 2B 目标 | 实现位置 | 状态 |
 | --- | --- | --- | --- |
-| B-001 | 完整读取并登记 98 项用户素材 | `catalogs/2b/catalog-definitions.json`、`tools/build_asset_package.py` | 已完成 |
+| B-001 | 完整读取并登记 98 项用户素材 | `catalogs/formal/pig-and-food-definitions.json`、`tools/build_asset_package.py` | 已完成 |
 | B-002 | 83 只猪、15 道美食按品质接入 | `tools/import_asset_catalog.py`、素材仓储 | 已完成 |
 | B-003 | 群 `1092931381` 的 4 项六星素材隔离 | Asset Manifest、模板仓储 | 已完成并用两个群实测 |
-| B-004 | GIF 和动画 WebP 保持动态 | `rendering/animation.py`、`tools/accept_asset_catalog.py` | 已完成，9 项逐帧验收 |
+| B-004 | GIF 和动画 WebP 保持动态 | `rendering/animation.py`、`tools/accept_asset_cards.py` | 已完成，9 项逐帧验收 |
 | B-005 | BanG Dream 角色、乐队与 `X/5` 图鉴进度 | Asset Manifest v2、`services/assets.py` | 已完成 |
-| B-006 | 每项静态整活描述与指定原文 | `catalogs/2b/catalog-definitions.json` | 已完成并测试精确文案 |
+| B-006 | 每项静态整活描述与指定原文 | `catalogs/formal/pig-and-food-definitions.json` | 已完成并测试精确文案 |
 | B-007 | 白色淡粉正式素材卡片 | `rendering/templates/asset_preview.html` | 已完成 98 项 Chromium 验收 |
 | B-008 | 数据迁移、原子导入与校验值 | `v0002_asset_media_and_collections.py`、素材导入服务 | 已完成 |
 
@@ -137,8 +137,8 @@
 | C-005 | 档案、详情、背包、图鉴和群纪录 | 玩法仓储、服务、命令与渲染模板 | 已完成 |
 | C-006 | 道具装备、取消和成功后原子消耗 | 玩法服务、道具回执模板 | 已完成 |
 | C-007 | 改变状态命令的幂等与重启保护 | `command_receipts`、`ReceiptService` | 已完成 |
-| C-008 | 白粉业务图与动画保真 | `rendering/`、`tools/accept_third_round.py` | 已完成 |
-| C-009 | 正式素材隔离命令 UAT | `tools/uat_third_round.py` | 已完成 |
+| C-008 | 白粉业务图与动画保真 | `rendering/`、`tools/accept_catching_and_collection_views.py` | 已完成 |
+| C-009 | 正式素材隔离命令 UAT | `tools/uat_catching_and_collection.py` | 已完成 |
 | C-010 | MaiBot 运行中热重载 | Runner 日志 | 已完成 |
 
 ## 9. 第四轮实现追溯
@@ -153,8 +153,8 @@
 | P4-006 | 猪与美食官方售卖 | 经济服务与原子资产状态更新 | 已完成 |
 | P4-007 | 不可变猪币账本与余额对账 | `repositories/economy.py`、`/猪币账本` | 已完成 |
 | P4-008 | 状态命令幂等及重启保护 | `command_receipts` 与发送领取 | 已完成 |
-| P4-009 | 白粉美食、商城和经济回执 | `rendering/`、`tools/accept_fourth_round.py` | 已完成 |
-| P4-010 | 正式数据隔离命令 UAT | `tools/uat_fourth_round.py` | 已完成 |
+| P4-009 | 白粉美食、商城和经济回执 | `rendering/`、`tools/accept_cooking_and_economy_views.py` | 已完成 |
+| P4-010 | 正式数据隔离命令 UAT | `tools/uat_cooking_and_economy.py` | 已完成 |
 | P4-011 | 每日 20 次与成功后 20 秒冷却 | 配置、玩法服务、规则版本 2 | 已完成 |
 
 ## 10. 第五轮实现追溯
@@ -168,8 +168,8 @@
 | P5-005 | `NEW`、迷你/巨型个体评价 | 体型领域规则与猪猪卡片 | 已完成 |
 | P5-006 | 全群绝对体型、重量纪录和巨物目击 | Schema 5、群纪录服务与渲染 | 已完成 |
 | P5-007 | 稳定历史统计不随转移或消耗倒退 | `player_statistics` | 已完成 |
-| P5-008 | 白色淡粉社交票据与原创排行 | `rendering/`、`tools/accept_fifth_round.py` | 已完成，8 张 Chromium 验收 |
-| P5-009 | 双用户、双群、重启幂等命令 UAT | `tools/uat_fifth_round.py` | 已完成，24 步 |
+| P5-008 | 白色淡粉社交票据与原创排行 | `rendering/`、`tools/accept_social_and_ranking_views.py` | 已完成，8 张 Chromium 验收 |
+| P5-009 | 双用户、双群、重启幂等命令 UAT | `tools/uat_social_and_rankings.py` | 已完成，24 步 |
 
 ## 11. 第六轮与正式版实现追溯
 
@@ -180,7 +180,7 @@
 | P6-003 | SQLite 繁忙无部分提交 | 数据库写锁故障注入 | 已完成 |
 | P6-004 | 重启后幂等、报价锁和过期解锁 | 第六轮 UAT、维护任务 | 已完成 |
 | P6-005 | 全库账本与启用素材周期巡检 | `OperationsRepository`、`MaintenanceRunner` | 已完成 |
-| P6-006 | 在线备份、恢复副本和重新加载 | `tools/uat_sixth_round.py` | 已完成 |
+| P6-006 | 在线备份、恢复副本和重新加载 | `tools/uat_production_recovery.py` | 已完成 |
 | P6-007 | 正式版工程与社交全量回归 | 124 项 pytest、第五轮与第六轮 UAT | 已完成 |
 | P6-008 | 真实 QQ 群人机命令回归 | 用户后续实际使用 | 按用户决定不由 Codex 操作 |
 
@@ -188,7 +188,7 @@
 
 | 编号 | 本轮目标 | 实现位置 | 状态 |
 | --- | --- | --- | --- |
-| V12-001 | 新增 4 道四、五星美食并保留原图 | `catalogs/2b/catalog-definitions.json`、Manifest v3 | 已完成，正式目录 102 项 |
+| V12-001 | 新增 4 道四、五星美食并保留原图 | `catalogs/formal/pig-and-food-definitions.json`、Manifest v3 | 已完成，正式目录 102 项 |
 | V12-002 | 商城可购买且全部商品单页展示 | 经济服务、`store.html`、命令 UAT | 已完成 |
 | V12-003 | 猪饲料和厨具使用 `/升级` 且为 Lv.0-5 | 解析器、经济服务、原子购买回执 | 已完成 |
 | V12-004 | GIF 在背包和图鉴显示代表帧 | 渲染器中间帧提取、源文件校验值测试 | 已完成 |

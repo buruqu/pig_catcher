@@ -9,7 +9,7 @@ import shutil
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_DEFINITIONS = PROJECT_ROOT / "catalogs" / "2b" / "catalog-definitions.json"
+DEFAULT_DEFINITIONS = PROJECT_ROOT / "catalogs" / "formal" / "pig-and-food-definitions.json"
 SUPPORTED_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
 PIG_RANGES = {
     1: (18.0, 55.0, 8.0, 85.0),

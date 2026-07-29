@@ -92,25 +92,27 @@ uv sync --all-groups --locked
 正式版社交流程回归与第六轮故障恢复 UAT：
 
 ```powershell
-uv run python .\tools\accept_fifth_round.py `
+uv run python .\tools\accept_social_and_ranking_views.py `
   --data-dir C:\Users\Administrator\MaiBot\data\plugins\local.pig-catcher `
-  --output .\artifacts\fifth-round-visual
+  --output .\artifacts\social-and-ranking-views
 
-uv run python .\tools\uat_fifth_round.py `
+uv run python .\tools\uat_social_and_rankings.py `
   --data-dir C:\Users\Administrator\MaiBot\data\plugins\local.pig-catcher `
   --output .\artifacts\production-social-regression
 
-uv run python .\tools\uat_sixth_round.py `
+uv run python .\tools\uat_production_recovery.py `
   --data-dir C:\Users\Administrator\MaiBot\data\plugins\local.pig-catcher `
   --output .\artifacts\production-readiness
 ```
 
 生成的本地验收图、隔离数据库和报告位于忽略目录 `artifacts/`，不会进入插件发布包。
-可审计的 2B 清单定义保存在 `catalogs/2b/`；用户素材原件和运行副本保存在 Git 忽略
-目录及 `ctx.paths.data_dir`，避免群专属素材进入公共历史。
+可审计的正式清单定义保存在 `catalogs/formal/pig-and-food-definitions.json`；本机当前素材包
+保存在 Git 忽略目录 `asset_library/current/`，运行副本位于 `ctx.paths.data_dir`，避免
+群专属素材进入公共历史。人工查找入口见根目录 [目录导航.md](目录导航.md)。
 
 ## 设计文档
 
+- [人工目录与素材导航](目录导航.md)
 - [需求来源与追溯矩阵](docs/00-requirement-traceability.md)
 - [产品需求基线](docs/01-product-requirements.md)
 - [领域与数据模型](docs/02-domain-and-data-model.md)

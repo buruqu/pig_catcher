@@ -181,9 +181,11 @@
 2B 清单定义与运行素材采用以下边界：
 
 ```text
-catalogs/2b/
-  catalog-definitions.json       # 可审计元数据，进入 Git
-incoming_assets/                 # 本机导入包，Git 忽略
+catalogs/formal/
+  pig-and-food-definitions.json  # 可审计元数据，进入 Git
+asset_library/
+  README.md                      # 素材位置和维护说明，进入 Git
+  current/                       # 本机当前导入包，Git 忽略
 ctx.paths.data_dir/
   assets/catalogs/<catalog-hash> # 原子发布后的运行素材
 ```

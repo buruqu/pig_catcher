@@ -1,4 +1,4 @@
-"""Render and inspect representative fifth-round social views with Chromium."""
+"""Render and inspect representative social and ranking views with Chromium."""
 
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ from pig_catcher.rendering import (  # noqa: E402
     TradeListItemViewModel,
     TradeListViewModel,
 )
-from tools.accept_third_round import (  # noqa: E402
+from tools.accept_catching_and_collection_views import (  # noqa: E402
     PlaywrightRenderCapability,
     render_options,
     write_image,
@@ -326,7 +326,7 @@ def write_contact_sheet(
     draw = ImageDraw.Draw(sheet)
     draw.text(
         (22, 18),
-        "Pig Catcher fifth-round Chromium acceptance",
+        "Pig Catcher social and ranking Chromium acceptance",
         fill="#553846",
         font=_font(26),
     )

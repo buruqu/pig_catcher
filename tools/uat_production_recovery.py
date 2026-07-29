@@ -17,7 +17,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from pig_catcher.version import FRAMEWORK_PHASE, PLUGIN_VERSION, SCHEMA_VERSION  # noqa: E402
-from tools.uat_third_round import (  # noqa: E402
+from tools.uat_catching_and_collection import (  # noqa: E402
     DeliveryCollector,
     FixedRandom,
     LocalContext,

@@ -180,13 +180,13 @@ class PigCatcherPlugin(MaiBotPlugin):
 
     @property
     def economy_service(self) -> EconomyService | None:
-        """Expose the active fourth-round service for command-level acceptance."""
+        """Expose the active economy service for command-level acceptance."""
 
         return self._economy_service
 
     @property
     def social_service(self) -> SocialService | None:
-        """Expose the active fifth-round service for command-level acceptance."""
+        """Expose the active social service for command-level acceptance."""
 
         return self._social_service
 

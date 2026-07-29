@@ -1,4 +1,4 @@
-"""Render and inspect representative third-round business views with Chromium."""
+"""Render and inspect representative catching and collection views with Chromium."""
 
 from __future__ import annotations
 
@@ -400,7 +400,7 @@ def write_contact_sheet(
     draw = ImageDraw.Draw(sheet)
     draw.text(
         (22, 18),
-        "Pig Catcher third-round Chromium acceptance",
+        "Pig Catcher catching and collection Chromium acceptance",
         fill="#553846",
         font=font(26),
     )

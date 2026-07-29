@@ -1,4 +1,4 @@
-"""Run isolated fifth-round command UAT against the formal catalog."""
+"""Run isolated social and ranking command UAT against the formal catalog."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from pig_catcher.domain.social import RANKING_TYPES  # noqa: E402
 from pig_catcher.version import PLUGIN_VERSION  # noqa: E402
-from tools.uat_third_round import (  # noqa: E402
+from tools.uat_catching_and_collection import (  # noqa: E402
     DeliveryCollector,
     FixedRandom,
     LocalContext,
