@@ -241,7 +241,7 @@ async def accept(args: argparse.Namespace) -> dict[str, object]:
     rendered_root = output_root / "rendered"
     rendered_root.mkdir()
     rows = load_rows(data_dir / args.database_filename)
-    expected_assets = 102
+    expected_assets = 112
     if len(rows) != expected_assets:
         raise RuntimeError(
             f"Expected {expected_assets} active assets, found {len(rows)}"
