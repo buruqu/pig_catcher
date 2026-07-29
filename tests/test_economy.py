@@ -28,6 +28,7 @@ from pig_catcher.domain.errors import (
 from pig_catcher.domain.models import CommandIdentity, ScopeKey
 from pig_catcher.infrastructure import PigCatcherDatabase
 from pig_catcher.infrastructure.repositories import EconomyRepository, FrameworkRepository
+from pig_catcher.rendering import food_card_view
 from pig_catcher.services import (
     AssetCatalogService,
     EconomyService,
@@ -279,6 +280,12 @@ async def test_cooking_commits_once_and_rehydrates_after_restart(
     assert first.foods[0].rarity == 1
     assert first.coin_balance == 5
     assert first.total_experience == 9
+    assert "等级：Lv.1 · 被猪拱；9/50 EXP" in first.receipt.text_summary
+    card = food_card_view(first.foods[0], mode_label="做菜成功", cooking=first)
+    assert card.player_level == 1
+    assert card.level_title == "被猪拱"
+    assert card.next_level_experience == 50
+    assert card.level_progress_percent == pytest.approx(18.0)
 
     duplicate = await first_service.cook(identity, caught.pig.selector)
     assert duplicate.receipt_created is False

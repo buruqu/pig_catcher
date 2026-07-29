@@ -512,6 +512,10 @@ async def test_third_round_templates_render_all_business_views(
         experience_reward=45,
         coin_balance=120,
         total_experience=600,
+        player_level=4,
+        level_title="抓猪老手",
+        next_level_experience=800,
+        level_progress_percent=42.86,
         daily_count=2,
         daily_limit=30,
         catalog_new=True,
@@ -523,6 +527,9 @@ async def test_third_round_templates_render_all_business_views(
     assert "&lt;script&gt;" in pig_html
     assert "data:image/png;base64," in pig_html
     assert "体型新纪录" in pig_html
+    assert "Lv.4 · 抓猪老手" in pig_html
+    assert "+45 EXP · 600/800" in pig_html
+    assert 'width: 42.86%' in pig_html
     await renderer.render_static_pig_card(replace(pig, coin_reward=None), None)
     missing_pig_html, _ = capability.calls[-1]
     assert "素材文件暂时不可用" in missing_pig_html
@@ -742,6 +749,10 @@ async def test_fourth_round_templates_render_food_and_economy_views(
         experience_reward=40,
         coin_balance=500,
         total_experience=900,
+        player_level=5,
+        level_title="抓猪老手",
+        next_level_experience=1250,
+        level_progress_percent=22.22,
         cookware_level=2,
         item_name="主厨香料",
         catalog_new_count=1,
@@ -755,6 +766,9 @@ async def test_fourth_round_templates_render_food_and_economy_views(
     assert "主厨香料" in food_html
     assert "最终品质概率" in food_html
     assert "1★ 75.0%" in food_html
+    assert "Lv.5 · 抓猪老手" in food_html
+    assert "+40 EXP · 900/1250" in food_html
+    assert 'width: 22.22%' in food_html
     await renderer.render_static_food_card(replace(food, coin_reward=None), None)
     missing_food_html, _ = capability.calls[-1]
     assert "素材文件暂时不可用" in missing_food_html

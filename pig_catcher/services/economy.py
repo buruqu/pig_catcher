@@ -48,7 +48,7 @@ from ..domain.food_effects import (
     effect_summary,
     resolve_food_effect,
 )
-from ..domain.gameplay import ItemDefinition, item_by_id
+from ..domain.gameplay import ItemDefinition, item_by_id, level_progress
 from ..domain.models import CommandIdentity, CommandReceipt
 from ..domain.ports import Clock, MessageKeyFactory, RandomSource, SystemClock, SystemRandomSource
 from ..domain.rules import choose_rarity
@@ -443,6 +443,7 @@ def _catalog_entry_from_row(row: Mapping[str, object]) -> FoodCatalogEntry:
 def format_cooking_summary(result: CookingResult) -> str:
     """Return a complete path-free text fallback for cooking."""
 
+    progress = level_progress(result.total_experience)
     main = result.foods[0]
     bonus = (
         f"\n大份餐盒加餐：{result.foods[1].selector}"
@@ -462,7 +463,9 @@ def format_cooking_summary(result: CookingResult) -> str:
         f"份量：{main.portion_weight:.2f} kg；肥瘦：{main.fat_label}\n"
         f"官方价值：{main.official_value} 猪币{bonus}\n"
         f"奖励：+{result.coin_reward} 猪币 / +{result.experience_reward} 经验\n"
-        f"当前余额：{result.coin_balance} 猪币；累计经验：{result.total_experience}\n"
+        f"等级：Lv.{progress.level} · {progress.title}；"
+        f"{result.total_experience}/{progress.next_threshold} EXP\n"
+        f"当前余额：{result.coin_balance} 猪币\n"
         f"厨具：Lv.{result.cookware_level}；本次道具：{item}\n"
         f"最终品质概率：{result.probability_summary}{effect_text}"
     )

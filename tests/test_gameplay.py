@@ -20,6 +20,7 @@ from pig_catcher.domain.errors import (
 )
 from pig_catcher.domain.models import CommandIdentity, ScopeKey
 from pig_catcher.infrastructure import PigCatcherDatabase
+from pig_catcher.rendering import pig_card_view
 from pig_catcher.services import (
     AssetCatalogService,
     FrameworkService,
@@ -175,6 +176,12 @@ async def test_catch_commits_all_effects_once_and_survives_restart(
     assert first.catalog_new is True
     assert first.size_record is True
     assert first.weight_record is True
+    assert "等级：Lv.1 · 被猪拱；5/50 EXP" in first.receipt.text_summary
+    card = pig_card_view(first.pig, mode_label="抓猪成功", catch=first)
+    assert card.player_level == 1
+    assert card.level_title == "被猪拱"
+    assert card.next_level_experience == 50
+    assert card.level_progress_percent == pytest.approx(10.0)
 
     duplicate = await first_service.catch(identity)
     assert duplicate.receipt_created is False

@@ -7,7 +7,7 @@ from pathlib import Path
 
 from ..domain.errors import RenderError
 from ..domain.food_effects import effect_summary
-from ..domain.gameplay import size_label, weight_label
+from ..domain.gameplay import level_progress, size_label, weight_label
 from ..domain.social import TRADE_STATUS_LABELS
 from ..services.economy import (
     BatchSaleResult,
@@ -99,6 +99,9 @@ def pig_card_view(
 ) -> PigCardViewModel:
     """Build one catch or detail card view."""
 
+    progress = (
+        level_progress(catch.total_experience) if catch is not None else None
+    )
     return PigCardViewModel(
         mode_label=mode_label,
         display_name=pig.display_name,
@@ -125,6 +128,14 @@ def pig_card_view(
         experience_reward=catch.experience_reward if catch is not None else None,
         coin_balance=catch.coin_balance if catch is not None else None,
         total_experience=catch.total_experience if catch is not None else None,
+        player_level=progress.level if progress is not None else None,
+        level_title=progress.title if progress is not None else "",
+        next_level_experience=(
+            progress.next_threshold if progress is not None else None
+        ),
+        level_progress_percent=(
+            progress.progress_percent if progress is not None else 0.0
+        ),
         daily_count=catch.daily_count if catch is not None else None,
         daily_limit=catch.daily_limit if catch is not None else None,
         item_name=catch.item_name if catch is not None else "",
@@ -337,6 +348,11 @@ def food_card_view(
     bonus_selector = ""
     if cooking is not None and cooking.bonus_serving and len(cooking.foods) > 1:
         bonus_selector = cooking.foods[1].selector
+    progress = (
+        level_progress(cooking.total_experience)
+        if cooking is not None
+        else None
+    )
     return FoodCardViewModel(
         mode_label=mode_label,
         display_name=food.display_name,
@@ -362,6 +378,14 @@ def food_card_view(
         coin_balance=cooking.coin_balance if cooking is not None else None,
         total_experience=(
             cooking.total_experience if cooking is not None else None
+        ),
+        player_level=progress.level if progress is not None else None,
+        level_title=progress.title if progress is not None else "",
+        next_level_experience=(
+            progress.next_threshold if progress is not None else None
+        ),
+        level_progress_percent=(
+            progress.progress_percent if progress is not None else 0.0
         ),
         cookware_level=(
             cooking.cookware_level if cooking is not None else None

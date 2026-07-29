@@ -71,8 +71,17 @@
         <strong>+{{ view.coin_reward }} 猪币</strong>
       </div>
       <div class="pig-card__receipt-item">
+        {% if view.player_level is not none %}
+        <span>等级阶段</span>
+        <strong>Lv.{{ view.player_level }} · {{ view.level_title }}</strong>
+        <small>+{{ view.experience_reward }} EXP · {{ view.total_experience }}/{{ view.next_level_experience }}</small>
+        <div class="receipt-level-progress" aria-label="等级进度">
+          <i style="width: {{ "%.2f"|format(view.level_progress_percent) }}%"></i>
+        </div>
+        {% else %}
         <span>成长</span>
         <strong>+{{ view.experience_reward }} 经验</strong>
+        {% endif %}
       </div>
       <div class="pig-card__receipt-item">
         <span>厨具 / 道具</span>

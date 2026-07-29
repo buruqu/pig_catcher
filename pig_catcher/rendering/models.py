@@ -111,6 +111,10 @@ class PigCardViewModel:
     experience_reward: int | None = None
     coin_balance: int | None = None
     total_experience: int | None = None
+    player_level: int | None = None
+    level_title: str = ""
+    next_level_experience: int | None = None
+    level_progress_percent: float = 0.0
     daily_count: int | None = None
     daily_limit: int | None = None
     item_name: str = ""
@@ -314,6 +318,10 @@ class FoodCardViewModel:
     experience_reward: int | None = None
     coin_balance: int | None = None
     total_experience: int | None = None
+    player_level: int | None = None
+    level_title: str = ""
+    next_level_experience: int | None = None
+    level_progress_percent: float = 0.0
     cookware_level: int | None = None
     item_name: str = ""
     catalog_new_count: int = 0

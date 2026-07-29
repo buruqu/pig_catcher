@@ -451,6 +451,7 @@ def _format_collection_rows(rows: Sequence[Mapping[str, object]]) -> tuple[Colle
 def format_catch_summary(result: CatchResult) -> str:
     """Return a complete path-free text fallback for a catch."""
 
+    progress = level_progress(result.total_experience)
     records: list[str] = []
     if result.size_record:
         records.append("体型新纪录")
@@ -487,7 +488,9 @@ def format_catch_summary(result: CatchResult) -> str:
         f"{body_text}"
         f"官方价值：{result.pig.official_value} 猪币\n"
         f"奖励：+{result.coin_reward} 猪币 / +{result.experience_reward} 经验\n"
-        f"当前余额：{result.coin_balance} 猪币；累计经验：{result.total_experience}\n"
+        f"等级：Lv.{progress.level} · {progress.title}；"
+        f"{result.total_experience}/{progress.next_threshold} EXP\n"
+        f"当前余额：{result.coin_balance} 猪币\n"
         f"今日抓猪：{result.daily_count}/{result.daily_limit}\n"
         f"本次道具：{item_text}\n"
         f"群纪录：{record_text}{effect_text}"
