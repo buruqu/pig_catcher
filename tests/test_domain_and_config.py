@@ -108,10 +108,12 @@ def test_message_key_is_stable_and_requires_message_id() -> None:
 def test_catch_weights_are_normalized_and_transfer_missing_six_star() -> None:
     available = catch_weights(BASE_CATCH_WEIGHTS, six_star_available=True)
     unavailable = catch_weights(BASE_CATCH_WEIGHTS, six_star_available=False)
+    assert BASE_CATCH_WEIGHTS == (40.0, 30.0, 17.0, 8.0, 4.0, 1.0)
     assert sum(available) == pytest.approx(100)
     assert sum(unavailable) == pytest.approx(100)
+    assert sum(available[3:]) == pytest.approx(13.0)
     assert unavailable[5] == 0
-    assert unavailable[4] > available[4]
+    assert unavailable[4] == pytest.approx(5.0)
 
 
 def test_feed_and_lucky_item_improve_high_rarity_share() -> None:
@@ -262,6 +264,7 @@ def test_default_config_exposes_fixed_rules_and_chinese_schema() -> None:
     assert config.plugin.framework_phase == "6"
     assert config.catching.daily_limit == 20
     assert config.catching.cooldown_seconds == 20
+    assert config.catching.weights() == BASE_CATCH_WEIGHTS
     assert config.cooking.six_star_to_five_percent == 90
     assert config.cooking.six_star_to_six_percent == 10
     assert config.features.cooking_enabled is True
@@ -285,13 +288,17 @@ def test_config_rejects_unsafe_paths_and_css_controls() -> None:
         PigCatcherConfig(rendering={"font_family": "   "})
 
 
-def test_help_is_copyable_text_and_marks_fifth_round_open() -> None:
+def test_help_is_copyable_concise_text() -> None:
     text = format_help("做菜")
     assert "/做菜 [猪名#短编号]" in text
     assert "/升级 <猪饲料|厨具>" in format_help("商城")
     assert "/批量售卖 <猪猪|美食>" in format_help("商城")
-    assert "粉红小香猪#A19F2C3D" in text
     assert "【做菜指令】" in text
-    assert "做菜指令·尚未开放" not in text
-    assert "赠送、双方确认交易" in text
+    assert "当前版本：" not in text
+    assert "已开放抓猪" not in text
+    full = format_help()
+    assert "/抓猪档案" not in full
+    assert "/抓猪详情" not in full
+    assert "/抓猪档案" not in format_help("抓猪")
+    assert "/抓猪详情" not in format_help("抓猪")
     assert "<img" not in text

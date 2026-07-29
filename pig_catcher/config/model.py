@@ -355,46 +355,46 @@ class CatchingSection(PluginConfigBase):
         json_schema_extra=_ui("纪录每页数量", "每个模板的体型与重量纪录分别占一行"),
     )
     rarity_1_weight: float = Field(
-        default=55.0,
+        default=40.0,
         ge=0,
         le=10000,
         description="一星普通家养猪的基础权重",
-        json_schema_extra=_ui("一星权重", "默认 55；六档会在运行时统一归一化"),
+        json_schema_extra=_ui("一星权重", "默认 40；六档会在运行时统一归一化"),
     )
     rarity_2_weight: float = Field(
-        default=25.0,
+        default=30.0,
         ge=0,
         le=10000,
         description="二星美味家养猪的基础权重",
-        json_schema_extra=_ui("二星权重", "默认 25；六档会在运行时统一归一化"),
+        json_schema_extra=_ui("二星权重", "默认 30；六档会在运行时统一归一化"),
     )
     rarity_3_weight: float = Field(
-        default=12.0,
+        default=17.0,
         ge=0,
         le=10000,
         description="三星优质家养猪的基础权重",
-        json_schema_extra=_ui("三星权重", "默认 12；六档会在运行时统一归一化"),
+        json_schema_extra=_ui("三星权重", "默认 17；六档会在运行时统一归一化"),
     )
     rarity_4_weight: float = Field(
-        default=5.5,
+        default=8.0,
         ge=0,
         le=10000,
         description="四星极品佳肴猪的基础权重",
-        json_schema_extra=_ui("四星权重", "默认 5.5；六档会在运行时统一归一化"),
+        json_schema_extra=_ui("四星权重", "默认 8；六档会在运行时统一归一化"),
     )
     rarity_5_weight: float = Field(
-        default=2.0,
+        default=4.0,
         ge=0,
         le=10000,
         description="五星传说珍馐猪的基础权重",
-        json_schema_extra=_ui("五星权重", "默认 2；无六星素材时会接收六星权重"),
+        json_schema_extra=_ui("五星权重", "默认 4；无六星素材时会接收六星权重"),
     )
     rarity_6_weight: float = Field(
-        default=0.5,
+        default=1.0,
         ge=0,
         le=10000,
         description="六星可爱猪群友的基础权重",
-        json_schema_extra=_ui("六星权重", "默认 0.5；当前群没有授权素材时不会抽取"),
+        json_schema_extra=_ui("六星权重", "默认 1；当前群没有授权素材时不会抽取"),
     )
     max_feed_level: Literal[5] = Field(
         default=5,

@@ -129,6 +129,10 @@ async def test_help_command_sends_copyable_text_without_rendering(tmp_path: Path
     assert success is True
     assert level == 2
     assert "/抓猪帮助 [抓猪|背包|道具|做菜|商城|交易|排行]" in text
+    assert "当前版本：" not in text
+    assert "已开放抓猪" not in text
+    assert "/抓猪档案" not in text
+    assert "/抓猪详情" not in text
     assert context.send.texts == [("stream-10001", text)]
     assert context.send.images == []
     assert context.render.calls == []

@@ -7,7 +7,7 @@ from collections.abc import Sequence
 from .enums import Rarity
 from .errors import DomainValidationError
 
-BASE_CATCH_WEIGHTS: tuple[float, ...] = (55.0, 25.0, 12.0, 5.5, 2.0, 0.5)
+BASE_CATCH_WEIGHTS: tuple[float, ...] = (40.0, 30.0, 17.0, 8.0, 4.0, 1.0)
 
 BASE_COOKING_WEIGHTS: dict[Rarity, tuple[float, ...]] = {
     Rarity.ONE: (75.0, 22.0, 3.0, 0.0, 0.0, 0.0),

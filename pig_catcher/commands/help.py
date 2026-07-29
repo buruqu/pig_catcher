@@ -2,14 +2,10 @@
 
 from __future__ import annotations
 
-from ..version import FRAMEWORK_PHASE, PLUGIN_VERSION
-
 _TOPICS: dict[str, tuple[str, ...]] = {
     "抓猪": (
         "/抓猪",
         "/抓群友",
-        "/抓猪档案",
-        "/抓猪详情 <猪名#短编号>",
     ),
     "背包": (
         "/猪猪背包 [页码] [品质=数字] [排序=方式]",
@@ -54,8 +50,6 @@ _TOPICS: dict[str, tuple[str, ...]] = {
     ),
 }
 
-_OPEN_TOPICS = frozenset(_TOPICS)
-
 _TOPIC_ALIASES = {
     "仓库": "背包",
     "图鉴": "背包",
@@ -64,42 +58,44 @@ _TOPIC_ALIASES = {
 
 
 def _topic_block(topic: str) -> str:
-    suffix = "" if topic in _OPEN_TOPICS else "·尚未开放"
-    lines = [f"【{topic}指令{suffix}】"]
+    lines = [f"【{topic}指令】"]
     lines.extend(_TOPICS[topic])
     return "\n".join(lines)
 
 
+def _usage_block() -> str:
+    return "\n".join(
+        (
+            "【使用提示】",
+            "同名资产请使用：名称#8位短编号",
+            "做菜、吃菜和单件售卖可省略编号，自动处理最低价值的 1 至 3 星资产。",
+            "赠送与交易必须明确 @ 一位当前群成员。",
+        )
+    )
+
+
 def format_help(topic: str = "") -> str:
-    """按主题返回便于复制的纯文字帮助，并标明开放边界。"""
+    """按主题返回只保留命令和必要提示的纯文字帮助。"""
 
     normalized = str(topic or "").strip()
     normalized = _TOPIC_ALIASES.get(normalized, normalized)
-    notice = (
-        f"当前版本：v{PLUGIN_VERSION}（第 {FRAMEWORK_PHASE} 轮）\n"
-        "已开放抓猪、收藏、做菜、美食、商城、赠送、双方确认交易、"
-        "展示位和七类群排行。"
-    )
     if normalized and normalized not in {"全部", *list(_TOPICS)}:
         topics = "、".join(_TOPICS)
         return (
-            f"【抓猪插件·指令帮助】\n\n{notice}\n\n未知帮助主题：{normalized}\n可用主题：{topics}\n示例：/抓猪帮助 做菜"
+            "【抓猪插件·指令帮助】\n\n"
+            f"未知帮助主题：{normalized}\n"
+            f"可用主题：{topics}\n"
+            "示例：/抓猪帮助 做菜"
         )
     if normalized and normalized != "全部":
         return (
             "【抓猪插件·指令帮助】\n\n"
-            f"{notice}\n\n"
             f"{_topic_block(normalized)}\n\n"
-            "资产选择器格式：名称#8位短编号\n"
-            "示例：/抓猪详情 粉红小香猪#A19F2C3D\n"
-            "做菜、吃菜和单件售卖不填编号时，自动处理价值最低的 1 至 3 星资产。\n"
-            "赠送与报价必须明确 @ 一位当前群成员。"
+            f"{_usage_block()}"
         )
 
     lines = [
         "【抓猪插件·指令帮助】",
-        "",
-        notice,
         "",
         "/抓猪帮助 [抓猪|背包|道具|做菜|商城|交易|排行]",
         "",
@@ -111,13 +107,7 @@ def format_help(topic: str = "") -> str:
     lines.extend(
         [
             "",
-            "资产选择器格式：名称#8位短编号",
-            "示例：/做菜 粉红小香猪#A19F2C3D",
-            "不填做菜/吃菜/售卖编号时，自动处理价值最低的 1 至 3 星资产。",
-            "4 星以上资产始终需要填写名称#短编号。",
-            "交易示例：/猪猪交易 粉红小香猪#A19F2C3D @群友 100",
-            "",
-            "所有玩法仅响应显式斜杠命令，不读取普通聊天，也不使用 LLM。",
+            _usage_block(),
         ]
     )
     return "\n".join(lines)
