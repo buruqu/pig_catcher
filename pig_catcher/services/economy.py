@@ -20,6 +20,7 @@ from ..domain.economy import (
     StoreProduct,
     adjusted_cooking_weights,
     build_store_products,
+    cookware_higher_rarity_multiplier,
     generate_food_attributes,
     item_product_by_name,
     recipe_affinity,
@@ -51,7 +52,12 @@ from ..domain.food_effects import (
 from ..domain.gameplay import ItemDefinition, item_by_id, level_progress
 from ..domain.models import CommandIdentity, CommandReceipt
 from ..domain.ports import Clock, MessageKeyFactory, RandomSource, SystemClock, SystemRandomSource
-from ..domain.rules import choose_rarity
+from ..domain.rules import (
+    BASE_CATCH_WEIGHTS,
+    catch_weights,
+    choose_rarity,
+    normalize_weights,
+)
 from ..domain.selectors import new_short_code, parse_asset_selector
 from ..infrastructure.database import DatabaseSession, PigCatcherDatabase
 from ..infrastructure.repositories import (
@@ -272,6 +278,7 @@ class StorePage:
     feed_level: int
     cookware_level: int
     products: tuple[StoreProduct, ...]
+    catch_base_weights: tuple[float, ...] = BASE_CATCH_WEIGHTS
 
 
 @dataclass(frozen=True, slots=True)
@@ -559,11 +566,29 @@ def format_eat_summary(result: EatResult) -> str:
 def format_store_summary(result: StorePage) -> str:
     """Return a complete store fallback."""
 
+    feed_probabilities = tuple(
+        sum(
+            catch_weights(
+                result.catch_base_weights,
+                feed_level=level,
+            )[3:]
+        )
+        for level in range(6)
+    )
+    cookware_bonuses = tuple(
+        (cookware_higher_rarity_multiplier(level) - 1.0) * 100.0
+        for level in range(6)
+    )
     lines = [
         "【猪猪商城】",
         f"玩家：{result.display_name}；余额：{result.coin_balance} 猪币",
         f"分类：{result.category}；单页展示全部 {result.total_count} 项",
         f"猪饲料 Lv.{result.feed_level}；厨具 Lv.{result.cookware_level}",
+        "猪饲料 Lv.0-5 的 4-6 星合计概率："
+        + " / ".join(f"{value:.2f}%" for value in feed_probabilities),
+        "厨具 Lv.0-5 的高档菜相对权重增幅："
+        + " / ".join(f"+{value:.0f}%" for value in cookware_bonuses),
+        "六星猪做菜不受厨具影响，保持 90% 五星 / 10% 六星。",
     ]
     if not result.products:
         lines.append("当前分类没有商品。")
@@ -665,6 +690,7 @@ class EconomyService:
         id_factory: Callable[[], str] | None = None,
         short_code_factory: Callable[[], str] | None = None,
         effect_handlers: Mapping[str, FoodEffectHandler] | None = None,
+        catch_base_weights: Sequence[float] | None = None,
     ) -> None:
         self.database = database
         self.cooking = cooking
@@ -679,6 +705,11 @@ class EconomyService:
         self.id_factory = id_factory or (lambda: uuid4().hex)
         self.short_code_factory = short_code_factory or new_short_code
         self.effect_handlers = dict(effect_handlers or {})
+        self.catch_base_weights = normalize_weights(
+            BASE_CATCH_WEIGHTS
+            if catch_base_weights is None
+            else catch_base_weights
+        )
 
     async def cook(self, identity: CommandIdentity, selector_text: str) -> CookingResult:
         """Atomically consume one pig and produce one or two foods."""
@@ -730,6 +761,13 @@ class EconomyService:
                 player_id=identity.player_id,
             )
             cookware_level = upgrades["cookware"]
+            probability_experience = (
+                await self.gameplay_repository.get_player_experience(
+                    session,
+                    player_id=identity.player_id,
+                )
+            )
+            probability_level = level_progress(probability_experience).level
             armed_row = await self.gameplay_repository.get_armed_item(
                 session,
                 player_id=identity.player_id,
@@ -741,6 +779,7 @@ class EconomyService:
                 size_percentile=source.size_percentile,
                 weight_percentile=source.weight_percentile,
                 cookware_level=cookware_level,
+                player_level=probability_level,
                 chef_spice=(
                     armed_item is not None and armed_item.item_id == "chef-spice"
                 ),
@@ -844,6 +883,7 @@ class EconomyService:
                 "source_rarity": source.rarity,
                 "weights": [round(value, 8) for value in weights],
                 "cookware_level": cookware_level,
+                "player_level": probability_level,
                 "item_id": armed_item.item_id if armed_item is not None else "",
                 "rarity_roll": rarity_roll,
                 "template_roll": template_roll,
@@ -1345,6 +1385,7 @@ class EconomyService:
             feed_level=upgrades["feed"],
             cookware_level=upgrades["cookware"],
             products=filtered,
+            catch_base_weights=self.catch_base_weights,
         )
 
     async def purchase(

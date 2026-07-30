@@ -754,6 +754,36 @@ footer strong {
   border-radius: 6px;
 }
 
+.profile-level-bonus {
+  margin-top: 18px;
+  padding-top: 15px;
+  display: grid;
+  gap: 4px;
+  border-top: 1px solid #efd7e0;
+}
+
+.profile-level-bonus span,
+.profile-level-bonus strong,
+.profile-level-bonus small {
+  display: block;
+}
+
+.profile-level-bonus span {
+  color: #9a526e;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.profile-level-bonus strong {
+  color: #3a3035;
+  font-size: 19px;
+}
+
+.profile-level-bonus small {
+  color: #725f68;
+  font-size: 14px;
+}
+
 .profile-sheet__balance {
   padding: 18px 22px;
   text-align: right;
@@ -1219,6 +1249,96 @@ footer strong {
   overflow-wrap: anywhere;
   color: #3a3035;
   font-size: 21px;
+}
+
+.store-probability {
+  padding: 24px 38px 28px;
+  display: grid;
+  gap: 22px;
+  background: #fffafd;
+  border-bottom: 1px solid #efd7e0;
+}
+
+.store-probability__group {
+  display: grid;
+  gap: 12px;
+}
+
+.store-probability__group + .store-probability__group {
+  padding-top: 20px;
+  border-top: 1px solid #efd7e0;
+}
+
+.store-probability__heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.store-probability__heading span {
+  color: #9a526e;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.store-probability__heading h2 {
+  margin-top: 3px;
+  color: #302730;
+  font-size: 24px;
+}
+
+.store-probability__heading p,
+.store-probability__note {
+  margin: 0;
+  color: #725f68;
+  font-size: 14px;
+}
+
+.store-probability__levels {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.store-probability__level {
+  min-width: 0;
+  min-height: 90px;
+  padding: 11px 9px;
+  display: grid;
+  align-content: center;
+  gap: 3px;
+  text-align: center;
+  background: #ffffff;
+  border: 1px solid #eadfe3;
+  border-radius: 6px;
+}
+
+.store-probability__level.is-current {
+  background: #fff0f6;
+  border-color: #d85d8b;
+}
+
+.store-probability__level span,
+.store-probability__level strong,
+.store-probability__level small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.store-probability__level span {
+  color: #896f79;
+  font-size: 12px;
+}
+
+.store-probability__level strong {
+  color: #a14568;
+  font-size: 21px;
+}
+
+.store-probability__level small {
+  color: #725f68;
+  font-size: 11px;
 }
 
 .store-list,

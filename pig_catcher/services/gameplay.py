@@ -12,6 +12,7 @@ from typing import Any
 from uuid import uuid4
 
 from ..config.model import CatchingSection, RankingSection
+from ..domain.economy import level_cooking_higher_rarity_multiplier
 from ..domain.enums import Rarity, RecordType, StatureProfile
 from ..domain.errors import (
     AmbiguousPigSelectorError,
@@ -39,7 +40,12 @@ from ..domain.gameplay import (
 )
 from ..domain.models import CommandIdentity, CommandReceipt
 from ..domain.ports import Clock, MessageKeyFactory, RandomSource, SystemClock, SystemRandomSource
-from ..domain.rules import catch_weights, choose_rarity, normalize_weights
+from ..domain.rules import (
+    LEVEL_CATCH_BONUS_CAP_LEVEL,
+    catch_weights,
+    choose_rarity,
+    normalize_weights,
+)
 from ..domain.selectors import new_short_code, parse_asset_selector
 from ..domain.social import describe_body_scale
 from ..infrastructure.database import DatabaseSession, PigCatcherDatabase
@@ -193,6 +199,10 @@ class PlayerProfile:
     collections: tuple[CollectionProgress, ...]
     showcase_pig: str = ""
     showcase_food: str = ""
+    level_catch_base_high_percent: float = 0.0
+    level_catch_adjusted_high_percent: float = 0.0
+    level_cooking_bonus_percent: float = 0.0
+    level_bonus_cap_level: int = LEVEL_CATCH_BONUS_CAP_LEVEL
 
 
 @dataclass(frozen=True, slots=True)
@@ -519,6 +529,11 @@ def format_profile_summary(profile: PlayerProfile) -> str:
         f"美食展示：{profile.showcase_food or '未设置'}\n"
         f"当前持有群纪录：{profile.held_records}\n"
         f"猪饲料：Lv.{profile.feed_level}；厨具：Lv.{profile.cookware_level}\n"
+        "等级概率加成：抓猪 4-6 星 "
+        f"{profile.level_catch_base_high_percent:.2f}% → "
+        f"{profile.level_catch_adjusted_high_percent:.2f}%；"
+        f"普通做菜高档权重 +{profile.level_cooking_bonus_percent:.2f}%"
+        f"（Lv.{profile.level_bonus_cap_level} 封顶）\n"
         f"今日抓猪：{profile.daily_count}/{profile.daily_limit}\n"
         f"抓猪冷却：{profile.cooldown_remaining_seconds} 秒\n"
         f"已装备抓猪道具：{armed}\n"
@@ -771,6 +786,11 @@ class GameplayService:
                 session,
                 player_id=identity.player_id,
             )
+            probability_experience = await self.repository.get_player_experience(
+                session,
+                player_id=identity.player_id,
+            )
+            probability_level = level_progress(probability_experience).level
             armed_row = await self.repository.get_armed_item(
                 session,
                 player_id=identity.player_id,
@@ -780,6 +800,7 @@ class GameplayService:
             weights = self._available_weights(
                 buckets=buckets,
                 feed_level=feed_level,
+                player_level=probability_level,
                 lucky_whistle=(
                     armed_item is not None and armed_item.item_id == "lucky-whistle"
                 ),
@@ -818,6 +839,7 @@ class GameplayService:
                 "base_weights": list(self.catching.weights()),
                 "normalized_weights": [round(value, 8) for value in weights],
                 "feed_level": feed_level,
+                "player_level": probability_level,
                 "item_id": armed_item.item_id if armed_item is not None else "",
                 "rarity_roll": rarity_roll,
                 "template_roll": template_roll,
@@ -1153,11 +1175,17 @@ class GameplayService:
                 player_id=identity.player_id,
             )
         experience = int(row["experience"])
+        progress = level_progress(experience)
+        base_weights = normalize_weights(self.catching.weights())
+        level_weights = catch_weights(
+            base_weights,
+            player_level=progress.level,
+        )
         return PlayerProfile(
             display_name=str(row["display_name"]),
             coin_balance=int(row["coin_balance"]),
             total_experience=experience,
-            level=level_progress(experience),
+            level=progress,
             total_catches=int(row["total_catches"]),
             active_pigs=int(row["active_pigs"]),
             catalog_count=visible_collected,
@@ -1195,6 +1223,12 @@ class GameplayService:
                 and showcase_row.get("food_short_code")
                 else ""
             ),
+            level_catch_base_high_percent=sum(base_weights[3:]),
+            level_catch_adjusted_high_percent=sum(level_weights[3:]),
+            level_cooking_bonus_percent=(
+                level_cooking_higher_rarity_multiplier(progress.level) - 1.0
+            )
+            * 100.0,
         )
 
     async def pig_detail(self, identity: CommandIdentity, selector_text: str) -> PigView:
@@ -1645,11 +1679,13 @@ class GameplayService:
         *,
         buckets: Mapping[Rarity, Sequence[Mapping[str, object]]],
         feed_level: int,
+        player_level: int,
         lucky_whistle: bool,
     ) -> tuple[float, ...]:
         weights = catch_weights(
             self.catching.weights(),
             feed_level=feed_level,
+            player_level=player_level,
             lucky_whistle=lucky_whistle,
             six_star_available=bool(buckets[Rarity.SIX]),
         )

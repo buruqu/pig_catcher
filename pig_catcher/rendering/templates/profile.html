@@ -31,6 +31,18 @@
         <div class="progress-track" aria-label="等级进度">
           <span style="width: {{ "%.2f"|format(view.progress_percent) }}%"></span>
         </div>
+        <div class="profile-level-bonus">
+          <span>等级概率加成</span>
+          <strong>
+            抓猪 4-6 星
+            {{ "%.2f"|format(view.level_catch_base_high_percent) }}%
+            → {{ "%.2f"|format(view.level_catch_adjusted_high_percent) }}%
+          </strong>
+          <small>
+            普通做菜高档权重 +{{ "%.2f"|format(view.level_cooking_bonus_percent) }}%
+            · Lv.{{ view.level_bonus_cap_level }} 封顶
+          </small>
+        </div>
       </div>
       <div class="profile-sheet__balance">
         <span>猪币余额</span>
@@ -75,7 +87,7 @@
     </section>
 
     <footer class="game-footer">
-      <span>数值等级与荣誉称号仅供展示，不提供隐藏概率</span>
+      <span>等级加成公开展示；荣誉称号不改变概率</span>
       <strong>北京时间自然日</strong>
     </footer>
   </main>

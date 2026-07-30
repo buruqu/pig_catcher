@@ -17,6 +17,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 from playwright.async_api import Browser, Page, async_playwright
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+DEFINITIONS = PROJECT_ROOT / "catalogs" / "formal" / "pig-and-food-definitions.json"
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from pig_catcher.rendering import (  # noqa: E402
@@ -112,6 +113,14 @@ def load_rows(database_path: Path) -> list[dict[str, object]]:
         return [dict(row) for row in rows]
     finally:
         connection.close()
+
+
+def expected_asset_count() -> int:
+    payload = json.loads(DEFINITIONS.read_text(encoding="utf-8"))
+    entries = payload.get("entries")
+    if not isinstance(entries, list) or not entries:
+        raise RuntimeError("Formal catalog definitions contain no entries")
+    return len(entries)
 
 
 def font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
@@ -241,7 +250,7 @@ async def accept(args: argparse.Namespace) -> dict[str, object]:
     rendered_root = output_root / "rendered"
     rendered_root.mkdir()
     rows = load_rows(data_dir / args.database_filename)
-    expected_assets = 112
+    expected_assets = expected_asset_count()
     if len(rows) != expected_assets:
         raise RuntimeError(
             f"Expected {expected_assets} active assets, found {len(rows)}"

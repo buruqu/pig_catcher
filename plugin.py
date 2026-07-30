@@ -286,6 +286,7 @@ class PigCatcherPlugin(MaiBotPlugin):
                 database,
                 settings.cooking,
                 settings.economy,
+                catch_base_weights=settings.catching.weights(),
             )
             self._social_service = SocialService(
                 database,

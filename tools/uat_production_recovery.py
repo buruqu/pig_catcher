@@ -663,7 +663,7 @@ async def run(args: argparse.Namespace) -> dict[str, object]:
         "schema_version": SCHEMA_VERSION,
         "component_count": 27,
         "production_defaults": {
-            "daily_limit": 20,
+            "daily_limit": 22,
             "cooldown_seconds": 20,
         },
         "uat_overrides": {

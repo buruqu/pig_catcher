@@ -8,7 +8,10 @@ from hashlib import sha256
 from .enums import Rarity, UpgradeType
 from .errors import DomainValidationError, StoreProductError
 from .gameplay import ITEM_DEFINITIONS, ItemDefinition
-from .rules import cooking_weights, normalize_weights
+from .rules import cooking_weights, level_catch_bonus_scale, normalize_weights
+
+COOKWARE_HIGHER_RARITY_STEP = 0.02
+LEVEL_COOKING_HIGHER_RARITY_STEP = 0.01
 
 FOOD_RARITY_NAMES: dict[Rarity, str] = {
     Rarity.ONE: "猪食",
@@ -105,15 +108,33 @@ def _unit(value: float, *, label: str) -> float:
     return normalized
 
 
+def cookware_higher_rarity_multiplier(cookware_level: int) -> float:
+    """返回厨具对高于原料品质结果的相对权重乘数。"""
+
+    normalized_level = int(cookware_level)
+    if not 0 <= normalized_level <= 5:
+        raise DomainValidationError("厨具等级必须位于 0 至 5。")
+    return 1.0 + COOKWARE_HIGHER_RARITY_STEP * normalized_level
+
+
+def level_cooking_higher_rarity_multiplier(player_level: int) -> float:
+    """返回数值等级对普通做菜高档结果的封顶相对权重乘数。"""
+
+    return 1.0 + LEVEL_COOKING_HIGHER_RARITY_STEP * level_catch_bonus_scale(
+        player_level
+    )
+
+
 def adjusted_cooking_weights(
     source_rarity: Rarity | int,
     *,
     size_percentile: float,
     weight_percentile: float,
     cookware_level: int,
+    player_level: int = 1,
     chef_spice: bool,
 ) -> tuple[float, ...]:
-    """应用属性、厨具和主厨香料，同时保持六星猪固定 90/10。"""
+    """应用属性、等级、厨具和主厨香料，同时保持六星猪固定 90/10。"""
 
     try:
         rarity = Rarity(int(source_rarity))
@@ -123,8 +144,8 @@ def adjusted_cooking_weights(
     weight = float(weight_percentile)
     if not 0.0 <= size <= 1.0 or not 0.0 <= weight <= 1.0:
         raise DomainValidationError("原料猪属性百分位必须位于 0 至 1。")
-    if not 0 <= int(cookware_level) <= 5:
-        raise DomainValidationError("厨具等级必须位于 0 至 5。")
+    cookware_multiplier = cookware_higher_rarity_multiplier(cookware_level)
+    level_multiplier = level_cooking_higher_rarity_multiplier(player_level)
     if rarity is Rarity.SIX:
         return cooking_weights(rarity)
 
@@ -139,7 +160,7 @@ def adjusted_cooking_weights(
         weights[lowest_index] -= spice_shift
         weights[target_index] += spice_shift
 
-    higher_multiplier = 1.0 + 0.02 * int(cookware_level)
+    higher_multiplier = cookware_multiplier * level_multiplier
     source_index = int(rarity) - 1
     for index in range(source_index + 1, len(weights)):
         weights[index] *= higher_multiplier

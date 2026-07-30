@@ -5,9 +5,11 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 
+from ..domain.economy import cookware_higher_rarity_multiplier
 from ..domain.errors import RenderError
 from ..domain.food_effects import effect_summary
 from ..domain.gameplay import level_progress, size_label, weight_label
+from ..domain.rules import catch_weights
 from ..domain.social import TRADE_STATUS_LABELS
 from ..services.economy import (
     BatchSaleResult,
@@ -62,6 +64,7 @@ from .models import (
     RankingViewModel,
     RecordItemViewModel,
     RecordsViewModel,
+    StoreProbabilityRowViewModel,
     StoreProductViewModel,
     StoreViewModel,
     TradeListItemViewModel,
@@ -204,6 +207,12 @@ def profile_view(profile: PlayerProfile) -> ProfileViewModel:
         collections=tuple(_collection_view(item) for item in profile.collections),
         showcase_pig=profile.showcase_pig,
         showcase_food=profile.showcase_food,
+        level_catch_base_high_percent=profile.level_catch_base_high_percent,
+        level_catch_adjusted_high_percent=(
+            profile.level_catch_adjusted_high_percent
+        ),
+        level_cooking_bonus_percent=profile.level_cooking_bonus_percent,
+        level_bonus_cap_level=profile.level_bonus_cap_level,
     )
 
 
@@ -467,6 +476,36 @@ def food_catalog_view(page: FoodCatalogPage) -> FoodCatalogViewModel:
 def store_view(page: StorePage) -> StoreViewModel:
     """Build one store rendering view."""
 
+    base_high_probability = sum(
+        catch_weights(page.catch_base_weights, feed_level=0)[3:]
+    )
+    feed_probability_rows = tuple(
+        StoreProbabilityRowViewModel(
+            level=level,
+            value=f"{high_probability:.2f}%",
+            delta=(
+                "基准"
+                if level == 0
+                else f"+{high_probability - base_high_probability:.2f} 点"
+            ),
+            current=level == page.feed_level,
+        )
+        for level in range(6)
+        for high_probability in (
+            sum(catch_weights(page.catch_base_weights, feed_level=level)[3:]),
+        )
+    )
+    cookware_probability_rows = tuple(
+        StoreProbabilityRowViewModel(
+            level=level,
+            value=(
+                f"+{(cookware_higher_rarity_multiplier(level) - 1.0) * 100.0:.0f}%"
+            ),
+            delta="相对权重",
+            current=level == page.cookware_level,
+        )
+        for level in range(6)
+    )
     return StoreViewModel(
         display_name=page.display_name,
         coin_balance=page.coin_balance,
@@ -476,6 +515,8 @@ def store_view(page: StorePage) -> StoreViewModel:
         category=page.category,
         feed_level=page.feed_level,
         cookware_level=page.cookware_level,
+        feed_probability_rows=feed_probability_rows,
+        cookware_probability_rows=cookware_probability_rows,
         products=tuple(
             StoreProductViewModel(
                 display_name=product.display_name,

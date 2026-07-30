@@ -310,11 +310,11 @@ class CatchingSection(PluginConfigBase):
     __ui_order__ = 50
 
     daily_limit: int = Field(
-        default=20,
+        default=22,
         ge=1,
         le=1000,
         description="每位玩家在每个群每天可成功抓取的次数",
-        json_schema_extra=_ui("每日抓猪次数", "默认 20 次；只统计当前群、按北京时间自然日重置"),
+        json_schema_extra=_ui("每日抓猪次数", "默认 22 次；只统计当前群、按北京时间自然日重置"),
     )
     cooldown_seconds: int = Field(
         default=20,

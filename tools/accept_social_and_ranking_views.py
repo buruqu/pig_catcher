@@ -267,6 +267,9 @@ def profile_view() -> ProfileViewModel:
         armed_cooking_item_quantity=3,
         showcase_pig="大象#GIANT526 · 双项巨物",
         showcase_food="巧克力猪猪蛋糕#FOOD0526",
+        level_catch_base_high_percent=13.0,
+        level_catch_adjusted_high_percent=13.34,
+        level_cooking_bonus_percent=1.25,
     )
 
 

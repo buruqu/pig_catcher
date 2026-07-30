@@ -5,7 +5,7 @@
 | 位置 | 内容 |
 | --- | --- |
 | `current/assets.json` | 可供导入工具读取的 Asset Manifest 3 |
-| `current/build-report.json` | 112 项素材、111 份唯一二进制的 SHA-256 校验报告 |
+| `current/build-report.json` | 116 项素材、115 份唯一二进制的 SHA-256 校验报告 |
 | `current/media/猪猪素材库/` | 一至五星公共猪猪素材 |
 | `current/media/美食素材库/` | 公共美食素材 |
 | `current/media/定制猪群友库/` | 按 QQ 群号隔离的六星定制猪 |

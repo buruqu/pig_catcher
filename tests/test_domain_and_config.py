@@ -34,9 +34,11 @@ from pig_catcher.domain.models import CommandIdentity, ScopeKey
 from pig_catcher.domain.ports import MessageKeyFactory
 from pig_catcher.domain.rules import (
     BASE_CATCH_WEIGHTS,
+    LEVEL_CATCH_BONUS_CAP_LEVEL,
     catch_weights,
     choose_rarity,
     cooking_weights,
+    level_catch_bonus_scale,
     normalize_weights,
 )
 from pig_catcher.domain.selectors import parse_asset_selector
@@ -122,6 +124,23 @@ def test_feed_and_lucky_item_improve_high_rarity_share() -> None:
     assert sum(boosted[2:]) > sum(baseline[2:])
 
 
+def test_numeric_level_improves_catch_probability_with_a_hard_cap() -> None:
+    baseline = catch_weights(player_level=1)
+    growing = catch_weights(player_level=9)
+    capped = catch_weights(player_level=LEVEL_CATCH_BONUS_CAP_LEVEL)
+    far_beyond_cap = catch_weights(player_level=10**1000)
+
+    assert level_catch_bonus_scale(1) == 0.0
+    assert level_catch_bonus_scale(5) == 1.0
+    assert level_catch_bonus_scale(LEVEL_CATCH_BONUS_CAP_LEVEL) == 5.0
+    assert sum(growing[3:]) > sum(baseline[3:])
+    assert sum(capped[3:]) > sum(growing[3:])
+    assert far_beyond_cap == pytest.approx(capped)
+    assert capped == pytest.approx(catch_weights(feed_level=5))
+    with pytest.raises(DomainValidationError, match="玩家等级"):
+        catch_weights(player_level=0)
+
+
 def test_six_star_cooking_rule_is_fixed() -> None:
     assert cooking_weights(Rarity.SIX) == (0.0, 0.0, 0.0, 0.0, 90.0, 10.0)
     assert all(weights[5] == 0 for rarity, weights in ((r, cooking_weights(r)) for r in range(1, 6)))
@@ -203,7 +222,7 @@ def test_food_rarity_effect_cannot_bypass_six_star_cooking_rule() -> None:
         )
 
 
-def test_numeric_level_and_honor_title_are_separate_cosmetic_progress() -> None:
+def test_numeric_level_and_honor_title_remain_separate_progress_tracks() -> None:
     assert level_progress(0).level == 1
     assert level_progress(50).level == 2
     assert level_progress(200).level == 3
@@ -262,7 +281,7 @@ def test_access_policy_blacklist_has_priority() -> None:
 def test_default_config_exposes_fixed_rules_and_chinese_schema() -> None:
     config = PigCatcherConfig()
     assert config.plugin.framework_phase == "6"
-    assert config.catching.daily_limit == 20
+    assert config.catching.daily_limit == 22
     assert config.catching.cooldown_seconds == 20
     assert config.catching.weights() == BASE_CATCH_WEIGHTS
     assert config.cooking.six_star_to_five_percent == 90

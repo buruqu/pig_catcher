@@ -42,6 +42,7 @@ from pig_catcher.rendering import (
     RecordsViewModel,
     RenderDelivery,
     RenderOptions,
+    StoreProbabilityRowViewModel,
     StoreProductViewModel,
     StoreViewModel,
     TradeListItemViewModel,
@@ -393,7 +394,7 @@ async def test_animated_inventory_and_catalog_use_static_middle_frame_preview(
     )
     await renderer.render_inventory(inventory, {"animated": source})
     inventory_html, _ = capability.calls[-1]
-    assert "data:image/png;base64," in inventory_html
+    assert "data:image/webp;base64," in inventory_html
     assert "动态猪猪<br>详情查看" not in inventory_html
 
     catalog = CatalogViewModel(
@@ -422,9 +423,73 @@ async def test_animated_inventory_and_catalog_use_static_middle_frame_preview(
     )
     await renderer.render_catalog(catalog, {"animated": source})
     catalog_html, _ = capability.calls[-1]
-    assert "data:image/png;base64," in catalog_html
+    assert "data:image/webp;base64," in catalog_html
     assert "动态猪猪<br>详情查看" not in catalog_html
     assert hashlib.sha256(source.read_bytes()).hexdigest() == source_hash
+
+
+@pytest.mark.asyncio
+async def test_complete_catalog_uses_bounded_compact_previews_for_rpc(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "large-noise.png"
+    Image.effect_noise((1024, 1024), 100).convert("RGB").save(
+        source,
+        format="PNG",
+    )
+    source_hash = hashlib.sha256(source.read_bytes()).hexdigest()
+    item_count = 92
+    assert source.stat().st_size * item_count * 4 // 3 > 16 * 1024 * 1024
+
+    capability = FakeRender()
+    renderer = PigCatcherRenderer(capability, _options())
+    catalog = CatalogViewModel(
+        display_name="正式大图鉴传输测试",
+        total_count=item_count,
+        rarity=None,
+        undiscovered_only=False,
+        collected_count=item_count,
+        visible_catalog_total=item_count,
+        items=tuple(
+            CatalogItemViewModel(
+                key=f"pig-{index}",
+                display_name=f"大图素材猪 {index}",
+                rarity=(index % 6) + 1,
+                discovered=True,
+                acquired_count=1,
+                best_size=50.0,
+                best_weight=60.0,
+                collection_name="",
+                character_name="",
+                media_visible=True,
+                is_animated=False,
+                image_fit="contain",
+            )
+            for index in range(item_count)
+        ),
+    )
+    await renderer.render_catalog(
+        catalog,
+        {f"pig-{index}": source for index in range(item_count)},
+    )
+    html, _ = capability.calls[-1]
+    assert len(html.encode("utf-8")) < 12 * 1024 * 1024
+    assert html.count("data:image/webp;base64,") == item_count
+
+    encoded_preview = html.split("data:image/webp;base64,", 1)[1].split('"', 1)[0]
+    with Image.open(BytesIO(base64.b64decode(encoded_preview))) as preview:
+        assert preview.format == "WEBP"
+        assert max(preview.size) <= 256
+    assert hashlib.sha256(source.read_bytes()).hexdigest() == source_hash
+
+
+@pytest.mark.asyncio
+async def test_renderer_rejects_oversized_html_before_rpc() -> None:
+    capability = FakeRender()
+    renderer = PigCatcherRenderer(capability, _options())
+    with pytest.raises(RenderError, match="RPC 安全上限"):
+        await renderer._render_asset_html("x" * (12 * 1024 * 1024 + 1))
+    assert capability.calls == []
 
 
 @pytest.mark.asyncio
@@ -565,10 +630,19 @@ async def test_third_round_templates_render_all_business_views(
             armed_item_name="巨物玉米",
             armed_item_quantity=2,
             collections=collections,
+            level_catch_base_high_percent=13.0,
+            level_catch_adjusted_high_percent=13.54,
+            level_cooking_bonus_percent=2.0,
+            level_bonus_cap_level=21,
         )
     )
-    assert "Lv.3" in capability.calls[-1][0]
-    assert "Poppin&#39;Party" in capability.calls[-1][0]
+    profile_html = capability.calls[-1][0]
+    assert "Lv.3" in profile_html
+    assert "Poppin&#39;Party" in profile_html
+    assert "等级概率加成" in profile_html
+    assert "13.00%" in profile_html
+    assert "13.54%" in profile_html
+    assert "荣誉称号不改变概率" in profile_html
 
     inventory = InventoryViewModel(
         display_name="测试成员",
@@ -609,7 +683,7 @@ async def test_third_round_templates_render_all_business_views(
     await renderer.render_inventory(inventory, {"static": source})
     inventory_html, _ = capability.calls[-1]
     assert "动态猪猪" in inventory_html
-    assert inventory_html.count("data:image/png;base64,") == 1
+    assert inventory_html.count("data:image/webp;base64,") == 1
 
     catalog = CatalogViewModel(
         display_name="测试成员",
@@ -816,7 +890,7 @@ async def test_fourth_round_templates_render_food_and_economy_views(
     await renderer.render_food_inventory(inventory, {"static": source})
     inventory_html, _ = capability.calls[-1]
     assert "动态美食" in inventory_html
-    assert inventory_html.count("data:image/png;base64,") == 1
+    assert inventory_html.count("data:image/webp;base64,") == 1
 
     catalog = FoodCatalogViewModel(
         display_name="测试成员",
@@ -870,6 +944,24 @@ async def test_fourth_round_templates_render_food_and_economy_views(
             category="全部",
             feed_level=1,
             cookware_level=2,
+            feed_probability_rows=tuple(
+                StoreProbabilityRowViewModel(
+                    level=level,
+                    value=f"{13.0 + level * 0.26:.2f}%",
+                    delta="基准" if level == 0 else f"+{level * 0.26:.2f} 点",
+                    current=level == 1,
+                )
+                for level in range(6)
+            ),
+            cookware_probability_rows=tuple(
+                StoreProbabilityRowViewModel(
+                    level=level,
+                    value=f"+{level * 2}%",
+                    delta="相对权重",
+                    current=level == 2,
+                )
+                for level in range(6)
+            ),
             products=(
                 StoreProductViewModel(
                     display_name="幸运猪哨",
@@ -890,7 +982,12 @@ async def test_fourth_round_templates_render_food_and_economy_views(
             ),
         )
     )
-    assert "幸运猪哨" in capability.calls[-1][0]
+    store_html = capability.calls[-1][0]
+    assert "幸运猪哨" in store_html
+    assert "猪饲料" in store_html
+    assert "4-6 星合计概率" in store_html
+    assert "+10%" in store_html
+    assert "Lv.2 · 当前" in store_html
 
     await renderer.render_economy_receipt(
         EconomyReceiptViewModel(
@@ -1045,5 +1142,5 @@ async def test_fifth_round_templates_render_body_trade_and_ranking_views(
     )
     ranking_html, _ = capability.calls[-1]
     assert "巨物 159.5 分" in ranking_html
-    assert "data:image/png;base64," in ranking_html
+    assert "data:image/webp;base64," in ranking_html
     assert "GIF" in ranking_html and "动态展示" in ranking_html

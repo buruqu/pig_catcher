@@ -143,7 +143,13 @@ class PlaywrightRenderCapability:
             }
             """
         )
-        self.diagnostics.append({"label": self.label, **dict(diagnostic)})
+        self.diagnostics.append(
+            {
+                "label": self.label,
+                "htmlBytes": len(html.encode("utf-8")),
+                **dict(diagnostic),
+            }
+        )
         payload = await locator.screenshot(type="png", animations="disabled")
         with Image.open(BytesIO(payload)) as image:
             width, height = image.size
@@ -586,6 +592,9 @@ async def accept(args: argparse.Namespace) -> dict[str, object]:
                         armed_item_name="巨物玉米",
                         armed_item_quantity=4,
                         collections=collections,
+                        level_catch_base_high_percent=13.0,
+                        level_catch_adjusted_high_percent=13.20,
+                        level_cooking_bonus_percent=0.75,
                     )
                 ),
             )
@@ -611,6 +620,9 @@ async def accept(args: argparse.Namespace) -> dict[str, object]:
                         feed_level=0,
                         armed_item_name="",
                         armed_item_quantity=0,
+                        level_catch_base_high_percent=13.0,
+                        level_catch_adjusted_high_percent=13.0,
+                        level_cooking_bonus_percent=0.0,
                     )
                 ),
             )

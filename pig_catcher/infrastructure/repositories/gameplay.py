@@ -113,6 +113,20 @@ class GameplayRepository:
         )
         return int(row["level"]) if row is not None else 0
 
+    async def get_player_experience(
+        self,
+        session: DatabaseSession,
+        *,
+        player_id: str,
+    ) -> int:
+        row = await session.fetch_one(
+            "SELECT experience FROM players WHERE player_id = ?",
+            (player_id,),
+        )
+        if row is None:
+            raise RuntimeError("玩家初始化后无法读取累计经验。")
+        return int(row["experience"])
+
     async def get_armed_item(
         self,
         session: DatabaseSession,

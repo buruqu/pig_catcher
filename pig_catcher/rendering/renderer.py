@@ -39,6 +39,9 @@ from .models import (
 _ASSET_PREVIEW_SLOT = MediaSlot(x=38, y=154, width=500, height=500)
 _PIG_CARD_SLOT = MediaSlot(x=38, y=164, width=480, height=480)
 _FOOD_CARD_SLOT = MediaSlot(x=38, y=164, width=480, height=480)
+_COMPACT_PREVIEW_MAX_SIDE = 256
+_COMPACT_PREVIEW_WEBP_QUALITY = 82
+_MAX_HTML_RPC_BYTES = 12 * 1024 * 1024
 
 
 class HtmlRenderCapability(Protocol):
@@ -376,38 +379,70 @@ class PigCatcherRenderer:
         media_paths: Mapping[str, Path],
     ) -> dict[str, str]:
         result: dict[str, str] = {}
+        preview_cache: dict[tuple[Path, bool], str] = {}
         for key, media_visible, is_animated in items:
             if not media_visible:
                 continue
             path = media_paths.get(key)
             if path is None or not path.is_file():
                 continue
-            result[key] = (
-                self._animated_preview_data_url(path)
-                if is_animated
-                else self._source_data_url(path)
-            )
+            cache_key = (Path(path).resolve(), bool(is_animated))
+            preview = preview_cache.get(cache_key)
+            if preview is None:
+                preview = self._compact_preview_data_url(
+                    path,
+                    is_animated=bool(is_animated),
+                )
+                preview_cache[cache_key] = preview
+            result[key] = preview
         return result
 
     @staticmethod
-    def _animated_preview_data_url(source_path: Path) -> str:
-        """Extract a deterministic middle frame for compact list renderings."""
+    def _compact_preview_data_url(
+        source_path: Path,
+        *,
+        is_animated: bool,
+    ) -> str:
+        """为紧凑列表生成有界静态预览，避免原图 Base64 撑破 RPC 帧。"""
 
         path = Path(source_path)
         if not path.is_file():
-            raise RenderError(f"动画素材不存在：{path.name}")
+            raise RenderError(f"紧凑预览素材不存在：{path.name}")
         try:
             with Image.open(path) as source:
                 frame_count = int(getattr(source, "n_frames", 1))
-                source.seek(max(0, frame_count // 2))
+                if is_animated:
+                    source.seek(max(0, frame_count // 2))
+                elif frame_count > 1:
+                    raise RenderError("动画素材必须使用确定性的中间帧预览")
                 frame = source.convert("RGBA")
+                frame.thumbnail(
+                    (_COMPACT_PREVIEW_MAX_SIDE, _COMPACT_PREVIEW_MAX_SIDE),
+                    Image.Resampling.LANCZOS,
+                )
                 payload = BytesIO()
-                frame.save(payload, format="PNG", optimize=True)
+                frame.save(
+                    payload,
+                    format="WEBP",
+                    quality=_COMPACT_PREVIEW_WEBP_QUALITY,
+                    method=6,
+                )
+        except RenderError:
+            raise
         except (OSError, EOFError, UnidentifiedImageError, Image.DecompressionBombError) as exc:
-            raise RenderError(f"动画素材无法提取预览帧：{path.name}") from exc
+            raise RenderError(f"紧凑预览素材无法解码：{path.name}") from exc
         return (
-            "data:image/png;base64,"
+            "data:image/webp;base64,"
             f"{base64.b64encode(payload.getvalue()).decode('ascii')}"
+        )
+
+    @staticmethod
+    def _animated_preview_data_url(source_path: Path) -> str:
+        """兼容旧调用：提取确定性的中间帧紧凑预览。"""
+
+        return PigCatcherRenderer._compact_preview_data_url(
+            source_path,
+            is_animated=True,
         )
 
     @staticmethod
@@ -442,6 +477,12 @@ class PigCatcherRenderer:
             raise RenderError("图片底图尺寸不足以容纳固定素材区域")
 
     async def _render_asset_html(self, html: str) -> RenderedImage:
+        html_size = len(html.encode("utf-8"))
+        if html_size > _MAX_HTML_RPC_BYTES:
+            raise RenderError(
+                f"HTML 渲染请求为 {html_size} 字节，超过插件的 "
+                f"{_MAX_HTML_RPC_BYTES} 字节 RPC 安全上限"
+            )
         try:
             result = await self.capability.html2png(
                 html,

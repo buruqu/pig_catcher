@@ -20,11 +20,12 @@ from pig_catcher.domain.errors import (
 )
 from pig_catcher.domain.models import CommandIdentity, ScopeKey
 from pig_catcher.infrastructure import PigCatcherDatabase
-from pig_catcher.rendering import pig_card_view
+from pig_catcher.rendering import pig_card_view, profile_view
 from pig_catcher.services import (
     AssetCatalogService,
     FrameworkService,
     GameplayService,
+    format_profile_summary,
 )
 
 
@@ -216,6 +217,62 @@ async def test_catch_commits_all_effects_once_and_survives_restart(
 
 
 @pytest.mark.asyncio
+async def test_numeric_level_changes_the_committed_catch_probability(
+    tmp_path: Path,
+) -> None:
+    database = await _database_with_catalog(
+        tmp_path,
+        [
+            *[
+                _pig_entry(f"pig-{rarity}", rarity=rarity)
+                for rarity in range(1, 6)
+            ],
+            _pig_entry("pig-6", rarity=6, group_id="100"),
+        ],
+    )
+    identity = _identity(message_id="level-probability")
+    await FrameworkService(database).touch_identity(identity)
+    async with database.transaction() as session:
+        await session.execute(
+            "UPDATE players SET experience = 20000 WHERE player_id = ?",
+            (identity.player_id,),
+        )
+    service = GameplayService(
+        database,
+        CatchingSection(cooldown_seconds=0),
+        random_source=SequenceRandom(*_catch_rolls(rarity_roll=0.39)),
+        short_code_factory=lambda: "ABCDEF21",
+    )
+
+    result = await service.catch(identity)
+    assert result.pig.rarity == 2
+    snapshot_row = await database.fetch_one(
+        """
+        SELECT random_snapshot_json
+        FROM pig_instances
+        WHERE pig_instance_id = ?
+        """,
+        (result.pig.pig_instance_id,),
+    )
+    assert snapshot_row is not None
+    snapshot = json.loads(str(snapshot_row["random_snapshot_json"]))
+    assert snapshot["player_level"] == 21
+
+    profile = await service.profile(_identity(message_id="level-profile"))
+    assert profile.level.level == 21
+    assert (
+        profile.level_catch_adjusted_high_percent
+        > profile.level_catch_base_high_percent
+    )
+    assert profile.level_cooking_bonus_percent == pytest.approx(5.0)
+    profile_card = profile_view(profile)
+    assert profile_card.level_bonus_cap_level == 21
+    assert "等级概率加成：抓猪 4-6 星" in format_profile_summary(profile)
+    assert "普通做菜高档权重 +5.00%" in format_profile_summary(profile)
+    await database.close()
+
+
+@pytest.mark.asyncio
 async def test_cooldown_daily_limit_and_duplicate_precedence(tmp_path: Path) -> None:
     database = await _database_with_catalog(
         tmp_path,
@@ -246,7 +303,7 @@ async def test_cooldown_daily_limit_and_duplicate_precedence(tmp_path: Path) -> 
 
 
 @pytest.mark.asyncio
-async def test_default_frequency_is_twenty_per_day_with_twenty_second_cooldown(
+async def test_default_frequency_is_twenty_two_per_day_with_twenty_second_cooldown(
     tmp_path: Path,
 ) -> None:
     database = await _database_with_catalog(
@@ -260,7 +317,7 @@ async def test_default_frequency_is_twenty_per_day_with_twenty_second_cooldown(
         random_source=SequenceRandom(
             *(
                 roll
-                for _ in range(20)
+                for _ in range(22)
                 for roll in _catch_rolls()
             )
         ),
@@ -269,15 +326,15 @@ async def test_default_frequency_is_twenty_per_day_with_twenty_second_cooldown(
     await service.catch(_identity(message_id="default-1"))
     with pytest.raises(CatchCooldownError, match="20"):
         await service.catch(_identity(message_id="default-2"))
-    for index in range(2, 21):
+    for index in range(2, 23):
         clock.value += timedelta(seconds=20)
         await service.catch(_identity(message_id=f"default-{index}"))
     clock.value += timedelta(seconds=20)
-    with pytest.raises(DailyCatchLimitError, match="20/20"):
-        await service.catch(_identity(message_id="default-21"))
+    with pytest.raises(DailyCatchLimitError, match="22/22"):
+        await service.catch(_identity(message_id="default-23"))
     profile = await service.profile(_identity(message_id="default-profile"))
-    assert profile.daily_count == 20
-    assert profile.daily_limit == 20
+    assert profile.daily_count == 22
+    assert profile.daily_limit == 22
     await database.close()
 
 

@@ -30,6 +30,7 @@ from pig_catcher.rendering import (  # noqa: E402
     PigCatcherRenderer,
     ProfileViewModel,
     RenderedImage,
+    StoreProbabilityRowViewModel,
     StoreProductViewModel,
     StoreViewModel,
 )
@@ -186,6 +187,31 @@ def store_view() -> StoreViewModel:
         category="全部",
         feed_level=2,
         cookware_level=3,
+        feed_probability_rows=tuple(
+            StoreProbabilityRowViewModel(
+                level=level,
+                value=value,
+                delta="基准" if level == 0 else delta,
+                current=level == 2,
+            )
+            for level, value, delta in (
+                (0, "13.00%", "基准"),
+                (1, "13.27%", "+0.27 点"),
+                (2, "13.54%", "+0.54 点"),
+                (3, "13.80%", "+0.80 点"),
+                (4, "14.05%", "+1.05 点"),
+                (5, "14.30%", "+1.30 点"),
+            )
+        ),
+        cookware_probability_rows=tuple(
+            StoreProbabilityRowViewModel(
+                level=level,
+                value=f"+{level * 2}%",
+                delta="相对权重",
+                current=level == 3,
+            )
+            for level in range(6)
+        ),
         products=tuple(
             StoreProductViewModel(
                 display_name=name,
@@ -298,6 +324,10 @@ def profile_view() -> ProfileViewModel:
         visible_food_catalog_total=13,
         armed_cooking_item_name="大份餐盒",
         armed_cooking_item_quantity=2,
+        level_catch_base_high_percent=13.0,
+        level_catch_adjusted_high_percent=13.20,
+        level_cooking_bonus_percent=0.75,
+        level_bonus_cap_level=21,
     )
 
 

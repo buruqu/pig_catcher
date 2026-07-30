@@ -17,7 +17,11 @@ from pig_catcher.config.model import (
     RankingSection,
     TradingSection,
 )
-from pig_catcher.domain.economy import adjusted_cooking_weights
+from pig_catcher.domain.economy import (
+    adjusted_cooking_weights,
+    cookware_higher_rarity_multiplier,
+    level_cooking_higher_rarity_multiplier,
+)
 from pig_catcher.domain.enums import AssetKind
 from pig_catcher.domain.errors import (
     CookingTemplateError,
@@ -28,12 +32,13 @@ from pig_catcher.domain.errors import (
 from pig_catcher.domain.models import CommandIdentity, ScopeKey
 from pig_catcher.infrastructure import PigCatcherDatabase
 from pig_catcher.infrastructure.repositories import EconomyRepository, FrameworkRepository
-from pig_catcher.rendering import food_card_view
+from pig_catcher.rendering import food_card_view, store_view
 from pig_catcher.services import (
     AssetCatalogService,
     EconomyService,
     GameplayService,
     SocialService,
+    format_store_summary,
 )
 from pig_catcher.services.command_state import iso_timestamp
 
@@ -258,6 +263,41 @@ def test_cooking_weight_hard_boundaries() -> None:
     ) == (0.0, 0.0, 0.0, 0.0, 90.0, 10.0)
 
 
+def test_level_and_cookware_probability_bonuses_are_exact_and_bounded() -> None:
+    baseline = adjusted_cooking_weights(
+        3,
+        size_percentile=0.5,
+        weight_percentile=0.5,
+        cookware_level=0,
+        player_level=1,
+        chef_spice=False,
+    )
+    boosted = adjusted_cooking_weights(
+        3,
+        size_percentile=0.5,
+        weight_percentile=0.5,
+        cookware_level=5,
+        player_level=21,
+        chef_spice=False,
+    )
+    assert tuple(
+        round((cookware_higher_rarity_multiplier(level) - 1.0) * 100)
+        for level in range(6)
+    ) == (0, 2, 4, 6, 8, 10)
+    assert level_cooking_higher_rarity_multiplier(1) == 1.0
+    assert level_cooking_higher_rarity_multiplier(21) == pytest.approx(1.05)
+    assert level_cooking_higher_rarity_multiplier(999) == pytest.approx(1.05)
+    assert sum(boosted[3:5]) > sum(baseline[3:5])
+    assert adjusted_cooking_weights(
+        6,
+        size_percentile=1.0,
+        weight_percentile=1.0,
+        cookware_level=5,
+        player_level=999,
+        chef_spice=True,
+    ) == (0.0, 0.0, 0.0, 0.0, 90.0, 10.0)
+
+
 @pytest.mark.asyncio
 async def test_cooking_commits_once_and_rehydrates_after_restart(
     tmp_path: Path,
@@ -314,6 +354,47 @@ async def test_cooking_commits_once_and_rehydrates_after_restart(
     assert pig is not None and pig["state"] == "consumed-for-cooking"
     assert food_count is not None and food_count["count"] == 1
     assert cook_receipts is not None and cook_receipts["count"] == 1
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_numeric_level_changes_the_committed_cooking_probability(
+    tmp_path: Path,
+) -> None:
+    database = await _database_with_catalog(
+        tmp_path,
+        food_rarities=(1, 2),
+    )
+    clock = FixedClock()
+    _, caught = await _catch_one_star(database, clock=clock)
+    identity = _identity(message_id="level-cook")
+    async with database.transaction() as session:
+        await session.execute(
+            "UPDATE players SET experience = 20000 WHERE player_id = ?",
+            (identity.player_id,),
+        )
+    service = EconomyService(
+        database,
+        CookingSection(),
+        EconomySection(),
+        random_source=SequenceRandom(0.705, 0.0, 0.5),
+        clock=clock,
+        short_code_factory=lambda: "C19F2C3D",
+    )
+
+    result = await service.cook(identity, caught.pig.selector)
+    assert result.foods[0].rarity == 2
+    snapshot_row = await database.fetch_one(
+        """
+        SELECT random_snapshot_json
+        FROM food_instances
+        WHERE food_instance_id = ?
+        """,
+        (result.foods[0].food_instance_id,),
+    )
+    assert snapshot_row is not None
+    snapshot = json.loads(str(snapshot_row["random_snapshot_json"]))
+    assert snapshot["player_level"] == 21
     await database.close()
 
 
@@ -755,6 +836,28 @@ async def test_store_purchase_upgrade_insufficient_balance_and_ledger(
     store = await service.store(seed_identity, page=1, category="全部")
     assert store.coin_balance == 1000
     assert len(store.products) == 10
+    store_card = store_view(store)
+    assert tuple(row.value for row in store_card.feed_probability_rows) == (
+        "13.00%",
+        "13.27%",
+        "13.54%",
+        "13.80%",
+        "14.05%",
+        "14.30%",
+    )
+    assert tuple(row.value for row in store_card.cookware_probability_rows) == (
+        "+0%",
+        "+2%",
+        "+4%",
+        "+6%",
+        "+8%",
+        "+10%",
+    )
+    assert store_card.feed_probability_rows[0].current is True
+    assert store_card.cookware_probability_rows[0].current is True
+    store_text = format_store_summary(store)
+    assert "猪饲料 Lv.0-5 的 4-6 星合计概率" in store_text
+    assert "厨具 Lv.0-5 的高档菜相对权重增幅" in store_text
 
     item_identity = _identity(message_id="buy-item")
     item = await service.purchase(item_identity, "幸运猪哨", quantity=2)

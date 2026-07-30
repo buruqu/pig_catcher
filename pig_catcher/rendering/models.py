@@ -175,6 +175,10 @@ class ProfileViewModel:
     collections: tuple[CollectionProgressViewModel, ...] = ()
     showcase_pig: str = ""
     showcase_food: str = ""
+    level_catch_base_high_percent: float = 0.0
+    level_catch_adjusted_high_percent: float = 0.0
+    level_cooking_bonus_percent: float = 0.0
+    level_bonus_cap_level: int = 21
 
 
 @dataclass(frozen=True, slots=True)
@@ -402,6 +406,16 @@ class StoreProductViewModel:
 
 
 @dataclass(frozen=True, slots=True)
+class StoreProbabilityRowViewModel:
+    """One permanent-upgrade probability level shown in the store."""
+
+    level: int
+    value: str
+    delta: str
+    current: bool
+
+
+@dataclass(frozen=True, slots=True)
 class StoreViewModel:
     """One current-player store page."""
 
@@ -414,6 +428,8 @@ class StoreViewModel:
     feed_level: int
     cookware_level: int
     products: tuple[StoreProductViewModel, ...]
+    feed_probability_rows: tuple[StoreProbabilityRowViewModel, ...] = ()
+    cookware_probability_rows: tuple[StoreProbabilityRowViewModel, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

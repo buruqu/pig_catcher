@@ -40,6 +40,47 @@
       </div>
     </section>
 
+    <section class="store-probability">
+      <div class="store-probability__group">
+        <div class="store-probability__heading">
+          <div>
+            <span>永久升级概率</span>
+            <h2>猪饲料</h2>
+          </div>
+          <p>当前基础权重下，仅计算饲料时的 4-6 星合计概率</p>
+        </div>
+        <div class="store-probability__levels">
+          {% for row in view.feed_probability_rows %}
+          <div class="store-probability__level{% if row.current %} is-current{% endif %}">
+            <span>Lv.{{ row.level }}{% if row.current %} · 当前{% endif %}</span>
+            <strong>{{ row.value }}</strong>
+            <small>{{ row.delta }}</small>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="store-probability__group">
+        <div class="store-probability__heading">
+          <div>
+            <span>永久升级概率</span>
+            <h2>厨具</h2>
+          </div>
+          <p>普通 1-5 星原料中，高于原料品质的菜品权重相对增幅</p>
+        </div>
+        <div class="store-probability__levels">
+          {% for row in view.cookware_probability_rows %}
+          <div class="store-probability__level{% if row.current %} is-current{% endif %}">
+            <span>Lv.{{ row.level }}{% if row.current %} · 当前{% endif %}</span>
+            <strong>{{ row.value }}</strong>
+            <small>{{ row.delta }}</small>
+          </div>
+          {% endfor %}
+        </div>
+        <p class="store-probability__note">六星猪做菜不受厨具影响，保持当前 90% 五星 / 10% 六星规则。</p>
+      </div>
+    </section>
+
     {% if view.products %}
     <section class="store-list">
       {% for product in view.products %}
