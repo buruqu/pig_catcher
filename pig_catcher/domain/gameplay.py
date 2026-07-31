@@ -68,11 +68,23 @@ class ItemDefinition:
 
 
 ITEM_DEFINITIONS: tuple[ItemDefinition, ...] = (
-    ItemDefinition("lucky-whistle", "幸运猪哨", "catching", 180, "下一次抓猪更容易遇到高星猪猪"),
+    ItemDefinition(
+        "lucky-whistle",
+        "幸运猪哨",
+        "catching",
+        180,
+        "下一次抓猪：3-5 星相对权重 ×1.12，6 星相对权重 ×1.02",
+    ),
     ItemDefinition("giant-corn", "巨物玉米", "catching", 140, "下一次抓猪更容易遇到大体型猪猪"),
     ItemDefinition("fattening-bean-cake", "增膘豆饼", "catching", 100, "下一次抓猪的猪猪更肥、更重"),
     ItemDefinition("lean-green-feed", "精瘦青饲料", "catching", 100, "下一次抓猪的猪猪更精瘦、体型略大"),
-    ItemDefinition("chef-spice", "主厨香料", "cooking", 180, "下一次做菜更容易提升品质"),
+    ItemDefinition(
+        "chef-spice",
+        "主厨香料",
+        "cooking",
+        180,
+        "下一次用 1-5 星猪做菜：从最低可出档向高一档转移最多 6 个百分点",
+    ),
     ItemDefinition("precision-knife", "精准刀工券", "cooking", 120, "优先偏瘦食谱"),
     ItemDefinition("slow-cook-seasoning", "慢炖调料包", "cooking", 120, "优先偏肥食谱"),
     ItemDefinition("large-lunch-box", "大份餐盒", "cooking", 240, "符合条件时可能额外出餐"),
@@ -190,8 +202,8 @@ def generate_pig_attributes(
     }[resolved_profile]
     fat_ratio = profile_range[0] + (profile_range[1] - profile_range[0]) * fifth
     bias = float(stature_bias)
-    if not -0.35 <= bias <= 0.35:
-        raise DomainValidationError("体型效果偏移必须位于 -0.35 至 0.35。")
+    if not -0.50 <= bias <= 0.50:
+        raise DomainValidationError("体型效果偏移必须位于 -0.50 至 0.50。")
     size_percentile = _clamp(size_percentile + bias, 0.0, 1.0)
     weight_percentile = _clamp(weight_percentile + bias * 0.65, 0.0, 1.0)
 

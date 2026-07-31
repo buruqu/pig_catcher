@@ -56,6 +56,7 @@ from ..domain.rules import (
     BASE_CATCH_WEIGHTS,
     catch_weights,
     choose_rarity,
+    cooking_weights,
     normalize_weights,
 )
 from ..domain.selectors import new_short_code, parse_asset_selector
@@ -579,6 +580,39 @@ def format_store_summary(result: StorePage) -> str:
         (cookware_higher_rarity_multiplier(level) - 1.0) * 100.0
         for level in range(6)
     )
+    lucky_before = catch_weights(result.catch_base_weights)
+    lucky_after = catch_weights(result.catch_base_weights, lucky_whistle=True)
+    lucky_summary = " / ".join(
+        f"{rarity}★ {before:.2f}%→{after:.2f}%"
+        for rarity, before, after in zip(
+            range(1, 7),
+            lucky_before,
+            lucky_after,
+            strict=True,
+        )
+    )
+    def reachable_distribution(weights: tuple[float, ...]) -> str:
+        return "、".join(
+            f"{target}★ {value:.0f}%"
+            for target, value in enumerate(weights, start=1)
+            if value > 0
+        )
+
+    chef_summary = " / ".join(
+        f"{rarity}★猪 {reachable_distribution(cooking_weights(rarity))}"
+        "→"
+        + reachable_distribution(
+            adjusted_cooking_weights(
+                rarity,
+                size_percentile=0.0,
+                weight_percentile=0.0,
+                cookware_level=0,
+                player_level=1,
+                chef_spice=True,
+            )
+        )
+        for rarity in range(1, 6)
+    )
     lines = [
         "【猪猪商城】",
         f"玩家：{result.display_name}；余额：{result.coin_balance} 猪币",
@@ -588,6 +622,8 @@ def format_store_summary(result: StorePage) -> str:
         + " / ".join(f"{value:.2f}%" for value in feed_probabilities),
         "厨具 Lv.0-5 的高档菜相对权重增幅："
         + " / ".join(f"+{value:.0f}%" for value in cookware_bonuses),
+        f"幸运猪哨（基础权重，使用前→使用后）：{lucky_summary}",
+        f"主厨香料（基础分布、Lv.0，使用前→使用后）：{chef_summary}",
         "六星猪做菜不受厨具影响，保持 90% 五星 / 10% 六星。",
     ]
     if not result.products:

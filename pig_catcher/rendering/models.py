@@ -416,6 +416,15 @@ class StoreProbabilityRowViewModel:
 
 
 @dataclass(frozen=True, slots=True)
+class StoreConsumableProbabilityRowViewModel:
+    """One before/after probability row for a one-shot store item."""
+
+    label: str
+    before: str
+    after: str
+
+
+@dataclass(frozen=True, slots=True)
 class StoreViewModel:
     """One current-player store page."""
 
@@ -430,6 +439,8 @@ class StoreViewModel:
     products: tuple[StoreProductViewModel, ...]
     feed_probability_rows: tuple[StoreProbabilityRowViewModel, ...] = ()
     cookware_probability_rows: tuple[StoreProbabilityRowViewModel, ...] = ()
+    lucky_whistle_rows: tuple[StoreConsumableProbabilityRowViewModel, ...] = ()
+    chef_spice_rows: tuple[StoreConsumableProbabilityRowViewModel, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

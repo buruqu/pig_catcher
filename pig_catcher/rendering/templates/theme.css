@@ -1341,6 +1341,54 @@ footer strong {
   font-size: 11px;
 }
 
+.store-consumable-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.store-consumable-grid--six {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.store-consumable-row {
+  min-width: 0;
+  padding: 12px 10px;
+  display: grid;
+  gap: 4px;
+  background: #ffffff;
+  border: 1px solid #eadfe3;
+  border-radius: 6px;
+}
+
+.store-consumable-row strong,
+.store-consumable-row span,
+.store-consumable-row small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.store-consumable-row strong {
+  color: #a14568;
+  font-size: 15px;
+}
+
+.store-consumable-row span,
+.store-consumable-row small {
+  color: #725f68;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.store-consumable-row--wide {
+  min-height: 112px;
+}
+
+.store-consumable-row--wide small {
+  color: #9a526e;
+  font-weight: 700;
+}
+
 .store-list,
 .ledger-list {
   padding: 24px 38px 30px;

@@ -8,6 +8,7 @@ from typing import Literal
 from maibot_sdk import Field, PluginConfigBase
 from pydantic import field_validator, model_validator
 
+from ..domain.quota import normalize_quota_refresh_hours
 from ..domain.rules import normalize_weights
 from ..version import FRAMEWORK_PHASE, PLUGIN_VERSION
 
@@ -303,31 +304,41 @@ class AssetsSection(PluginConfigBase):
 
 
 class CatchingSection(PluginConfigBase):
-    """抓猪频率和六档基础权重。"""
+    """抓猪分时额度、冷却和六档基础权重。"""
 
     __ui_label__ = "抓猪规则"
     __ui_icon__ = "target"
     __ui_order__ = 50
 
     daily_limit: int = Field(
-        default=22,
+        default=5,
         ge=1,
         le=1000,
-        description="每位玩家在每个群每天可成功抓取的次数",
-        json_schema_extra=_ui("每日抓猪次数", "默认 22 次；只统计当前群、按北京时间自然日重置"),
+        description="每位玩家在每个群每个刷新窗口可成功抓取的次数",
+        json_schema_extra=_ui("每时段抓猪次数", "默认 5 次；00:00、09:00、12:00、19:00 分别重新计数"),
     )
     cooldown_seconds: int = Field(
         default=20,
         ge=0,
         le=86400,
         description="同一玩家两次抓猪之间的最短秒数",
-        json_schema_extra=_ui("抓猪冷却", "默认 20 秒；设置 0 表示不限制冷却，仍受每日次数约束"),
+        json_schema_extra=_ui("抓猪冷却", "默认 20 秒；设置 0 表示不限制，刷新窗口切换或手动重置后旧冷却失效"),
+    )
+    quota_refresh_hours: list[int] = Field(
+        default_factory=lambda: [0, 9, 12, 19],
+        min_length=1,
+        max_length=24,
+        description="北京时间每天重新开放抓猪额度的整点小时",
+        json_schema_extra=_ui(
+            "额度刷新小时",
+            "默认 0、9、12、19；每个时段单独计算次数，必须包含 0 且不能重复",
+        ),
     )
     daily_reset_timezone: Literal["Asia/Shanghai"] = Field(
         default="Asia/Shanghai",
         frozen=True,
-        description="抓猪每日次数重置所使用的自然日时区",
-        json_schema_extra=_ui("每日重置时区", "固定按北京时间自然日统计，不依赖服务器时区", disabled=True),
+        description="抓猪分时额度刷新所使用的时区",
+        json_schema_extra=_ui("额度刷新时区", "固定按北京时间刷新，不依赖服务器时区", disabled=True),
     )
     inventory_page_size: int = Field(
         default=12,
@@ -420,6 +431,11 @@ class CatchingSection(PluginConfigBase):
                 self.rarity_6_weight,
             )
         )
+
+    @field_validator("quota_refresh_hours")
+    @classmethod
+    def validate_quota_refresh_hours(cls, value: list[int]) -> list[int]:
+        return list(normalize_quota_refresh_hours(value))
 
 
 class CookingSection(PluginConfigBase):
@@ -712,6 +728,43 @@ class RenderingSection(PluginConfigBase):
         return normalized
 
 
+class QuotaAdministrationSection(PluginConfigBase):
+    """指定群抓猪额度的审计重置入口。"""
+
+    __ui_label__ = "额度重置"
+    __ui_icon__ = "timer-reset"
+    __ui_order__ = 95
+
+    group_id: str = Field(
+        default="",
+        max_length=128,
+        description="需要重置当前抓猪时段的群号",
+        json_schema_extra=_ui(
+            "目标群号",
+            "只填写一个精确群号，例如 123456789；不会重置其他群",
+            placeholder="填写需要重置的群号",
+        ),
+    )
+    execute_current_window_reset: bool = Field(
+        default=False,
+        description="保存配置后立即备份数据库并重置指定群当前时段额度",
+        json_schema_extra=_ui(
+            "重置当前时段",
+            "填写群号后打开并保存；成功后会写审计记录并自动恢复为关闭",
+        ),
+    )
+
+    @field_validator("group_id")
+    @classmethod
+    def validate_group_id(cls, value: str) -> str:
+        normalized = str(value or "").strip()
+        if ":" in normalized:
+            raise ValueError("目标群号只填写群 ID，不要填写平台前缀")
+        if any(ord(character) < 32 for character in normalized):
+            raise ValueError("目标群号包含不允许的控制字符")
+        return normalized
+
+
 class MaintenanceSection(PluginConfigBase):
     """数据库与暂存目录维护。"""
 
@@ -752,11 +805,19 @@ class PigCatcherConfig(PluginConfigBase):
     trading: TradingSection = Field(default_factory=TradingSection)
     ranking: RankingSection = Field(default_factory=RankingSection)
     rendering: RenderingSection = Field(default_factory=RenderingSection)
+    quota_administration: QuotaAdministrationSection = Field(
+        default_factory=QuotaAdministrationSection
+    )
     maintenance: MaintenanceSection = Field(default_factory=MaintenanceSection)
 
     @model_validator(mode="after")
     def validate_cross_section_rules(self) -> PigCatcherConfig:
         self.catching.weights()
+        if (
+            self.quota_administration.execute_current_window_reset
+            and not self.quota_administration.group_id
+        ):
+            raise ValueError("执行额度重置前必须填写目标群号")
         if self.cooking.six_star_to_five_percent + self.cooking.six_star_to_six_percent != 100:
             raise ValueError("六星猪料理概率必须合计 100%")
         if (

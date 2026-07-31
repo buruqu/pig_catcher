@@ -7,7 +7,7 @@ import math
 import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime, time, timedelta, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
@@ -40,6 +40,7 @@ from ..domain.gameplay import (
 )
 from ..domain.models import CommandIdentity, CommandReceipt
 from ..domain.ports import Clock, MessageKeyFactory, RandomSource, SystemClock, SystemRandomSource
+from ..domain.quota import catch_quota_window
 from ..domain.rules import (
     LEVEL_CATCH_BONUS_CAP_LEVEL,
     catch_weights,
@@ -71,7 +72,6 @@ _CATCH_COMMAND = "pig-catcher.catch"
 _ARM_ITEM_COMMAND = "pig-catcher.arm-item"
 _CANCEL_ITEM_COMMAND = "pig-catcher.cancel-item"
 _SHORT_CODE_PATTERN = re.compile(r"^[A-F0-9]{8}$")
-_BEIJING_TIMEZONE = timezone(timedelta(hours=8), "Asia/Shanghai")
 _FAT_LABELS = {
     "lean": "偏瘦",
     "balanced": "均衡",
@@ -336,15 +336,6 @@ def _parse_timestamp(value: str) -> datetime:
     return _safe_datetime(parsed)
 
 
-def _day_window(now: datetime, timezone_name: str) -> tuple[str, str]:
-    if timezone_name != "Asia/Shanghai":
-        raise DomainValidationError("每日重置时区当前只支持 Asia/Shanghai。")
-    local = _safe_datetime(now).astimezone(_BEIJING_TIMEZONE)
-    local_start = datetime.combine(local.date(), time.min, tzinfo=_BEIJING_TIMEZONE)
-    local_end = local_start + timedelta(days=1)
-    return iso_timestamp(local_start), iso_timestamp(local_end)
-
-
 def _cooldown_remaining(
     *,
     now: datetime,
@@ -503,7 +494,7 @@ def format_catch_summary(result: CatchResult) -> str:
         f"等级：Lv.{progress.level} · {progress.title}；"
         f"{result.total_experience}/{progress.next_threshold} EXP\n"
         f"当前余额：{result.coin_balance} 猪币\n"
-        f"今日抓猪：{result.daily_count}/{result.daily_limit}\n"
+        f"本时段抓猪：{result.daily_count}/{result.daily_limit}\n"
         f"本次道具：{item_text}\n"
         f"群纪录：{record_text}{effect_text}"
     )
@@ -536,7 +527,7 @@ def format_profile_summary(profile: PlayerProfile) -> str:
         f"{profile.level_catch_adjusted_high_percent:.2f}%；"
         f"普通做菜高档权重 +{profile.level_cooking_bonus_percent:.2f}%"
         f"（Lv.{profile.level_bonus_cap_level} 封顶）\n"
-        f"今日抓猪：{profile.daily_count}/{profile.daily_limit}\n"
+        f"本时段抓猪：{profile.daily_count}/{profile.daily_limit}\n"
         f"抓猪冷却：{profile.cooldown_remaining_seconds} 秒\n"
         f"已装备抓猪道具：{armed}\n"
         "已装备做菜道具："
@@ -725,10 +716,13 @@ class GameplayService:
         async with self.database.transaction() as session:
             now_datetime = _safe_datetime(self.clock.now())
             now = iso_timestamp(now_datetime)
-            day_start, day_end = _day_window(
+            quota_window = catch_quota_window(
                 now_datetime,
-                self.catching.daily_reset_timezone,
+                refresh_hours=self.catching.quota_refresh_hours,
+                timezone_name=self.catching.daily_reset_timezone,
             )
+            window_start = iso_timestamp(quota_window.start)
+            window_end = iso_timestamp(quota_window.end)
             existing = await self.receipt_repository.get_by_key(session, idempotency_key)
             if existing is not None:
                 validate_existing_receipt(
@@ -747,8 +741,8 @@ class GameplayService:
             daily_count, last_acquired_at = await self.repository.catch_usage(
                 session,
                 player_id=identity.player_id,
-                day_start=day_start,
-                day_end=day_end,
+                window_start=window_start,
+                window_end=window_end,
             )
             extra_granted, extra_consumed = (
                 await self.economy_repository.extra_catch_grants(
@@ -760,13 +754,13 @@ class GameplayService:
             daily_limit = self.catching.daily_limit + extra_granted
             if daily_count >= daily_limit:
                 raise DailyCatchLimitError(
-                    f"今天已经抓了 {daily_count}/{daily_limit} 次，"
-                    "请在北京时间次日 00:00 后再来。"
+                    f"本时段已经抓了 {daily_count}/{daily_limit} 次，"
+                    f"下次刷新：北京时间 {quota_window.next_refresh_label}。"
                 )
             using_extra_catch = daily_count >= self.catching.daily_limit
             if using_extra_catch and extra_consumed >= extra_granted:
                 raise DailyCatchLimitError(
-                    f"今天已经抓了 {daily_count}/{daily_limit} 次，"
+                    f"本时段已经抓了 {daily_count}/{daily_limit} 次，"
                     "额外抓猪机会已用完。"
                 )
             remaining = _cooldown_remaining(
@@ -1000,6 +994,8 @@ class GameplayService:
             payload: dict[str, Any] = {
                 "daily_count": daily_count + 1,
                 "daily_limit": daily_limit,
+                "quota_window": quota_window.label,
+                "next_quota_refresh": quota_window.next_refresh_label,
                 "coin_reward": coin_reward,
                 "experience_reward": experience_reward,
                 "coin_balance": coin_balance,
@@ -1100,10 +1096,13 @@ class GameplayService:
 
         now_datetime = _safe_datetime(self.clock.now())
         now = iso_timestamp(now_datetime)
-        day_start, day_end = _day_window(
+        quota_window = catch_quota_window(
             now_datetime,
-            self.catching.daily_reset_timezone,
+            refresh_hours=self.catching.quota_refresh_hours,
+            timezone_name=self.catching.daily_reset_timezone,
         )
+        window_start = iso_timestamp(quota_window.start)
+        window_end = iso_timestamp(quota_window.end)
         async with self.database.transaction() as session:
             await self.framework_repository.touch_identity(
                 session,
@@ -1119,8 +1118,8 @@ class GameplayService:
             daily_count, last_acquired_at = await self.repository.catch_usage(
                 session,
                 player_id=identity.player_id,
-                day_start=day_start,
-                day_end=day_end,
+                window_start=window_start,
+                window_end=window_end,
             )
             extra_granted, _ = await self.economy_repository.extra_catch_grants(
                 session,

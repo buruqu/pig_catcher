@@ -49,7 +49,12 @@ def test_high_rarity_food_effects_cover_new_gameplay_families() -> None:
     assert foods["猪猪白菜炖粉条"]["effect_params"] == {"shift_percent": 12}
     assert foods["小马猪蒙布朗"]["effect_params"] == {
         "rarity": 6,
-        "multiplier": 3.0,
+        "multiplier": 12.0,
+    }
+    assert foods["猪鼻蛋包饭"]["effect_params"] == {"six_star_percent": 60}
+    assert foods["撅撅猪派"]["effect_params"] == {
+        "mode": "mini",
+        "strength": 0.5,
     }
 
 

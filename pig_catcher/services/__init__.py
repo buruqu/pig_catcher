@@ -49,6 +49,7 @@ from .gameplay import (
     format_records_summary,
 )
 from .maintenance import MaintenanceOptions, MaintenanceReport, MaintenanceRunner
+from .quota import CatchQuotaResetResult, CatchQuotaResetService
 from .receipts import ReceiptService
 from .social import (
     GiftResult,
@@ -86,6 +87,8 @@ __all__ = [
     "CatalogEntry",
     "CatalogPage",
     "CatchResult",
+    "CatchQuotaResetResult",
+    "CatchQuotaResetService",
     "GameplayService",
     "GiantSightingEntry",
     "InventoryPage",

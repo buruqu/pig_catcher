@@ -156,7 +156,7 @@ def resolve_food_effect(
             f"下一次做菜时，向更高一档转移 {shift:g} 个百分点。",
         )
     if normalized_id == NEXT_SIX_STAR_COOK:
-        percent = _number(raw, "six_star_percent", lower=11.0, upper=35.0)
+        percent = _number(raw, "six_star_percent", lower=11.0, upper=60.0)
         return FoodEffectGrant(
             normalized_id,
             {"six_star_percent": percent},
@@ -174,7 +174,17 @@ def resolve_food_effect(
     if normalized_id in {NEXT_PIG_RARITY, NEXT_FOOD_RARITY}:
         rarity_upper = 6 if normalized_id == NEXT_PIG_RARITY else 5
         rarity = _integer(raw, "rarity", lower=1, upper=rarity_upper)
-        multiplier = _number(raw, "multiplier", lower=1.01, upper=3.0)
+        multiplier_upper = (
+            12.0
+            if normalized_id == NEXT_PIG_RARITY and rarity == 6
+            else 3.0
+        )
+        multiplier = _number(
+            raw,
+            "multiplier",
+            lower=1.01,
+            upper=multiplier_upper,
+        )
         target = "抓猪" if normalized_id == NEXT_PIG_RARITY else "做菜"
         noun = "猪猪" if normalized_id == NEXT_PIG_RARITY else "美食"
         return FoodEffectGrant(
@@ -187,7 +197,7 @@ def resolve_food_effect(
         mode = str(raw.get("mode") or "").strip()
         if mode not in {"giant", "mini"}:
             raise FoodEffectError("体型美食效果的 mode 只能是 giant 或 mini。")
-        strength = _number(raw, "strength", lower=0.05, upper=0.35)
+        strength = _number(raw, "strength", lower=0.05, upper=0.50)
         label = "巨物" if mode == "giant" else "迷你"
         return FoodEffectGrant(
             normalized_id,
@@ -248,7 +258,7 @@ def apply_catch_effects(
         summaries.append(grant.summary)
     return CatchEffectApplication(
         weights=normalize_weights(adjusted),
-        stature_bias=max(-0.35, min(0.35, stature_bias)),
+        stature_bias=max(-0.50, min(0.50, stature_bias)),
         consumed_entry_ids=tuple(consumed),
         summaries=tuple(summaries),
     )

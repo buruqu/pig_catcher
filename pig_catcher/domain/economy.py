@@ -28,7 +28,7 @@ FOOD_BASE_VALUES: dict[Rarity, int] = {
     Rarity.THREE: 100,
     Rarity.FOUR: 320,
     Rarity.FIVE: 1100,
-    Rarity.SIX: 4200,
+    Rarity.SIX: 25000,
 }
 
 COOK_COIN_REWARDS: dict[Rarity, int] = {
@@ -37,7 +37,7 @@ COOK_COIN_REWARDS: dict[Rarity, int] = {
     Rarity.THREE: 18,
     Rarity.FOUR: 45,
     Rarity.FIVE: 120,
-    Rarity.SIX: 350,
+    Rarity.SIX: 1500,
 }
 
 COOK_EXPERIENCE_REWARDS: dict[Rarity, int] = {
@@ -46,7 +46,7 @@ COOK_EXPERIENCE_REWARDS: dict[Rarity, int] = {
     Rarity.THREE: 18,
     Rarity.FOUR: 40,
     Rarity.FIVE: 85,
-    Rarity.SIX: 170,
+    Rarity.SIX: 800,
 }
 
 EAT_EXPERIENCE_REWARDS: dict[Rarity, int] = {
@@ -55,7 +55,7 @@ EAT_EXPERIENCE_REWARDS: dict[Rarity, int] = {
     Rarity.THREE: 40,
     Rarity.FOUR: 65,
     Rarity.FIVE: 110,
-    Rarity.SIX: 200,
+    Rarity.SIX: 1200,
 }
 
 UPGRADE_DISPLAY_NAMES: dict[UpgradeType, str] = {

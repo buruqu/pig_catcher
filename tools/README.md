@@ -26,5 +26,20 @@
 | `uat_social_and_rankings.py` | 双用户、双群、交易和排行流程 |
 | `uat_production_recovery.py` | 发送失败、锁库、缺图、备份恢复和重启幂等 |
 
+## 额度运维
+
+| 脚本 | 用途 |
+| --- | --- |
+| `reset_catch_quota.py` | 先在线备份，再精准重置一个指定群的当前抓猪时段；不接受“全部群”通配 |
+
+最常用命令：
+
+```powershell
+uv run python .\tools\reset_catch_quota.py --group-id <群号>
+```
+
+成功输出包含群范围、窗口起止、归零次数、受影响玩家、审计事件、备份路径和
+`quick_check`。详见 `docs/08-catch-quota-operations.md`。
+
 所有脚本都可先加 `--help` 查看参数。输出统一写到被 Git 忽略的 `artifacts/`，不要把
 验收图片、临时数据库或运行日志当作正式素材保存。

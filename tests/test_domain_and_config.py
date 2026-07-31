@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 from pydantic import ValidationError
@@ -32,6 +33,7 @@ from pig_catcher.domain.food_effects import (
 from pig_catcher.domain.gameplay import level_progress, size_label, weight_label
 from pig_catcher.domain.models import CommandIdentity, ScopeKey
 from pig_catcher.domain.ports import MessageKeyFactory
+from pig_catcher.domain.quota import catch_quota_window
 from pig_catcher.domain.rules import (
     BASE_CATCH_WEIGHTS,
     LEVEL_CATCH_BONUS_CAP_LEVEL,
@@ -177,6 +179,47 @@ def test_food_effects_are_one_shot_explicit_probability_adjustments() -> None:
     assert cook_application.weights == (0.0, 0.0, 0.0, 0.0, 80.0, 20.0)
     assert cook_application.consumed_entry_ids == ("six-star-effect",)
 
+    extreme_cook = ActiveFoodEffect(
+        effect_entry_id="extreme-six-star-effect",
+        effect_id="next-six-star-cook",
+        params={"six_star_percent": 60},
+        granted_uses=1,
+        consumed_uses=0,
+        expires_at="",
+        created_at="2026-07-29T00:00:00.000Z",
+    )
+    extreme_application = apply_cooking_effects(
+        cooking_weights(6),
+        [extreme_cook],
+        source_rarity=6,
+    )
+    assert extreme_application.weights == (
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        40.0,
+        60.0,
+    )
+
+
+def test_six_star_food_effect_caps_support_extreme_rewards() -> None:
+    rarity_grant = resolve_food_effect(
+        "next-pig-rarity",
+        {"rarity": 6, "multiplier": 12.0},
+    )
+    stature_grant = resolve_food_effect(
+        "next-pig-stature",
+        {"mode": "mini", "strength": 0.5},
+    )
+    assert rarity_grant.params["multiplier"] == 12.0
+    assert stature_grant.params["strength"] == 0.5
+    with pytest.raises(FoodEffectError):
+        resolve_food_effect(
+            "next-food-rarity",
+            {"rarity": 5, "multiplier": 12.0},
+        )
+
 
 def test_cooking_effects_wait_for_a_compatible_source_rarity() -> None:
     regular = ActiveFoodEffect(
@@ -281,8 +324,9 @@ def test_access_policy_blacklist_has_priority() -> None:
 def test_default_config_exposes_fixed_rules_and_chinese_schema() -> None:
     config = PigCatcherConfig()
     assert config.plugin.framework_phase == "6"
-    assert config.catching.daily_limit == 22
+    assert config.catching.daily_limit == 5
     assert config.catching.cooldown_seconds == 20
+    assert config.catching.quota_refresh_hours == [0, 9, 12, 19]
     assert config.catching.weights() == BASE_CATCH_WEIGHTS
     assert config.cooking.six_star_to_five_percent == 90
     assert config.cooking.six_star_to_six_percent == 10
@@ -296,6 +340,25 @@ def test_default_config_exposes_fixed_rules_and_chinese_schema() -> None:
     serialized = str(schema)
     assert "启用插件" in serialized
     assert "群白名单" in serialized
+    assert "目标群号" in serialized
+    assert "重置当前时段" in serialized
+
+
+def test_quota_windows_follow_four_beijing_refreshes() -> None:
+    cases = (
+        (datetime(2026, 7, 27, 16, 0, tzinfo=UTC), 0, 9),
+        (datetime(2026, 7, 28, 1, 0, tzinfo=UTC), 9, 12),
+        (datetime(2026, 7, 28, 4, 0, tzinfo=UTC), 12, 19),
+        (datetime(2026, 7, 28, 11, 0, tzinfo=UTC), 19, 0),
+    )
+    for now, start_hour, end_hour in cases:
+        window = catch_quota_window(
+            now,
+            refresh_hours=[0, 9, 12, 19],
+            timezone_name="Asia/Shanghai",
+        )
+        assert window.start.astimezone(timezone(timedelta(hours=8))).hour == start_hour
+        assert window.end.astimezone(timezone(timedelta(hours=8))).hour == end_hour
 
 
 def test_config_rejects_unsafe_paths_and_css_controls() -> None:

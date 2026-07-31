@@ -5,6 +5,7 @@ from .economy import EconomyRepository
 from .framework import FrameworkRepository
 from .gameplay import GameplayRepository
 from .operations import OperationsRepository
+from .quota import QuotaRepository
 from .receipts import ReceiptRepository
 from .social import SocialRepository
 
@@ -14,6 +15,7 @@ __all__ = [
     "FrameworkRepository",
     "GameplayRepository",
     "OperationsRepository",
+    "QuotaRepository",
     "ReceiptRepository",
     "SocialRepository",
 ]

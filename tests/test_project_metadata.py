@@ -38,4 +38,5 @@ def test_manifest_versions_dependencies_and_capabilities_are_narrow() -> None:
         "aiosqlite",
         "Jinja2",
         "Pillow",
+        "tomlkit",
     }

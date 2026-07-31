@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import Awaitable, Callable
 from dataclasses import replace
 from pathlib import Path
 from re import escape
 from typing import Any, cast
+from uuid import uuid4
 
-from maibot_sdk import CONFIG_RELOAD_SCOPE_SELF, Command, MaiBotPlugin
+import tomlkit
+from maibot_sdk import CONFIG_RELOAD_SCOPE_SELF, Command, HomeCard, MaiBotPlugin
 
 from .pig_catcher.assets import AssetCatalogStorage
 from .pig_catcher.commands import (
@@ -80,6 +83,7 @@ from .pig_catcher.rendering import (
 )
 from .pig_catcher.services import (
     AssetCatalogService,
+    CatchQuotaResetService,
     CatchResult,
     CookingResult,
     EconomyService,
@@ -143,6 +147,7 @@ class PigCatcherPlugin(MaiBotPlugin):
         self._economy_service: EconomyService | None = None
         self._social_service: SocialService | None = None
         self._receipt_service: ReceiptService | None = None
+        self._quota_reset_service: CatchQuotaResetService | None = None
         self._renderer: PigCatcherRenderer | None = None
         self._animation_composer: AnimatedCardComposer | None = None
         self._delivery: RenderDelivery | None = None
@@ -193,6 +198,7 @@ class PigCatcherPlugin(MaiBotPlugin):
     async def on_load(self) -> None:
         if self.settings.plugin.enabled:
             await self._open_runtime()
+            await self._execute_pending_quota_reset(source="admin-panel-load")
         self.ctx.logger.info(
             "抓猪插件已加载，版本=%s，阶段=%s",
             PLUGIN_VERSION,
@@ -212,6 +218,10 @@ class PigCatcherPlugin(MaiBotPlugin):
         del config_data
         if scope != CONFIG_RELOAD_SCOPE_SELF:
             return
+        if self.settings.quota_administration.execute_current_window_reset:
+            if self._database is None and self.settings.plugin.enabled:
+                await self._open_runtime()
+            await self._execute_pending_quota_reset(source="admin-panel-save")
         await self._close_runtime()
         if self.settings.plugin.enabled:
             await self._open_runtime()
@@ -294,6 +304,12 @@ class PigCatcherPlugin(MaiBotPlugin):
                 settings.ranking,
             )
             self._receipt_service = ReceiptService(database)
+            self._quota_reset_service = CatchQuotaResetService(
+                database,
+                refresh_hours=settings.catching.quota_refresh_hours,
+                timezone_name=settings.catching.daily_reset_timezone,
+                window_limit=settings.catching.daily_limit,
+            )
             self._renderer = renderer
             self._animation_composer = animation_composer
             self._delivery = RenderDelivery(
@@ -323,6 +339,7 @@ class PigCatcherPlugin(MaiBotPlugin):
         self._delivery = None
         self._animation_composer = None
         self._renderer = None
+        self._quota_reset_service = None
         self._receipt_service = None
         self._economy_service = None
         self._social_service = None
@@ -331,6 +348,90 @@ class PigCatcherPlugin(MaiBotPlugin):
         self._asset_service = None
         self._storage = None
         self._database = None
+
+    async def _execute_pending_quota_reset(self, *, source: str) -> None:
+        """Execute and acknowledge the one-shot WebUI reset request."""
+
+        administration = self.settings.quota_administration
+        if not administration.execute_current_window_reset:
+            return
+        service = self._quota_reset_service
+        if service is None:
+            raise RuntimeError("抓猪额度重置服务尚未就绪。")
+        result = await service.backup_and_reset_current_window(
+            data_dir=Path(self.ctx.paths.data_dir).resolve(),
+            group_id=administration.group_id,
+            actor_user_id="maibot-admin-panel",
+            source=source,
+        )
+        self._clear_quota_reset_trigger()
+        self.ctx.logger.info(
+            "抓猪额度已精准重置：scope=%s，window=%s，cleared=%s，players=%s，audit=%s，backup=%s",
+            result.scope_id,
+            result.window.label,
+            result.cleared_catches,
+            result.affected_players,
+            result.audit_event_id,
+            result.backup_path,
+        )
+
+    @staticmethod
+    def _clear_quota_reset_trigger() -> None:
+        """Atomically turn the one-shot reset switch back off in config.toml."""
+
+        config_path = Path(__file__).resolve().with_name("config.toml")
+        temporary_path = config_path.with_name(
+            f".{config_path.name}.{uuid4().hex}.tmp"
+        )
+        document = tomlkit.parse(config_path.read_text(encoding="utf-8"))
+        administration = document.get("quota_administration")
+        if administration is None:
+            raise RuntimeError("config.toml 缺少 [quota_administration] 配置节。")
+        administration["execute_current_window_reset"] = False
+        try:
+            temporary_path.write_text(tomlkit.dumps(document), encoding="utf-8")
+            os.replace(temporary_path, config_path)
+        finally:
+            if temporary_path.exists():
+                temporary_path.unlink()
+
+    @HomeCard(
+        "pig_catcher_quota_control",
+        title="抓猪额度管理",
+        description="按群精准重置当前抓猪时段；操作前自动在线备份并保留历史记录。",
+        content=[
+            {
+                "type": "key_value",
+                "entries": {
+                    "每日刷新": "00:00 / 09:00 / 12:00 / 19:00",
+                    "每段额度": "5 次 / 玩家 / 群",
+                    "时段内冷却": "20 秒",
+                },
+            },
+            {
+                "type": "markdown",
+                "content": "点击下方按钮，在“额度重置”中填写精确群号，打开一次性开关并保存。",
+            },
+            {
+                "type": "actions",
+                "actions": [
+                    {
+                        "label": "重置抓猪次数",
+                        "url": "/plugin-config?plugin=local.pig-catcher",
+                    }
+                ],
+            },
+        ],
+        link_url="/plugin-config?plugin=local.pig-catcher",
+        link_label="打开额度重置",
+        icon="timer-reset",
+        width="medium",
+        order=140,
+    )
+    async def home_quota_control(self) -> None:
+        """Declare the safe catch-quota reset entry on the MaiBot home page."""
+
+        return None
 
     def _access_policy(self) -> AccessPolicy:
         settings = self.settings.access

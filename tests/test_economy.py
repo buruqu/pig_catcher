@@ -18,11 +18,15 @@ from pig_catcher.config.model import (
     TradingSection,
 )
 from pig_catcher.domain.economy import (
+    COOK_COIN_REWARDS,
+    COOK_EXPERIENCE_REWARDS,
+    EAT_EXPERIENCE_REWARDS,
+    FOOD_BASE_VALUES,
     adjusted_cooking_weights,
     cookware_higher_rarity_multiplier,
     level_cooking_higher_rarity_multiplier,
 )
-from pig_catcher.domain.enums import AssetKind
+from pig_catcher.domain.enums import AssetKind, Rarity
 from pig_catcher.domain.errors import (
     CookingTemplateError,
     DailyCatchLimitError,
@@ -63,6 +67,13 @@ class FixedClock:
 
     def now(self) -> datetime:
         return self.value
+
+
+def test_six_star_food_has_extreme_value_and_rewards() -> None:
+    assert FOOD_BASE_VALUES[Rarity.SIX] == 25000
+    assert COOK_COIN_REWARDS[Rarity.SIX] == 1500
+    assert COOK_EXPERIENCE_REWARDS[Rarity.SIX] == 800
+    assert EAT_EXPERIENCE_REWARDS[Rarity.SIX] == 1200
 
 
 def _identity(
@@ -870,9 +881,30 @@ async def test_store_purchase_upgrade_insufficient_balance_and_ledger(
     )
     assert store_card.feed_probability_rows[0].current is True
     assert store_card.cookware_probability_rows[0].current is True
+    assert tuple(
+        (row.before, row.after)
+        for row in store_card.lucky_whistle_rows
+    ) == (
+        ("40.00%", "38.65%"),
+        ("30.00%", "28.99%"),
+        ("17.00%", "18.40%"),
+        ("8.00%", "8.66%"),
+        ("4.00%", "4.33%"),
+        ("1.00%", "0.99%"),
+    )
+    assert tuple(row.after for row in store_card.chef_spice_rows) == (
+        "1★ 69% · 2★ 28% · 3★ 3%",
+        "1★ 9% · 2★ 71% · 3★ 18% · 4★ 2%",
+        "2★ 14% · 3★ 66% · 4★ 18% · 5★ 2%",
+        "3★ 30% · 4★ 60% · 5★ 10%",
+        "4★ 30% · 5★ 70%",
+    )
     store_text = format_store_summary(store)
     assert "猪饲料 Lv.0-5 的 4-6 星合计概率" in store_text
     assert "厨具 Lv.0-5 的高档菜相对权重增幅" in store_text
+    assert "幸运猪哨（基础权重，使用前→使用后）" in store_text
+    assert "主厨香料（基础分布、Lv.0，使用前→使用后）" in store_text
+    assert "1★猪 1★ 75%、2★ 22%、3★ 3%→1★ 69%、2★ 28%、3★ 3%" in store_text
 
     item_identity = _identity(message_id="buy-item")
     item = await service.purchase(item_identity, "幸运猪哨", quantity=2)

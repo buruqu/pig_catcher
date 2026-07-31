@@ -42,6 +42,7 @@ from pig_catcher.rendering import (
     RecordsViewModel,
     RenderDelivery,
     RenderOptions,
+    StoreConsumableProbabilityRowViewModel,
     StoreProbabilityRowViewModel,
     StoreProductViewModel,
     StoreViewModel,
@@ -962,6 +963,20 @@ async def test_fourth_round_templates_render_food_and_economy_views(
                 )
                 for level in range(6)
             ),
+            lucky_whistle_rows=(
+                StoreConsumableProbabilityRowViewModel(
+                    label="6 星",
+                    before="1.00%",
+                    after="0.99%",
+                ),
+            ),
+            chef_spice_rows=(
+                StoreConsumableProbabilityRowViewModel(
+                    label="4 星猪",
+                    before="2★ 5% · 3★ 25% · 4★ 60% · 5★ 10%",
+                    after="3★ 30% · 4★ 60% · 5★ 10%",
+                ),
+            ),
             products=(
                 StoreProductViewModel(
                     display_name="幸运猪哨",
@@ -988,6 +1003,10 @@ async def test_fourth_round_templates_render_food_and_economy_views(
     assert "4-6 星合计概率" in store_html
     assert "+10%" in store_html
     assert "Lv.2 · 当前" in store_html
+    assert "幸运猪哨" in store_html
+    assert "1.00% → 0.99%" in store_html
+    assert "主厨香料" in store_html
+    assert "3★ 30% · 4★ 60% · 5★ 10%" in store_html
 
     await renderer.render_economy_receipt(
         EconomyReceiptViewModel(

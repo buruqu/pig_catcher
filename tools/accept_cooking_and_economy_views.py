@@ -30,6 +30,7 @@ from pig_catcher.rendering import (  # noqa: E402
     PigCatcherRenderer,
     ProfileViewModel,
     RenderedImage,
+    StoreConsumableProbabilityRowViewModel,
     StoreProbabilityRowViewModel,
     StoreProductViewModel,
     StoreViewModel,
@@ -167,11 +168,23 @@ def catalog_view(rows: Sequence[Mapping[str, object]]) -> FoodCatalogViewModel:
 
 def store_view() -> StoreViewModel:
     definitions = (
-        ("幸运猪哨", "抓猪道具", 180, "下一次抓猪更容易遇到高星猪猪", "/购买 幸运猪哨"),
+        (
+            "幸运猪哨",
+            "抓猪道具",
+            180,
+            "下一次抓猪：3-5 星相对权重 ×1.12，6 星相对权重 ×1.02",
+            "/购买 幸运猪哨",
+        ),
         ("巨物玉米", "抓猪道具", 140, "下一次抓猪更容易遇到大体型猪猪", "/购买 巨物玉米"),
         ("增膘豆饼", "抓猪道具", 100, "下一次抓猪的猪猪更肥、更重", "/购买 增膘豆饼"),
         ("精瘦青饲料", "抓猪道具", 100, "下一次抓猪的猪猪更精瘦、体型略大", "/购买 精瘦青饲料"),
-        ("主厨香料", "做菜道具", 180, "下一次做菜更容易提升品质", "/购买 主厨香料"),
+        (
+            "主厨香料",
+            "做菜道具",
+            180,
+            "下一次用 1-5 星猪做菜：从最低可出档向高一档转移最多 6 个百分点",
+            "/购买 主厨香料",
+        ),
         ("精准刀工券", "做菜道具", 120, "下一次做菜优先偏瘦食谱", "/购买 精准刀工券"),
         ("慢炖调料包", "做菜道具", 120, "下一次做菜优先偏肥食谱", "/购买 慢炖调料包"),
         ("大份餐盒", "做菜道具", 240, "符合条件时有机会额外出餐", "/购买 大份餐盒"),
@@ -211,6 +224,47 @@ def store_view() -> StoreViewModel:
                 current=level == 3,
             )
             for level in range(6)
+        ),
+        lucky_whistle_rows=tuple(
+            StoreConsumableProbabilityRowViewModel(
+                label=f"{rarity} 星",
+                before=before,
+                after=after,
+            )
+            for rarity, before, after in (
+                (1, "40.00%", "38.65%"),
+                (2, "30.00%", "28.99%"),
+                (3, "17.00%", "18.40%"),
+                (4, "8.00%", "8.66%"),
+                (5, "4.00%", "4.33%"),
+                (6, "1.00%", "0.99%"),
+            )
+        ),
+        chef_spice_rows=tuple(
+            StoreConsumableProbabilityRowViewModel(
+                label=label,
+                before=before,
+                after=after,
+            )
+            for label, before, after in (
+                ("1 星猪", "1★ 75% · 2★ 22% · 3★ 3%", "1★ 69% · 2★ 28% · 3★ 3%"),
+                (
+                    "2 星猪",
+                    "1★ 15% · 2★ 65% · 3★ 18% · 4★ 2%",
+                    "1★ 9% · 2★ 71% · 3★ 18% · 4★ 2%",
+                ),
+                (
+                    "3 星猪",
+                    "2★ 20% · 3★ 60% · 4★ 18% · 5★ 2%",
+                    "2★ 14% · 3★ 66% · 4★ 18% · 5★ 2%",
+                ),
+                (
+                    "4 星猪",
+                    "2★ 5% · 3★ 25% · 4★ 60% · 5★ 10%",
+                    "3★ 30% · 4★ 60% · 5★ 10%",
+                ),
+                ("5 星猪", "3★ 5% · 4★ 25% · 5★ 70%", "4★ 30% · 5★ 70%"),
+            )
         ),
         products=tuple(
             StoreProductViewModel(
@@ -312,7 +366,7 @@ def profile_view() -> ProfileViewModel:
         visible_catalog_total=81,
         held_records=4,
         daily_count=20,
-        daily_limit=20,
+        daily_limit=5,
         cooldown_remaining_seconds=0,
         feed_level=2,
         armed_item_name="幸运猪哨",

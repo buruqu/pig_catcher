@@ -247,7 +247,7 @@ def pig_card(
         next_level_experience=800 if mode_label == "抓猪成功" else None,
         level_progress_percent=77.14 if mode_label == "抓猪成功" else 0.0,
         daily_count=12 if mode_label == "抓猪成功" else None,
-        daily_limit=20 if mode_label == "抓猪成功" else None,
+        daily_limit=5 if mode_label == "抓猪成功" else None,
         item_name="巨物玉米" if mode_label == "抓猪成功" else "",
         catalog_new=True,
         size_record=True,

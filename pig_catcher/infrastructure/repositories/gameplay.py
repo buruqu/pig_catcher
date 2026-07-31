@@ -55,46 +55,47 @@ class GameplayRepository:
         session: DatabaseSession,
         *,
         player_id: str,
-        day_start: str,
-        day_end: str,
+        window_start: str,
+        window_end: str,
     ) -> tuple[int, str | None]:
         row = await session.fetch_one(
             """
+            WITH player_scope AS (
+                SELECT scope_id
+                FROM players
+                WHERE player_id = ?
+            ),
+            effective_window AS (
+                SELECT COALESCE(MAX(reset.created_at), ?) AS effective_start
+                FROM audit_events AS reset
+                WHERE reset.action IN (
+                        'daily-catch-quota-reset',
+                        'catch-quota-window-reset'
+                    )
+                  AND reset.created_at >= ?
+                  AND reset.created_at < ?
+                  AND (
+                      reset.scope_id IS NULL
+                      OR reset.scope_id = (SELECT scope_id FROM player_scope)
+                  )
+            )
             SELECT
-                (
-                    SELECT COUNT(*)
-                    FROM command_receipts
-                    WHERE player_id = ?
-                      AND command_name = 'pig-catcher.catch'
-                      AND created_at >= (
-                          SELECT COALESCE(MAX(reset.created_at), ?)
-                          FROM audit_events AS reset
-                          WHERE reset.action = 'daily-catch-quota-reset'
-                            AND reset.created_at >= ?
-                            AND reset.created_at < ?
-                            AND (
-                                reset.scope_id IS NULL
-                                OR reset.scope_id = (
-                                    SELECT player.scope_id
-                                    FROM players AS player
-                                    WHERE player.player_id = ?
-                                )
-                            )
-                      )
-                      AND created_at < ?
-                ) AS daily_count,
-                statistic.last_catch_at AS last_acquired_at
-            FROM player_statistics AS statistic
-            WHERE statistic.player_id = ?
+                COUNT(*) AS daily_count,
+                MAX(receipt.created_at) AS last_acquired_at
+            FROM command_receipts AS receipt
+            CROSS JOIN effective_window
+            WHERE receipt.player_id = ?
+              AND receipt.command_name = 'pig-catcher.catch'
+              AND receipt.created_at >= effective_window.effective_start
+              AND receipt.created_at < ?
             """,
             (
                 player_id,
-                day_start,
-                day_start,
-                day_end,
+                window_start,
+                window_start,
+                window_end,
                 player_id,
-                day_end,
-                player_id,
+                window_end,
             ),
         )
         if row is None:

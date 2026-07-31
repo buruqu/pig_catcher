@@ -43,6 +43,7 @@ from .gameplay import (
     level_progress,
 )
 from .models import AssetSelector, CommandIdentity, ScopeKey
+from .quota import CatchQuotaWindow, catch_quota_window, normalize_quota_refresh_hours
 from .social import (
     RANKING_TYPES,
     BodyScale,
@@ -61,6 +62,7 @@ __all__ = [
     "COOK_COIN_REWARDS",
     "COOK_EXPERIENCE_REWARDS",
     "CommandIdentity",
+    "CatchQuotaWindow",
     "ConsentStatus",
     "FatProfile",
     "FoodAttributes",
@@ -87,6 +89,7 @@ __all__ = [
     "build_store_products",
     "generate_food_attributes",
     "generate_pig_attributes",
+    "catch_quota_window",
     "describe_body_scale",
     "giant_score",
     "item_by_id",
@@ -94,6 +97,7 @@ __all__ = [
     "item_product_by_name",
     "level_progress",
     "normalize_ranking_type",
+    "normalize_quota_refresh_hours",
     "normalize_trade_id",
     "recipe_affinity",
     "stable_recipe_factor",

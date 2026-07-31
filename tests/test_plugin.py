@@ -66,12 +66,69 @@ async def test_config_reload_closes_and_reopens_runtime(tmp_path: Path) -> None:
     await plugin.on_unload()
 
 
+@pytest.mark.asyncio
+async def test_admin_panel_one_shot_reset_is_scoped_and_audited(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    plugin, _ = await create_test_plugin(tmp_path)
+    assert plugin.gameplay_service is not None
+    await plugin.gameplay_service.profile(
+        CommandIdentity(
+            scope=ScopeKey("qq", "10001"),
+            stream_id="stream-10001",
+            user_id="20001",
+            display_name="测试管理员",
+            message_id="profile-before-reset",
+            group_name="抓猪测试群",
+        )
+    )
+    cleared: list[bool] = []
+    monkeypatch.setattr(
+        plugin,
+        "_clear_quota_reset_trigger",
+        lambda: cleared.append(True),
+    )
+    config = plugin.get_plugin_config_data()
+    config["quota_administration"] = {
+        "group_id": "10001",
+        "execute_current_window_reset": True,
+    }
+    plugin.set_plugin_config(config)
+    await plugin.on_config_update(
+        CONFIG_RELOAD_SCOPE_SELF,
+        config,
+        "admin-reset",
+    )
+    assert cleared == [True]
+    assert plugin.database is not None
+    row = await plugin.database.fetch_one(
+        """
+        SELECT scope_id, actor_user_id, action
+        FROM audit_events
+        WHERE action = 'catch-quota-window-reset'
+        """
+    )
+    assert row is not None
+    assert tuple(row) == (
+        "qq:10001",
+        "maibot-admin-panel",
+        "catch-quota-window-reset",
+    )
+    assert tuple((tmp_path / "backups").glob("*.sqlite3"))
+    await plugin.on_unload()
+
+
 def test_plugin_registers_only_explicit_production_commands() -> None:
     plugin = create_plugin()
     components = plugin.get_components()
-    assert len(components) == 29
-    assert {component["type"] for component in components} == {"COMMAND"}
-    assert {component["name"] for component in components} == {
+    assert len(components) == 30
+    commands = {
+        component["name"]
+        for component in components
+        if component["type"] == "COMMAND"
+    }
+    assert commands == {
         "pig_catcher_help",
         "pig_catcher_catch",
         "pig_catcher_profile",
@@ -102,6 +159,14 @@ def test_plugin_registers_only_explicit_production_commands() -> None:
         "pig_catcher_showcase",
         "pig_catcher_ranking",
     }
+    home_card = next(
+        component
+        for component in components
+        if component["type"] == "HOME_CARD"
+    )
+    assert home_card["name"] == "pig_catcher_quota_control"
+    assert "重置抓猪次数" in str(home_card)
+    assert "/plugin-config?plugin=local.pig-catcher" in str(home_card)
     serialized = str(components)
     assert "EVENT_HANDLER" not in serialized
     assert "LLM" not in serialized

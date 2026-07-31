@@ -79,6 +79,45 @@
         </div>
         <p class="store-probability__note">六星猪做菜不受厨具影响，保持当前 90% 五星 / 10% 六星规则。</p>
       </div>
+
+      <div class="store-probability__group">
+        <div class="store-probability__heading">
+          <div>
+            <span>一次性道具概率</span>
+            <h2>幸运猪哨</h2>
+          </div>
+          <p>基础抓猪权重；逐星展示使用前 → 使用后</p>
+        </div>
+        <div class="store-consumable-grid store-consumable-grid--six">
+          {% for row in view.lucky_whistle_rows %}
+          <div class="store-consumable-row">
+            <strong>{{ row.label }}</strong>
+            <span>{{ row.before }} → {{ row.after }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        <p class="store-probability__note">规则：3-5 星相对权重 ×1.12，6 星相对权重 ×1.02；表中已包含归一化后的最终概率。</p>
+      </div>
+
+      <div class="store-probability__group">
+        <div class="store-probability__heading">
+          <div>
+            <span>一次性道具概率</span>
+            <h2>主厨香料</h2>
+          </div>
+          <p>基础分布、不计体型属性加成、Lv.0 厨具与玩家 Lv.1；逐档展示使用前 → 使用后</p>
+        </div>
+        <div class="store-consumable-grid">
+          {% for row in view.chef_spice_rows %}
+          <div class="store-consumable-row store-consumable-row--wide">
+            <strong>{{ row.label }}</strong>
+            <span>{{ row.before }}</span>
+            <small>→ {{ row.after }}</small>
+          </div>
+          {% endfor %}
+        </div>
+        <p class="store-probability__note">从最低可出品质向高一档转移最多 6 个百分点；六星猪不适用。</p>
+      </div>
     </section>
 
     {% if view.products %}

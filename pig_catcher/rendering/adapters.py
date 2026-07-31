@@ -5,11 +5,14 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 
-from ..domain.economy import cookware_higher_rarity_multiplier
+from ..domain.economy import (
+    adjusted_cooking_weights,
+    cookware_higher_rarity_multiplier,
+)
 from ..domain.errors import RenderError
 from ..domain.food_effects import effect_summary
 from ..domain.gameplay import level_progress, size_label, weight_label
-from ..domain.rules import catch_weights
+from ..domain.rules import catch_weights, cooking_weights
 from ..domain.social import TRADE_STATUS_LABELS
 from ..services.economy import (
     BatchSaleResult,
@@ -64,6 +67,7 @@ from .models import (
     RankingViewModel,
     RecordItemViewModel,
     RecordsViewModel,
+    StoreConsumableProbabilityRowViewModel,
     StoreProbabilityRowViewModel,
     StoreProductViewModel,
     StoreViewModel,
@@ -506,6 +510,38 @@ def store_view(page: StorePage) -> StoreViewModel:
         )
         for level in range(6)
     )
+    lucky_before = catch_weights(page.catch_base_weights)
+    lucky_after = catch_weights(page.catch_base_weights, lucky_whistle=True)
+    lucky_whistle_rows = tuple(
+        StoreConsumableProbabilityRowViewModel(
+            label=f"{rarity} 星",
+            before=f"{before:.2f}%",
+            after=f"{after:.2f}%",
+        )
+        for rarity, before, after in zip(
+            range(1, 7),
+            lucky_before,
+            lucky_after,
+            strict=True,
+        )
+    )
+    chef_spice_rows = tuple(
+        StoreConsumableProbabilityRowViewModel(
+            label=f"{rarity} 星猪",
+            before=_probability_distribution(cooking_weights(rarity)),
+            after=_probability_distribution(
+                adjusted_cooking_weights(
+                    rarity,
+                    size_percentile=0.0,
+                    weight_percentile=0.0,
+                    cookware_level=0,
+                    player_level=1,
+                    chef_spice=True,
+                )
+            ),
+        )
+        for rarity in range(1, 6)
+    )
     return StoreViewModel(
         display_name=page.display_name,
         coin_balance=page.coin_balance,
@@ -517,6 +553,8 @@ def store_view(page: StorePage) -> StoreViewModel:
         cookware_level=page.cookware_level,
         feed_probability_rows=feed_probability_rows,
         cookware_probability_rows=cookware_probability_rows,
+        lucky_whistle_rows=lucky_whistle_rows,
+        chef_spice_rows=chef_spice_rows,
         products=tuple(
             StoreProductViewModel(
                 display_name=product.display_name,
@@ -533,6 +571,16 @@ def store_view(page: StorePage) -> StoreViewModel:
             )
             for product in page.products
         ),
+    )
+
+
+def _probability_distribution(weights: tuple[float, ...]) -> str:
+    """Compactly format only reachable rarity outcomes."""
+
+    return " · ".join(
+        f"{rarity}★ {value:.0f}%"
+        for rarity, value in enumerate(weights, start=1)
+        if value > 0
     )
 
 
