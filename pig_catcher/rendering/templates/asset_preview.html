@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root { --font-family: {{ font_family }}; }
+    {{ theme_css | safe }}
+  </style>
+</head>
+<body>
+  <main class="asset-preview rarity-{{ view.rarity }}" data-pig-catcher-root data-render-ready="true">
+    <header class="asset-preview__header">
+      <div>
+        <p class="asset-preview__eyebrow">抓猪收藏册 · 正式素材</p>
+        <h1>{{ view.display_name }}</h1>
+      </div>
+      <div class="asset-preview__rarity" aria-label="{{ view.rarity }} 星品质">
+        <span>品质</span>
+        <strong>{{ "★" * view.rarity }}</strong>
+      </div>
+    </header>
+
+    <section class="asset-preview__media" aria-label="素材展示区域">
+      {% if media_data_url %}
+      <img src="{{ media_data_url }}" alt="{{ view.display_name }}">
+      {% endif %}
+    </section>
+
+    <section class="asset-preview__detail">
+      <div class="asset-preview__facts">
+        <span>{{ view.kind_label }}</span>
+        <span>{{ view.media_format }}</span>
+        <span>{{ view.frame_count }} 帧</span>
+      </div>
+      <p class="asset-preview__description">{{ view.description }}</p>
+      {% if view.collection_name %}
+      <div class="asset-preview__collection">
+        <span>BanG Dream! 联动</span>
+        <strong>{{ view.collection_name }} · {{ view.collection_progress }}</strong>
+        <em>{{ view.character_name }}</em>
+      </div>
+      {% endif %}
+    </section>
+
+    <footer class="asset-preview__footer">
+      <span>白色收藏册 · 淡粉称重票据</span>
+      <strong>{{ "动画逐帧保留" if view.frame_count > 1 else "原始图片保留" }}</strong>
+    </footer>
+  </main>
+</body>
+</html>

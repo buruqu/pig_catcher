@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root { --font-family: {{ font_family }}; }
+    {{ theme_css | safe }}
+  </style>
+</head>
+<body>
+  <main class="game-sheet economy-receipt" data-pig-catcher-root data-render-ready="true">
+    <header class="game-header">
+      <div class="game-header__copy">
+        <p class="game-header__eyebrow">{{ view.eyebrow }}</p>
+        <h1>{{ view.title }}</h1>
+      </div>
+      <div class="game-header__meta">
+        <span>{{ view.badge_label }}</span>
+        <strong>{{ view.badge_value }}</strong>
+      </div>
+    </header>
+
+    <section class="economy-receipt__body">
+      <div class="economy-receipt__mark">✓</div>
+      <h2 style="font-size: {% if view.summary|length > 60 %}17{% elif view.summary|length > 40 %}22{% elif view.summary|length > 24 %}28{% else %}34{% endif %}px">{{ view.summary }}</h2>
+      <div class="economy-receipt__rows" style="grid-template-columns: repeat({{ view.rows|length }}, minmax(0, 1fr))">
+        {% for row in view.rows %}
+        <div>
+          <span>{{ row.label }}</span>
+          <strong>{{ row.value }}</strong>
+        </div>
+        {% endfor %}
+      </div>
+      <p>{{ view.note }}</p>
+    </section>
+
+    <footer class="game-footer">
+      <span>业务已提交，图片故障不会回滚结算</span>
+      <strong>一次且仅一次</strong>
+    </footer>
+  </main>
+</body>
+</html>

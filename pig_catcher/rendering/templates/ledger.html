@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root { --font-family: {{ font_family }}; }
+    {{ theme_css | safe }}
+  </style>
+</head>
+<body>
+  <main class="game-sheet ledger-sheet" data-pig-catcher-root data-render-ready="true">
+    <header class="game-header">
+      <div class="game-header__copy">
+        <p class="game-header__eyebrow">猪币账本 · 当前群个人流水</p>
+        <h1 style="font-size: {% if view.display_name|length > 60 %}16{% elif view.display_name|length > 40 %}20{% elif view.display_name|length > 24 %}31{% else %}42{% endif %}px">{{ view.display_name }}</h1>
+      </div>
+      <div class="game-header__meta">
+        <span>当前余额</span>
+        <strong>{{ view.coin_balance }}</strong>
+      </div>
+    </header>
+
+    <section class="ledger-summary">
+      <div><span>流水合计</span><strong>{{ view.ledger_total }}</strong></div>
+      <div><span>对账状态</span><strong>一致</strong></div>
+      <div><span>页面</span><strong>{{ view.page }}/{{ view.page_count }}</strong></div>
+      <div><span>总流水</span><strong>{{ view.total_count }} 条</strong></div>
+    </section>
+
+    {% if view.items %}
+    <section class="ledger-list">
+      {% for item in view.items %}
+      <article class="ledger-row">
+        <div class="ledger-row__amount {% if item.positive %}ledger-row__amount--positive{% endif %}">{{ item.amount_text }}</div>
+        <div class="ledger-row__copy">
+          <strong>{{ item.reason_text }}</strong>
+          <span>{{ item.created_at }}</span>
+        </div>
+        <div class="ledger-row__balance">
+          <span>结余</span>
+          <strong>{{ item.balance_after }}</strong>
+        </div>
+      </article>
+      {% endfor %}
+    </section>
+    {% else %}
+    <section style="padding:32px 38px"><div class="empty-state">当前还没有猪币流水</div></section>
+    {% endif %}
+
+    <footer class="game-footer">
+      <span>每次猪币变化都会写入不可变流水</span>
+      <strong>{{ view.page }}/{{ view.page_count }}</strong>
+    </footer>
+  </main>
+</body>
+</html>

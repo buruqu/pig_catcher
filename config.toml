@@ -1,0 +1,109 @@
+[plugin]
+enabled = true
+config_version = "1.2.6"
+framework_phase = "6"
+
+[features]
+help_enabled = true
+catching_enabled = true
+profile_enabled = true
+inventory_enabled = true
+catalog_enabled = true
+records_enabled = true
+items_enabled = true
+cooking_enabled = true
+food_inventory_enabled = true
+food_catalog_enabled = true
+eating_enabled = true
+store_enabled = true
+selling_enabled = true
+ledger_enabled = true
+showcase_enabled = true
+ranking_enabled = true
+
+[access]
+group_whitelist = []
+group_blacklist = []
+user_whitelist = []
+user_blacklist = []
+admin_user_ids = []
+notify_denied = true
+denied_message = "当前群或账号未启用抓猪插件。"
+
+[storage]
+database_filename = "pig_catcher.sqlite3"
+sqlite_busy_timeout_ms = 5000
+auto_backup_enabled = true
+backup_interval_hours = 24
+backup_retention_count = 7
+
+[assets]
+manifest_filename = "assets.json"
+min_image_side = 200
+max_image_bytes = 12582912
+max_animation_frames = 300
+max_animation_duration_ms = 30000
+staging_max_age_hours = 24
+
+[catching]
+daily_limit = 22
+cooldown_seconds = 20
+daily_reset_timezone = "Asia/Shanghai"
+inventory_page_size = 12
+catalog_page_size = 12
+records_page_size = 10
+rarity_1_weight = 40.0
+rarity_2_weight = 30.0
+rarity_3_weight = 17.0
+rarity_4_weight = 8.0
+rarity_5_weight = 4.0
+rarity_6_weight = 1.0
+max_feed_level = 5
+missing_six_star_strategy = "transfer-to-five"
+
+[cooking]
+max_cookware_level = 5
+six_star_to_five_percent = 90
+six_star_to_six_percent = 10
+inventory_page_size = 12
+catalog_page_size = 12
+
+[economy]
+max_upgrade_level = 5
+feed_upgrade_prices = [500, 1200, 2800, 6500, 15000]
+cookware_upgrade_prices = [500, 1200, 2800, 6500, 15000]
+store_page_size = 16
+ledger_page_size = 10
+max_purchase_quantity = 99
+
+[trading]
+gift_enabled = true
+trade_enabled = true
+max_trade_price = 1000000
+offer_expiry_minutes = 5
+trade_page_size = 8
+
+[ranking]
+ranking_page_size = 10
+pig_catalog_weight_percent = 60
+food_catalog_weight_percent = 40
+giant_size_threshold_cm = 120.0
+giant_weight_threshold_kg = 350.0
+giant_sightings_limit = 6
+
+[rendering]
+enabled = true
+fallback_to_text = true
+card_width = 1200
+viewport_height = 1600
+device_scale_factor = 1.0
+render_timeout_ms = 15000
+max_png_bytes = 12582912
+max_animation_bytes = 52428800
+missing_frame_duration_ms = 100
+font_family = "\"Noto Sans CJK SC\", \"Microsoft YaHei\", sans-serif"
+
+[maintenance]
+enabled = true
+interval_minutes = 60
+run_integrity_check = true

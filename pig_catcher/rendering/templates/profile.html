@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root { --font-family: {{ font_family }}; }
+    {{ theme_css | safe }}
+  </style>
+</head>
+<body>
+  <main class="game-sheet profile-sheet" data-pig-catcher-root data-render-ready="true">
+    <header class="game-header">
+      <div class="game-header__copy">
+        <p class="game-header__eyebrow">抓猪档案 · 当前群独立数据</p>
+        <h1 style="font-size: {% if view.display_name|length > 60 %}16{% elif view.display_name|length > 40 %}20{% elif view.display_name|length > 24 %}31{% else %}42{% endif %}px">{{ view.display_name }}</h1>
+      </div>
+      <div class="game-header__meta">
+        <span>累计抓取</span>
+        <strong>{{ view.total_catches }} 次</strong>
+      </div>
+    </header>
+
+    <section class="profile-sheet__level">
+      <div>
+        <h2>Lv.{{ view.level }} · {{ view.title }}</h2>
+        <p>
+          {{ view.total_experience }} 经验 ·
+          {% if view.next_threshold is none %}已达当前最高等级{% else %}下一等级 {{ view.next_threshold }} EXP{% endif %}
+        </p>
+        <div class="progress-track" aria-label="等级进度">
+          <span style="width: {{ "%.2f"|format(view.progress_percent) }}%"></span>
+        </div>
+        <div class="profile-level-bonus">
+          <span>等级概率加成</span>
+          <strong>
+            抓猪 4-6 星
+            {{ "%.2f"|format(view.level_catch_base_high_percent) }}%
+            → {{ "%.2f"|format(view.level_catch_adjusted_high_percent) }}%
+          </strong>
+          <small>
+            普通做菜高档权重 +{{ "%.2f"|format(view.level_cooking_bonus_percent) }}%
+            · Lv.{{ view.level_bonus_cap_level }} 封顶
+          </small>
+        </div>
+      </div>
+      <div class="profile-sheet__balance">
+        <span>猪币余额</span>
+        <strong>{{ view.coin_balance }}</strong>
+      </div>
+    </section>
+
+    <section class="profile-sheet__stats">
+      <div class="profile-stat"><span>当前持有</span><strong>{{ view.active_pigs }} 只</strong></div>
+      <div class="profile-stat"><span>猪猪图鉴</span><strong>{{ view.catalog_count }}/{{ view.visible_catalog_total }}</strong></div>
+      <div class="profile-stat"><span>累计做菜</span><strong>{{ view.total_cooks }} 次</strong></div>
+      <div class="profile-stat"><span>当前美食</span><strong>{{ view.active_foods }} 份</strong></div>
+      <div class="profile-stat"><span>美食图鉴</span><strong>{{ view.food_catalog_count }}/{{ view.visible_food_catalog_total }}</strong></div>
+      <div class="profile-stat"><span>持有群纪录</span><strong>{{ view.held_records }} 项</strong></div>
+      <div class="profile-stat"><span>猪饲料</span><strong>Lv.{{ view.feed_level }}</strong></div>
+      <div class="profile-stat"><span>厨具</span><strong>Lv.{{ view.cookware_level }}</strong></div>
+      <div class="profile-stat"><span>今日抓猪</span><strong>{{ view.daily_count }}/{{ view.daily_limit }}</strong></div>
+      <div class="profile-stat"><span>当前冷却</span><strong>{{ view.cooldown_remaining_seconds }} 秒</strong></div>
+      <div class="profile-stat"><span>抓猪道具</span><strong>{{ view.armed_item_name or "无" }}</strong></div>
+      <div class="profile-stat"><span>做菜道具</span><strong>{{ view.armed_cooking_item_name or "无" }}</strong></div>
+      <div class="profile-stat"><span>猪猪展示</span><strong style="font-size:17px">{{ view.showcase_pig or "未设置" }}</strong></div>
+      <div class="profile-stat"><span>美食展示</span><strong style="font-size:17px">{{ view.showcase_food or "未设置" }}</strong></div>
+    </section>
+
+    <section class="profile-sheet__collections">
+      <h2 class="section-title">联动收藏</h2>
+      {% if view.collections %}
+      <div class="collection-list">
+        {% for collection in view.collections %}
+        <div class="collection-row">
+          <div>
+            <span>{{ collection.collaboration_name }} · 已交付 {{ collection.available_count }}/{{ collection.total_count }}</span>
+            <strong>{{ collection.collection_name }}</strong>
+          </div>
+          <div class="collection-row__progress">{{ collection.collected_count }}/{{ collection.total_count }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty-state" style="min-height:110px;padding:24px">当前素材库没有联动收藏系列</div>
+      {% endif %}
+    </section>
+
+    <footer class="game-footer">
+      <span>等级加成公开展示；荣誉称号不改变概率</span>
+      <strong>北京时间自然日</strong>
+    </footer>
+  </main>
+</body>
+</html>

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root { --font-family: {{ font_family }}; }
+    {{ theme_css | safe }}
+  </style>
+</head>
+<body>
+  <main class="game-sheet catalog-sheet" data-pig-catcher-root data-render-ready="true">
+    <header class="game-header">
+      <div class="game-header__copy">
+        <p class="game-header__eyebrow">美食图鉴 · 群专属条目隐私保护</p>
+        <h1 style="font-size: {% if view.display_name|length > 60 %}16{% elif view.display_name|length > 40 %}20{% elif view.display_name|length > 24 %}31{% else %}42{% endif %}px">{{ view.display_name }}</h1>
+      </div>
+      <div class="game-header__meta">
+        <span>收集进度</span>
+        <strong>{{ view.collected_count }}/{{ view.visible_catalog_total }}</strong>
+      </div>
+    </header>
+
+    <section class="list-summary">
+      <p>按品质完整排列 · 当前显示 {{ view.total_count }} 项</p>
+      <div class="pill-row">
+        <span class="pill">{{ view.rarity ~ " 星" if view.rarity is not none else "全部品质" }}</span>
+        {% if view.undiscovered_only %}<span class="pill pill--strong">只看未收集</span>{% endif %}
+      </div>
+    </section>
+
+    {% if view.items %}
+    <section class="catalog-rarity-list">
+      {% for rarity, rarity_items in view.items|groupby("rarity") %}
+      <section class="catalog-rarity-section rarity-{{ rarity }}">
+        <header class="catalog-rarity-header">
+          <div>
+            <span class="catalog-rarity-header__stars">{{ "★" * rarity }}</span>
+            <h2>{{ rarity }} 星品质</h2>
+          </div>
+          <strong>{{ rarity_items|selectattr("discovered")|list|length }}/{{ rarity_items|length }}</strong>
+        </header>
+        <div class="catalog-rarity-grid">
+          {% for item in rarity_items %}
+          <article class="catalog-item rarity-{{ item.rarity }}{% if not item.discovered %} catalog-item--unknown{% endif %}">
+            <span class="catalog-item__stars">{{ "★" * item.rarity }}</span>
+            <div class="catalog-item__media">
+              {% if item.discovered and media_data_urls.get(item.key) %}
+              <img src="{{ media_data_urls[item.key] }}" alt="{{ item.display_name }}" style="object-fit: {{ item.image_fit }}">
+              {% elif item.discovered and item.is_animated %}
+              <span>动态美食<br>详情查看</span>
+              {% else %}
+              <span>?</span>
+              {% endif %}
+            </div>
+            <h2 style="font-size: {% if item.display_name|length > 50 %}9{% elif item.display_name|length > 32 %}11{% elif item.display_name|length > 20 %}13{% else %}16{% endif %}px">{{ item.display_name if item.discovered else "???" }}</h2>
+            {% if item.discovered %}
+            <div class="catalog-item__facts">获得 {{ item.acquired_count }} 次<br>最大 {{ "%.2f"|format(item.best_portion_weight or 0) }} kg</div>
+            {% if item.effect_summary %}
+            <div class="catalog-item__effect">{{ item.effect_summary }}</div>
+            {% endif %}
+            {% else %}
+            <div class="catalog-item__facts">尚未发现</div>
+            {% endif %}
+          </article>
+          {% endfor %}
+        </div>
+      {% endfor %}
+    </section>
+    {% else %}
+    <section style="padding:32px 38px"><div class="empty-state">当前没有符合条件的图鉴条目</div></section>
+    {% endif %}
+
+    <footer class="game-footer">
+      <span>授权群专属六星美食在发现前仅显示保密占位</span>
+      <strong>{{ view.collected_count }}/{{ view.visible_catalog_total }}</strong>
+    </footer>
+  </main>
+</body>
+</html>

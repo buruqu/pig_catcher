@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root { --font-family: {{ font_family }}; }
+    {{ theme_css | safe }}
+  </style>
+</head>
+<body>
+  <main class="game-sheet ranking-sheet" data-pig-catcher-root data-render-ready="true">
+    <header class="game-header">
+      <div class="game-header__copy">
+        <p class="game-header__eyebrow">猪猪排行 · {{ view.ranking_type }}榜</p>
+        <h1 style="font-size:{% if view.group_name|length > 48 %}18{% elif view.group_name|length > 28 %}28{% else %}42{% endif %}px">{{ view.group_name or "当前群" }}</h1>
+      </div>
+      <div class="game-header__meta">
+        <span>参榜玩家</span>
+        <strong>{{ view.total_count }} 人</strong>
+      </div>
+    </header>
+    <section class="ranking-tabs">
+      <span>综合</span><span>抓猪</span><span>美食</span><span>价值</span>
+      <span>巨物</span><span>数量</span><span>猪币</span>
+      <strong>{{ view.ranking_type }}</strong>
+    </section>
+    {% if view.items %}
+    <section class="ranking-list">
+      {% for item in view.items %}
+      <article class="ranking-row ranking-row--{{ item.rank if item.rank <= 3 else 'standard' }}">
+        <div class="ranking-row__rank">{{ item.rank }}</div>
+        <div class="ranking-row__media">
+          {% if media_data_urls.get(item.key) %}
+          <img src="{{ media_data_urls[item.key] }}" alt="{{ item.showcase_name }}" style="object-fit:{{ item.image_fit }}">
+          {% elif item.is_animated %}
+          <span>GIF<br>动态展示</span>
+          {% elif item.showcase_name %}
+          <span>{{ item.showcase_kind }}<br>{{ "★" * item.showcase_rarity }}</span>
+          {% else %}
+          <span>未设置<br>展示位</span>
+          {% endif %}
+        </div>
+        <div class="ranking-row__player">
+          <strong style="font-size:{% if item.display_name|length > 40 %}14{% elif item.display_name|length > 24 %}17{% else %}22{% endif %}px">{{ item.display_name }}</strong>
+          <span>
+            猪图鉴 {{ item.pig_progress }} · 美食图鉴 {{ item.food_progress }} ·
+            持有 {{ item.asset_count }} · {{ item.coin_balance }} 猪币
+          </span>
+          {% if item.showcase_name %}
+          <small>{{ item.showcase_kind }}展示 · {{ "★" * item.showcase_rarity }} {{ item.showcase_name }} · {{ item.showcase_detail }}</small>
+          {% endif %}
+        </div>
+        <div class="ranking-row__metric">{{ item.metric_text }}</div>
+      </article>
+      {% endfor %}
+    </section>
+    {% else %}
+    <section style="padding:38px"><div class="empty-state">本群还没有排行数据</div></section>
+    {% endif %}
+    <footer class="game-footer">
+      <span>同分时按更早达到该成绩者优先，再按稳定玩家编号排序</span>
+      <strong>{{ view.page }}/{{ view.page_count }}</strong>
+    </footer>
+  </main>
+</body>
+</html>

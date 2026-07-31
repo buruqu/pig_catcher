@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root { --font-family: {{ font_family }}; }
+    {{ theme_css | safe }}
+  </style>
+</head>
+<body>
+  <main class="game-sheet trade-sheet" data-pig-catcher-root data-render-ready="true">
+    <header class="game-header">
+      <div class="game-header__copy">
+        <p class="game-header__eyebrow">双方确认交易 · 当前群独立</p>
+        <h1 style="font-size:{% if view.display_name|length > 45 %}20{% elif view.display_name|length > 24 %}30{% else %}42{% endif %}px">{{ view.display_name }}</h1>
+      </div>
+      <div class="game-header__meta">
+        <span>{{ view.status_label }}</span>
+        <strong>{{ view.total_count }} 笔</strong>
+      </div>
+    </header>
+    <section class="list-summary">
+      <p>第 {{ view.page }}/{{ view.page_count }} 页</p>
+      <div class="pill-row">
+        <span class="pill pill--pink">报价锁定 5 分钟</span>
+        <span class="pill pill--mint">接收方确认后成交</span>
+      </div>
+    </section>
+    {% if view.items %}
+    <section class="trade-list">
+      {% for item in view.items %}
+      <article class="trade-row rarity-{{ item.rarity }}">
+        <div class="trade-row__id"><span>交易号</span><strong>{{ item.trade_id }}</strong></div>
+        <div class="trade-row__asset">
+          <strong>{{ "★" * item.rarity }} {{ item.asset_name }}#{{ item.asset_code }}</strong>
+          <span>{{ item.sender_name }} → {{ item.recipient_name }}</span>
+        </div>
+        <div class="trade-row__price"><span>{{ item.status_label }}</span><strong>{{ item.price }} 猪币</strong></div>
+        <div class="trade-row__expiry"><span>有效期至</span><strong>{{ item.expires_at }}</strong></div>
+      </article>
+      {% endfor %}
+    </section>
+    {% else %}
+    <section style="padding:38px"><div class="empty-state">当前没有符合条件的交易</div></section>
+    {% endif %}
+    <footer class="game-footer">
+      <span>接受、拒绝和取消都使用可复制的八位交易号</span>
+      <strong>{{ view.page }}/{{ view.page_count }}</strong>
+    </footer>
+  </main>
+</body>
+</html>

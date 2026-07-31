@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root { --font-family: {{ font_family }}; }
+    {{ theme_css | safe }}
+  </style>
+</head>
+<body>
+  {% from "components.html" import privacy_placeholder %}
+  <main class="preview" data-pig-catcher-root data-render-ready="true">
+    <header class="preview__header">
+      <div>
+        <p class="eyebrow">MaiBot 群聊收集插件</p>
+        <h1>抓猪</h1>
+        <p class="subtitle">2B 正式素材与动画管线</p>
+      </div>
+      <div class="phase" aria-label="当前阶段">
+        <span>PHASE</span>
+        <strong>{{ view.framework_phase }}</strong>
+      </div>
+    </header>
+
+    <section class="status-band" aria-label="框架状态">
+      <div class="status-band__item">
+        <span>插件版本</span>
+        <strong>v{{ view.plugin_version }}</strong>
+      </div>
+      <div class="status-band__item">
+        <span>数据库</span>
+        <strong>Schema {{ view.schema_version }}</strong>
+      </div>
+      <div class="status-band__item">
+        <span>素材协议</span>
+        <strong>Manifest {{ view.asset_manifest_version }}</strong>
+      </div>
+      <div class="status-band__item">
+        <span>规则版本</span>
+        <strong>Rules {{ view.ruleset_version }}</strong>
+      </div>
+    </section>
+
+    <section class="foundation" aria-label="已经完成的框架能力">
+      <h2>框架基础</h2>
+      <div class="foundation__grid">
+        <article>
+          <span class="marker marker--pink"></span>
+          <h3>确定性领域规则</h3>
+          <p>六档品质、六星群隔离与料理硬规则已经固化。</p>
+        </article>
+        <article>
+          <span class="marker marker--mint"></span>
+          <h3>可靠数据层</h3>
+          <p>SQLite 迁移、事务、幂等回执、备份与完整性检查就绪。</p>
+        </article>
+        <article>
+          <span class="marker marker--blue"></span>
+          <h3>安全素材管线</h3>
+          <p>清单、图片、授权范围与原子发布均需通过校验。</p>
+          {{ privacy_placeholder() }}
+        </article>
+        <article>
+          <span class="marker marker--gold"></span>
+          <h3>可降级图片输出</h3>
+          <p>只使用本地模板；渲染或发送失败时可退回纯文字。</p>
+        </article>
+      </div>
+    </section>
+
+    <footer>
+      <span>白色 + 淡粉红视觉方向</span>
+      <strong>玩法命令将在后续阶段逐项闭环后开放</strong>
+    </footer>
+  </main>
+</body>
+</html>
