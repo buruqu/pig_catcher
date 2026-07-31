@@ -73,7 +73,7 @@ ITEM_DEFINITIONS: tuple[ItemDefinition, ...] = (
         "幸运猪哨",
         "catching",
         180,
-        "下一次抓猪：3-5 星相对权重 ×1.12，6 星相对权重 ×1.02",
+        "下一次抓猪：基础六档概率调整为 38% / 29% / 16.5% / 10% / 5% / 1.5%",
     ),
     ItemDefinition("giant-corn", "巨物玉米", "catching", 140, "下一次抓猪更容易遇到大体型猪猪"),
     ItemDefinition("fattening-bean-cake", "增膘豆饼", "catching", 100, "下一次抓猪的猪猪更肥、更重"),

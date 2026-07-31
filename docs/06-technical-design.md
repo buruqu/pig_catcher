@@ -10,7 +10,7 @@
 
 第五轮沿用已验证的 SDK 2.7.x 公共接口和宿主加载器；若后续版本变化，先更新兼容设计再写代码。
 
-当前正式插件为 `1.3.0`，标识为 `schema_version=7`、`asset_manifest_version=4` 和 `ruleset_version=9`。三者独立递增，不能用插件版本代替数据、素材和数值规则版本。
+当前正式插件为 `1.3.1`，标识为 `schema_version=7`、`asset_manifest_version=4` 和 `ruleset_version=10`。三者独立递增，不能用插件版本代替数据、素材和数值规则版本。
 
 ## 2. SDK 映射
 

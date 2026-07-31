@@ -122,7 +122,9 @@ def test_catch_weights_are_normalized_and_transfer_missing_six_star() -> None:
 
 def test_feed_and_lucky_item_improve_high_rarity_share() -> None:
     baseline = catch_weights(feed_level=0, lucky_whistle=False)
+    lucky_only = catch_weights(feed_level=0, lucky_whistle=True)
     boosted = catch_weights(feed_level=5, lucky_whistle=True)
+    assert lucky_only == pytest.approx((38.0, 29.0, 16.5, 10.0, 5.0, 1.5))
     assert sum(boosted[2:]) > sum(baseline[2:])
 
 

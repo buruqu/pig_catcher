@@ -885,12 +885,12 @@ async def test_store_purchase_upgrade_insufficient_balance_and_ledger(
         (row.before, row.after)
         for row in store_card.lucky_whistle_rows
     ) == (
-        ("40.00%", "38.65%"),
-        ("30.00%", "28.99%"),
-        ("17.00%", "18.40%"),
-        ("8.00%", "8.66%"),
-        ("4.00%", "4.33%"),
-        ("1.00%", "0.99%"),
+        ("40.00%", "38.00%"),
+        ("30.00%", "29.00%"),
+        ("17.00%", "16.50%"),
+        ("8.00%", "10.00%"),
+        ("4.00%", "5.00%"),
+        ("1.00%", "1.50%"),
     )
     assert tuple(row.after for row in store_card.chef_spice_rows) == (
         "1★ 69% · 2★ 28% · 3★ 3%",

@@ -8,6 +8,15 @@ from .enums import Rarity
 from .errors import DomainValidationError
 
 BASE_CATCH_WEIGHTS: tuple[float, ...] = (40.0, 30.0, 17.0, 8.0, 4.0, 1.0)
+LUCKY_WHISTLE_BASE_WEIGHTS: tuple[float, ...] = (38.0, 29.0, 16.5, 10.0, 5.0, 1.5)
+LUCKY_WHISTLE_RARITY_MULTIPLIERS: tuple[float, ...] = tuple(
+    adjusted / baseline
+    for adjusted, baseline in zip(
+        LUCKY_WHISTLE_BASE_WEIGHTS,
+        BASE_CATCH_WEIGHTS,
+        strict=True,
+    )
+)
 FEED_RARITY_MULTIPLIER_STEPS: tuple[float, ...] = (
     0.0,
     0.01,
@@ -99,9 +108,14 @@ def catch_weights(
         )
     ]
     if lucky_whistle:
-        for index in range(2, 5):
-            weights[index] *= 1.12
-        weights[5] *= 1.02
+        weights = [
+            value * multiplier
+            for value, multiplier in zip(
+                weights,
+                LUCKY_WHISTLE_RARITY_MULTIPLIERS,
+                strict=True,
+            )
+        ]
     if not six_star_available:
         weights[4] += weights[5]
         weights[5] = 0.0
