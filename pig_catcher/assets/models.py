@@ -73,6 +73,11 @@ class AssetManifestEntry(BaseModel):
         default_factory=dict,
         max_length=20,
     )
+    paired_food_template_id: str = Field(
+        default="",
+        pattern=r"^(?:[a-z0-9]+(?:-[a-z0-9]+)*)?$",
+        max_length=80,
+    )
     collection: CollectionMetadata | None = None
 
     @field_validator("image")
@@ -133,6 +138,11 @@ class AssetManifestEntry(BaseModel):
                 raise ValueError("猪素材最大重量不能小于最小重量")
             if self.effect_id or self.effect_params:
                 raise ValueError("猪素材不能声明美食效果")
+            if self.paired_food_template_id and (
+                self.scope is not TemplateScope.GROUP
+                or self.rarity is not Rarity.SIX
+            ):
+                raise ValueError("只有群专属六星猪可以绑定定制六星菜")
         elif any(
             value is not None
             for value in (
@@ -148,6 +158,8 @@ class AssetManifestEntry(BaseModel):
         if self.kind is AssetKind.FOOD and self.collection is not None:
             raise ValueError("美食素材不能加入猪猪联动收藏系列")
         if self.kind is AssetKind.FOOD:
+            if self.paired_food_template_id:
+                raise ValueError("美食素材不能声明对应菜模板")
             if self.effect_params and not self.effect_id:
                 raise ValueError("美食填写 effect_params 时必须同时填写 effect_id")
             if self.effect_id in SUPPORTED_EFFECT_IDS:
@@ -163,7 +175,7 @@ class AssetManifest(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True, str_strip_whitespace=True)
 
-    manifest_version: Literal[1, 2, 3] = ASSET_MANIFEST_VERSION
+    manifest_version: Literal[1, 2, 3, 4] = ASSET_MANIFEST_VERSION
     catalog_id: str = Field(pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$", min_length=2, max_length=80)
     source_label: str = Field(min_length=1, max_length=200)
     entries: list[AssetManifestEntry] = Field(min_length=1, max_length=5000)
@@ -193,6 +205,51 @@ class AssetManifest(BaseModel):
             existing = collection_definitions.setdefault(collection.collection_id, definition)
             if existing != definition:
                 raise ValueError(f"联动收藏系列 {collection.collection_id} 的名称或总数不一致")
+        if self.manifest_version >= 4:
+            entries_by_id = {entry.template_id: entry for entry in self.entries}
+            six_star_pigs = [
+                entry
+                for entry in self.entries
+                if entry.kind is AssetKind.PIG
+                and entry.scope is TemplateScope.GROUP
+                and entry.rarity is Rarity.SIX
+            ]
+            six_star_food_ids = {
+                entry.template_id
+                for entry in self.entries
+                if entry.kind is AssetKind.FOOD
+                and entry.scope is TemplateScope.GROUP
+                and entry.rarity is Rarity.SIX
+            }
+            paired_food_ids: list[str] = []
+            for pig in six_star_pigs:
+                paired_id = pig.paired_food_template_id
+                if not paired_id:
+                    raise ValueError(
+                        f"群专属六星猪 {pig.template_id} 必须绑定对应定制六星菜"
+                    )
+                food = entries_by_id.get(paired_id)
+                if food is None:
+                    raise ValueError(
+                        f"群专属六星猪 {pig.template_id} 绑定的美食模板不存在"
+                    )
+                if (
+                    food.kind is not AssetKind.FOOD
+                    or food.scope is not TemplateScope.GROUP
+                    or food.rarity is not Rarity.SIX
+                ):
+                    raise ValueError(
+                        f"群专属六星猪 {pig.template_id} 只能绑定群专属六星菜"
+                    )
+                if food.group_scope_id != pig.group_scope_id:
+                    raise ValueError(
+                        f"群专属六星猪 {pig.template_id} 不能绑定其他群的定制六星菜"
+                    )
+                paired_food_ids.append(paired_id)
+            if len(paired_food_ids) != len(set(paired_food_ids)):
+                raise ValueError("同一道定制六星菜不能绑定给多只六星猪")
+            if set(paired_food_ids) != six_star_food_ids:
+                raise ValueError("每道群专属六星菜必须且只能对应一只六星猪")
         return self
 
 

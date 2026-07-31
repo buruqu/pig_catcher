@@ -91,6 +91,7 @@ def manifest_entry(
         "recipe_tags": definition.get("recipe_tags", []),
         "effect_id": definition.get("effect_id", ""),
         "effect_params": definition.get("effect_params", {}),
+        "paired_food_template_id": definition.get("paired_food_template_id", ""),
         "collection": definition.get("collection"),
     }
     if kind == "pig":
@@ -123,7 +124,8 @@ def build_package(
     validate_coverage(source_root, entries)
     output_root.mkdir(parents=True)
 
-    hash_to_media_path: dict[str, str] = {}
+    hash_to_media_path: dict[tuple[str, str], str] = {}
+    unique_hashes: set[str] = set()
     aliases: list[dict[str, str]] = []
     manifest_entries: list[dict[str, object]] = []
     inventory: list[dict[str, object]] = []
@@ -133,13 +135,16 @@ def build_package(
         source_path = source_root / Path(source_relative)
         payload = source_path.read_bytes()
         sha256 = hashlib.sha256(payload).hexdigest()
-        media_path = hash_to_media_path.get(sha256)
+        unique_hashes.add(sha256)
+        storage_scope = str(definition.get("group_scope_id") or "common")
+        storage_key = (sha256, storage_scope)
+        media_path = hash_to_media_path.get(storage_key)
         if media_path is None:
             media_path = f"media/{source_relative}"
             destination = output_root / Path(media_path)
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source_path, destination)
-            hash_to_media_path[sha256] = media_path
+            hash_to_media_path[storage_key] = media_path
         else:
             aliases.append(
                 {
@@ -167,7 +172,7 @@ def build_package(
         )
 
     manifest = {
-        "manifest_version": 3,
+        "manifest_version": 4,
         "catalog_id": definitions["catalog_id"],
         "source_label": definitions["source_label"],
         "entries": manifest_entries,
@@ -180,7 +185,8 @@ def build_package(
         "source_root": str(source_root),
         "definitions": str(definitions_path.resolve()),
         "entry_count": len(entries),
-        "unique_binary_count": len(hash_to_media_path),
+        "unique_binary_count": len(unique_hashes),
+        "stored_binary_count": len(hash_to_media_path),
         "duplicate_aliases": aliases,
         "inventory": inventory,
     }

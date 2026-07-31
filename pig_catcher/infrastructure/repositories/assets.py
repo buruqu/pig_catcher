@@ -160,7 +160,7 @@ class AssetRepository:
                 media_format, is_animated, frame_count, total_duration_ms,
                 loop_count, has_transparency, collaboration_name, collection_id,
                 collection_name, collection_slot, collection_total, character_id,
-                character_name, official_profile_url,
+                character_name, official_profile_url, paired_food_template_id,
                 enabled, created_at, updated_at
             )
             VALUES (
@@ -171,7 +171,7 @@ class AssetRepository:
                 :media_format, :is_animated, :frame_count, :total_duration_ms,
                 :loop_count, :has_transparency, :collaboration_name, :collection_id,
                 :collection_name, :collection_slot, :collection_total, :character_id,
-                :character_name, :official_profile_url,
+                :character_name, :official_profile_url, :paired_food_template_id,
                 :enabled, :created_at, :updated_at
             )
             ON CONFLICT(template_id) DO UPDATE SET
@@ -210,6 +210,7 @@ class AssetRepository:
                 character_id = excluded.character_id,
                 character_name = excluded.character_name,
                 official_profile_url = excluded.official_profile_url,
+                paired_food_template_id = excluded.paired_food_template_id,
                 enabled = excluded.enabled,
                 updated_at = excluded.updated_at
             """,
@@ -253,6 +254,7 @@ class AssetRepository:
                 "character_id": collection.character_id if collection else "",
                 "character_name": collection.character_name if collection else "",
                 "official_profile_url": collection.official_profile_url if collection else "",
+                "paired_food_template_id": entry.paired_food_template_id,
                 "enabled": enabled,
                 "created_at": now,
                 "updated_at": now,

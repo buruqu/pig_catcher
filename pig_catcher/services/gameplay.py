@@ -118,6 +118,7 @@ class PigView:
     body_label: str = ""
     body_description: str = ""
     giant_score: float = 0.0
+    paired_food_template_id: str = ""
 
     @property
     def stars(self) -> str:
@@ -414,6 +415,7 @@ def pig_view_from_row(
         body_label=body.label,
         body_description=body.description,
         giant_score=body.giant_score,
+        paired_food_template_id=str(row.get("paired_food_template_id") or ""),
     )
 
 

@@ -47,6 +47,8 @@ async def test_empty_database_migrates_and_passes_integrity_check(tmp_path: Path
         "player_food_effects",
         "trade_offers",
     } <= names
+    pig_columns = await database.fetch_all("PRAGMA table_info(pig_templates)")
+    assert "paired_food_template_id" in {str(row["name"]) for row in pig_columns}
     await database.close()
 
 

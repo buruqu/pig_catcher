@@ -810,11 +810,24 @@ class EconomyService:
                     f"当前群没有可用的 {int(output_rarity)} 星美食模板，原料猪未消耗。"
                 )
             desired_affinity = source.fat_category
-            if armed_item is not None and armed_item.item_id == "precision-knife":
-                desired_affinity = "lean"
-            elif armed_item is not None and armed_item.item_id == "slow-cook-seasoning":
-                desired_affinity = "fatty"
-            candidates = self._affinity_candidates(templates, desired_affinity)
+            if source.rarity == 6 and int(output_rarity) == 6:
+                paired_template_id = source.paired_food_template_id
+                candidates = [
+                    candidate
+                    for candidate in templates
+                    if str(candidate["template_id"]) == paired_template_id
+                ]
+                if not paired_template_id or not candidates:
+                    raise CookingTemplateError(
+                        "这只六星猪没有当前群可用的对应定制六星菜，原料猪未消耗。"
+                    )
+            else:
+                paired_template_id = ""
+                if armed_item is not None and armed_item.item_id == "precision-knife":
+                    desired_affinity = "lean"
+                elif armed_item is not None and armed_item.item_id == "slow-cook-seasoning":
+                    desired_affinity = "fatty"
+                candidates = self._affinity_candidates(templates, desired_affinity)
             template_roll = self.random_source.random()
             template = candidates[
                 min(int(template_roll * len(candidates)), len(candidates) - 1)
@@ -888,6 +901,7 @@ class EconomyService:
                 "rarity_roll": rarity_roll,
                 "template_roll": template_roll,
                 "desired_affinity": desired_affinity,
+                "paired_food_template_id": paired_template_id,
                 "bonus_roll": bonus_roll,
                 "bonus_serving": bonus_serving,
                 "food_effect_entry_ids": list(

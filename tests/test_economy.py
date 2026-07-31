@@ -85,17 +85,20 @@ def _pig_entry(
     rarity: int,
     *,
     group_id: str | None = None,
+    template_suffix: str = "",
+    paired_food_template_id: str = "",
 ) -> dict[str, object]:
     group_only = group_id is not None
+    suffix = f"-{template_suffix}" if template_suffix else ""
     return {
-        "template_id": f"pig-{rarity}-{'group' if group_only else 'common'}",
+        "template_id": f"pig-{rarity}-{'group' if group_only else 'common'}{suffix}",
         "kind": "pig",
         "display_name": f"{rarity}星测试猪",
         "rarity": rarity,
         "scope": "group" if group_only else "common",
         "group_scope_id": f"qq:{group_id}" if group_only else None,
         "description": "第四轮测试原料猪",
-        "image": f"pig-{rarity}.png",
+        "image": f"pig-{rarity}{suffix}.png",
         "fit": "contain",
         "source": "pytest synthetic asset",
         "license": "test-only",
@@ -106,6 +109,7 @@ def _pig_entry(
         "weight_max_kg": 120,
         "fat_profile": "balanced",
         "recipe_tags": ["家常"],
+        "paired_food_template_id": paired_food_template_id,
     }
 
 
@@ -115,17 +119,19 @@ def _food_entry(
     group_id: str | None = None,
     effect_id: str = "",
     effect_params: dict[str, object] | None = None,
+    template_suffix: str = "",
 ) -> dict[str, object]:
     group_only = group_id is not None
+    suffix = f"-{template_suffix}" if template_suffix else ""
     return {
-        "template_id": f"food-{rarity}-{'group' if group_only else 'common'}",
+        "template_id": f"food-{rarity}-{'group' if group_only else 'common'}{suffix}",
         "kind": "food",
         "display_name": f"{rarity}星测试菜",
         "rarity": rarity,
         "scope": "group" if group_only else "common",
         "group_scope_id": f"qq:{group_id}" if group_only else None,
         "description": "第四轮测试美食",
-        "image": f"food-{rarity}.png",
+        "image": f"food-{rarity}{suffix}.png",
         "fit": "contain",
         "source": "pytest synthetic asset",
         "license": "test-only",
@@ -145,13 +151,22 @@ async def _database_with_catalog(
     effect_ids: dict[int, str] | None = None,
     effect_params: dict[int, dict[str, object]] | None = None,
     extra_entries: tuple[dict[str, object], ...] = (),
+    manifest_version: int = 2,
 ) -> PigCatcherDatabase:
     source = tmp_path / "source"
     source.mkdir()
     entries: list[dict[str, object]] = []
     for rarity in pig_rarities:
         entries.append(
-            _pig_entry(rarity, group_id=group_id if rarity == 6 else None)
+            _pig_entry(
+                rarity,
+                group_id=group_id if rarity == 6 else None,
+                paired_food_template_id=(
+                    "food-6-group"
+                    if rarity == 6 and manifest_version >= 4
+                    else ""
+                ),
+            )
         )
     for rarity in food_rarities:
         entries.append(
@@ -175,7 +190,7 @@ async def _database_with_catalog(
     manifest.write_text(
         json.dumps(
             {
-                "manifest_version": 2,
+                "manifest_version": manifest_version,
                 "catalog_id": "fourth-round-tests",
                 "source_label": "pytest fourth-round catalog",
                 "entries": entries,
@@ -976,6 +991,111 @@ async def test_six_star_food_templates_are_group_isolated(tmp_path: Path) -> Non
     )
     assert all(entry.template_id != "food-6-group" for entry in denied_catalog.entries)
     assert denied_catalog.visible_catalog_total == 2
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_six_star_pig_can_only_produce_its_paired_six_star_food(
+    tmp_path: Path,
+) -> None:
+    database = await _database_with_catalog(
+        tmp_path,
+        pig_rarities=(1, 6),
+        food_rarities=(1, 5, 6),
+        group_id="100",
+        manifest_version=4,
+        extra_entries=(
+            _pig_entry(
+                6,
+                group_id="100",
+                template_suffix="alt",
+                paired_food_template_id="food-6-group-alt",
+            ),
+            _food_entry(6, group_id="100", template_suffix="alt"),
+        ),
+    )
+    clock = FixedClock()
+    caught = await GameplayService(
+        database,
+        CatchingSection(cooldown_seconds=0),
+        random_source=SequenceRandom(
+            0.999,
+            0.0,
+            0.5,
+            0.5,
+            0.5,
+            0.5,
+            0.5,
+        ),
+        clock=clock,
+        id_factory=iter(("pig-six", "pig-six-ledger")).__next__,
+        short_code_factory=lambda: "ABCDEF66",
+    ).catch(_identity(group_id="100", message_id="catch-six-paired"))
+    assert caught.pig.template_id == "pig-6-group"
+    cooked = await EconomyService(
+        database,
+        CookingSection(),
+        EconomySection(),
+        random_source=SequenceRandom(0.999, 0.999, 0.5),
+        clock=clock,
+    ).cook(
+        _identity(group_id="100", message_id="cook-six-paired"),
+        caught.pig.selector,
+    )
+    assert cooked.foods[0].template_id == "food-6-group"
+    snapshot_row = await database.fetch_one(
+        "SELECT random_snapshot_json FROM food_instances WHERE food_instance_id = ?",
+        (cooked.foods[0].food_instance_id,),
+    )
+    assert snapshot_row is not None
+    snapshot = json.loads(str(snapshot_row["random_snapshot_json"]))
+    assert snapshot["paired_food_template_id"] == "food-6-group"
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_missing_six_star_pair_rolls_back_the_source_pig(
+    tmp_path: Path,
+) -> None:
+    database = await _database_with_catalog(
+        tmp_path,
+        pig_rarities=(1, 6),
+        food_rarities=(1, 5, 6),
+        group_id="100",
+    )
+    clock = FixedClock()
+    caught = await GameplayService(
+        database,
+        CatchingSection(cooldown_seconds=0),
+        random_source=SequenceRandom(
+            0.999,
+            0.0,
+            0.5,
+            0.5,
+            0.5,
+            0.5,
+            0.5,
+        ),
+        clock=clock,
+        short_code_factory=lambda: "ABCDEF67",
+    ).catch(_identity(group_id="100", message_id="catch-six-unpaired"))
+    cooking = EconomyService(
+        database,
+        CookingSection(),
+        EconomySection(),
+        random_source=SequenceRandom(0.999),
+        clock=clock,
+    )
+    with pytest.raises(CookingTemplateError, match="原料猪未消耗"):
+        await cooking.cook(
+            _identity(group_id="100", message_id="cook-six-unpaired"),
+            caught.pig.selector,
+        )
+    row = await database.fetch_one(
+        "SELECT state FROM pig_instances WHERE pig_instance_id = ?",
+        (caught.pig.pig_instance_id,),
+    )
+    assert row is not None and row["state"] == "active"
     await database.close()
 
 

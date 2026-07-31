@@ -15,11 +15,11 @@ def _entries() -> list[dict[str, object]]:
     return list(payload["entries"])
 
 
-def test_formal_catalog_has_all_116_named_assets_and_stable_ids() -> None:
+def test_formal_catalog_has_all_122_named_assets_and_stable_ids() -> None:
     entries = _entries()
-    assert len(entries) == 116
-    assert len({entry["template_id"] for entry in entries}) == 116
-    assert len({entry["source_path"] for entry in entries}) == 116
+    assert len(entries) == 122
+    assert len({entry["template_id"] for entry in entries}) == 122
+    assert len({entry["source_path"] for entry in entries}) == 122
     assert all(str(entry["description"]).strip() for entry in entries)
     pig_counts = Counter(
         int(entry["rarity"])
@@ -31,8 +31,8 @@ def test_formal_catalog_has_all_116_named_assets_and_stable_ids() -> None:
         for entry in entries
         if entry["kind"] == "food"
     )
-    assert pig_counts == {1: 20, 2: 20, 3: 20, 4: 17, 5: 12, 6: 3}
-    assert food_counts == {1: 2, 2: 5, 3: 5, 4: 5, 5: 4, 6: 3}
+    assert pig_counts == {1: 20, 2: 20, 3: 20, 4: 17, 5: 12, 6: 6}
+    assert food_counts == {1: 2, 2: 5, 3: 5, 4: 5, 5: 4, 6: 6}
 
 
 def test_high_rarity_food_effects_cover_new_gameplay_families() -> None:
@@ -60,15 +60,49 @@ def test_group_custom_assets_are_confined_and_keep_user_text() -> None:
         for entry in entries
         if entry.get("group_scope_id")
     ]
-    assert len(group_entries) == 6
-    assert {entry["group_scope_id"] for entry in group_entries} == {"qq:1092931381"}
+    assert len(group_entries) == 12
+    assert {entry["group_scope_id"] for entry in group_entries} == {
+        "qq:1092931381",
+        "qq:237716658",
+    }
+    assert all(
+        f"/{str(entry['group_scope_id']).split(':', 1)[1]}/"
+        in f"/{entry['source_path']}"
+        for entry in group_entries
+    )
     descriptions = {
         entry["display_name"]: entry["description"]
         for entry in group_entries
+        if entry["group_scope_id"] == "qq:1092931381"
     }
     assert descriptions["撅撅猪"] == "撅撅。"
     assert descriptions["1004猪鼻哥"] == "救我！！！！！晚上救来不及咯！"
     assert {"小马猪", "小马猪蒙布朗"} <= set(descriptions)
+
+
+def test_every_custom_six_star_pig_has_one_same_group_food_pair() -> None:
+    entries = _entries()
+    by_id = {entry["template_id"]: entry for entry in entries}
+    pigs = [
+        entry
+        for entry in entries
+        if entry["kind"] == "pig" and entry["rarity"] == 6
+    ]
+    foods = {
+        entry["template_id"]
+        for entry in entries
+        if entry["kind"] == "food" and entry["rarity"] == 6
+    }
+    paired = []
+    for pig in pigs:
+        paired_id = pig["paired_food_template_id"]
+        food = by_id[paired_id]
+        assert food["kind"] == "food"
+        assert food["rarity"] == 6
+        assert food["group_scope_id"] == pig["group_scope_id"]
+        paired.append(paired_id)
+    assert len(paired) == len(set(paired))
+    assert set(paired) == foods
 
 
 def test_bandori_collaboration_mappings_use_official_profiles_and_five_slots() -> None:

@@ -376,6 +376,7 @@ class GameplayRepository:
                 template.collection_name,
                 template.collection_total,
                 template.character_name,
+                template.paired_food_template_id,
                 player.display_name AS owner_display_name,
                 EXISTS(
                     SELECT 1

@@ -26,6 +26,7 @@ def _pig_entry(
     group_scope_id: str | None = None,
     consent_status: str = "not-required",
     description: str = "测试猪素材",
+    paired_food_template_id: str = "",
 ) -> dict[str, object]:
     return {
         "template_id": template_id,
@@ -46,25 +47,92 @@ def _pig_entry(
         "weight_max_kg": 100,
         "fat_profile": "balanced",
         "recipe_tags": ["家常"],
+        "paired_food_template_id": paired_food_template_id,
     }
 
 
-def _food_entry(template_id: str, image: str) -> dict[str, object]:
+def _food_entry(
+    template_id: str,
+    image: str,
+    *,
+    rarity: int = 2,
+    group_scope_id: str | None = None,
+) -> dict[str, object]:
+    group_only = group_scope_id is not None
     return {
         "template_id": template_id,
         "kind": "food",
         "display_name": f"测试菜{template_id}",
-        "rarity": 2,
-        "scope": "common",
+        "rarity": rarity,
+        "scope": "group" if group_only else "common",
+        "group_scope_id": group_scope_id,
         "description": "测试美食素材",
         "image": image,
         "fit": "contain",
         "source": "pytest synthetic asset",
         "license": "test-only",
-        "consent_status": "not-required",
+        "consent_status": "granted" if group_only else "not-required",
         "recipe_tags": ["家常"],
         "effect_id": "test-effect",
     }
+
+
+def test_manifest_v4_requires_one_to_one_same_group_six_star_pairs(
+    tmp_path: Path,
+) -> None:
+    for filename, color in (
+        ("pig-a.png", (255, 180, 205, 255)),
+        ("pig-b.png", (240, 170, 210, 255)),
+        ("food-a.png", (255, 220, 150, 255)),
+        ("food-b.png", (245, 210, 160, 255)),
+    ):
+        _write_png(tmp_path / filename, color)
+    entries = [
+        _pig_entry(
+            "pig-group-a",
+            "pig-a.png",
+            rarity=6,
+            scope="group",
+            group_scope_id="qq:100",
+            consent_status="granted",
+            paired_food_template_id="food-group-a",
+        ),
+        _pig_entry(
+            "pig-group-b",
+            "pig-b.png",
+            rarity=6,
+            scope="group",
+            group_scope_id="qq:200",
+            consent_status="granted",
+            paired_food_template_id="food-group-b",
+        ),
+        _food_entry(
+            "food-group-a",
+            "food-a.png",
+            rarity=6,
+            group_scope_id="qq:100",
+        ),
+        _food_entry(
+            "food-group-b",
+            "food-b.png",
+            rarity=6,
+            group_scope_id="qq:200",
+        ),
+    ]
+    manifest = _write_manifest(tmp_path, entries, manifest_version=4)
+    validated = AssetManifestValidator(
+        min_image_side=32,
+        max_image_bytes=1024 * 1024,
+    ).validate_file(manifest)
+    assert len(validated.assets) == 4
+
+    entries[0]["paired_food_template_id"] = "food-group-b"
+    _write_manifest(tmp_path, entries, manifest_version=4)
+    with pytest.raises(AssetValidationError, match="其他群"):
+        AssetManifestValidator(
+            min_image_side=32,
+            max_image_bytes=1024 * 1024,
+        ).validate_file(manifest)
 
 
 def _write_png(path: Path, color: tuple[int, int, int, int]) -> None:
