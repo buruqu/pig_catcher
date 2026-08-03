@@ -40,7 +40,7 @@ from ..domain.gameplay import (
 )
 from ..domain.models import CommandIdentity, CommandReceipt
 from ..domain.ports import Clock, MessageKeyFactory, RandomSource, SystemClock, SystemRandomSource
-from ..domain.quota import catch_quota_window
+from ..domain.quota import catch_quota_window, effective_catch_limit
 from ..domain.rules import (
     LEVEL_CATCH_BONUS_CAP_LEVEL,
     catch_weights,
@@ -751,7 +751,12 @@ class GameplayService:
                     now=now,
                 )
             )
-            daily_limit = self.catching.daily_limit + extra_granted
+            daily_limit = effective_catch_limit(
+                base_limit=self.catching.daily_limit,
+                used_count=daily_count,
+                extra_granted=extra_granted,
+                extra_consumed=extra_consumed,
+            )
             if daily_count >= daily_limit:
                 raise DailyCatchLimitError(
                     f"本时段已经抓了 {daily_count}/{daily_limit} 次，"
@@ -1121,7 +1126,7 @@ class GameplayService:
                 window_start=window_start,
                 window_end=window_end,
             )
-            extra_granted, _ = await self.economy_repository.extra_catch_grants(
+            extra_granted, extra_consumed = await self.economy_repository.extra_catch_grants(
                 session,
                 player_id=identity.player_id,
                 now=now,
@@ -1193,7 +1198,12 @@ class GameplayService:
             visible_catalog_total=visible_total,
             held_records=int(row["held_records"]),
             daily_count=daily_count,
-            daily_limit=self.catching.daily_limit + extra_granted,
+            daily_limit=effective_catch_limit(
+                base_limit=self.catching.daily_limit,
+                used_count=daily_count,
+                extra_granted=extra_granted,
+                extra_consumed=extra_consumed,
+            ),
             cooldown_remaining_seconds=_cooldown_remaining(
                 now=now_datetime,
                 last_acquired_at=last_acquired_at,

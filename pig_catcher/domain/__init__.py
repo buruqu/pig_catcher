@@ -43,7 +43,12 @@ from .gameplay import (
     level_progress,
 )
 from .models import AssetSelector, CommandIdentity, ScopeKey
-from .quota import CatchQuotaWindow, catch_quota_window, normalize_quota_refresh_hours
+from .quota import (
+    CatchQuotaWindow,
+    catch_quota_window,
+    effective_catch_limit,
+    normalize_quota_refresh_hours,
+)
 from .social import (
     RANKING_TYPES,
     BodyScale,
@@ -90,6 +95,7 @@ __all__ = [
     "generate_food_attributes",
     "generate_pig_attributes",
     "catch_quota_window",
+    "effective_catch_limit",
     "describe_body_scale",
     "giant_score",
     "item_by_id",

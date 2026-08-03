@@ -35,6 +35,28 @@ def normalize_quota_refresh_hours(hours: list[int] | tuple[int, ...]) -> tuple[i
     return normalized
 
 
+def effective_catch_limit(
+    *,
+    base_limit: int,
+    used_count: int,
+    extra_granted: int,
+    extra_consumed: int,
+) -> int:
+    """返回当前有效窗口还能真实达到的抓猪次数上限。
+
+    额外次数按北京时间自然日发放和消费，而基础次数会在日内换段或手工重置后
+    重新计数。分母既要保留本窗口已经用掉的额外次数，也不能把旧窗口已经消费的
+    额外次数重新显示成可用额度。
+    """
+
+    normalized_base = max(0, int(base_limit))
+    normalized_used = max(0, int(used_count))
+    normalized_granted = max(0, int(extra_granted))
+    normalized_consumed = max(0, int(extra_consumed))
+    remaining_extra = max(0, normalized_granted - normalized_consumed)
+    return max(normalized_base, normalized_used) + remaining_extra
+
+
 def catch_quota_window(
     now: datetime,
     *,

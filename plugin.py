@@ -578,6 +578,35 @@ class PigCatcherPlugin(MaiBotPlugin):
         )
         return False, fallback_text, 1
 
+    async def _deliver_text_receipt(
+        self,
+        *,
+        stream_id: str,
+        receipt: CommandReceipt,
+    ) -> tuple[bool, str, int]:
+        """只发送一次已经提交的纯文字管理回执。"""
+
+        receipts = self._receipt_service
+        if receipts is None:
+            return False, "抓猪回执服务尚未就绪。", 1
+        if not await receipts.claim_send(receipt.receipt_id):
+            return True, "该消息已处理，不重复公示。", 0
+        try:
+            sent = bool(await self.ctx.send.text(receipt.text_summary, stream_id))
+        except Exception as exc:
+            await receipts.mark_failed(receipt.receipt_id, str(exc))
+            raise
+        if sent:
+            marked = await receipts.mark_sent(receipt.receipt_id)
+            if not marked:
+                self.ctx.logger.error(
+                    "抓猪纯文字回执已发送但无法标记完成，receipt_id=%s",
+                    receipt.receipt_id,
+                )
+            return True, receipt.text_summary, 2
+        await receipts.mark_failed(receipt.receipt_id, "纯文字发送未成功")
+        return False, receipt.text_summary, 1
+
     async def _render_pig_card(
         self,
         pig: PigView,
@@ -702,6 +731,70 @@ class PigCatcherPlugin(MaiBotPlugin):
                 stream_id,
                 "抓猪帮助暂时不可用，请稍后再试。",
                 success=False,
+            )
+
+    @Command(
+        "pig_catcher_reset_quota",
+        description="由插件管理员重置当前群的本时段抓猪次数",
+        pattern=r"^/重置\s*$",
+    )
+    async def handle_reset_quota(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        """让已配置的插件管理员审计式重置命令所在群的当前额度。"""
+
+        identity, rejected = await self._prepare_command(
+            stream_id,
+            kwargs,
+            feature_enabled=self.settings.features.catching_enabled,
+            feature_label="抓猪",
+        )
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        if not self._access_policy().is_admin(
+            platform=identity.scope.platform,
+            user_id=identity.user_id,
+            admin_user_ids=self.settings.access.admin_user_ids,
+        ):
+            self.ctx.logger.warning(
+                "拒绝非管理员执行抓猪额度重置：platform=%s，scope=%s，user_id=%s",
+                identity.scope.platform,
+                identity.scope.value,
+                identity.user_id,
+            )
+            return await self._reply_text(
+                identity.stream_id,
+                "只有插件配置中的管理员可以使用 /重置。QQ 官方机器人请配置成员 OpenID，不能用数字 QQ 号代替。",
+                success=False,
+            )
+        try:
+            service = cast(CatchQuotaResetService, self._quota_reset_service)
+            result = await service.backup_and_reset_from_command(
+                data_dir=Path(self.ctx.paths.data_dir).resolve(),
+                identity=identity,
+            )
+            if result.receipt is None:
+                raise RuntimeError("群内额度重置没有生成幂等回执。")
+            self.ctx.logger.info(
+                "群内抓猪额度已精准重置：scope=%s，window=%s，cleared=%s，players=%s，audit=%s，backup=%s",
+                result.scope_id,
+                result.window.label,
+                result.cleared_catches,
+                result.affected_players,
+                result.audit_event_id,
+                result.backup_path,
+            )
+            return await self._deliver_text_receipt(
+                stream_id=identity.stream_id,
+                receipt=result.receipt,
+            )
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation="重置抓猪次数",
+                error=exc,
             )
 
     @Command(

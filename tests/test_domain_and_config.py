@@ -33,7 +33,7 @@ from pig_catcher.domain.food_effects import (
 from pig_catcher.domain.gameplay import level_progress, size_label, weight_label
 from pig_catcher.domain.models import CommandIdentity, ScopeKey
 from pig_catcher.domain.ports import MessageKeyFactory
-from pig_catcher.domain.quota import catch_quota_window
+from pig_catcher.domain.quota import catch_quota_window, effective_catch_limit
 from pig_catcher.domain.rules import (
     BASE_CATCH_WEIGHTS,
     LEVEL_CATCH_BONUS_CAP_LEVEL,
@@ -321,6 +321,46 @@ def test_access_policy_blacklist_has_priority() -> None:
     )
     assert not policy.evaluate(group_id="100", user_id="200").allowed
     assert not policy.evaluate(group_id="999", user_id="200").allowed
+
+
+def test_plugin_admin_supports_raw_and_platform_scoped_user_ids() -> None:
+    policy = AccessPolicy(denied_message="拒绝")
+    assert policy.is_admin(
+        platform="qq",
+        user_id="123456",
+        admin_user_ids=["123456"],
+    )
+    assert policy.is_admin(
+        platform="qq-official",
+        user_id="member-openid",
+        admin_user_ids=["qq-official:member-openid"],
+    )
+    assert not policy.is_admin(
+        platform="qq-official",
+        user_id="another-openid",
+        admin_user_ids=["123456"],
+    )
+
+
+def test_effective_catch_limit_drops_consumed_old_window_extras_from_display() -> None:
+    assert effective_catch_limit(
+        base_limit=5,
+        used_count=5,
+        extra_granted=2,
+        extra_consumed=0,
+    ) == 7
+    assert effective_catch_limit(
+        base_limit=5,
+        used_count=6,
+        extra_granted=2,
+        extra_consumed=1,
+    ) == 7
+    assert effective_catch_limit(
+        base_limit=5,
+        used_count=0,
+        extra_granted=2,
+        extra_consumed=2,
+    ) == 5
 
 
 def test_default_config_exposes_fixed_rules_and_chinese_schema() -> None:

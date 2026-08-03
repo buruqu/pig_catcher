@@ -51,7 +51,19 @@ class AccessPolicy:
             return AccessDecision(False, self.denied_message)
         return AccessDecision(True)
 
-    def is_admin(self, user_id: str, admin_user_ids: Iterable[str]) -> bool:
-        """判断用户是否位于插件管理员列表。"""
+    def is_admin(
+        self,
+        *,
+        platform: str,
+        user_id: str,
+        admin_user_ids: Iterable[str],
+    ) -> bool:
+        """按当前平台身份判断用户是否位于插件管理员列表。"""
 
-        return str(user_id or "").strip() in normalized_id_set(admin_user_ids)
+        normalized_user_id = str(user_id or "").strip()
+        normalized_platform = str(platform or "").strip().lower()
+        configured = normalized_id_set(admin_user_ids)
+        return normalized_user_id in configured or (
+            bool(normalized_platform)
+            and f"{normalized_platform}:{normalized_user_id}" in configured
+        )

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -39,6 +39,7 @@ from pig_catcher.infrastructure.repositories import EconomyRepository, Framework
 from pig_catcher.rendering import food_card_view, store_view
 from pig_catcher.services import (
     AssetCatalogService,
+    CatchQuotaResetService,
     EconomyService,
     GameplayService,
     SocialService,
@@ -738,6 +739,43 @@ async def test_extra_catch_food_extends_today_limit_and_consumes_only_bonus_uses
     )
     assert effect is not None
     assert (effect["granted_uses"], effect["consumed_uses"]) == (2, 2)
+    clock.value += timedelta(hours=7)
+    refreshed_profile = await bonus_catching.profile(
+        _identity(message_id="quota-after-refresh-profile")
+    )
+    assert (refreshed_profile.daily_count, refreshed_profile.daily_limit) == (0, 1)
+    refreshed_catching = GameplayService(
+        database,
+        CatchingSection(daily_limit=1, cooldown_seconds=0),
+        random_source=SequenceRandom(0.0, 0.0, 0.5, 0.5, 0.5, 0.5, 0.5),
+        clock=clock,
+        id_factory=iter(
+            ("quota-refreshed-pig", "quota-refreshed-ledger")
+        ).__next__,
+        short_code_factory=lambda: "F29F2C3D",
+    )
+    refreshed_catch = await refreshed_catching.catch(
+        _identity(message_id="quota-after-refresh-catch")
+    )
+    assert (refreshed_catch.daily_count, refreshed_catch.daily_limit) == (1, 1)
+    clock.value += timedelta(seconds=1)
+    reset = CatchQuotaResetService(
+        database,
+        refresh_hours=[0, 9, 12, 19],
+        timezone_name="Asia/Shanghai",
+        window_limit=1,
+        clock=clock,
+    )
+    await reset.backup_and_reset_current_window(
+        data_dir=tmp_path,
+        group_id="100",
+        actor_user_id="test-admin",
+        source="pytest",
+    )
+    profile = await refreshed_catching.profile(
+        _identity(message_id="quota-after-reset-profile")
+    )
+    assert (profile.daily_count, profile.daily_limit) == (0, 1)
     await database.close()
 
 

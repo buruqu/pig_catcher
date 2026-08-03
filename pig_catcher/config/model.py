@@ -177,8 +177,11 @@ class AccessSection(PluginConfigBase):
     admin_user_ids: list[str] = Field(
         default_factory=list,
         max_length=200,
-        description="允许执行未来素材与维护管理操作的用户",
-        json_schema_extra=_ui("插件管理员", "每行一个用户号；不会自动继承群管理员身份"),
+        description="允许执行素材与维护管理操作的平台用户身份",
+        json_schema_extra=_ui(
+            "插件管理员",
+            "每行一个身份；NapCat 可填 QQ 号，QQ 官方机器人需填成员 OpenID，也支持 platform:user_id",
+        ),
     )
     notify_denied: bool = Field(
         default=True,

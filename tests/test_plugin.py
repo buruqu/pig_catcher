@@ -119,10 +119,124 @@ async def test_admin_panel_one_shot_reset_is_scoped_and_audited(
     await plugin.on_unload()
 
 
+@pytest.mark.asyncio
+async def test_group_reset_command_requires_configured_admin_and_is_idempotent(
+    tmp_path: Path,
+) -> None:
+    admin_openid = "official-admin-openid"
+    plugin, context = await create_test_plugin(
+        tmp_path,
+        config_updates={
+            "access": {"admin_user_ids": [f"qq-official:{admin_openid}"]},
+            "catching": {"cooldown_seconds": 0},
+        },
+    )
+    await _install_test_pig(plugin, tmp_path)
+    catch_message = build_message(
+        platform="qq-official",
+        group_id="official-group",
+        user_id=admin_openid,
+        display_name="官方管理员",
+        message_id="official-catch-before-reset",
+    )
+    caught = await plugin.handle_catch(
+        stream_id="stream-10001",
+        **_command_kwargs(catch_message),
+    )
+    assert caught[0] is True
+
+    reset_message = build_message(
+        platform="qq-official",
+        group_id="official-group",
+        group_name="官方测试群",
+        user_id=admin_openid,
+        display_name="官方管理员",
+        message_id="official-reset-once",
+    )
+    reset = await plugin.handle_reset_quota(
+        stream_id="stream-10001",
+        **_command_kwargs(reset_message),
+    )
+    assert reset[0] is True
+    assert "已归零：1 次" in reset[1]
+    assert len(context.send.texts) == 1
+    assert len(tuple((tmp_path / "backups").glob("*.sqlite3"))) == 1
+
+    duplicate = await plugin.handle_reset_quota(
+        stream_id="stream-10001",
+        **_command_kwargs(reset_message),
+    )
+    assert duplicate == (True, "该消息已处理，不重复公示。", 0)
+    assert len(context.send.texts) == 1
+    assert len(tuple((tmp_path / "backups").glob("*.sqlite3"))) == 1
+    rows = await plugin.database.fetch_all(
+        """
+        SELECT action, scope_id, actor_user_id
+        FROM audit_events
+        WHERE action = 'catch-quota-window-reset'
+        """
+    )
+    assert [tuple(row) for row in rows] == [
+        (
+            "catch-quota-window-reset",
+            "qq-official:official-group",
+            admin_openid,
+        )
+    ]
+    receipt = await plugin.database.fetch_one(
+        """
+        SELECT command_name, send_status
+        FROM command_receipts
+        WHERE command_name = 'pig-catcher.reset-quota'
+        """
+    )
+    assert receipt is not None
+    assert tuple(receipt) == ("pig-catcher.reset-quota", "sent")
+    await plugin.on_unload()
+
+
+@pytest.mark.asyncio
+async def test_group_reset_command_rejects_unconfigured_user_before_backup(
+    tmp_path: Path,
+) -> None:
+    plugin, context = await create_test_plugin(
+        tmp_path,
+        config_updates={"access": {"admin_user_ids": ["configured-admin"]}},
+    )
+    await plugin.gameplay_service.profile(
+        CommandIdentity(
+            scope=ScopeKey("qq", "10001"),
+            stream_id="stream-10001",
+            user_id="configured-admin",
+            display_name="已配置管理员",
+            message_id="seed-admin-scope",
+            group_name="抓猪测试群",
+        )
+    )
+    denied = await plugin.handle_reset_quota(
+        stream_id="stream-10001",
+        **_command_kwargs(
+            build_message(
+                user_id="not-admin",
+                display_name="普通成员",
+                message_id="unauthorized-reset",
+            )
+        ),
+    )
+    assert denied[0] is False
+    assert "只有插件配置中的管理员" in denied[1]
+    assert len(context.send.texts) == 1
+    assert not (tmp_path / "backups").exists()
+    assert await plugin.database.fetch_one(
+        "SELECT 1 FROM audit_events WHERE action = 'catch-quota-window-reset'"
+    ) is None
+    await plugin.on_unload()
+
+
 def test_plugin_registers_only_explicit_production_commands() -> None:
     plugin = create_plugin()
     components = plugin.get_components()
-    assert len(components) == 30
+    assert len(components) == 31
     commands = {
         component["name"]
         for component in components
@@ -130,6 +244,7 @@ def test_plugin_registers_only_explicit_production_commands() -> None:
     }
     assert commands == {
         "pig_catcher_help",
+        "pig_catcher_reset_quota",
         "pig_catcher_catch",
         "pig_catcher_profile",
         "pig_catcher_pig_detail",
