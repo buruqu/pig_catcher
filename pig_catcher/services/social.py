@@ -20,6 +20,7 @@ from ..domain.errors import (
     PigNotFoundError,
     ReceiptConflictError,
     SelfTransferError,
+    SocialTransferRestrictedError,
     TradeExpiredError,
     TradeNotFoundError,
     TradePermissionError,
@@ -41,8 +42,10 @@ from ..infrastructure.repositories import (
     FrameworkRepository,
     GameplayRepository,
     ReceiptRepository,
+    RestrictionRepository,
     SocialRepository,
 )
+from ..infrastructure.repositories.restrictions import GIFT_TRANSFER_BAN, TRADE_BAN
 from .command_state import (
     iso_timestamp,
     receipt_payload,
@@ -372,6 +375,7 @@ class SocialService:
         economy_repository: EconomyRepository | None = None,
         framework_repository: FrameworkRepository | None = None,
         receipt_repository: ReceiptRepository | None = None,
+        restriction_repository: RestrictionRepository | None = None,
         clock: Clock | None = None,
         id_factory: Callable[[], str] | None = None,
         trade_id_factory: Callable[[], str] | None = None,
@@ -384,6 +388,7 @@ class SocialService:
         self.economy_repository = economy_repository or EconomyRepository()
         self.framework_repository = framework_repository or FrameworkRepository()
         self.receipt_repository = receipt_repository or ReceiptRepository()
+        self.restriction_repository = restriction_repository or RestrictionRepository()
         self.clock = clock or SystemClock()
         self.id_factory = id_factory or (lambda: uuid4().hex)
         self.trade_id_factory = trade_id_factory or new_short_code
@@ -426,6 +431,12 @@ class SocialService:
                     request_payload=request_payload,
                 )
                 return self._gift_from_receipt(existing, receipt_created=False)
+            await self._ensure_social_transfer_allowed(
+                session,
+                player_ids=(identity.player_id, recipient.player_id),
+                restriction_type=GIFT_TRANSFER_BAN,
+                now=now,
+            )
             await self.framework_repository.touch_identity(
                 session,
                 identity=identity,
@@ -571,6 +582,12 @@ class SocialService:
                     existing,
                     receipt_created=False,
                 )
+            await self._ensure_social_transfer_allowed(
+                session,
+                player_ids=(identity.player_id, recipient.player_id),
+                restriction_type=TRADE_BAN,
+                now=now,
+            )
             await self.framework_repository.touch_identity(
                 session,
                 identity=identity,
@@ -689,6 +706,15 @@ class SocialService:
                 role="recipient",
             )
             trade = self._trade_from_row(row)
+            await self._ensure_social_transfer_allowed(
+                session,
+                player_ids=(
+                    trade.sender_player_id,
+                    trade.recipient_player_id,
+                ),
+                restriction_type=TRADE_BAN,
+                now=now,
+            )
             buyer_balance = await self.economy_repository.apply_currency_change(
                 session,
                 player_id=trade.recipient_player_id,
@@ -1445,6 +1471,33 @@ class SocialService:
             raise SelfTransferError("不支持跨群赠送或交易。")
         if identity.user_id == recipient.user_id:
             raise SelfTransferError("不能把资产赠送或交易给自己。")
+
+    async def _ensure_social_transfer_allowed(
+        self,
+        session: DatabaseSession,
+        *,
+        player_ids: tuple[str, ...],
+        restriction_type: str,
+        now: str,
+    ) -> None:
+        restrictions = (
+            await self.restriction_repository.active_restrictions_for_players(
+                session,
+                player_ids=player_ids,
+                restriction_type=restriction_type,
+                now=now,
+            )
+        )
+        if not restrictions:
+            return
+        if restriction_type == GIFT_TRANSFER_BAN:
+            operation = "赠送或收赠任何猪猪和美食"
+        else:
+            operation = "创建或接受任何猪猪和美食交易"
+        raise SocialTransferRestrictedError(
+            f"参与方账号已被永久列入黑名单，禁止{operation}；"
+            "解除需由管理员复核。"
+        )
 
     async def _new_trade_id(self, session: DatabaseSession) -> str:
         for _ in range(64):

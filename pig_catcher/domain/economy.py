@@ -133,8 +133,9 @@ def adjusted_cooking_weights(
     cookware_level: int,
     player_level: int = 1,
     chef_spice: bool,
+    super_chef_spice: bool = False,
 ) -> tuple[float, ...]:
-    """应用属性、等级、厨具和主厨香料，同时保持六星猪固定 90/10。"""
+    """应用属性、等级、厨具与互斥香料。"""
 
     try:
         rarity = Rarity(int(source_rarity))
@@ -144,10 +145,16 @@ def adjusted_cooking_weights(
     weight = float(weight_percentile)
     if not 0.0 <= size <= 1.0 or not 0.0 <= weight <= 1.0:
         raise DomainValidationError("原料猪属性百分位必须位于 0 至 1。")
+    if chef_spice and super_chef_spice:
+        raise DomainValidationError("主厨香料与超级主厨香料不能叠加。")
     cookware_multiplier = cookware_higher_rarity_multiplier(cookware_level)
     level_multiplier = level_cooking_higher_rarity_multiplier(player_level)
     if rarity is Rarity.SIX:
-        return cooking_weights(rarity)
+        weights = list(cooking_weights(rarity))
+        if super_chef_spice:
+            weights[4] -= 5.0
+            weights[5] += 5.0
+        return normalize_weights(weights)
 
     weights = list(cooking_weights(rarity))
     lowest_index = next(index for index, value in enumerate(weights) if value > 0)
@@ -156,7 +163,7 @@ def adjusted_cooking_weights(
     weights[lowest_index] -= attribute_shift
     weights[target_index] += attribute_shift
     if chef_spice:
-        spice_shift = min(weights[lowest_index], 6.0)
+        spice_shift = min(weights[lowest_index], 15.0)
         weights[lowest_index] -= spice_shift
         weights[target_index] += spice_shift
 

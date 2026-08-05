@@ -288,6 +288,14 @@ def test_cooking_weight_hard_boundaries() -> None:
         cookware_level=5,
         chef_spice=True,
     ) == (0.0, 0.0, 0.0, 0.0, 90.0, 10.0)
+    assert adjusted_cooking_weights(
+        6,
+        size_percentile=1.0,
+        weight_percentile=1.0,
+        cookware_level=5,
+        chef_spice=False,
+        super_chef_spice=True,
+    ) == (0.0, 0.0, 0.0, 0.0, 85.0, 15.0)
 
 
 def test_level_and_cookware_probability_bonuses_are_exact_and_bounded() -> None:
@@ -514,6 +522,110 @@ async def test_large_lunch_box_produces_two_foods_and_consumes_once(
         (identity.player_id,),
     )
     assert item is not None and item["quantity"] == 0
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_super_chef_spice_turns_six_star_cook_to_15_percent_and_consumes_once(
+    tmp_path: Path,
+) -> None:
+    database = await _database_with_catalog(
+        tmp_path,
+        pig_rarities=(6,),
+        food_rarities=(5, 6),
+        manifest_version=4,
+    )
+    clock = FixedClock()
+    catching = GameplayService(
+        database,
+        CatchingSection(cooldown_seconds=0),
+        random_source=SequenceRandom(0.0, 0.0, 0.5, 0.5, 0.5, 0.5, 0.5),
+        clock=clock,
+        id_factory=iter(("super-source-pig", "super-source-ledger")).__next__,
+        short_code_factory=lambda: "C19F2C3D",
+    )
+    source = await catching.catch(_identity(message_id="super-source"))
+    identity = _identity(message_id="super-cook")
+    now = iso_timestamp(clock.now())
+    async with database.transaction() as session:
+        await session.execute(
+            "INSERT INTO item_inventory(player_id, item_id, quantity, updated_at) "
+            "VALUES (?, 'super-chef-spice', 1, ?)",
+            (identity.player_id, now),
+        )
+        await session.execute(
+            "INSERT INTO armed_items(player_id, action_type, item_id, armed_at) "
+            "VALUES (?, 'cooking', 'super-chef-spice', ?)",
+            (identity.player_id, now),
+        )
+    economy = EconomyService(
+        database,
+        CookingSection(),
+        EconomySection(),
+        random_source=SequenceRandom(0.86, 0.0, 0.5),
+        clock=clock,
+        id_factory=iter(("super-food", "super-cook-ledger")).__next__,
+        short_code_factory=lambda: "C29F2C3D",
+    )
+
+    result = await economy.cook(identity, source.pig.selector)
+
+    assert result.foods[0].rarity == 6
+    assert result.weights == (0.0, 0.0, 0.0, 0.0, 85.0, 15.0)
+    assert result.item_name == "超级主厨香料"
+    item = await database.fetch_one(
+        "SELECT quantity FROM item_inventory WHERE player_id = ? AND item_id = 'super-chef-spice'",
+        (identity.player_id,),
+    )
+    assert item is not None and item["quantity"] == 0
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_incompatible_super_chef_spice_stays_armed_for_a_later_six_star_pig(
+    tmp_path: Path,
+) -> None:
+    database = await _database_with_catalog(tmp_path)
+    clock = FixedClock()
+    _, caught = await _catch_one_star(database, clock=clock)
+    identity = _identity(message_id="regular-cook-with-super-spice")
+    now = iso_timestamp(clock.now())
+    async with database.transaction() as session:
+        await session.execute(
+            "INSERT INTO item_inventory(player_id, item_id, quantity, updated_at) "
+            "VALUES (?, 'super-chef-spice', 1, ?)",
+            (identity.player_id, now),
+        )
+        await session.execute(
+            "INSERT INTO armed_items(player_id, action_type, item_id, armed_at) "
+            "VALUES (?, 'cooking', 'super-chef-spice', ?)",
+            (identity.player_id, now),
+        )
+    economy = EconomyService(
+        database,
+        CookingSection(),
+        EconomySection(),
+        random_source=SequenceRandom(0.0, 0.0, 0.5),
+        clock=clock,
+        id_factory=iter(("regular-food", "regular-cook-ledger")).__next__,
+        short_code_factory=lambda: "D39F2C3D",
+    )
+
+    result = await economy.cook(identity, caught.pig.selector)
+
+    assert result.item_name == ""
+    row = await database.fetch_one(
+        """
+        SELECT inventory.quantity, armed.item_id
+        FROM item_inventory AS inventory
+        JOIN armed_items AS armed
+          ON armed.player_id = inventory.player_id
+         AND armed.item_id = inventory.item_id
+        WHERE inventory.player_id = ?
+        """,
+        (identity.player_id,),
+    )
+    assert row is not None and tuple(row) == (1, "super-chef-spice")
     await database.close()
 
 
@@ -780,6 +892,124 @@ async def test_extra_catch_food_extends_today_limit_and_consumes_only_bonus_uses
 
 
 @pytest.mark.asyncio
+async def test_weekly_window_food_adds_five_to_every_window_without_stacking(
+    tmp_path: Path,
+) -> None:
+    database = await _database_with_catalog(
+        tmp_path,
+        pig_rarities=(5,),
+        food_rarities=(5,),
+        effect_ids={5: "weekly-window-catches"},
+        effect_params={5: {"count": 5}},
+    )
+    clock = FixedClock()
+    catching = GameplayService(
+        database,
+        CatchingSection(daily_limit=1, cooldown_seconds=0),
+        random_source=SequenceRandom(0.0, 0.0, 0.5, 0.5, 0.5, 0.5, 0.5),
+        clock=clock,
+        id_factory=iter(("weekly-source-pig", "weekly-source-ledger")).__next__,
+        short_code_factory=lambda: "E19F2C3D",
+    )
+    source = await catching.catch(_identity(message_id="weekly-source"))
+    economy = EconomyService(
+        database,
+        CookingSection(),
+        EconomySection(),
+        random_source=SequenceRandom(0.5, 0.0, 0.5),
+        clock=clock,
+        id_factory=iter(("weekly-food", "weekly-cook-ledger")).__next__,
+        short_code_factory=lambda: "E29F2C3D",
+    )
+    cooked = await economy.cook(_identity(message_id="weekly-cook"), source.pig.selector)
+    eaten = await economy.eat(_identity(message_id="weekly-eat"), cooked.foods[0].selector)
+
+    assert eaten.effect.queued_effect_id == "weekly-window-catches"
+    profile = await catching.profile(_identity(message_id="weekly-profile"))
+    assert (profile.daily_count, profile.daily_limit) == (1, 6)
+    row = await database.fetch_one(
+        "SELECT weekly_bonus, weekly_expires_at FROM player_catch_quota_bonuses WHERE player_id = ?",
+        (source.pig.owner_player_id,),
+    )
+    assert row is not None and row["weekly_bonus"] == 5 and row["weekly_expires_at"]
+    async with database.transaction() as session:
+        granted_again = await EconomyRepository().grant_weekly_catch_bonus(
+            session,
+            player_id=source.pig.owner_player_id,
+            source_food_instance_id="another-food",
+            count=5,
+            expires_at=str(row["weekly_expires_at"]),
+            now=iso_timestamp(clock.now()),
+        )
+    assert granted_again is False
+
+    clock.value += timedelta(days=7)
+    expired = await catching.profile(_identity(message_id="weekly-expired-profile"))
+    assert expired.daily_limit == 1
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_permanent_window_food_refuses_to_consume_at_plus_five_cap(
+    tmp_path: Path,
+) -> None:
+    database = await _database_with_catalog(
+        tmp_path,
+        pig_rarities=(5,),
+        food_rarities=(5,),
+        effect_ids={5: "permanent-window-catch"},
+        effect_params={5: {"count": 1, "max_bonus": 5}},
+    )
+    clock = FixedClock()
+    catching = GameplayService(
+        database,
+        CatchingSection(cooldown_seconds=0),
+        random_source=SequenceRandom(0.0, 0.0, 0.5, 0.5, 0.5, 0.5, 0.5),
+        clock=clock,
+        id_factory=iter(("permanent-source-pig", "permanent-source-ledger")).__next__,
+        short_code_factory=lambda: "F19F2C3D",
+    )
+    source = await catching.catch(_identity(message_id="permanent-source"))
+    economy = EconomyService(
+        database,
+        CookingSection(),
+        EconomySection(),
+        random_source=SequenceRandom(0.5, 0.0, 0.5),
+        clock=clock,
+        id_factory=iter(("permanent-food", "permanent-cook-ledger")).__next__,
+        short_code_factory=lambda: "F29F2C3D",
+    )
+    cooked = await economy.cook(
+        _identity(message_id="permanent-cook"),
+        source.pig.selector,
+    )
+    now = iso_timestamp(clock.now())
+    async with database.transaction() as session:
+        for index in range(5):
+            total = await EconomyRepository().increment_permanent_catch_bonus(
+                session,
+                player_id=source.pig.owner_player_id,
+                source_food_instance_id=f"seed-permanent-{index}",
+                count=1,
+                max_bonus=5,
+                now=now,
+            )
+            assert total == index + 1
+
+    with pytest.raises(FoodEffectError, match=r"达到 \+5 上限"):
+        await economy.eat(
+            _identity(message_id="permanent-eat-at-cap"),
+            cooked.foods[0].selector,
+        )
+    food = await database.fetch_one(
+        "SELECT state FROM food_instances WHERE food_instance_id = ?",
+        (cooked.foods[0].food_instance_id,),
+    )
+    assert food is not None and food["state"] == "active"
+    await database.close()
+
+
+@pytest.mark.asyncio
 async def test_empty_selector_sells_cheapest_low_star_then_batch_sells_rest_once(
     tmp_path: Path,
 ) -> None:
@@ -887,7 +1117,7 @@ async def test_store_purchase_upgrade_insufficient_balance_and_ledger(
     database = await _database_with_catalog(tmp_path)
     clock = FixedClock()
     seed_identity = _identity(message_id="seed")
-    await _grant_coins(database, seed_identity, 1000)
+    await _grant_coins(database, seed_identity, 2000)
     service = EconomyService(
         database,
         CookingSection(),
@@ -898,8 +1128,11 @@ async def test_store_purchase_upgrade_insufficient_balance_and_ledger(
         ).__next__,
     )
     store = await service.store(seed_identity, page=1, category="全部")
-    assert store.coin_balance == 1000
-    assert len(store.products) == 10
+    assert store.coin_balance == 2000
+    assert len(store.products) == 12
+    products = {product.display_name: product for product in store.products}
+    assert products["超级幸运猪哨"].unit_price == 2600
+    assert products["超级主厨香料"].unit_price == 2200
     store_card = store_view(store)
     assert tuple(row.value for row in store_card.feed_probability_rows) == (
         "13.00%",
@@ -923,17 +1156,17 @@ async def test_store_purchase_upgrade_insufficient_balance_and_ledger(
         (row.before, row.after)
         for row in store_card.lucky_whistle_rows
     ) == (
-        ("40.00%", "38.00%"),
-        ("30.00%", "29.00%"),
-        ("17.00%", "16.50%"),
-        ("8.00%", "10.00%"),
-        ("4.00%", "5.00%"),
-        ("1.00%", "1.50%"),
+        ("40.00%", "36.00%"),
+        ("30.00%", "28.00%"),
+        ("17.00%", "16.00%"),
+        ("8.00%", "11.00%"),
+        ("4.00%", "6.00%"),
+        ("1.00%", "3.00%"),
     )
     assert tuple(row.after for row in store_card.chef_spice_rows) == (
-        "1★ 69% · 2★ 28% · 3★ 3%",
-        "1★ 9% · 2★ 71% · 3★ 18% · 4★ 2%",
-        "2★ 14% · 3★ 66% · 4★ 18% · 5★ 2%",
+        "1★ 60% · 2★ 37% · 3★ 3%",
+        "2★ 80% · 3★ 18% · 4★ 2%",
+        "2★ 5% · 3★ 75% · 4★ 18% · 5★ 2%",
         "3★ 30% · 4★ 60% · 5★ 10%",
         "4★ 30% · 5★ 70%",
     )
@@ -942,7 +1175,7 @@ async def test_store_purchase_upgrade_insufficient_balance_and_ledger(
     assert "厨具 Lv.0-5 的高档菜相对权重增幅" in store_text
     assert "幸运猪哨（基础权重，使用前→使用后）" in store_text
     assert "主厨香料（基础分布、Lv.0，使用前→使用后）" in store_text
-    assert "1★猪 1★ 75%、2★ 22%、3★ 3%→1★ 69%、2★ 28%、3★ 3%" in store_text
+    assert "1★猪 1★ 75%、2★ 22%、3★ 3%→1★ 60%、2★ 37%、3★ 3%" in store_text
 
     item_identity = _identity(message_id="buy-item")
     item = await service.purchase(item_identity, "幸运猪哨", quantity=2)

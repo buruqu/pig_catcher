@@ -300,13 +300,32 @@ def test_store_command_patterns_do_not_claim_livehouse_commands() -> None:
         "command_pattern"
     ]
 
-    assert re.search(purchase_pattern, "/购买 幸运猪哨 2")
-    assert re.search(upgrade_pattern, "/升级 猪饲料")
-    assert re.search(upgrade_pattern, "/升级 厨具")
+    for text in (
+        "/购买 幸运猪哨 2",
+        "/购买 超级幸运猪哨",
+        "/购买 超级主厨香料 2",
+        "/购买 超级幸运猪哨 数量错误",
+        "@小马哥bot测试机 /购买 超级幸运猪哨",
+        "<@!bot-openid> /购买 超级幸运猪哨",
+        "[CQ:at,qq=1353436150] /购买 超级主厨香料",
+    ):
+        assert re.search(purchase_pattern, text), text
+    for text in (
+        "/升级 猪饲料",
+        "/升级 厨具",
+        "@小马哥bot测试机 /升级 厨具",
+        "<@bot-openid> /升级 猪饲料",
+    ):
+        assert re.search(upgrade_pattern, text), text
     assert re.search(purchase_pattern, "/购买")  # 保留缺参时的格式提示。
     assert re.search(upgrade_pattern, "/升级")
 
-    assert re.search(purchase_pattern, "/购买 练习券 2") is None
+    for text in (
+        "/购买 练习券 2",
+        "@小马哥bot测试机 /购买 招募券 3",
+        "<@!bot-openid> /购买 蓝魔方",
+    ):
+        assert re.search(purchase_pattern, text) is None, text
     assert re.search(upgrade_pattern, "/升级 #3 满级") is None
     assert re.search(upgrade_pattern, "/升级 户山香澄") is None
 
@@ -671,12 +690,12 @@ async def test_complete_fourth_round_command_flow_and_duplicate_publication(
         "SELECT coin_balance FROM players WHERE player_id = 'qq:10001:20001'"
     )
     assert player is not None
-    balance_after_seed = int(player["coin_balance"]) + 1000
+    balance_after_seed = int(player["coin_balance"]) + 2000
     async with plugin.database.transaction() as session:
         await session.execute(
             """
             UPDATE players
-            SET coin_balance = coin_balance + 1000
+            SET coin_balance = coin_balance + 2000
             WHERE player_id = 'qq:10001:20001'
             """
         )
@@ -688,7 +707,7 @@ async def test_complete_fourth_round_command_flow_and_duplicate_publication(
                 idempotency_key, created_at
             )
             VALUES (
-                'round4-seed', 'qq:10001:20001', 'qq:10001', 1000, ?,
+                'round4-seed', 'qq:10001:20001', 'qq:10001', 2000, ?,
                 'test-grant', '命令测试入账', 'test', 'seed',
                 'round4-seed', '2026-07-28T00:00:00.000Z'
             )

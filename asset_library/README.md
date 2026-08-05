@@ -1,18 +1,19 @@
 # 本机素材库
 
-`current/` 保存当前正式素材导入包，包含：
+`current-v1.4.1/` 保存当前正式素材导入包；原有版本目录继续保留为回滚包。
+本次正式包包含：
 
 | 位置 | 内容 |
 | --- | --- |
-| `current/assets.json` | 可供导入工具读取的 Asset Manifest 4 |
-| `current/build-report.json` | 122 项模板、115 份唯一内容、121 份隔离存储媒体的 SHA-256 校验报告 |
-| `current/media/猪猪素材库/` | 一至五星公共猪猪素材 |
-| `current/media/美食素材库/` | 公共美食素材 |
-| `current/media/定制猪群友库/` | 按 QQ 群号隔离的六星定制猪 |
-| `current/media/定制美食库/` | 按 QQ 群号隔离的六星定制美食 |
+| `current-v1.4.1/assets.json` | 可供导入工具读取的 Asset Manifest 4 |
+| `current-v1.4.1/build-report.json` | 159 项模板、146 份唯一内容、158 份隔离存储媒体的 SHA-256 校验报告 |
+| `current-v1.4.1/media/猪猪素材库/` | 一至五星公共猪猪素材 |
+| `current-v1.4.1/media/美食素材库/` | 公共美食素材 |
+| `current-v1.4.1/media/定制猪群友库/` | 按 QQ 群号隔离的六星定制猪 |
+| `current-v1.4.1/media/定制美食库/` | 按 QQ 群号隔离的六星定制美食 |
 
 该目录中的图片和 GIF 保留原始字节，不做重编码；动画列表页只提取确定性预览帧，
-单项详情仍使用原动画。`current/` 被 Git 忽略，以免群专属图片进入公共仓库。
+单项详情仍使用原动画。正式包被 Git 忽略，以免群专属图片进入公共仓库。
 
 正式名称、描述、品质、概率属性和授权范围维护在
 `catalogs/formal/pig-and-food-definitions.json`。新增或替换素材后，应使用

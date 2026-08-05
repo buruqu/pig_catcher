@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 
 from ...domain.enums import AssetKind, RecordType, TradeStatus
 from ..database import DatabaseSession
@@ -473,6 +473,61 @@ class SocialRepository:
             )
             expired += 1
         return expired
+
+    async def cancel_pending_offers_for_players(
+        self,
+        session: DatabaseSession,
+        *,
+        scope_id: str,
+        player_ids: Sequence[str],
+        now: str,
+    ) -> int:
+        """取消处罚对象参与的待处理报价并释放卖方资产锁。"""
+
+        normalized = tuple(
+            dict.fromkeys(
+                str(value).strip()
+                for value in player_ids
+                if str(value).strip()
+            )
+        )
+        if not normalized:
+            return 0
+        placeholders = ",".join("?" for _ in normalized)
+        rows = await session.fetch_all(
+            f"""
+            SELECT trade_id, asset_kind, asset_instance_id
+            FROM trade_offers
+            WHERE scope_id = ?
+              AND status = 'pending'
+              AND (
+                  sender_player_id IN ({placeholders})
+                  OR recipient_player_id IN ({placeholders})
+              )
+            ORDER BY created_at, trade_id
+            """,
+            (scope_id, *normalized, *normalized),
+        )
+        cancelled = 0
+        for row in rows:
+            changed = await self.resolve_trade(
+                session,
+                trade_id=str(row["trade_id"]),
+                expected_status=TradeStatus.PENDING,
+                new_status=TradeStatus.CANCELLED,
+                now=now,
+            )
+            if not changed:
+                continue
+            await self.unlock_trade_asset(
+                session,
+                asset_kind=AssetKind(str(row["asset_kind"])),
+                asset_instance_id=str(row["asset_instance_id"]),
+                trade_id=str(row["trade_id"]),
+                now=now,
+            )
+            cancelled += 1
+        return cancelled
 
     async def insert_transfer_event(
         self,

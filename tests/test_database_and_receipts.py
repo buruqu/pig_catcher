@@ -45,6 +45,8 @@ async def test_empty_database_migrates_and_passes_integrity_check(tmp_path: Path
         "command_receipts",
         "currency_ledger",
         "player_food_effects",
+        "player_catch_quota_bonuses",
+        "player_restrictions",
         "trade_offers",
     } <= names
     pig_columns = await database.fetch_all("PRAGMA table_info(pig_templates)")
@@ -97,6 +99,100 @@ async def test_existing_v1_database_migrates_media_and_collection_columns(
         """
     )
     assert effect_table is not None
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_legacy_v9_social_ban_splits_into_two_permanent_blacklists(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "legacy-v9.sqlite3"
+    connection = sqlite3.connect(path)
+    connection.executescript(
+        """
+        PRAGMA foreign_keys = ON;
+        CREATE TABLE schema_migrations (
+            version INTEGER PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE,
+            applied_at TEXT NOT NULL
+        );
+        INSERT INTO schema_migrations(version, name, applied_at)
+        VALUES (9, 'player_restrictions', '2026-08-05T00:00:00Z');
+        CREATE TABLE scopes (
+            scope_id TEXT PRIMARY KEY,
+            platform TEXT NOT NULL,
+            group_id TEXT NOT NULL,
+            group_name TEXT NOT NULL DEFAULT '',
+            stream_id TEXT NOT NULL DEFAULT '',
+            enabled INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE TABLE players (
+            player_id TEXT PRIMARY KEY,
+            scope_id TEXT NOT NULL REFERENCES scopes(scope_id) ON DELETE CASCADE,
+            platform_user_id TEXT NOT NULL,
+            display_name TEXT NOT NULL,
+            coin_balance INTEGER NOT NULL DEFAULT 0,
+            experience INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE TABLE player_restrictions (
+            restriction_id TEXT PRIMARY KEY,
+            player_id TEXT NOT NULL REFERENCES players(player_id) ON DELETE CASCADE,
+            restriction_type TEXT NOT NULL CHECK (
+                restriction_type IN ('social-transfer-ban', 'catch-window-limit')
+            ),
+            limit_value INTEGER,
+            starts_at TEXT NOT NULL,
+            expires_at TEXT,
+            reason TEXT NOT NULL DEFAULT '',
+            source TEXT NOT NULL DEFAULT '',
+            created_by TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE(player_id, restriction_type)
+        );
+        INSERT INTO scopes(
+            scope_id, platform, group_id, created_at, updated_at
+        ) VALUES ('qq-official:group', 'qq-official', 'group', 'now', 'now');
+        INSERT INTO players(
+            player_id, scope_id, platform_user_id, display_name,
+            created_at, updated_at
+        ) VALUES (
+            'qq-official:group:user', 'qq-official:group', 'user', '成员',
+            'now', 'now'
+        );
+        INSERT INTO player_restrictions(
+            restriction_id, player_id, restriction_type, limit_value,
+            starts_at, expires_at, reason, source, created_by,
+            created_at, updated_at
+        ) VALUES (
+            'legacy-ban', 'qq-official:group:user', 'social-transfer-ban', NULL,
+            '2026-08-05T00:00:00Z', '2026-08-12T00:00:00Z',
+            'legacy', 'pytest', 'admin', 'now', 'now'
+        );
+        PRAGMA user_version = 9;
+        """
+    )
+    connection.commit()
+    connection.close()
+
+    database = PigCatcherDatabase(path)
+    await database.open()
+    assert await database.schema_version() == SCHEMA_VERSION
+    rows = await database.fetch_all(
+        """
+        SELECT restriction_type, expires_at
+        FROM player_restrictions
+        ORDER BY restriction_type
+        """
+    )
+    assert [(row["restriction_type"], row["expires_at"]) for row in rows] == [
+        ("gift-transfer-ban", None),
+        ("trade-ban", None),
+    ]
     await database.close()
 
 

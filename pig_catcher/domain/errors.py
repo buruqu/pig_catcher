@@ -129,6 +129,10 @@ class SocialError(GameplayError):
     """第五轮赠送、交易、展示或排行的可说明错误。"""
 
 
+class SocialTransferRestrictedError(SocialError):
+    """玩家处于禁止赠送与交易的处理期。"""
+
+
 class MentionTargetError(SocialError):
     """命令缺少唯一且有效的群成员 @。"""
 

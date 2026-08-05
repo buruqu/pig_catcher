@@ -8,7 +8,7 @@ from .enums import Rarity
 from .errors import DomainValidationError
 
 BASE_CATCH_WEIGHTS: tuple[float, ...] = (40.0, 30.0, 17.0, 8.0, 4.0, 1.0)
-LUCKY_WHISTLE_BASE_WEIGHTS: tuple[float, ...] = (38.0, 29.0, 16.5, 10.0, 5.0, 1.5)
+LUCKY_WHISTLE_BASE_WEIGHTS: tuple[float, ...] = (36.0, 28.0, 16.0, 11.0, 6.0, 3.0)
 LUCKY_WHISTLE_RARITY_MULTIPLIERS: tuple[float, ...] = tuple(
     adjusted / baseline
     for adjusted, baseline in zip(
@@ -91,9 +91,13 @@ def catch_weights(
     feed_level: int = 0,
     player_level: int = 1,
     lucky_whistle: bool = False,
+    super_lucky_whistle: bool = False,
     six_star_available: bool = True,
 ) -> tuple[float, ...]:
-    """计算等级、饲料、消耗品和六星资格修正后的抓取权重。"""
+    """计算等级、饲料、互斥消耗品和六星资格修正后的抓取权重。"""
+
+    if lucky_whistle and super_lucky_whistle:
+        raise DomainValidationError("幸运猪哨与超级幸运猪哨不能叠加。")
 
     weights = list(normalize_weights(base_weights))
     feed_multipliers = feed_rarity_multipliers(feed_level)
@@ -116,6 +120,22 @@ def catch_weights(
                 strict=True,
             )
         ]
+    if super_lucky_whistle:
+        normalized = list(normalize_weights(weights))
+        boosted_five = normalized[4] * 5.0
+        boosted_six = normalized[5] * 5.0
+        boosted_total = boosted_five + boosted_six
+        lower_total = sum(normalized[:4])
+        if boosted_total >= 100.0 or lower_total <= 0.0:
+            high_scale = 100.0 / boosted_total
+            weights = [0.0, 0.0, 0.0, 0.0, boosted_five * high_scale, boosted_six * high_scale]
+        else:
+            lower_scale = (100.0 - boosted_total) / lower_total
+            weights = [
+                *(value * lower_scale for value in normalized[:4]),
+                boosted_five,
+                boosted_six,
+            ]
     if not six_star_available:
         weights[4] += weights[5]
         weights[5] = 0.0

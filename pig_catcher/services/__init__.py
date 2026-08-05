@@ -51,6 +51,7 @@ from .gameplay import (
 from .maintenance import MaintenanceOptions, MaintenanceReport, MaintenanceRunner
 from .quota import CatchQuotaResetResult, CatchQuotaResetService
 from .receipts import ReceiptService
+from .restrictions import RestrictionAdminService, RestrictionBatchResult
 from .social import (
     GiftResult,
     RankingEntry,
@@ -104,6 +105,8 @@ __all__ = [
     "RecordsPage",
     "PurchaseResult",
     "ReceiptService",
+    "RestrictionAdminService",
+    "RestrictionBatchResult",
     "RankingEntry",
     "RankingPage",
     "SaleResult",

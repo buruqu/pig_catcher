@@ -123,12 +123,17 @@ from .pig_catcher.version import PLUGIN_VERSION
 _PURCHASE_PRODUCT_PATTERN = "(?:" + "|".join(
     escape(item.display_name) for item in ITEM_DEFINITIONS
 ) + ")"
+_COMMAND_LEADING_MENTION_PATTERN = (
+    r"(?:\[CQ:at,qq=[^\],]+\]\s*|<@!?[^>\s]+>\s*|@\S+\s*)?"
+)
 _PURCHASE_COMMAND_PATTERN = (
-    rf"^/购买(?:\s+(?P<arguments>{_PURCHASE_PRODUCT_PATTERN}(?:\s+.*?)?))?\s*$"
+    rf"^{_COMMAND_LEADING_MENTION_PATTERN}/购买"
+    rf"(?:\s+(?P<arguments>{_PURCHASE_PRODUCT_PATTERN}(?:\s+.*?)?))?\s*$"
 )
 _UPGRADE_TARGET_PATTERN = r"(?:猪饲料|饲料|猪饲料升级|厨具|厨具升级)"
 _UPGRADE_COMMAND_PATTERN = (
-    rf"^/升级(?:\s+(?P<arguments>{_UPGRADE_TARGET_PATTERN}))?\s*$"
+    rf"^{_COMMAND_LEADING_MENTION_PATTERN}/升级"
+    rf"(?:\s+(?P<arguments>{_UPGRADE_TARGET_PATTERN}))?\s*$"
 )
 
 

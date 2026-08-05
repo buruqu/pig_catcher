@@ -124,8 +124,19 @@ def test_feed_and_lucky_item_improve_high_rarity_share() -> None:
     baseline = catch_weights(feed_level=0, lucky_whistle=False)
     lucky_only = catch_weights(feed_level=0, lucky_whistle=True)
     boosted = catch_weights(feed_level=5, lucky_whistle=True)
-    assert lucky_only == pytest.approx((38.0, 29.0, 16.5, 10.0, 5.0, 1.5))
+    assert lucky_only == pytest.approx((36.0, 28.0, 16.0, 11.0, 6.0, 3.0))
     assert sum(boosted[2:]) > sum(baseline[2:])
+
+    super_lucky = catch_weights(super_lucky_whistle=True)
+    assert super_lucky[4] == pytest.approx(baseline[4] * 5.0)
+    assert super_lucky[5] == pytest.approx(baseline[5] * 5.0)
+    assert super_lucky[:4] == pytest.approx(
+        tuple(value * (75.0 / 95.0) for value in baseline[:4])
+    )
+    assert sum(super_lucky) == pytest.approx(100.0)
+    assert sum(super_lucky[4:]) > sum(lucky_only[4:])
+    with pytest.raises(DomainValidationError, match="不能叠加"):
+        catch_weights(lucky_whistle=True, super_lucky_whistle=True)
 
 
 def test_numeric_level_improves_catch_probability_with_a_hard_cap() -> None:
@@ -216,6 +227,24 @@ def test_six_star_food_effect_caps_support_extreme_rewards() -> None:
     )
     assert rarity_grant.params["multiplier"] == 12.0
     assert stature_grant.params["strength"] == 0.5
+    exact_catch = ActiveFoodEffect(
+        effect_entry_id="exact-six-star-catch",
+        effect_id="next-six-star-catch",
+        params={"six_star_percent": 50},
+        granted_uses=1,
+        consumed_uses=0,
+        expires_at="",
+        created_at="2026-08-04T00:00:00+08:00",
+    )
+    exact_application = apply_catch_effects(BASE_CATCH_WEIGHTS, [exact_catch])
+    assert exact_application.weights[5] == pytest.approx(50.0)
+    assert sum(exact_application.weights[:5]) == pytest.approx(50.0)
+    assert resolve_food_effect(
+        "weekly-window-catches", {"count": 5}
+    ).params == {"count": 5}
+    assert resolve_food_effect(
+        "permanent-window-catch", {"count": 1, "max_bonus": 5}
+    ).params == {"count": 1, "max_bonus": 5}
     with pytest.raises(FoodEffectError):
         resolve_food_effect(
             "next-food-rarity",

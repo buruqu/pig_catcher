@@ -17,12 +17,16 @@ EXTRA_CATCHES = "extra-catches"
 NEXT_PIG_RARITY = "next-pig-rarity"
 NEXT_FOOD_RARITY = "next-food-rarity"
 NEXT_PIG_STATURE = "next-pig-stature"
+NEXT_SIX_STAR_CATCH = "next-six-star-catch"
+WEEKLY_WINDOW_CATCHES = "weekly-window-catches"
+PERMANENT_WINDOW_CATCH = "permanent-window-catch"
 
 CATCH_EFFECT_IDS = frozenset(
     {
         NEXT_CATCH_QUALITY,
         NEXT_PIG_RARITY,
         NEXT_PIG_STATURE,
+        NEXT_SIX_STAR_CATCH,
     }
 )
 COOK_EFFECT_IDS = frozenset(
@@ -32,7 +36,8 @@ COOK_EFFECT_IDS = frozenset(
         NEXT_FOOD_RARITY,
     }
 )
-SUPPORTED_EFFECT_IDS = CATCH_EFFECT_IDS | COOK_EFFECT_IDS | {EXTRA_CATCHES}
+IMMEDIATE_EFFECT_IDS = frozenset({WEEKLY_WINDOW_CATCHES, PERMANENT_WINDOW_CATCH})
+SUPPORTED_EFFECT_IDS = CATCH_EFFECT_IDS | COOK_EFFECT_IDS | {EXTRA_CATCHES} | IMMEDIATE_EFFECT_IDS
 
 
 @dataclass(frozen=True, slots=True)
@@ -163,6 +168,14 @@ def resolve_food_effect(
             1,
             f"下一次用 6 星猪做菜时，6 星定制菜概率提升至 {percent:g}%。",
         )
+    if normalized_id == NEXT_SIX_STAR_CATCH:
+        percent = _number(raw, "six_star_percent", lower=11.0, upper=50.0)
+        return FoodEffectGrant(
+            normalized_id,
+            {"six_star_percent": percent},
+            1,
+            f"下一次抓猪时，6 星猪概率提升至 {percent:g}%。",
+        )
     if normalized_id == EXTRA_CATCHES:
         count = _integer(raw, "count", lower=1, upper=10)
         return FoodEffectGrant(
@@ -171,13 +184,30 @@ def resolve_food_effect(
             count,
             f"今天额外获得 {count} 次抓猪机会。",
         )
+    if normalized_id == WEEKLY_WINDOW_CATCHES:
+        count = _integer(raw, "count", lower=1, upper=5)
+        return FoodEffectGrant(
+            normalized_id,
+            {"count": count},
+            1,
+            f"本周所有抓猪时段的基础额度额外 +{count} 次；不可重复叠加。",
+        )
+    if normalized_id == PERMANENT_WINDOW_CATCH:
+        count = _integer(raw, "count", lower=1, upper=1)
+        max_bonus = _integer(raw, "max_bonus", lower=1, upper=5)
+        return FoodEffectGrant(
+            normalized_id,
+            {"count": count, "max_bonus": max_bonus},
+            1,
+            f"永久增加所有抓猪时段基础额度 +{count} 次，累计上限 +{max_bonus}。",
+        )
     if normalized_id in {NEXT_PIG_RARITY, NEXT_FOOD_RARITY}:
         rarity_upper = 6 if normalized_id == NEXT_PIG_RARITY else 5
         rarity = _integer(raw, "rarity", lower=1, upper=rarity_upper)
         multiplier_upper = (
             12.0
             if normalized_id == NEXT_PIG_RARITY and rarity == 6
-            else 3.0
+            else 5.0
         )
         multiplier = _number(
             raw,
@@ -254,6 +284,15 @@ def apply_catch_effects(
         elif effect.effect_id == NEXT_PIG_STATURE:
             direction = 1.0 if grant.params["mode"] == "giant" else -1.0
             stature_bias += direction * float(grant.params["strength"])
+        elif effect.effect_id == NEXT_SIX_STAR_CATCH:
+            if adjusted[5] <= 0:
+                continue
+            target = float(grant.params["six_star_percent"])
+            lower_total = sum(adjusted[:5])
+            if lower_total <= 0:
+                continue
+            scale = (100.0 - target) / lower_total
+            adjusted = [value * scale for value in adjusted[:5]] + [target]
         consumed.append(effect.effect_entry_id)
         summaries.append(grant.summary)
     return CatchEffectApplication(

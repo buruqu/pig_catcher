@@ -49,6 +49,118 @@ class EconomyRepository:
         )
         return [dict(row) for row in rows]
 
+    async def catch_quota_bonuses(
+        self,
+        session: DatabaseSession,
+        *,
+        player_id: str,
+        now: str,
+    ) -> tuple[int, int]:
+        """Return the permanent bonus and the currently active weekly bonus."""
+
+        row = await session.fetch_one(
+            """
+            SELECT
+                permanent_bonus,
+                CASE
+                    WHEN weekly_expires_at IS NOT NULL AND weekly_expires_at > ?
+                    THEN weekly_bonus
+                    ELSE 0
+                END AS active_weekly_bonus
+            FROM player_catch_quota_bonuses
+            WHERE player_id = ?
+            """,
+            (now, player_id),
+        )
+        if row is None:
+            return 0, 0
+        return int(row["permanent_bonus"]), int(row["active_weekly_bonus"])
+
+    async def grant_weekly_catch_bonus(
+        self,
+        session: DatabaseSession,
+        *,
+        player_id: str,
+        source_food_instance_id: str,
+        count: int,
+        expires_at: str,
+        now: str,
+    ) -> bool:
+        """Grant one weekly bonus only when no unexpired weekly grant exists."""
+
+        cursor = await session.execute(
+            """
+            INSERT INTO player_catch_quota_bonuses(
+                player_id, permanent_bonus, weekly_bonus, weekly_expires_at,
+                weekly_source_food_instance_id, permanent_source_food_instance_id,
+                created_at, updated_at
+            )
+            VALUES (?, 0, ?, ?, ?, NULL, ?, ?)
+            ON CONFLICT(player_id) DO UPDATE SET
+                weekly_bonus = excluded.weekly_bonus,
+                weekly_expires_at = excluded.weekly_expires_at,
+                weekly_source_food_instance_id = excluded.weekly_source_food_instance_id,
+                updated_at = excluded.updated_at
+            WHERE player_catch_quota_bonuses.weekly_expires_at IS NULL
+               OR player_catch_quota_bonuses.weekly_expires_at <= ?
+            """,
+            (
+                player_id,
+                count,
+                expires_at,
+                source_food_instance_id,
+                now,
+                now,
+                now,
+            ),
+        )
+        return cursor.rowcount == 1
+
+    async def increment_permanent_catch_bonus(
+        self,
+        session: DatabaseSession,
+        *,
+        player_id: str,
+        source_food_instance_id: str,
+        count: int,
+        max_bonus: int,
+        now: str,
+    ) -> int | None:
+        """Increment the permanent bonus, returning None when already capped."""
+
+        cursor = await session.execute(
+            """
+            INSERT INTO player_catch_quota_bonuses(
+                player_id, permanent_bonus, weekly_bonus, weekly_expires_at,
+                weekly_source_food_instance_id, permanent_source_food_instance_id,
+                created_at, updated_at
+            )
+            VALUES (?, ?, 0, NULL, NULL, ?, ?, ?)
+            ON CONFLICT(player_id) DO UPDATE SET
+                permanent_bonus = MIN(?, player_catch_quota_bonuses.permanent_bonus + ?),
+                permanent_source_food_instance_id = excluded.permanent_source_food_instance_id,
+                updated_at = excluded.updated_at
+            WHERE player_catch_quota_bonuses.permanent_bonus < ?
+            """,
+            (
+                player_id,
+                count,
+                source_food_instance_id,
+                now,
+                now,
+                max_bonus,
+                count,
+                max_bonus,
+            ),
+        )
+        if cursor.rowcount != 1:
+            return None
+        row = await session.fetch_one(
+            "SELECT permanent_bonus FROM player_catch_quota_bonuses WHERE player_id = ?",
+            (player_id,),
+        )
+        return int(row["permanent_bonus"]) if row is not None else None
+
     async def get_upgrade_levels(
         self,
         session: DatabaseSession,

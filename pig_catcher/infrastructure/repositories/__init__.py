@@ -7,6 +7,7 @@ from .gameplay import GameplayRepository
 from .operations import OperationsRepository
 from .quota import QuotaRepository
 from .receipts import ReceiptRepository
+from .restrictions import RestrictionRepository
 from .social import SocialRepository
 
 __all__ = [
@@ -17,5 +18,6 @@ __all__ = [
     "OperationsRepository",
     "QuotaRepository",
     "ReceiptRepository",
+    "RestrictionRepository",
     "SocialRepository",
 ]

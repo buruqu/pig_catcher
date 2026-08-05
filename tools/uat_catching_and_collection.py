@@ -275,8 +275,15 @@ async def load_plugin(
     )
     configure_plugin(plugin)
     await plugin.on_load()
-    if len(plugin.get_components()) != 9:
-        raise AssertionError("MaiBot component registration is not exactly 9 commands.")
+    components = plugin.get_components()
+    command_count = sum(
+        component["type"] == "COMMAND"
+        for component in components
+    )
+    if len(components) != 31 or command_count != 30:
+        raise AssertionError(
+            "MaiBot component registration is not exactly 30 commands and 1 home card."
+        )
     return plugin
 
 
@@ -380,9 +387,9 @@ async def run_uat(args: argparse.Namespace) -> dict[str, object]:
                     {"arguments": "1 排序=价值"},
                 ),
                 (
-                    "/猪猪图鉴 1",
+                    "/猪猪图鉴",
                     plugin.handle_catalog,
-                    {"arguments": "1"},
+                    {"arguments": ""},
                 ),
                 (
                     "/猪猪纪录 1",

@@ -44,6 +44,9 @@ from ..domain.errors import (
 )
 from ..domain.food_effects import (
     EXTRA_CATCHES,
+    NEXT_SIX_STAR_COOK,
+    PERMANENT_WINDOW_CATCH,
+    WEEKLY_WINDOW_CATCHES,
     active_effect_from_row,
     apply_cooking_effects,
     effect_summary,
@@ -810,16 +813,6 @@ class EconomyService:
                 action_type="cooking",
             )
             armed_item, _ = self._armed_item(armed_row)
-            weights = adjusted_cooking_weights(
-                source.rarity,
-                size_percentile=source.size_percentile,
-                weight_percentile=source.weight_percentile,
-                cookware_level=cookware_level,
-                player_level=probability_level,
-                chef_spice=(
-                    armed_item is not None and armed_item.item_id == "chef-spice"
-                ),
-            )
             active_effects = tuple(
                 active_effect_from_row(row)
                 for row in await self.repository.list_active_food_effects(
@@ -827,6 +820,44 @@ class EconomyService:
                     player_id=identity.player_id,
                     now=now,
                 )
+            )
+            has_six_star_food_effect = any(
+                effect.effect_id == NEXT_SIX_STAR_COOK for effect in active_effects
+            )
+            item_compatible = bool(
+                armed_item is not None
+                and (
+                    (
+                        source.rarity <= 5
+                        and armed_item.item_id
+                        in {
+                            "chef-spice",
+                            "precision-knife",
+                            "slow-cook-seasoning",
+                            "large-lunch-box",
+                        }
+                    )
+                    or (
+                        source.rarity == 6
+                        and armed_item.item_id == "super-chef-spice"
+                        and not has_six_star_food_effect
+                    )
+                )
+            )
+            applied_item = armed_item if item_compatible else None
+            weights = adjusted_cooking_weights(
+                source.rarity,
+                size_percentile=source.size_percentile,
+                weight_percentile=source.weight_percentile,
+                cookware_level=cookware_level,
+                player_level=probability_level,
+                chef_spice=(
+                    applied_item is not None and applied_item.item_id == "chef-spice"
+                ),
+                super_chef_spice=(
+                    applied_item is not None
+                    and applied_item.item_id == "super-chef-spice"
+                ),
             )
             effect_application = apply_cooking_effects(
                 weights,
@@ -859,9 +890,9 @@ class EconomyService:
                     )
             else:
                 paired_template_id = ""
-                if armed_item is not None and armed_item.item_id == "precision-knife":
+                if applied_item is not None and applied_item.item_id == "precision-knife":
                     desired_affinity = "lean"
-                elif armed_item is not None and armed_item.item_id == "slow-cook-seasoning":
+                elif applied_item is not None and applied_item.item_id == "slow-cook-seasoning":
                     desired_affinity = "fatty"
                 candidates = self._affinity_candidates(templates, desired_affinity)
             template_roll = self.random_source.random()
@@ -881,8 +912,8 @@ class EconomyService:
             bonus_attributes: FoodAttributes | None = None
             bonus_serving = False
             if (
-                armed_item is not None
-                and armed_item.item_id == "large-lunch-box"
+                applied_item is not None
+                and applied_item.item_id == "large-lunch-box"
                 and source.rarity <= 5
                 and int(output_rarity) <= 5
             ):
@@ -933,7 +964,7 @@ class EconomyService:
                 "weights": [round(value, 8) for value in weights],
                 "cookware_level": cookware_level,
                 "player_level": probability_level,
-                "item_id": armed_item.item_id if armed_item is not None else "",
+                "item_id": applied_item.item_id if applied_item is not None else "",
                 "rarity_roll": rarity_roll,
                 "template_roll": template_roll,
                 "desired_affinity": desired_affinity,
@@ -1023,17 +1054,17 @@ class EconomyService:
                 field="total_cooks",
                 now=now,
             )
-            if armed_item is not None:
+            if applied_item is not None:
                 item_consumed = await self.gameplay_repository.consume_armed_item(
                     session,
                     player_id=identity.player_id,
                     action_type="cooking",
-                    item_id=armed_item.item_id,
+                    item_id=applied_item.item_id,
                     now=now,
                 )
                 if not item_consumed:
                     raise ItemInventoryError(
-                        f"已装备的“{armed_item.display_name}”库存不足，本次做菜未结算。"
+                        f"已装备的“{applied_item.display_name}”库存不足，本次做菜未结算。"
                     )
             if effect_application.consumed_entry_ids:
                 await self.repository.consume_food_effects(
@@ -1057,8 +1088,8 @@ class EconomyService:
                 "total_experience": total_experience,
                 "catalog_new_count": catalog_new_count,
                 "cookware_level": cookware_level,
-                "item_id": armed_item.item_id if armed_item is not None else "",
-                "item_name": armed_item.display_name if armed_item is not None else "",
+                "item_id": applied_item.item_id if applied_item is not None else "",
+                "item_name": applied_item.display_name if applied_item is not None else "",
                 "weights": [round(value, 8) for value in weights],
                 "bonus_serving": bonus_serving,
                 "effect_summaries": list(effect_application.summaries),
@@ -1083,8 +1114,8 @@ class EconomyService:
                 total_experience=total_experience,
                 catalog_new_count=catalog_new_count,
                 cookware_level=cookware_level,
-                item_id=armed_item.item_id if armed_item is not None else "",
-                item_name=armed_item.display_name if armed_item is not None else "",
+                item_id=applied_item.item_id if applied_item is not None else "",
+                item_name=applied_item.display_name if applied_item is not None else "",
                 weights=weights,
                 bonus_serving=bonus_serving,
                 effect_summaries=effect_application.summaries,
@@ -1112,8 +1143,8 @@ class EconomyService:
                 total_experience=total_experience,
                 catalog_new_count=catalog_new_count,
                 cookware_level=cookware_level,
-                item_id=armed_item.item_id if armed_item is not None else "",
-                item_name=armed_item.display_name if armed_item is not None else "",
+                item_id=applied_item.item_id if applied_item is not None else "",
+                item_name=applied_item.display_name if applied_item is not None else "",
                 weights=weights,
                 bonus_serving=bonus_serving,
                 effect_summaries=effect_application.summaries,
@@ -1258,6 +1289,30 @@ class EconomyService:
                 normalized_selector,
             )
             effect = self._food_effect(food)
+            effect_expires_at = effect.expires_at
+            if effect.queued_effect_id == WEEKLY_WINDOW_CATCHES:
+                effect_expires_at = self._weekly_effect_expiry(now_datetime)
+                granted = await self.repository.grant_weekly_catch_bonus(
+                    session,
+                    player_id=identity.player_id,
+                    source_food_instance_id=food.food_instance_id,
+                    count=int(effect.queued_effect_params["count"]),
+                    expires_at=effect_expires_at,
+                    now=now,
+                )
+                if not granted:
+                    raise FoodEffectError("本周的全时段抓猪额度加成已经生效，不能重复叠加；美食未消耗。")
+            elif effect.queued_effect_id == PERMANENT_WINDOW_CATCH:
+                permanent_total = await self.repository.increment_permanent_catch_bonus(
+                    session,
+                    player_id=identity.player_id,
+                    source_food_instance_id=food.food_instance_id,
+                    count=int(effect.queued_effect_params["count"]),
+                    max_bonus=int(effect.queued_effect_params["max_bonus"]),
+                    now=now,
+                )
+                if permanent_total is None:
+                    raise FoodEffectError("永久抓猪时段额度已经达到 +5 上限；美食未消耗。")
             consumed = await self.repository.consume_food(
                 session,
                 food_instance_id=food.food_instance_id,
@@ -1275,8 +1330,10 @@ class EconomyService:
                 now=now,
             )
             effect_entry_id = ""
-            effect_expires_at = effect.expires_at
-            if effect.queued_effect_id:
+            if effect.queued_effect_id and effect.queued_effect_id not in {
+                WEEKLY_WINDOW_CATCHES,
+                PERMANENT_WINDOW_CATCH,
+            }:
                 effect_entry_id = self._new_identifier()
                 if effect.queued_effect_id == EXTRA_CATCHES:
                     effect_expires_at = self._daily_effect_expiry(now_datetime)
@@ -2420,6 +2477,19 @@ class EconomyService:
         next_day = (local + timedelta(days=1)).date()
         expiry = datetime.combine(
             next_day,
+            datetime.min.time(),
+            tzinfo=beijing_timezone,
+        )
+        return iso_timestamp(expiry)
+
+    @staticmethod
+    def _weekly_effect_expiry(now: datetime) -> str:
+        beijing_timezone = timezone(timedelta(hours=8), "Asia/Shanghai")
+        local = now.astimezone(beijing_timezone)
+        days_until_monday = 7 - local.weekday()
+        next_monday = (local + timedelta(days=days_until_monday)).date()
+        expiry = datetime.combine(
+            next_monday,
             datetime.min.time(),
             tzinfo=beijing_timezone,
         )

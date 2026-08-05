@@ -8,6 +8,9 @@ from .v0004_cooking_and_economy_indexes import MIGRATION_0004
 from .v0005_social_ranking_and_global_records import MIGRATION_0005
 from .v0006_food_effect_queue import MIGRATION_0006
 from .v0007_paired_six_star_recipes import MIGRATION_0007
+from .v0008_catch_quota_bonuses import MIGRATION_0008
+from .v0009_player_restrictions import MIGRATION_0009
+from .v0010_split_social_blacklists import MIGRATION_0010
 
 MIGRATIONS: tuple[Migration, ...] = (
     MIGRATION_0001,
@@ -17,6 +20,9 @@ MIGRATIONS: tuple[Migration, ...] = (
     MIGRATION_0005,
     MIGRATION_0006,
     MIGRATION_0007,
+    MIGRATION_0008,
+    MIGRATION_0009,
+    MIGRATION_0010,
 )
 
 __all__ = ["MIGRATIONS", "Migration"]

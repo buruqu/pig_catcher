@@ -7,7 +7,7 @@ import math
 import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, timezone
 from typing import Any
 from uuid import uuid4
 
@@ -56,8 +56,10 @@ from ..infrastructure.repositories import (
     FrameworkRepository,
     GameplayRepository,
     ReceiptRepository,
+    RestrictionRepository,
     SocialRepository,
 )
+from ..infrastructure.repositories.restrictions import CATCH_WINDOW_LIMIT
 from ..version import RULESET_VERSION
 from .assets import CollectionProgress
 from .command_state import (
@@ -689,6 +691,7 @@ class GameplayService:
         asset_repository: AssetRepository | None = None,
         economy_repository: EconomyRepository | None = None,
         social_repository: SocialRepository | None = None,
+        restriction_repository: RestrictionRepository | None = None,
         random_source: RandomSource | None = None,
         clock: Clock | None = None,
         id_factory: Callable[[], str] | None = None,
@@ -703,6 +706,7 @@ class GameplayService:
         self.asset_repository = asset_repository or AssetRepository()
         self.economy_repository = economy_repository or EconomyRepository()
         self.social_repository = social_repository or SocialRepository()
+        self.restriction_repository = restriction_repository or RestrictionRepository()
         self.random_source = random_source or SystemRandomSource()
         self.clock = clock or SystemClock()
         self.id_factory = id_factory or (lambda: uuid4().hex)
@@ -751,18 +755,45 @@ class GameplayService:
                     now=now,
                 )
             )
-            daily_limit = effective_catch_limit(
-                base_limit=self.catching.daily_limit,
+            permanent_bonus, weekly_bonus = (
+                await self.economy_repository.catch_quota_bonuses(
+                    session,
+                    player_id=identity.player_id,
+                    now=now,
+                )
+            )
+            catch_restriction = await self.restriction_repository.active_restriction(
+                session,
+                player_id=identity.player_id,
+                restriction_type=CATCH_WINDOW_LIMIT,
+                now=now,
+            )
+            base_window_limit = self.catching.daily_limit + permanent_bonus + weekly_bonus
+            normal_daily_limit = effective_catch_limit(
+                base_limit=base_window_limit,
                 used_count=daily_count,
                 extra_granted=extra_granted,
                 extra_consumed=extra_consumed,
             )
+            daily_limit = self._restricted_daily_limit(
+                normal_limit=normal_daily_limit,
+                restriction=catch_restriction,
+            )
             if daily_count >= daily_limit:
+                if catch_restriction is not None:
+                    expiry = str(catch_restriction.get("expires_at") or "")
+                    raise DailyCatchLimitError(
+                        "账号处于违规处理期，"
+                        f"本时段额度限制为 {daily_limit} 次；限制截止："
+                        f"{self._restriction_expiry_label(expiry)}。"
+                    )
                 raise DailyCatchLimitError(
                     f"本时段已经抓了 {daily_count}/{daily_limit} 次，"
                     f"下次刷新：北京时间 {quota_window.next_refresh_label}。"
                 )
-            using_extra_catch = daily_count >= self.catching.daily_limit
+            using_extra_catch = (
+                catch_restriction is None and daily_count >= base_window_limit
+            )
             if using_extra_catch and extra_consumed >= extra_granted:
                 raise DailyCatchLimitError(
                     f"本时段已经抓了 {daily_count}/{daily_limit} 次，"
@@ -804,6 +835,10 @@ class GameplayService:
                 player_level=probability_level,
                 lucky_whistle=(
                     armed_item is not None and armed_item.item_id == "lucky-whistle"
+                ),
+                super_lucky_whistle=(
+                    armed_item is not None
+                    and armed_item.item_id == "super-lucky-whistle"
                 ),
             )
             active_effects = tuple(
@@ -852,6 +887,18 @@ class GameplayService:
                 "stature_bias": effect_application.stature_bias,
                 "extra_catch_granted": extra_granted,
                 "extra_catch_used": using_extra_catch,
+                "permanent_window_bonus": permanent_bonus,
+                "weekly_window_bonus": weekly_bonus,
+                "catch_window_limit_restriction_id": (
+                    str(catch_restriction["restriction_id"])
+                    if catch_restriction is not None
+                    else ""
+                ),
+                "catch_window_limit_restriction_expires_at": (
+                    str(catch_restriction.get("expires_at") or "")
+                    if catch_restriction is not None
+                    else ""
+                ),
             }
             await self.repository.insert_pig_instance(
                 session,
@@ -1131,6 +1178,19 @@ class GameplayService:
                 player_id=identity.player_id,
                 now=now,
             )
+            permanent_bonus, weekly_bonus = (
+                await self.economy_repository.catch_quota_bonuses(
+                    session,
+                    player_id=identity.player_id,
+                    now=now,
+                )
+            )
+            catch_restriction = await self.restriction_repository.active_restriction(
+                session,
+                player_id=identity.player_id,
+                restriction_type=CATCH_WINDOW_LIMIT,
+                now=now,
+            )
             feed_level = await self.repository.get_feed_level(
                 session,
                 player_id=identity.player_id,
@@ -1198,11 +1258,18 @@ class GameplayService:
             visible_catalog_total=visible_total,
             held_records=int(row["held_records"]),
             daily_count=daily_count,
-            daily_limit=effective_catch_limit(
-                base_limit=self.catching.daily_limit,
-                used_count=daily_count,
-                extra_granted=extra_granted,
-                extra_consumed=extra_consumed,
+            daily_limit=self._restricted_daily_limit(
+                normal_limit=effective_catch_limit(
+                    base_limit=(
+                        self.catching.daily_limit
+                        + permanent_bonus
+                        + weekly_bonus
+                    ),
+                    used_count=daily_count,
+                    extra_granted=extra_granted,
+                    extra_consumed=extra_consumed,
+                ),
+                restriction=catch_restriction,
             ),
             cooldown_remaining_seconds=_cooldown_remaining(
                 now=now_datetime,
@@ -1692,12 +1759,14 @@ class GameplayService:
         feed_level: int,
         player_level: int,
         lucky_whistle: bool,
+        super_lucky_whistle: bool,
     ) -> tuple[float, ...]:
         weights = catch_weights(
             self.catching.weights(),
             feed_level=feed_level,
             player_level=player_level,
             lucky_whistle=lucky_whistle,
+            super_lucky_whistle=super_lucky_whistle,
             six_star_available=bool(buckets[Rarity.SIX]),
         )
         available = tuple(
@@ -1724,6 +1793,28 @@ class GameplayService:
                 f"已装备的“{item.display_name}”库存不足，请先取消道具。"
             )
         return item, quantity
+
+    @staticmethod
+    def _restricted_daily_limit(
+        *,
+        normal_limit: int,
+        restriction: Mapping[str, object] | None,
+    ) -> int:
+        if restriction is None:
+            return normal_limit
+        return min(normal_limit, int(restriction["limit_value"]))
+
+    @staticmethod
+    def _restriction_expiry_label(value: str) -> str:
+        if not value:
+            return "长期"
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return value
+        return parsed.astimezone(timezone(timedelta(hours=8))).strftime(
+            "北京时间 %Y-%m-%d %H:%M:%S"
+        )
 
     def _new_identifier(self) -> str:
         candidate = str(self.id_factory() or "").strip()

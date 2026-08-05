@@ -14,16 +14,32 @@ from pig_catcher.assets import AssetCatalogStorage
 from pig_catcher.config.model import CatchingSection, RankingSection, TradingSection
 from pig_catcher.domain.enums import AssetKind, StatureProfile, TradeStatus
 from pig_catcher.domain.errors import (
+    DailyCatchLimitError,
     InsufficientBalanceError,
     SelfTransferError,
+    SocialTransferRestrictedError,
     TradePermissionError,
     TradeStateError,
 )
 from pig_catcher.domain.models import CommandIdentity, ScopeKey
 from pig_catcher.domain.social import RANKING_TYPES, describe_body_scale
 from pig_catcher.infrastructure import PigCatcherDatabase
-from pig_catcher.infrastructure.repositories import EconomyRepository, FrameworkRepository
-from pig_catcher.services import AssetCatalogService, GameplayService, SocialService
+from pig_catcher.infrastructure.repositories import (
+    EconomyRepository,
+    FrameworkRepository,
+    RestrictionRepository,
+)
+from pig_catcher.infrastructure.repositories.restrictions import (
+    CATCH_WINDOW_LIMIT,
+    GIFT_TRANSFER_BAN,
+    TRADE_BAN,
+)
+from pig_catcher.services import (
+    AssetCatalogService,
+    GameplayService,
+    RestrictionAdminService,
+    SocialService,
+)
 from pig_catcher.services.command_state import iso_timestamp
 
 
@@ -615,4 +631,160 @@ async def test_concurrent_acceptance_has_exactly_one_winner(tmp_path: Path) -> N
     assert row is not None and row["status"] == "accepted"
     assert transfer is not None and transfer["count"] == 1
     assert ledger is not None and tuple(ledger) == (2, 0)
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_permanent_social_blacklists_and_expiring_catch_limit(
+    tmp_path: Path,
+) -> None:
+    database = await _database_with_social_catalog(tmp_path)
+    clock = MutableClock()
+    caught = await _catch_many(database, clock, count=4)
+    social = SocialService(
+        database,
+        TradingSection(),
+        RankingSection(),
+        clock=clock,
+        trade_id_factory=iter(("BAA00001", "BAA00002")).__next__,
+    )
+    seller = _identity(user_id="seller", message_id="gift-before-ban")
+    buyer = _identity(user_id="buyer", message_id="buyer-before-ban")
+    third = _identity(user_id="third", message_id="third-before-ban")
+
+    await social.gift(
+        seller,
+        buyer,
+        asset_kind=AssetKind.PIG,
+        selector_text=caught[0].pig.selector,
+    )
+    pending_for_buyer = await social.create_trade(
+        _identity(user_id="seller", message_id="offer-before-ban-1"),
+        buyer,
+        asset_kind=AssetKind.PIG,
+        selector_text=caught[1].pig.selector,
+        price=1,
+    )
+    pending_for_third = await social.create_trade(
+        _identity(user_id="seller", message_id="offer-before-ban-2"),
+        third,
+        asset_kind=AssetKind.PIG,
+        selector_text=caught[2].pig.selector,
+        price=1,
+    )
+
+    result = await RestrictionAdminService(database, clock=clock).apply_batch(
+        scope_id=buyer.scope.value,
+        player_ids=(buyer.player_id,),
+        duration=timedelta(days=7),
+        catch_window_limit=1,
+        reason="pytest 违规处理",
+        source="pytest",
+        created_by="pytest-admin",
+        backup_path=tmp_path / "pre-restrictions.sqlite3",
+    )
+    assert result.cancelled_pending_trades == 1
+    assert result.catch_limit_expires_at == iso_timestamp(clock.value + timedelta(days=7))
+
+    rows = await database.fetch_all(
+        """
+        SELECT restriction_type, limit_value, expires_at
+        FROM player_restrictions
+        WHERE player_id = ?
+        ORDER BY restriction_type
+        """,
+        (buyer.player_id,),
+    )
+    restrictions = {str(row["restriction_type"]): dict(row) for row in rows}
+    assert set(restrictions) == {
+        CATCH_WINDOW_LIMIT,
+        GIFT_TRANSFER_BAN,
+        TRADE_BAN,
+    }
+    assert restrictions[GIFT_TRANSFER_BAN]["expires_at"] is None
+    assert restrictions[TRADE_BAN]["expires_at"] is None
+    assert restrictions[CATCH_WINDOW_LIMIT]["limit_value"] == 1
+    assert restrictions[CATCH_WINDOW_LIMIT]["expires_at"] is not None
+
+    cancelled = await database.fetch_one(
+        "SELECT status FROM trade_offers WHERE trade_id = ?",
+        (pending_for_buyer.trade.trade_id,),
+    )
+    assert cancelled is not None and cancelled["status"] == TradeStatus.CANCELLED.value
+
+    with pytest.raises(SocialTransferRestrictedError, match="赠送或收赠"):
+        await social.gift(
+            _identity(user_id="buyer", message_id="gift-banned-sender"),
+            seller,
+            asset_kind=AssetKind.PIG,
+            selector_text=caught[0].pig.selector,
+        )
+    with pytest.raises(SocialTransferRestrictedError, match="赠送或收赠"):
+        await social.gift(
+            _identity(user_id="seller", message_id="gift-banned-recipient"),
+            buyer,
+            asset_kind=AssetKind.PIG,
+            selector_text=caught[3].pig.selector,
+        )
+    with pytest.raises(SocialTransferRestrictedError, match="创建或接受"):
+        await social.create_trade(
+            _identity(user_id="seller", message_id="trade-banned-recipient"),
+            buyer,
+            asset_kind=AssetKind.PIG,
+            selector_text=caught[3].pig.selector,
+            price=1,
+        )
+
+    now = iso_timestamp(clock.value)
+    async with database.transaction() as session:
+        await RestrictionRepository().upsert_restriction(
+            session,
+            restriction_id="third-trade-ban",
+            player_id=third.player_id,
+            restriction_type=TRADE_BAN,
+            limit_value=None,
+            starts_at=now,
+            expires_at=None,
+            reason="pytest",
+            source="pytest",
+            created_by="pytest-admin",
+            now=now,
+        )
+    with pytest.raises(SocialTransferRestrictedError, match="创建或接受"):
+        await social.accept_trade(
+            _identity(user_id="third", message_id="accept-while-banned"),
+            pending_for_third.trade.trade_id,
+        )
+
+    catching = GameplayService(
+        database,
+        _catching(),
+        ranking=RankingSection(),
+        random_source=SequenceRandom(
+            *(0.5, 0.0, 0.5, 0.5, 0.5, 0.5, 0.5) * 2
+        ),
+        clock=clock,
+        short_code_factory=iter(("B1000001", "B1000002")).__next__,
+    )
+    first = await catching.catch(
+        _identity(user_id="buyer", message_id="restricted-catch-1")
+    )
+    assert first.daily_limit == 1
+    with pytest.raises(DailyCatchLimitError, match="本时段额度限制为 1 次"):
+        await catching.catch(
+            _identity(user_id="buyer", message_id="restricted-catch-2")
+        )
+
+    clock.value += timedelta(days=8)
+    resumed = await catching.catch(
+        _identity(user_id="buyer", message_id="catch-after-expiry")
+    )
+    assert resumed.daily_limit == _catching().daily_limit
+    with pytest.raises(SocialTransferRestrictedError, match="永久列入黑名单"):
+        await social.gift(
+            _identity(user_id="buyer", message_id="gift-after-catch-expiry"),
+            seller,
+            asset_kind=AssetKind.PIG,
+            selector_text=caught[0].pig.selector,
+        )
     await database.close()
