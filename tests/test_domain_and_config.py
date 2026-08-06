@@ -413,6 +413,37 @@ def test_default_config_exposes_fixed_rules_and_chinese_schema() -> None:
     assert "群白名单" in serialized
     assert "目标群号" in serialized
     assert "重置当前时段" in serialized
+    assert "赠送/收赠黑名单" in serialized
+    assert "公告正文" in serialized
+    assert config.blacklist_administration.__ui_label__ == "社交黑名单"
+    assert config.announcement_administration.__ui_label__ == "群公告发送"
+
+
+def test_admin_panel_operations_require_explicit_safe_inputs() -> None:
+    with pytest.raises(ValidationError, match="至少选择一种"):
+        PigCatcherConfig(
+            blacklist_administration={
+                "group_id": "100",
+                "user_ids": ["member-openid"],
+                "execute_blacklist_update": True,
+            }
+        )
+    with pytest.raises(ValidationError, match="公告正文"):
+        PigCatcherConfig(
+            announcement_administration={
+                "group_id": "100",
+                "execute_send": True,
+            }
+        )
+    with pytest.raises(ValidationError, match="必须先启用"):
+        PigCatcherConfig(
+            plugin={"enabled": False},
+            announcement_administration={
+                "group_id": "100",
+                "content": "测试公告",
+                "execute_send": True,
+            },
+        )
 
 
 def test_quota_windows_follow_four_beijing_refreshes() -> None:

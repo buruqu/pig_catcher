@@ -144,6 +144,125 @@ class RestrictionRepository:
         )
         return [dict(row) for row in rows]
 
+    async def scopes_for_group(
+        self,
+        session: DatabaseSession,
+        *,
+        group_id: str,
+        platform: str = "",
+    ) -> list[dict[str, object]]:
+        """Resolve an exact group, optionally narrowed to one platform."""
+
+        normalized_platform = str(platform or "").strip()
+        if normalized_platform:
+            rows = await session.fetch_all(
+                """
+                SELECT scope_id, platform, group_id, group_name, stream_id
+                FROM scopes
+                WHERE group_id = ? AND platform = ?
+                ORDER BY scope_id
+                """,
+                (str(group_id).strip(), normalized_platform),
+            )
+        else:
+            rows = await session.fetch_all(
+                """
+                SELECT scope_id, platform, group_id, group_name, stream_id
+                FROM scopes
+                WHERE group_id = ?
+                ORDER BY scope_id
+                """,
+                (str(group_id).strip(),),
+            )
+        return [dict(row) for row in rows]
+
+    async def players_by_platform_user_ids(
+        self,
+        session: DatabaseSession,
+        *,
+        scope_id: str,
+        platform_user_ids: Sequence[str],
+    ) -> list[dict[str, object]]:
+        normalized = tuple(
+            dict.fromkeys(
+                str(value).strip()
+                for value in platform_user_ids
+                if str(value).strip()
+            )
+        )
+        if not normalized:
+            return []
+        placeholders = ",".join("?" for _ in normalized)
+        rows = await session.fetch_all(
+            f"""
+            SELECT player_id, platform_user_id, display_name
+            FROM players
+            WHERE scope_id = ? AND platform_user_id IN ({placeholders})
+            ORDER BY player_id
+            """,
+            (scope_id, *normalized),
+        )
+        return [dict(row) for row in rows]
+
+    async def delete_restrictions(
+        self,
+        session: DatabaseSession,
+        *,
+        player_ids: Sequence[str],
+        restriction_type: str,
+    ) -> int:
+        normalized = tuple(
+            dict.fromkeys(
+                str(value).strip()
+                for value in player_ids
+                if str(value).strip()
+            )
+        )
+        if not normalized:
+            return 0
+        placeholders = ",".join("?" for _ in normalized)
+        cursor = await session.execute(
+            f"""
+            DELETE FROM player_restrictions
+            WHERE player_id IN ({placeholders}) AND restriction_type = ?
+            """,
+            (*normalized, restriction_type),
+        )
+        return max(int(cursor.rowcount), 0)
+
+    async def insert_operation_audit_event(
+        self,
+        session: DatabaseSession,
+        *,
+        audit_event_id: str,
+        scope_id: str,
+        actor_user_id: str,
+        action: str,
+        object_type: str,
+        object_id: str,
+        detail_json: str,
+        now: str,
+    ) -> None:
+        await session.execute(
+            """
+            INSERT INTO audit_events(
+                audit_event_id, scope_id, actor_user_id, action,
+                object_type, object_id, detail_json, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                audit_event_id,
+                scope_id,
+                actor_user_id,
+                action,
+                object_type,
+                object_id,
+                detail_json,
+                now,
+            ),
+        )
+
     async def insert_audit_event(
         self,
         session: DatabaseSession,

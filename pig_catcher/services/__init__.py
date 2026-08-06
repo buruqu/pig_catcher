@@ -51,7 +51,13 @@ from .gameplay import (
 from .maintenance import MaintenanceOptions, MaintenanceReport, MaintenanceRunner
 from .quota import CatchQuotaResetResult, CatchQuotaResetService
 from .receipts import ReceiptService
-from .restrictions import RestrictionAdminService, RestrictionBatchResult
+from .restrictions import (
+    AnnouncementAdminService,
+    AnnouncementClaim,
+    RestrictionAdminService,
+    RestrictionBatchResult,
+    SocialBlacklistUpdateResult,
+)
 from .social import (
     GiftResult,
     RankingEntry,
@@ -72,6 +78,8 @@ from .social import (
 
 __all__ = [
     "AssetCatalogService",
+    "AnnouncementAdminService",
+    "AnnouncementClaim",
     "BatchSaleResult",
     "CatalogImportResult",
     "CollectionProgress",
@@ -107,6 +115,7 @@ __all__ = [
     "ReceiptService",
     "RestrictionAdminService",
     "RestrictionBatchResult",
+    "SocialBlacklistUpdateResult",
     "RankingEntry",
     "RankingPage",
     "SaleResult",

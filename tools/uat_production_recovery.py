@@ -107,8 +107,10 @@ async def load_plugin(
     )
     await plugin.on_load()
     components = plugin.get_components()
-    if len(components) != 27 or {item["type"] for item in components} != {"COMMAND"}:
-        raise AssertionError("正式版必须只注册 27 个显式命令组件。")
+    command_count = sum(item["type"] == "COMMAND" for item in components)
+    home_card_count = sum(item["type"] == "HOME_CARD" for item in components)
+    if len(components) != 32 or command_count != 31 or home_card_count != 1:
+        raise AssertionError("正式版必须注册 31 个显式命令和 1 个运营首页卡片。")
     if plugin.gameplay_service is None:
         raise AssertionError("正式版抓猪服务未加载。")
     plugin.gameplay_service.random_source = FixedRandom(
@@ -661,7 +663,7 @@ async def run(args: argparse.Namespace) -> dict[str, object]:
         "plugin_version": PLUGIN_VERSION,
         "framework_phase": FRAMEWORK_PHASE,
         "schema_version": SCHEMA_VERSION,
-        "component_count": 27,
+        "component_count": 32,
         "production_defaults": {
             "daily_limit": 22,
             "cooldown_seconds": 20,

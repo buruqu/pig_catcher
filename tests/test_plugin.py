@@ -86,7 +86,7 @@ async def test_admin_panel_one_shot_reset_is_scoped_and_audited(
     cleared: list[bool] = []
     monkeypatch.setattr(
         plugin,
-        "_clear_quota_reset_trigger",
+        "_clear_administration_triggers",
         lambda: cleared.append(True),
     )
     config = plugin.get_plugin_config_data()
@@ -236,7 +236,7 @@ async def test_group_reset_command_rejects_unconfigured_user_before_backup(
 def test_plugin_registers_only_explicit_production_commands() -> None:
     plugin = create_plugin()
     components = plugin.get_components()
-    assert len(components) == 31
+    assert len(components) == 32
     commands = {
         component["name"]
         for component in components
@@ -273,6 +273,7 @@ def test_plugin_registers_only_explicit_production_commands() -> None:
         "pig_catcher_trade_list",
         "pig_catcher_showcase",
         "pig_catcher_ranking",
+        "pig_catcher_toggle_baogian",
     }
     home_card = next(
         component
@@ -280,7 +281,9 @@ def test_plugin_registers_only_explicit_production_commands() -> None:
         if component["type"] == "HOME_CARD"
     )
     assert home_card["name"] == "pig_catcher_quota_control"
-    assert "重置抓猪次数" in str(home_card)
+    assert "打开运营控制" in str(home_card)
+    assert "社交黑名单" in str(home_card)
+    assert "群公告" in str(home_card)
     assert "/plugin-config?plugin=local.pig-catcher" in str(home_card)
     serialized = str(components)
     assert "EVENT_HANDLER" not in serialized
@@ -454,6 +457,7 @@ async def _install_test_pig(
     *,
     animated: bool = False,
     include_food: bool = False,
+    alternate: bool = False,
 ) -> None:
     source = tmp_path / "command-assets"
     source.mkdir()
@@ -477,6 +481,12 @@ async def _install_test_pig(
             source / image_name,
             format="PNG",
         )
+    alternate_name = "command-pig-sticker.png"
+    if alternate:
+        Image.new("RGBA", (256, 256), "#66BFA3").save(
+            source / alternate_name,
+            format="PNG",
+        )
     entries = [
         {
             "template_id": "command-pig",
@@ -487,6 +497,7 @@ async def _install_test_pig(
             "group_scope_id": None,
             "description": "用于命令级完整流程验收。",
             "image": image_name,
+            "alternate_image": alternate_name if alternate else "",
             "fit": "contain",
             "source": "pytest",
             "license": "test-only",
@@ -608,6 +619,32 @@ async def test_complete_third_round_command_flow_and_duplicate_publication(
     assert len(context.send.images) == 6
     assert len(context.render.calls) == 6
     assert all(call[1]["allow_network"] is False for call in context.render.calls)
+    await plugin.on_unload()
+
+
+@pytest.mark.asyncio
+async def test_alternate_catch_preface_is_not_resent_for_duplicate_delivery(
+    tmp_path: Path,
+) -> None:
+    plugin, context = await create_test_plugin(
+        tmp_path,
+        config_updates={"catching": {"cooldown_seconds": 0}},
+    )
+    await _install_test_pig(plugin, tmp_path, alternate=True)
+    message = build_message(message_id="alternate-catch-once")
+    first = await plugin.handle_catch(
+        stream_id="stream-10001",
+        **_command_kwargs(message),
+    )
+    assert first[0] is True
+    assert len(context.send.images) == 2
+
+    duplicate = await plugin.handle_catch(
+        stream_id="stream-10001",
+        **_command_kwargs(message),
+    )
+    assert duplicate == (True, "该消息已处理，不重复公示。", 0)
+    assert len(context.send.images) == 2
     await plugin.on_unload()
 
 

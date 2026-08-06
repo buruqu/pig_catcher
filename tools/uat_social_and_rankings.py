@@ -15,7 +15,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from pig_catcher.domain.social import RANKING_TYPES  # noqa: E402
-from pig_catcher.version import PLUGIN_VERSION  # noqa: E402
+from pig_catcher.version import PLUGIN_VERSION, SCHEMA_VERSION  # noqa: E402
 from tools.uat_catching_and_collection import (  # noqa: E402
     DeliveryCollector,
     FixedRandom,
@@ -210,10 +210,17 @@ async def run(args: argparse.Namespace) -> dict[str, object]:
         if plugin.social_service is None or plugin.gameplay_service is None:
             raise AssertionError("第五轮服务未加载。")
         components = plugin.get_components()
-        if len(components) != 27:
-            raise AssertionError(f"第五轮组件数应为 27，实际为 {len(components)}。")
-        if {component["type"] for component in components} != {"COMMAND"}:
-            raise AssertionError("第五轮插件出现了非显式命令组件。")
+        command_count = sum(
+            component["type"] == "COMMAND" for component in components
+        )
+        home_card_count = sum(
+            component["type"] == "HOME_CARD" for component in components
+        )
+        if len(components) != 32 or command_count != 31 or home_card_count != 1:
+            raise AssertionError(
+                "正式版必须注册 31 个显式命令和 1 个运营首页卡片，"
+                f"实际为 {len(components)} 个组件。"
+            )
 
         plugin.gameplay_service.random_source = FixedRandom(
             [
@@ -562,7 +569,11 @@ async def run(args: argparse.Namespace) -> dict[str, object]:
                 SUM(CASE WHEN transfer_type = 'gift' THEN 1 ELSE 0 END) AS gifts,
                 SUM(CASE WHEN transfer_type = 'trade' THEN 1 ELSE 0 END) AS trades
             FROM asset_transfer_events
-            """
+            WHERE scope_id = ?
+              AND from_player_id = ?
+              AND to_player_id = ?
+            """,
+            (f"qq:{args.primary_group}", seller_player, buyer_player),
         )
         scope_counts = await plugin.database.fetch_all(
             """
@@ -616,8 +627,8 @@ async def run(args: argparse.Namespace) -> dict[str, object]:
     report = {
         "status": "passed",
         "plugin_version": PLUGIN_VERSION,
-        "schema_version": 5,
-        "component_count": 27,
+        "schema_version": SCHEMA_VERSION,
+        "component_count": 32,
         "commands": records,
         "command_count": len(records),
         "deliveries": {
@@ -657,6 +668,8 @@ async def run(args: argparse.Namespace) -> dict[str, object]:
 
 
 def main() -> int:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="backslashreplace")
     report = asyncio.run(run(parse_args()))
     print(json.dumps(report, ensure_ascii=False, indent=2))
     return 0

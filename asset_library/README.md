@@ -1,16 +1,17 @@
 # 本机素材库
 
-`current-v1.4.1/` 保存当前正式素材导入包；原有版本目录继续保留为回滚包。
+`current/` 保存当前正式素材导入包；`archive/` 保存按版本命名的本机回滚包。两者都被 Git 忽略，整理目录时不得删除。
 本次正式包包含：
 
 | 位置 | 内容 |
 | --- | --- |
-| `current-v1.4.1/assets.json` | 可供导入工具读取的 Asset Manifest 4 |
-| `current-v1.4.1/build-report.json` | 159 项模板、146 份唯一内容、158 份隔离存储媒体的 SHA-256 校验报告 |
-| `current-v1.4.1/media/猪猪素材库/` | 一至五星公共猪猪素材 |
-| `current-v1.4.1/media/美食素材库/` | 公共美食素材 |
-| `current-v1.4.1/media/定制猪群友库/` | 按 QQ 群号隔离的六星定制猪 |
-| `current-v1.4.1/media/定制美食库/` | 按 QQ 群号隔离的六星定制美食 |
+| `current/assets.json` | 可供导入工具读取的 Asset Manifest 4 |
+| `current/build-report.json` | 169 项模板、155 份唯一内容、170 份隔离存储媒体的 SHA-256 校验报告 |
+| `current/media/猪猪素材库/` | 一至五星公共猪猪素材 |
+| `current/media/美食素材库/` | 公共美食素材 |
+| `current/media/定制猪群友库/` | 按 QQ 群号隔离的六星定制猪 |
+| `current/media/定制美食库/` | 按 QQ 群号隔离的六星定制美食 |
+| `archive/v*/` | 历史版本素材包，仅用于本机核验和回滚 |
 
 该目录中的图片和 GIF 保留原始字节，不做重编码；动画列表页只提取确定性预览帧，
 单项详情仍使用原动画。正式包被 Git 忽略，以免群专属图片进入公共仓库。

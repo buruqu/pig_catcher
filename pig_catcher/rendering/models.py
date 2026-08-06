@@ -130,6 +130,7 @@ class PigCardViewModel:
     size_label: str = ""
     weight_label: str = ""
     effect_summaries: tuple[str, ...] = ()
+    tutorial_text: str = ""
 
 
 @dataclass(frozen=True, slots=True)

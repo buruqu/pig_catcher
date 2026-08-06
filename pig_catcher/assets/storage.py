@@ -66,6 +66,16 @@ class AssetCatalogStorage:
             destination = files_root / relative_path
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(asset.source_path, destination)
+            if asset.entry.alternate_image:
+                alt_relative_path = Path(asset.entry.alternate_image)
+                alt_source = asset.alternate_source_path
+                if alt_source is None:
+                    raise AssetImportError(
+                        f"备用图片未通过素材校验：{asset.entry.alternate_image}"
+                    )
+                alt_destination = files_root / alt_relative_path
+                alt_destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(alt_source, alt_destination)
         manifest_data = validated.manifest.model_dump(mode="json")
         (staging / "manifest.json").write_text(
             json.dumps(manifest_data, ensure_ascii=False, indent=2) + "\n",
@@ -86,6 +96,7 @@ class AssetCatalogStorage:
                     "total_duration_ms": asset.total_duration_ms,
                     "loop_count": asset.loop_count,
                     "has_transparency": asset.has_transparency,
+                    "alternate_sha256": asset.alternate_sha256,
                 }
                 for asset in validated.assets
             ],

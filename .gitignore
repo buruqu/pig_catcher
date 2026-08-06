@@ -15,6 +15,11 @@ data/
 artifacts/
 config_back/
 asset_library/current/
+asset_library/current-v*/
+asset_library/archive/
+asset_library/*.rar
+backups/
+tools/local/
 临时素材库/
 *.db
 *.db-shm

@@ -51,8 +51,15 @@ def validate_coverage(root: Path, entries: list[dict[str, object]]) -> None:
     defined = [str(entry["source_path"]) for entry in entries]
     if len(defined) != len(set(defined)):
         raise ValueError("Catalog definitions contain duplicate source_path values")
+    alternates = [
+        str(entry["alternate_image"])
+        for entry in entries
+        if entry.get("alternate_image")
+    ]
+    if len(alternates) != len(set(alternates)):
+        raise ValueError("Catalog definitions contain duplicate alternate_image paths")
     actual = source_files(root)
-    expected = set(defined)
+    expected = set(defined) | set(alternates)
     missing = sorted(expected - actual)
     unexpected = sorted(actual - expected)
     if missing or unexpected:
@@ -69,6 +76,7 @@ def manifest_entry(
     definition: dict[str, object],
     *,
     image_path: str,
+    alternate_image_path: str = "",
     source_label: str,
     license_label: str,
 ) -> dict[str, object]:
@@ -84,6 +92,7 @@ def manifest_entry(
         "group_scope_id": group_scope_id,
         "description": definition["description"],
         "image": image_path,
+        "alternate_image": alternate_image_path,
         "fit": definition.get("fit", "contain"),
         "source": source_label,
         "license": license_label,
@@ -129,9 +138,8 @@ def build_package(
     aliases: list[dict[str, str]] = []
     manifest_entries: list[dict[str, object]] = []
     inventory: list[dict[str, object]] = []
-    for raw_definition in entries:
-        definition = dict(raw_definition)
-        source_relative = str(definition["source_path"])
+
+    def _store_media(source_relative: str) -> tuple[str, str, int]:
         source_path = source_root / Path(source_relative)
         payload = source_path.read_bytes()
         sha256 = hashlib.sha256(payload).hexdigest()
@@ -153,10 +161,21 @@ def build_package(
                     "sha256": sha256,
                 }
             )
+        return media_path, sha256, len(payload)
+
+    for raw_definition in entries:
+        definition = dict(raw_definition)
+        source_relative = str(definition["source_path"])
+        media_path, sha256, payload_size = _store_media(source_relative)
+        alternate_image = str(definition.get("alternate_image") or "")
+        alternate_media_path = ""
+        if alternate_image:
+            alternate_media_path, _, _ = _store_media(alternate_image)
         manifest_entries.append(
             manifest_entry(
                 definition,
                 image_path=media_path,
+                alternate_image_path=alternate_media_path,
                 source_label=str(definitions["source_label"]),
                 license_label=str(definitions["license"]),
             )
@@ -167,7 +186,7 @@ def build_package(
                 "source_path": source_relative,
                 "media_path": media_path,
                 "sha256": sha256,
-                "bytes": len(payload),
+                "bytes": payload_size,
             }
         )
 

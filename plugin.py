@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import os
 from collections.abc import Awaitable, Callable
 from dataclasses import replace
@@ -68,6 +69,7 @@ from .pig_catcher.rendering import (
     inventory_view,
     item_receipt_view,
     ledger_view,
+    media_path,
     pig_card_view,
     pig_media_path,
     profile_view,
@@ -82,6 +84,7 @@ from .pig_catcher.rendering import (
     trade_receipt_view,
 )
 from .pig_catcher.services import (
+    AnnouncementAdminService,
     AssetCatalogService,
     CatchQuotaResetService,
     CatchResult,
@@ -94,6 +97,7 @@ from .pig_catcher.services import (
     MaintenanceRunner,
     PigView,
     ReceiptService,
+    RestrictionAdminService,
     SocialService,
     format_batch_sale_summary,
     format_catalog_summary,
@@ -153,6 +157,8 @@ class PigCatcherPlugin(MaiBotPlugin):
         self._social_service: SocialService | None = None
         self._receipt_service: ReceiptService | None = None
         self._quota_reset_service: CatchQuotaResetService | None = None
+        self._restriction_admin_service: RestrictionAdminService | None = None
+        self._announcement_admin_service: AnnouncementAdminService | None = None
         self._renderer: PigCatcherRenderer | None = None
         self._animation_composer: AnimatedCardComposer | None = None
         self._delivery: RenderDelivery | None = None
@@ -203,7 +209,7 @@ class PigCatcherPlugin(MaiBotPlugin):
     async def on_load(self) -> None:
         if self.settings.plugin.enabled:
             await self._open_runtime()
-            await self._execute_pending_quota_reset(source="admin-panel-load")
+            await self._execute_pending_admin_operations(source="admin-panel-load")
         self.ctx.logger.info(
             "抓猪插件已加载，版本=%s，阶段=%s",
             PLUGIN_VERSION,
@@ -223,10 +229,10 @@ class PigCatcherPlugin(MaiBotPlugin):
         del config_data
         if scope != CONFIG_RELOAD_SCOPE_SELF:
             return
-        if self.settings.quota_administration.execute_current_window_reset:
-            if self._database is None and self.settings.plugin.enabled:
+        if self.settings.plugin.enabled and self._has_pending_admin_operation():
+            if self._database is None:
                 await self._open_runtime()
-            await self._execute_pending_quota_reset(source="admin-panel-save")
+            await self._execute_pending_admin_operations(source="admin-panel-save")
         await self._close_runtime()
         if self.settings.plugin.enabled:
             await self._open_runtime()
@@ -315,6 +321,8 @@ class PigCatcherPlugin(MaiBotPlugin):
                 timezone_name=settings.catching.daily_reset_timezone,
                 window_limit=settings.catching.daily_limit,
             )
+            self._restriction_admin_service = RestrictionAdminService(database)
+            self._announcement_admin_service = AnnouncementAdminService(database)
             self._renderer = renderer
             self._animation_composer = animation_composer
             self._delivery = RenderDelivery(
@@ -345,6 +353,8 @@ class PigCatcherPlugin(MaiBotPlugin):
         self._animation_composer = None
         self._renderer = None
         self._quota_reset_service = None
+        self._restriction_admin_service = None
+        self._announcement_admin_service = None
         self._receipt_service = None
         self._economy_service = None
         self._social_service = None
@@ -354,45 +364,164 @@ class PigCatcherPlugin(MaiBotPlugin):
         self._storage = None
         self._database = None
 
-    async def _execute_pending_quota_reset(self, *, source: str) -> None:
-        """Execute and acknowledge the one-shot WebUI reset request."""
+    def _has_pending_admin_operation(self) -> bool:
+        return bool(
+            self.settings.quota_administration.execute_current_window_reset
+            or self.settings.blacklist_administration.execute_blacklist_update
+            or self.settings.announcement_administration.execute_send
+        )
 
-        administration = self.settings.quota_administration
-        if not administration.execute_current_window_reset:
+    async def _execute_pending_admin_operations(self, *, source: str) -> None:
+        """Consume panel triggers at most once, then execute and audit each request."""
+
+        quota = self.settings.quota_administration
+        blacklist = self.settings.blacklist_administration
+        announcement = self.settings.announcement_administration
+        run_quota = bool(quota.execute_current_window_reset)
+        run_blacklist = bool(blacklist.execute_blacklist_update)
+        run_announcement = bool(announcement.execute_send)
+        if not (run_quota or run_blacklist or run_announcement):
             return
-        service = self._quota_reset_service
-        if service is None:
-            raise RuntimeError("抓猪额度重置服务尚未就绪。")
-        result = await service.backup_and_reset_current_window(
-            data_dir=Path(self.ctx.paths.data_dir).resolve(),
-            group_id=administration.group_id,
-            actor_user_id="maibot-admin-panel",
-            source=source,
-        )
-        self._clear_quota_reset_trigger()
-        self.ctx.logger.info(
-            "抓猪额度已精准重置：scope=%s，window=%s，cleared=%s，players=%s，audit=%s，backup=%s",
-            result.scope_id,
-            result.window.label,
-            result.cleared_catches,
-            result.affected_players,
-            result.audit_event_id,
-            result.backup_path,
-        )
+
+        # Reset every trigger before any external effect. A crash can lose a requested
+        # operation, but it cannot silently repeat a punishment or announcement.
+        self._clear_administration_triggers()
+        data_dir = Path(self.ctx.paths.data_dir).resolve()
+
+        if run_quota:
+            try:
+                service = self._quota_reset_service
+                if service is None:
+                    raise RuntimeError("抓猪额度重置服务尚未就绪。")
+                result = await service.backup_and_reset_current_window(
+                    data_dir=data_dir,
+                    group_id=quota.group_id,
+                    actor_user_id="maibot-admin-panel",
+                    source=source,
+                )
+                self.ctx.logger.info(
+                    "抓猪额度已精准重置：scope=%s，window=%s，cleared=%s，players=%s，audit=%s，backup=%s",
+                    result.scope_id,
+                    result.window.label,
+                    result.cleared_catches,
+                    result.affected_players,
+                    result.audit_event_id,
+                    result.backup_path,
+                )
+            except Exception:
+                self.ctx.logger.exception("控制面板抓猪额度重置失败；触发开关已关闭，不会自动重试")
+
+        if run_blacklist:
+            try:
+                service = self._restriction_admin_service
+                if service is None:
+                    raise RuntimeError("社交黑名单管理服务尚未就绪。")
+                action_map = {
+                    "不操作": "none",
+                    "加入黑名单": "add",
+                    "解除黑名单": "remove",
+                }
+                result = await service.backup_and_update_social_blacklists(
+                    data_dir=data_dir,
+                    group_id=blacklist.group_id,
+                    platform=blacklist.platform,
+                    user_ids=blacklist.user_ids,
+                    gift_action=action_map[blacklist.gift_action],
+                    trade_action=action_map[blacklist.trade_action],
+                    reason=blacklist.reason,
+                    source=source,
+                    created_by="maibot-admin-panel",
+                )
+                self.ctx.logger.info(
+                    "社交黑名单已更新：scope=%s，players=%s，gift=%s/%s，trade=%s/%s，cancelled=%s，audit=%s，backup=%s",
+                    result.scope_id,
+                    len(result.player_ids),
+                    result.gift_action,
+                    result.gift_rows_changed,
+                    result.trade_action,
+                    result.trade_rows_changed,
+                    result.cancelled_pending_trades,
+                    result.audit_event_id,
+                    result.backup_path,
+                )
+            except Exception:
+                self.ctx.logger.exception("控制面板社交黑名单变更失败；触发开关已关闭，不会自动重试")
+
+        if run_announcement:
+            service = self._announcement_admin_service
+            if service is None:
+                self.ctx.logger.error("群公告发送服务尚未就绪；触发开关已关闭，不会自动重试")
+                return
+            try:
+                claim = await service.claim(
+                    group_id=announcement.group_id,
+                    platform=announcement.platform,
+                    content=announcement.content,
+                    source=source,
+                    created_by="maibot-admin-panel",
+                )
+            except Exception:
+                self.ctx.logger.exception("控制面板群公告认领失败；触发开关已关闭，不会自动重试")
+                return
+            try:
+                sent = bool(await self.ctx.send.text(claim.content, claim.stream_id))
+            except Exception as exc:
+                try:
+                    await service.record_result(claim, success=False, error=str(exc))
+                except Exception:
+                    self.ctx.logger.exception("群公告发送失败后写入审计结果失败")
+                self.ctx.logger.exception(
+                    "控制面板群公告发送失败：scope=%s；QQ 官方机器人可能缺少 5 分钟内的被动回复上下文",
+                    claim.scope_id,
+                )
+                return
+            try:
+                result_audit_id = await service.record_result(
+                    claim,
+                    success=sent,
+                    error="" if sent else "MaiBot 发送接口返回 false",
+                )
+            except Exception:
+                self.ctx.logger.exception(
+                    "群公告发送后写入结果审计失败：scope=%s，announcement=%s",
+                    claim.scope_id,
+                    claim.announcement_id,
+                )
+                return
+            if sent:
+                self.ctx.logger.info(
+                    "控制面板群公告已发送：scope=%s，stream=%s，announcement=%s，audit=%s",
+                    claim.scope_id,
+                    claim.stream_id,
+                    claim.announcement_id,
+                    result_audit_id,
+                )
+            else:
+                self.ctx.logger.error(
+                    "控制面板群公告未发送成功：scope=%s，announcement=%s，audit=%s；不会自动重试",
+                    claim.scope_id,
+                    claim.announcement_id,
+                    result_audit_id,
+                )
 
     @staticmethod
-    def _clear_quota_reset_trigger() -> None:
-        """Atomically turn the one-shot reset switch back off in config.toml."""
+    def _clear_administration_triggers() -> None:
+        """Atomically turn all one-shot admin switches off in config.toml."""
 
         config_path = Path(__file__).resolve().with_name("config.toml")
         temporary_path = config_path.with_name(
             f".{config_path.name}.{uuid4().hex}.tmp"
         )
         document = tomlkit.parse(config_path.read_text(encoding="utf-8"))
-        administration = document.get("quota_administration")
-        if administration is None:
-            raise RuntimeError("config.toml 缺少 [quota_administration] 配置节。")
-        administration["execute_current_window_reset"] = False
+        trigger_fields = {
+            "quota_administration": "execute_current_window_reset",
+            "blacklist_administration": "execute_blacklist_update",
+            "announcement_administration": "execute_send",
+        }
+        for section_name, field_name in trigger_fields.items():
+            section = document.get(section_name)
+            if section is not None:
+                section[field_name] = False
         try:
             temporary_path.write_text(tomlkit.dumps(document), encoding="utf-8")
             os.replace(temporary_path, config_path)
@@ -402,34 +531,37 @@ class PigCatcherPlugin(MaiBotPlugin):
 
     @HomeCard(
         "pig_catcher_quota_control",
-        title="抓猪额度管理",
-        description="按群精准重置当前抓猪时段；操作前自动在线备份并保留历史记录。",
+        title="抓猪运营管理",
+        description="集中管理额度重置、社交黑名单和群公告发送。",
         content=[
             {
                 "type": "key_value",
                 "entries": {
                     "每日刷新": "00:00 / 09:00 / 12:00 / 19:00",
-                    "每段额度": "5 次 / 玩家 / 群",
-                    "时段内冷却": "20 秒",
+                    "黑名单": "赠送/收赠与交易分别管理",
+                    "群公告": "使用目标群最近活跃线路",
                 },
             },
             {
                 "type": "markdown",
-                "content": "点击下方按钮，在“额度重置”中填写精确群号，打开一次性开关并保存。",
+                "content": (
+                    "点击下方按钮进入插件配置。所有写操作均为一次性开关；"
+                    "黑名单变更会先在线备份，公告失败不会自动重发。"
+                ),
             },
             {
                 "type": "actions",
                 "actions": [
                     {
-                        "label": "重置抓猪次数",
+                        "label": "打开运营控制",
                         "url": "/plugin-config?plugin=local.pig-catcher",
                     }
                 ],
             },
         ],
         link_url="/plugin-config?plugin=local.pig-catcher",
-        link_label="打开额度重置",
-        icon="timer-reset",
+        link_label="打开运营控制",
+        icon="shield-check",
         width="medium",
         order=140,
     )
@@ -642,6 +774,29 @@ class PigCatcherPlugin(MaiBotPlugin):
             )
         return await renderer.render_static_pig_card(view, source_path)
 
+    async def _send_image_file(
+        self,
+        stream_id: str,
+        relative_path: str,
+    ) -> bool:
+        """Send one on-disk image file as a standalone message."""
+
+        data_dir = Path(self.ctx.paths.data_dir).resolve()
+        try:
+            source_path = media_path(data_dir, relative_path)
+        except Exception:
+            self.ctx.logger.exception("备用图片路径解析失败：%s", relative_path)
+            return False
+        if not source_path.is_file():
+            return False
+        try:
+            payload = source_path.read_bytes()
+            encoded = base64.b64encode(payload).decode("ascii")
+            return bool(await self.ctx.send.image(encoded, stream_id))
+        except Exception:
+            self.ctx.logger.exception("备用图片独立发送失败：%s", relative_path)
+            return False
+
     async def _render_food_card(
         self,
         food: FoodView,
@@ -823,6 +978,11 @@ class PigCatcherPlugin(MaiBotPlugin):
         try:
             result = await cast(GameplayService, self._gameplay_service).catch(identity)
             fallback = result.receipt.text_summary or format_catch_summary(result)
+            if result.receipt_created and result.pig.alternate_image_relpath:
+                await self._send_image_file(
+                    identity.stream_id,
+                    result.pig.alternate_image_relpath,
+                )
             return await self._deliver_receipt(
                 stream_id=identity.stream_id,
                 receipt=result.receipt,
@@ -837,6 +997,58 @@ class PigCatcherPlugin(MaiBotPlugin):
             return await self._command_error(
                 stream_id=identity.stream_id,
                 operation="抓猪",
+                error=exc,
+            )
+
+    @Command(
+        "pig_catcher_toggle_baogian",
+        description="切换保千猪的立绘与表情包显示",
+        pattern=r"^/切换\s+猪保千\s*$",
+    )
+    async def handle_toggle_baogian(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_command(
+            stream_id,
+            kwargs,
+            feature_enabled=self.settings.features.catching_enabled,
+            feature_label="抓猪",
+        )
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        baogian_template_ids = {
+            "pig-g1092931381-baogian",
+            "pig-g237716658-baogian",
+        }
+        try:
+            service = cast(GameplayService, self._gameplay_service)
+            total = 0
+            new_variant = "pig"
+            for template_id in baogian_template_ids:
+                count, variant = await service.toggle_pig_display_variant(
+                    identity,
+                    template_id=template_id,
+                )
+                total += count
+                new_variant = variant
+            if total == 0:
+                return await self._reply_text(
+                    identity.stream_id,
+                    "你还没有保千猪，无法切换立绘。",
+                    success=False,
+                )
+            label = "表情包" if new_variant == "sticker" else "猪猪立绘"
+            return await self._reply_text(
+                identity.stream_id,
+                f"已将你的 {total} 只保千猪切换为 {label}。",
+                success=True,
+            )
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation="切换保千猪立绘",
                 error=exc,
             )
 

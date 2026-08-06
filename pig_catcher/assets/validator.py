@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from dataclasses import dataclass
 from pathlib import Path
 
 from PIL import Image, ImageSequence, UnidentifiedImageError
@@ -13,6 +14,21 @@ from ..domain.errors import AssetValidationError
 from .models import AssetManifest, ValidatedAsset, ValidatedManifest
 
 _MAX_MANIFEST_BYTES = 2 * 1024 * 1024
+
+
+@dataclass(frozen=True, slots=True)
+class _ImageInspection:
+    source_path: Path
+    sha256: str
+    width: int
+    height: int
+    image_format: str
+    is_animated: bool
+    frame_count: int
+    frame_durations_ms: tuple[int, ...]
+    total_duration_ms: int
+    loop_count: int | None
+    has_transparency: bool
 
 
 def _ensure_no_symlink(root: Path, relative_path: Path) -> None:
@@ -28,8 +44,11 @@ def _safe_asset_path(root: Path, relative_path: str) -> Path:
     if relative.is_absolute() or ".." in relative.parts:
         raise AssetValidationError(f"素材路径越界：{relative_path}")
     _ensure_no_symlink(root, relative)
-    candidate = (root / relative).resolve(strict=True)
-    resolved_root = root.resolve(strict=True)
+    try:
+        candidate = (root / relative).resolve(strict=True)
+        resolved_root = root.resolve(strict=True)
+    except OSError as exc:
+        raise AssetValidationError(f"素材文件不存在：{relative_path}") from exc
     if not candidate.is_relative_to(resolved_root):
         raise AssetValidationError(f"素材路径逃逸目录：{relative_path}")
     if not candidate.is_file():
@@ -81,60 +100,30 @@ class AssetManifestValidator:
         source_root = path.parent.resolve(strict=True)
         validated_assets: list[ValidatedAsset] = []
         for entry in manifest.entries:
-            source_path = _safe_asset_path(source_root, entry.image)
-            file_size = source_path.stat().st_size
-            if file_size > self.max_image_bytes:
-                raise AssetValidationError(f"素材图片超过大小上限：{entry.image}")
-            sha256 = hashlib.sha256(source_path.read_bytes()).hexdigest()
-            try:
-                with Image.open(source_path) as image:
-                    width, height = image.size
-                    image_format = str(image.format or "").upper()
-                    frame_count = int(getattr(image, "n_frames", 1))
-                    is_animated = frame_count > 1
-                    loop_count = image.info.get("loop")
-                    durations: list[int] = []
-                    has_transparency = image.mode in {"RGBA", "LA"} or "transparency" in image.info
-                    for frame in ImageSequence.Iterator(image):
-                        frame.load()
-                        durations.append(int(frame.info.get("duration", image.info.get("duration", 0)) or 0))
-                        has_transparency = (
-                            has_transparency
-                            or frame.mode in {"RGBA", "LA"}
-                            or "transparency" in frame.info
-                        )
-            except (OSError, UnidentifiedImageError, Image.DecompressionBombError) as exc:
-                raise AssetValidationError(f"素材图片无法解码：{entry.image}") from exc
-            if image_format not in {"PNG", "JPEG", "WEBP", "GIF"}:
-                raise AssetValidationError(f"素材图片格式必须是 PNG、JPEG、WebP 或 GIF：{entry.image}")
-            if min(width, height) < self.min_image_side:
-                raise AssetValidationError(
-                    f"素材图片最短边不足 {self.min_image_side}px：{entry.image}（{width}x{height}）"
-                )
-            if frame_count > self.max_animation_frames:
-                raise AssetValidationError(
-                    f"素材动画超过 {self.max_animation_frames} 帧：{entry.image}（{frame_count} 帧）"
-                )
-            total_duration_ms = sum(durations)
-            if total_duration_ms > self.max_animation_duration_ms:
-                raise AssetValidationError(
-                    f"素材动画超过 {self.max_animation_duration_ms} 毫秒："
-                    f"{entry.image}（{total_duration_ms} 毫秒）"
-                )
+            primary = self._inspect_image(source_root, entry.image)
+            alternate = (
+                self._inspect_image(source_root, entry.alternate_image)
+                if entry.alternate_image
+                else None
+            )
             validated_assets.append(
                 ValidatedAsset(
                     entry=entry,
-                    source_path=source_path,
-                    sha256=sha256,
-                    width=width,
-                    height=height,
-                    image_format=image_format,
-                    is_animated=is_animated,
-                    frame_count=frame_count,
-                    frame_durations_ms=tuple(durations),
-                    total_duration_ms=total_duration_ms,
-                    loop_count=int(loop_count) if loop_count is not None else None,
-                    has_transparency=has_transparency,
+                    source_path=primary.source_path,
+                    sha256=primary.sha256,
+                    width=primary.width,
+                    height=primary.height,
+                    image_format=primary.image_format,
+                    is_animated=primary.is_animated,
+                    frame_count=primary.frame_count,
+                    frame_durations_ms=primary.frame_durations_ms,
+                    total_duration_ms=primary.total_duration_ms,
+                    loop_count=primary.loop_count,
+                    has_transparency=primary.has_transparency,
+                    alternate_source_path=(
+                        alternate.source_path if alternate is not None else None
+                    ),
+                    alternate_sha256=(alternate.sha256 if alternate is not None else ""),
                 )
             )
 
@@ -146,6 +135,14 @@ class AssetManifestValidator:
                 key=lambda item: item.entry.template_id,
             )
         }
+        canonical["alternate_image_hashes"] = {
+            asset.entry.template_id: asset.alternate_sha256
+            for asset in sorted(
+                validated_assets,
+                key=lambda item: item.entry.template_id,
+            )
+            if asset.alternate_sha256
+        }
         catalog_hash = hashlib.sha256(
             json.dumps(canonical, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
         ).hexdigest()
@@ -155,4 +152,63 @@ class AssetManifestValidator:
             source_manifest_path=path.resolve(strict=True),
             catalog_hash=catalog_hash,
             assets=tuple(validated_assets),
+        )
+
+    def _inspect_image(self, source_root: Path, relative_path: str) -> _ImageInspection:
+        source_path = _safe_asset_path(source_root, relative_path)
+        file_size = source_path.stat().st_size
+        if file_size > self.max_image_bytes:
+            raise AssetValidationError(f"素材图片超过大小上限：{relative_path}")
+        digest = hashlib.sha256(source_path.read_bytes()).hexdigest()
+        try:
+            with Image.open(source_path) as image:
+                width, height = image.size
+                image_format = str(image.format or "").upper()
+                frame_count = int(getattr(image, "n_frames", 1))
+                is_animated = frame_count > 1
+                loop_count = image.info.get("loop")
+                durations: list[int] = []
+                has_transparency = image.mode in {"RGBA", "LA"} or "transparency" in image.info
+                for frame in ImageSequence.Iterator(image):
+                    frame.load()
+                    durations.append(int(frame.info.get("duration", image.info.get("duration", 0)) or 0))
+                    has_transparency = (
+                        has_transparency
+                        or frame.mode in {"RGBA", "LA"}
+                        or "transparency" in frame.info
+                    )
+        except (OSError, UnidentifiedImageError, Image.DecompressionBombError) as exc:
+            raise AssetValidationError(f"素材图片无法解码：{relative_path}") from exc
+        if image_format not in {"PNG", "JPEG", "WEBP", "GIF"}:
+            raise AssetValidationError(
+                f"素材图片格式必须是 PNG、JPEG、WebP 或 GIF：{relative_path}"
+            )
+        if min(width, height) < self.min_image_side:
+            raise AssetValidationError(
+                f"素材图片最短边不足 {self.min_image_side}px："
+                f"{relative_path}（{width}x{height}）"
+            )
+        if frame_count > self.max_animation_frames:
+            raise AssetValidationError(
+                f"素材动画超过 {self.max_animation_frames} 帧："
+                f"{relative_path}（{frame_count} 帧）"
+            )
+        total_duration_ms = sum(durations)
+        if total_duration_ms > self.max_animation_duration_ms:
+            raise AssetValidationError(
+                f"素材动画超过 {self.max_animation_duration_ms} 毫秒："
+                f"{relative_path}（{total_duration_ms} 毫秒）"
+            )
+        return _ImageInspection(
+            source_path=source_path,
+            sha256=digest,
+            width=width,
+            height=height,
+            image_format=image_format,
+            is_animated=is_animated,
+            frame_count=frame_count,
+            frame_durations_ms=tuple(durations),
+            total_duration_ms=total_duration_ms,
+            loop_count=int(loop_count) if loop_count is not None else None,
+            has_transparency=has_transparency,
         )

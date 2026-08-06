@@ -170,6 +170,11 @@ def pig_card_view(
         effect_summaries=(
             catch.effect_summaries if catch is not None else ()
         ),
+        tutorial_text=(
+            "输入 /切换 猪保千 可在猪猪立绘与表情包之间切换"
+            if pig.alternate_image_relpath
+            else ""
+        ),
     )
 
 

@@ -378,6 +378,7 @@ class GameplayRepository:
                 template.collection_total,
                 template.character_name,
                 template.paired_food_template_id,
+                template.alternate_image_relpath,
                 player.display_name AS owner_display_name,
                 EXISTS(
                     SELECT 1
@@ -594,6 +595,7 @@ class GameplayRepository:
                 template.is_animated,
                 template.frame_count,
                 template.stature_profile,
+                template.alternate_image_relpath,
                 EXISTS(
                     SELECT 1
                     FROM group_global_records AS record
@@ -811,6 +813,42 @@ class GameplayRepository:
             (player_id, action_type),
         )
         return str(row["item_id"])
+
+    async def toggle_pig_display_variant(
+        self,
+        session: DatabaseSession,
+        *,
+        player_id: str,
+        template_id: str,
+        now: str,
+    ) -> tuple[int, str]:
+        """Toggle display_variant for all active owned instances of a template.
+
+        Returns (updated_count, new_variant).
+        """
+        rows = await session.fetch_all(
+            """
+            SELECT pig_instance_id, display_variant
+            FROM pig_instances
+            WHERE owner_player_id = ? AND template_id = ? AND state = 'active'
+            ORDER BY acquired_at DESC
+            """,
+            (player_id, template_id),
+        )
+        if not rows:
+            return 0, "pig"
+        new_variant = "sticker" if any(
+            str(row["display_variant"]) != "sticker" for row in rows
+        ) else "pig"
+        await session.execute(
+            """
+            UPDATE pig_instances
+            SET display_variant = ?, updated_at = ?
+            WHERE owner_player_id = ? AND template_id = ? AND state = 'active'
+            """,
+            (new_variant, now, player_id, template_id),
+        )
+        return len(rows), new_variant
 
     @staticmethod
     def random_snapshot_json(snapshot: Mapping[str, object]) -> str:

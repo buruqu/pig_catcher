@@ -198,6 +198,40 @@ def test_manifest_validator_accepts_png_and_is_deterministic(tmp_path: Path) -> 
     assert first.assets[0].image_format == "PNG"
 
 
+def test_alternate_image_is_fully_validated_and_hashed(tmp_path: Path) -> None:
+    _write_png(tmp_path / "pig.png", (255, 180, 205, 255))
+    _write_png(tmp_path / "sticker.png", (100, 210, 190, 255))
+    entry = _pig_entry("alternate-pig", "pig.png")
+    entry["alternate_image"] = "sticker.png"
+    manifest = _write_manifest(tmp_path, [entry])
+    validator = AssetManifestValidator(min_image_side=32, max_image_bytes=1024 * 1024)
+    first = validator.validate_file(manifest)
+    asset = first.assets[0]
+    assert asset.alternate_source_path == (tmp_path / "sticker.png").resolve()
+    assert len(asset.alternate_sha256) == 64
+
+    Image.new("RGBA", (64, 64), "#AA3366").save(tmp_path / "sticker.png", format="PNG")
+    second = validator.validate_file(manifest)
+    assert second.assets[0].alternate_sha256 != asset.alternate_sha256
+    assert second.catalog_hash != first.catalog_hash
+
+
+def test_missing_or_corrupt_alternate_image_is_rejected_before_storage(
+    tmp_path: Path,
+) -> None:
+    _write_png(tmp_path / "pig.png", (255, 180, 205, 255))
+    entry = _pig_entry("alternate-pig", "pig.png")
+    entry["alternate_image"] = "missing.png"
+    manifest = _write_manifest(tmp_path, [entry])
+    validator = AssetManifestValidator(min_image_side=32, max_image_bytes=1024 * 1024)
+    with pytest.raises(AssetValidationError):
+        validator.validate_file(manifest)
+
+    (tmp_path / "missing.png").write_bytes(b"not an image")
+    with pytest.raises(AssetValidationError, match="无法解码"):
+        validator.validate_file(manifest)
+
+
 def test_manifest_detects_animated_content_even_when_extension_is_jpg(
     tmp_path: Path,
 ) -> None:

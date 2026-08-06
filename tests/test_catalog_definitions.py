@@ -15,11 +15,11 @@ def _entries() -> list[dict[str, object]]:
     return list(payload["entries"])
 
 
-def test_formal_catalog_has_all_159_named_assets_and_stable_ids() -> None:
+def test_formal_catalog_has_all_169_named_assets_and_stable_ids() -> None:
     entries = _entries()
-    assert len(entries) == 159
-    assert len({entry["template_id"] for entry in entries}) == 159
-    assert len({entry["source_path"] for entry in entries}) == 159
+    assert len(entries) == 169
+    assert len({entry["template_id"] for entry in entries}) == 169
+    assert len({entry["source_path"] for entry in entries}) == 169
     assert all(str(entry["description"]).strip() for entry in entries)
     pig_counts = Counter(
         int(entry["rarity"])
@@ -31,8 +31,8 @@ def test_formal_catalog_has_all_159_named_assets_and_stable_ids() -> None:
         for entry in entries
         if entry["kind"] == "food"
     )
-    assert pig_counts == {1: 20, 2: 20, 3: 20, 4: 22, 5: 22, 6: 12}
-    assert food_counts == {1: 3, 2: 6, 3: 7, 4: 8, 5: 7, 6: 12}
+    assert pig_counts == {1: 20, 2: 20, 3: 21, 4: 24, 5: 25, 6: 14}
+    assert food_counts == {1: 3, 2: 6, 3: 7, 4: 8, 5: 7, 6: 14}
 
 
 def test_high_rarity_food_effects_cover_new_gameplay_families() -> None:
@@ -55,6 +55,7 @@ def test_high_rarity_food_effects_cover_new_gameplay_families() -> None:
     assert foods["向你道早猪猪巧克力螺"]["effect_params"] == {"count": 5}
     assert foods["雾蓝键盘大福"]["effect_params"] == {"six_star_percent": 50}
     assert foods["彩彩修车猪慕斯"]["effect_params"] == {"count": 5}
+    assert foods["猪保千猪排轮盘"]["effect_params"] == {"count": 5}
     assert foods["猪果冻"]["effect_params"] == {"count": 1}
 
 
@@ -82,7 +83,7 @@ def test_group_custom_assets_are_confined_and_keep_user_text() -> None:
         for entry in entries
         if entry.get("group_scope_id")
     ]
-    assert len(group_entries) == 24
+    assert len(group_entries) == 28
     assert {entry["group_scope_id"] for entry in group_entries} == {
         "qq:1092931381",
         "qq:237716658",
@@ -170,6 +171,11 @@ def test_bandori_collaboration_mappings_use_official_profiles_and_five_slots() -
         "仓鼠猪": ("二叶筑紫", "Morfonica"),
         "提琴猪": ("八潮瑠唯", "Morfonica"),
         "绿茶猪": ("薇欧拉", "梦限大动画"),
+        "HAPPY猪": ("弦卷心", "Hello, Happy World!"),
+        "歌剧猪": ("濑田熏", "Hello, Happy World!"),
+        "迷路猪": ("松原花音", "Hello, Happy World!"),
+        "美咲猪": ("奥泽美咲", "Hello, Happy World!"),
+        "可乐饼猪": ("育美", "Hello, Happy World!"),
     }
     assert all(
         value["total"] == (1 if value["collection_id"] == "bandori-yumemita-viola" else 5)
@@ -214,6 +220,12 @@ def test_bandori_collaboration_mappings_use_official_profiles_and_five_slots() -
     assert pastel_palettes_slots == {1, 2, 3, 4, 5}
     assert collabs["绿茶猪"]["collection_id"] == "bandori-yumemita-viola"
     assert collabs["绿茶猪"]["slot"] == 1
+    hhw_slots = {
+        int(value["slot"])
+        for value in collabs.values()
+        if value["collection_name"] == "Hello, Happy World!"
+    }
+    assert hhw_slots == {1, 2, 3, 4, 5}
 
 
 def test_new_pigs_keep_reviewed_descriptions_and_rarities() -> None:
@@ -294,4 +306,21 @@ def test_new_pigs_keep_reviewed_descriptions_and_rarities() -> None:
     )
     assert pigs["软糯丰川祥猪"]["paired_food_template_id"].endswith(
         "mist-blue-keyboard-daifuku"
+    )
+    assert pigs["HAPPY猪"]["rarity"] == 5
+    assert pigs["HAPPY猪"]["collection"]["character_name"] == "弦卷心"
+    assert pigs["歌剧猪"]["rarity"] == 5
+    assert pigs["歌剧猪"]["collection"]["character_name"] == "濑田熏"
+    assert pigs["迷路猪"]["rarity"] == 5
+    assert pigs["迷路猪"]["collection"]["character_name"] == "松原花音"
+    assert pigs["美咲猪"]["rarity"] == 4
+    assert pigs["美咲猪"]["collection"]["character_name"] == "奥泽美咲"
+    assert pigs["可乐饼猪"]["rarity"] == 4
+    assert pigs["可乐饼猪"]["collection"]["character_name"] == "育美"
+    assert pigs["米歇尔猪"]["rarity"] == 3
+    assert "米歇尔" in pigs["米歇尔猪"]["description"]
+    assert pigs["保千猪"]["rarity"] == 6
+    assert pigs["保千猪"]["alternate_image"].endswith("猪保千表情包.png")
+    assert pigs["保千猪"]["paired_food_template_id"].endswith(
+        "baogian-pork-roulette"
     )

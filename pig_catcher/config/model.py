@@ -25,6 +25,35 @@ def _validate_simple_filename(value: str, field_label: str) -> str:
     return normalized
 
 
+def _validate_group_id(value: str) -> str:
+    normalized = str(value or "").strip()
+    if ":" in normalized:
+        raise ValueError("目标群号只填写群 ID，不要填写平台前缀")
+    if any(ord(character) < 32 for character in normalized):
+        raise ValueError("目标群号包含不允许的控制字符")
+    return normalized
+
+
+def _validate_platform(value: str) -> str:
+    normalized = str(value or "").strip().lower()
+    if normalized and not all(character.isalnum() or character in {"-", "_"} for character in normalized):
+        raise ValueError("平台标识只能包含字母、数字、短横线或下划线")
+    return normalized
+
+
+def _validate_user_ids(values: list[str]) -> list[str]:
+    normalized: list[str] = []
+    for raw_value in values:
+        value = str(raw_value or "").strip()
+        if not value:
+            continue
+        if len(value) > 320 or any(ord(character) < 32 for character in value):
+            raise ValueError("成员 ID/OpenID 不合法")
+        if value not in normalized:
+            normalized.append(value)
+    return normalized
+
+
 class PluginSection(PluginConfigBase):
     """插件启停与版本。"""
 
@@ -760,12 +789,153 @@ class QuotaAdministrationSection(PluginConfigBase):
     @field_validator("group_id")
     @classmethod
     def validate_group_id(cls, value: str) -> str:
-        normalized = str(value or "").strip()
-        if ":" in normalized:
-            raise ValueError("目标群号只填写群 ID，不要填写平台前缀")
-        if any(ord(character) < 32 for character in normalized):
-            raise ValueError("目标群号包含不允许的控制字符")
-        return normalized
+        return _validate_group_id(value)
+
+
+class BlacklistAdministrationSection(PluginConfigBase):
+    """赠送/收赠与交易黑名单的一次性管理入口。"""
+
+    __ui_label__ = "社交黑名单"
+    __ui_icon__ = "shield-ban"
+    __ui_order__ = 96
+
+    group_id: str = Field(
+        default="",
+        max_length=128,
+        description="需要管理黑名单的精确群号",
+        json_schema_extra=_ui(
+            "目标群号",
+            "只填写一个精确群号；所有成员必须已经在该群使用过抓猪插件",
+            placeholder="填写群号或 QQ 官方群 OpenID",
+        ),
+    )
+    platform: str = Field(
+        default="",
+        max_length=40,
+        description="同一群号在多个平台重复时用于精确选择平台",
+        json_schema_extra=_ui(
+            "平台（可选）",
+            "通常留空自动识别；需要时填写 qq 或 qq-official",
+            placeholder="留空自动识别",
+        ),
+    )
+    user_ids: list[str] = Field(
+        default_factory=list,
+        max_length=200,
+        description="需要加入或解除黑名单的成员 ID/OpenID",
+        json_schema_extra=_ui(
+            "成员 ID/OpenID",
+            "每行一个；QQ 官方填写成员 OpenID，不接受昵称",
+        ),
+    )
+    gift_action: Literal["不操作", "加入黑名单", "解除黑名单"] = Field(
+        default="不操作",
+        description="对赠送与收赠黑名单执行的动作",
+        json_schema_extra=_ui(
+            "赠送/收赠黑名单",
+            "命中后不能赠送，也不能接收任何猪猪或美食",
+        ),
+    )
+    trade_action: Literal["不操作", "加入黑名单", "解除黑名单"] = Field(
+        default="不操作",
+        description="对猪猪与美食交易黑名单执行的动作",
+        json_schema_extra=_ui(
+            "交易黑名单",
+            "加入后会同时取消相关待处理交易并释放资产锁",
+        ),
+    )
+    reason: str = Field(
+        default="管理面板人工复核",
+        min_length=1,
+        max_length=500,
+        description="写入审计记录的操作原因",
+        json_schema_extra=_ui(
+            "操作原因",
+            "请填写可供后续复核的原因，不会发送到群聊",
+            **{"input_type": "textarea", "x-widget": "textarea"},
+        ),
+    )
+    execute_blacklist_update: bool = Field(
+        default=False,
+        description="保存配置后立即备份数据库并执行本次黑名单变更",
+        json_schema_extra=_ui(
+            "执行黑名单变更",
+            "确认群号、成员和动作后打开并保存；触发开关会立即自动关闭",
+        ),
+    )
+
+    @field_validator("group_id")
+    @classmethod
+    def validate_group_id(cls, value: str) -> str:
+        return _validate_group_id(value)
+
+    @field_validator("platform")
+    @classmethod
+    def validate_platform(cls, value: str) -> str:
+        return _validate_platform(value)
+
+    @field_validator("user_ids")
+    @classmethod
+    def validate_user_ids(cls, value: list[str]) -> list[str]:
+        return _validate_user_ids(value)
+
+
+class AnnouncementAdministrationSection(PluginConfigBase):
+    """通过最近活跃聊天流发送一次公告。"""
+
+    __ui_label__ = "群公告发送"
+    __ui_icon__ = "megaphone"
+    __ui_order__ = 97
+
+    group_id: str = Field(
+        default="",
+        max_length=128,
+        description="需要发送公告的精确群号",
+        json_schema_extra=_ui(
+            "目标群号",
+            "使用该群最近活跃的 MaiBot 聊天流和机器人线路",
+            placeholder="填写群号或 QQ 官方群 OpenID",
+        ),
+    )
+    platform: str = Field(
+        default="",
+        max_length=40,
+        description="同一群号在多个平台重复时用于精确选择平台",
+        json_schema_extra=_ui(
+            "平台（可选）",
+            "通常留空自动识别；需要时填写 qq 或 qq-official",
+            placeholder="留空自动识别",
+        ),
+    )
+    content: str = Field(
+        default="",
+        max_length=4000,
+        description="要由机器人发送到目标群的公告正文",
+        json_schema_extra=_ui(
+            "公告正文",
+            "QQ 官方机器人默认需要目标群 5 分钟内存在可用的被动回复上下文",
+            placeholder="填写公告正文",
+            **{"input_type": "textarea", "x-widget": "textarea"},
+        ),
+    )
+    execute_send: bool = Field(
+        default=False,
+        description="保存配置后立即尝试向目标群发送一次公告",
+        json_schema_extra=_ui(
+            "立即发送公告",
+            "发送前会先关闭触发开关并写审计记录；失败不会自动重试或重复发送",
+        ),
+    )
+
+    @field_validator("group_id")
+    @classmethod
+    def validate_group_id(cls, value: str) -> str:
+        return _validate_group_id(value)
+
+    @field_validator("platform")
+    @classmethod
+    def validate_platform(cls, value: str) -> str:
+        return _validate_platform(value)
 
 
 class MaintenanceSection(PluginConfigBase):
@@ -811,6 +981,12 @@ class PigCatcherConfig(PluginConfigBase):
     quota_administration: QuotaAdministrationSection = Field(
         default_factory=QuotaAdministrationSection
     )
+    blacklist_administration: BlacklistAdministrationSection = Field(
+        default_factory=BlacklistAdministrationSection
+    )
+    announcement_administration: AnnouncementAdministrationSection = Field(
+        default_factory=AnnouncementAdministrationSection
+    )
     maintenance: MaintenanceSection = Field(default_factory=MaintenanceSection)
 
     @model_validator(mode="after")
@@ -821,6 +997,26 @@ class PigCatcherConfig(PluginConfigBase):
             and not self.quota_administration.group_id
         ):
             raise ValueError("执行额度重置前必须填写目标群号")
+        blacklist = self.blacklist_administration
+        if blacklist.execute_blacklist_update:
+            if not blacklist.group_id:
+                raise ValueError("执行黑名单变更前必须填写目标群号")
+            if not blacklist.user_ids:
+                raise ValueError("执行黑名单变更前必须填写成员 ID/OpenID")
+            if blacklist.gift_action == "不操作" and blacklist.trade_action == "不操作":
+                raise ValueError("执行黑名单变更前至少选择一种加入或解除动作")
+        announcement = self.announcement_administration
+        if announcement.execute_send:
+            if not announcement.group_id:
+                raise ValueError("发送公告前必须填写目标群号")
+            if not announcement.content.strip():
+                raise ValueError("发送公告前必须填写公告正文")
+        if (
+            self.quota_administration.execute_current_window_reset
+            or blacklist.execute_blacklist_update
+            or announcement.execute_send
+        ) and not self.plugin.enabled:
+            raise ValueError("执行控制面板操作前必须先启用抓猪插件")
         if self.cooking.six_star_to_five_percent + self.cooking.six_star_to_six_percent != 100:
             raise ValueError("六星猪料理概率必须合计 100%")
         if (

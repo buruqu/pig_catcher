@@ -121,6 +121,8 @@ class PigView:
     body_description: str = ""
     giant_score: float = 0.0
     paired_food_template_id: str = ""
+    display_variant: str = "pig"
+    alternate_image_relpath: str = ""
 
     @property
     def stars(self) -> str:
@@ -372,6 +374,11 @@ def pig_view_from_row(
         giant_size_threshold_cm=giant_size_threshold_cm,
         giant_weight_threshold_kg=giant_weight_threshold_kg,
     )
+    display_variant = str(row.get("display_variant") or "pig")
+    image_relpath = str(row.get("image_relpath") or "")
+    alternate_image_relpath = str(row.get("alternate_image_relpath") or "")
+    if display_variant == "sticker" and alternate_image_relpath:
+        image_relpath = alternate_image_relpath
     return PigView(
         pig_instance_id=str(row["pig_instance_id"]),
         short_code=str(row["short_code"]),
@@ -390,7 +397,7 @@ def pig_view_from_row(
         fat_ratio=float(row["fat_ratio"]),
         official_value=int(row["official_value"]),
         acquired_at=str(row["acquired_at"]),
-        image_relpath=str(row.get("image_relpath") or ""),
+        image_relpath=image_relpath,
         image_fit=str(row.get("image_fit") or "contain"),
         media_format=str(row.get("media_format") or "PNG"),
         is_animated=bool(row.get("is_animated") or False),
@@ -409,6 +416,8 @@ def pig_view_from_row(
         body_description=body.description,
         giant_score=body.giant_score,
         paired_food_template_id=str(row.get("paired_food_template_id") or ""),
+        display_variant=display_variant,
+        alternate_image_relpath=alternate_image_relpath,
     )
 
 
@@ -1142,6 +1151,29 @@ class GameplayService:
                 global_weight_record=global_weight_record,
                 giant_sighting=giant_sighting,
             )
+
+    async def toggle_pig_display_variant(
+        self,
+        identity: CommandIdentity,
+        template_id: str,
+    ) -> tuple[int, str]:
+        """Toggle alternate display art for all active instances of a template."""
+
+        now_datetime = _safe_datetime(self.clock.now())
+        now = iso_timestamp(now_datetime)
+        async with self.database.transaction() as session:
+            await self.framework_repository.touch_identity(
+                session,
+                identity=identity,
+                now=now,
+            )
+            count, new_variant = await self.repository.toggle_pig_display_variant(
+                session,
+                player_id=identity.player_id,
+                template_id=template_id,
+                now=now,
+            )
+            return count, new_variant
 
     async def profile(self, identity: CommandIdentity) -> PlayerProfile:
         """Read the current-group player profile."""

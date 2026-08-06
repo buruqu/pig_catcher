@@ -1,6 +1,6 @@
 [plugin]
 enabled = true
-config_version = "1.4.2"
+config_version = "1.5.0"
 framework_phase = "6"
 
 [features]
@@ -133,6 +133,21 @@ font_family = "\"Noto Sans CJK SC\", \"Microsoft YaHei\", sans-serif"
 [quota_administration]
 group_id = "237716658"
 execute_current_window_reset = false
+
+[blacklist_administration]
+group_id = ""
+platform = ""
+user_ids = []
+gift_action = "不操作"
+trade_action = "不操作"
+reason = "管理面板人工复核"
+execute_blacklist_update = false
+
+[announcement_administration]
+group_id = ""
+platform = ""
+content = ""
+execute_send = false
 
 [maintenance]
 enabled = true

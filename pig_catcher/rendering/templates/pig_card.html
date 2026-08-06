@@ -68,6 +68,9 @@
       </div>
       {% endif %}
       <p class="pig-card__description" style="font-size: {% if view.description|length > 350 %}13{% elif view.description|length > 250 %}14{% elif view.description|length > 160 %}15{% elif view.description|length > 115 %}16{% elif view.description|length > 80 %}17{% else %}19{% endif %}px;line-height:{% if view.description|length > 160 %}1.45{% else %}1.55{% endif %}">{{ view.description }}</p>
+      {% if view.tutorial_text %}
+      <p class="pig-card__tutorial" style="margin-top:10px;padding:8px 12px;background:rgba(255,105,180,0.12);border-radius:8px;color:#c2185b;font-size:14px;font-weight:600">{{ view.tutorial_text }}</p>
+      {% endif %}
       <p class="pig-card__subline">
         {% if view.collection_name %}{{ view.collection_name }}{% if view.character_name %} · {{ view.character_name }}{% endif %} · {% endif %}
         获得于 {{ view.acquired_at }}

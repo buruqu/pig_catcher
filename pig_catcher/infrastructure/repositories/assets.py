@@ -150,6 +150,10 @@ class AssetRepository:
         entry = asset.entry
         collection = entry.collection
         enabled = int(entry.scope is TemplateScope.COMMON or entry.consent_status is ConsentStatus.GRANTED)
+        image_relpath = self._stored_image_path(stored, asset)
+        alternate_image_relpath = ""
+        if entry.alternate_image:
+            alternate_image_relpath = f"{stored.storage_relative_path}/files/{entry.alternate_image}"
         await session.execute(
             """
             INSERT INTO pig_templates(
@@ -161,7 +165,7 @@ class AssetRepository:
                 loop_count, has_transparency, collaboration_name, collection_id,
                 collection_name, collection_slot, collection_total, character_id,
                 character_name, official_profile_url, paired_food_template_id,
-                enabled, created_at, updated_at
+                alternate_image_relpath, enabled, created_at, updated_at
             )
             VALUES (
                 :template_id, :catalog_hash, 1, :display_name, :rarity,
@@ -172,7 +176,7 @@ class AssetRepository:
                 :loop_count, :has_transparency, :collaboration_name, :collection_id,
                 :collection_name, :collection_slot, :collection_total, :character_id,
                 :character_name, :official_profile_url, :paired_food_template_id,
-                :enabled, :created_at, :updated_at
+                :alternate_image_relpath, :enabled, :created_at, :updated_at
             )
             ON CONFLICT(template_id) DO UPDATE SET
                 catalog_hash = excluded.catalog_hash,
@@ -211,6 +215,7 @@ class AssetRepository:
                 character_name = excluded.character_name,
                 official_profile_url = excluded.official_profile_url,
                 paired_food_template_id = excluded.paired_food_template_id,
+                alternate_image_relpath = excluded.alternate_image_relpath,
                 enabled = excluded.enabled,
                 updated_at = excluded.updated_at
             """,
@@ -221,7 +226,7 @@ class AssetRepository:
                 "rarity": int(entry.rarity),
                 "scope_type": entry.scope.value,
                 "description": entry.description,
-                "image_relpath": self._stored_image_path(stored, asset),
+                "image_relpath": image_relpath,
                 "image_sha256": asset.sha256,
                 "image_fit": entry.fit.value,
                 "length_min": entry.length_min_cm,
@@ -255,6 +260,7 @@ class AssetRepository:
                 "character_name": collection.character_name if collection else "",
                 "official_profile_url": collection.official_profile_url if collection else "",
                 "paired_food_template_id": entry.paired_food_template_id,
+                "alternate_image_relpath": alternate_image_relpath,
                 "enabled": enabled,
                 "created_at": now,
                 "updated_at": now,

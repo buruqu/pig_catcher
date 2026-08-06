@@ -78,6 +78,10 @@ class AssetManifestEntry(BaseModel):
         pattern=r"^(?:[a-z0-9]+(?:-[a-z0-9]+)*)?$",
         max_length=80,
     )
+    alternate_image: str = Field(
+        default="",
+        max_length=300,
+    )
     collection: CollectionMetadata | None = None
 
     @field_validator("image")
@@ -88,6 +92,19 @@ class AssetManifestEntry(BaseModel):
             raise ValueError("图片必须使用素材包内不含上级跳转的相对路径")
         if path.suffix.lower() not in {".png", ".webp", ".jpg", ".jpeg", ".gif"}:
             raise ValueError("图片路径仅支持 PNG、JPEG、WebP 或 GIF 扩展名")
+        return path.as_posix()
+
+    @field_validator("alternate_image")
+    @classmethod
+    def validate_alternate_image_path(cls, value: str) -> str:
+        value = str(value or "").strip()
+        if not value:
+            return ""
+        path = Path(value)
+        if path.is_absolute() or value.startswith(("/", "\\")) or ".." in path.parts or "\x00" in value:
+            raise ValueError("备用图片必须使用素材包内不含上级跳转的相对路径")
+        if path.suffix.lower() not in {".png", ".webp", ".jpg", ".jpeg", ".gif"}:
+            raise ValueError("备用图片路径仅支持 PNG、JPEG、WebP 或 GIF 扩展名")
         return path.as_posix()
 
     @field_validator("recipe_tags")
@@ -269,6 +286,8 @@ class ValidatedAsset:
     total_duration_ms: int
     loop_count: int | None
     has_transparency: bool
+    alternate_source_path: Path | None = None
+    alternate_sha256: str = ""
 
 
 @dataclass(frozen=True, slots=True)

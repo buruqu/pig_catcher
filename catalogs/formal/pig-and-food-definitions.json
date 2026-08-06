@@ -2600,6 +2600,218 @@
       "effect_params": {
         "count": 5
       }
+    },
+    {
+      "template_id": "pig-bandori-hhw-happy",
+      "source_path": "猪猪素材库/金色品质/HAPPY猪.png",
+      "kind": "pig",
+      "display_name": "HAPPY猪",
+      "rarity": 5,
+      "description": "把弦卷心闪闪发光的笑容和'让世界充满笑容'的念头一起塞进猪猪里；好奇心旺盛，口袋里的零花钱似乎比整个猪圈的价值还要高。",
+      "fat_profile": "balanced",
+      "recipe_tags": [
+        "BanG Dream!",
+        "Hello, Happy World!",
+        "主唱",
+        "笑容"
+      ],
+      "collection": {
+        "collaboration_name": "BanG Dream!",
+        "collection_id": "bandori-hello-happy-world",
+        "collection_name": "Hello, Happy World!",
+        "slot": 1,
+        "total": 5,
+        "character_id": "tsurumaki-kokoro",
+        "character_name": "弦卷心",
+        "official_profile_url": "https://bang-dream.com/artist/hello-happy-world/tsurumaki-kokoro/"
+      }
+    },
+    {
+      "template_id": "pig-bandori-hhw-opera",
+      "source_path": "猪猪素材库/金色品质/歌剧猪.png",
+      "kind": "pig",
+      "display_name": "歌剧猪",
+      "rarity": 5,
+      "description": "披着濑田薰的华丽气场和演剧部主角的台词腔，走到哪里都像是舞台幕布刚刚拉开；虽然诗集只翻了两页，风度却已经满分。",
+      "fat_profile": "lean",
+      "recipe_tags": [
+        "BanG Dream!",
+        "Hello, Happy World!",
+        "吉他",
+        "演剧"
+      ],
+      "collection": {
+        "collaboration_name": "BanG Dream!",
+        "collection_id": "bandori-hello-happy-world",
+        "collection_name": "Hello, Happy World!",
+        "slot": 2,
+        "total": 5,
+        "character_id": "seta-kaoru",
+        "character_name": "濑田熏",
+        "official_profile_url": "https://bang-dream.com/artist/hello-happy-world/seta-kaoru/"
+      }
+    },
+    {
+      "template_id": "pig-bandori-hhw-lost",
+      "source_path": "猪猪素材库/金色品质/迷路猪.png",
+      "kind": "pig",
+      "display_name": "迷路猪",
+      "rarity": 5,
+      "description": "长着松原花音那样怯生生的眼神，一边说着'对不起'一边被点心香气拐进队伍；方向感依然在路上，但鼓点会帮它找到节拍。",
+      "fat_profile": "balanced",
+      "recipe_tags": [
+        "BanG Dream!",
+        "Hello, Happy World!",
+        "鼓手",
+        "甜点"
+      ],
+      "collection": {
+        "collaboration_name": "BanG Dream!",
+        "collection_id": "bandori-hello-happy-world",
+        "collection_name": "Hello, Happy World!",
+        "slot": 3,
+        "total": 5,
+        "character_id": "matsubara-kanon",
+        "character_name": "松原花音",
+        "official_profile_url": "https://bang-dream.com/artist/hello-happy-world/matsubara-kanon/"
+      }
+    },
+    {
+      "template_id": "pig-bandori-hhw-misaki",
+      "source_path": "猪猪素材库/紫色品质/美咲猪.png",
+      "kind": "pig",
+      "display_name": "美咲猪",
+      "rarity": 4,
+      "description": "学着奥泽美咲把'普普通通就好'挂在嘴边，其实早就被队友拖进了一场又一场热闹；DJ台和吐槽剧本都藏在猪耳朵后面。",
+      "fat_profile": "balanced",
+      "recipe_tags": [
+        "BanG Dream!",
+        "Hello, Happy World!",
+        "DJ",
+        "吐槽"
+      ],
+      "collection": {
+        "collaboration_name": "BanG Dream!",
+        "collection_id": "bandori-hello-happy-world",
+        "collection_name": "Hello, Happy World!",
+        "slot": 4,
+        "total": 5,
+        "character_id": "okusawa-misaki",
+        "character_name": "奥泽美咲",
+        "official_profile_url": "https://bang-dream.com/artist/hello-happy-world/michelle/"
+      }
+    },
+    {
+      "template_id": "pig-bandori-hhw-korokke",
+      "source_path": "猪猪素材库/紫色品质/可乐饼猪.png",
+      "kind": "pig",
+      "display_name": "可乐饼猪",
+      "rarity": 4,
+      "description": "顶着北泽育美的运动帽，怀里抱着自家肉店刚出锅的可乐饼；精力充沛到能绕着猪圈跑三圈，跑完还要请大家再吃一块。",
+      "fat_profile": "balanced",
+      "recipe_tags": [
+        "BanG Dream!",
+        "Hello, Happy World!",
+        "贝斯",
+        "可乐饼"
+      ],
+      "collection": {
+        "collaboration_name": "BanG Dream!",
+        "collection_id": "bandori-hello-happy-world",
+        "collection_name": "Hello, Happy World!",
+        "slot": 5,
+        "total": 5,
+        "character_id": "kitazawa-hagumi",
+        "character_name": "育美",
+        "official_profile_url": "https://bang-dream.com/artist/hello-happy-world/kitazawa-hagumi/"
+      }
+    },
+    {
+      "template_id": "pig-bandori-hhw-michelle",
+      "source_path": "猪猪素材库/蓝色品质/米歇尔猪.png",
+      "kind": "pig",
+      "display_name": "米歇尔猪",
+      "rarity": 3,
+      "description": "穿着米歇尔的熊布偶装登场，外表是可爱DJ熊，内里其实正在冷静地计算今天还要收拾多少烂摊子；秘密就让它留在布偶里。",
+      "fat_profile": "fatty",
+      "recipe_tags": [
+        "BanG Dream!",
+        "Hello, Happy World!",
+        "DJ",
+        "熊"
+      ]
+    },
+    {
+      "template_id": "pig-g1092931381-baogian",
+      "source_path": "定制猪群友库/1092931381/保千猪.png",
+      "kind": "pig",
+      "display_name": "保千猪",
+      "rarity": 6,
+      "description": "因为猪保千，现在保千猪的信誉分已经不够刷共享单车赶去加餐了。",
+      "fat_profile": "balanced",
+      "recipe_tags": [
+        "群友定制",
+        "保千",
+        "表情包"
+      ],
+      "group_scope_id": "qq:1092931381",
+      "paired_food_template_id": "food-g1092931381-baogian-pork-roulette",
+      "alternate_image": "定制猪群友库/1092931381/猪保千表情包.png"
+    },
+    {
+      "template_id": "pig-g237716658-baogian",
+      "source_path": "定制猪群友库/237716658/保千猪.png",
+      "kind": "pig",
+      "display_name": "保千猪",
+      "rarity": 6,
+      "description": "因为猪保千，现在保千猪的信誉分已经不够刷共享单车赶去加餐了。",
+      "fat_profile": "balanced",
+      "recipe_tags": [
+        "群友定制",
+        "保千",
+        "表情包"
+      ],
+      "group_scope_id": "qq:237716658",
+      "paired_food_template_id": "food-g237716658-baogian-pork-roulette",
+      "alternate_image": "定制猪群友库/237716658/猪保千表情包.png"
+    },
+    {
+      "template_id": "food-g1092931381-baogian-pork-roulette",
+      "source_path": "定制美食库/1092931381/猪保千猪排轮盘.png",
+      "kind": "food",
+      "display_name": "猪保千猪排轮盘",
+      "rarity": 6,
+      "description": "因为猪保千，现在保千猪的信誉分已经不够刷共享单车赶去加餐了；这盘猪排轮盘先垫垫肚子，剩下的账单留给表情包的笑脸去还。",
+      "recipe_tags": [
+        "群友定制",
+        "保千",
+        "猪排",
+        "轮盘"
+      ],
+      "group_scope_id": "qq:1092931381",
+      "effect_id": "weekly-window-catches",
+      "effect_params": {
+        "count": 5
+      }
+    },
+    {
+      "template_id": "food-g237716658-baogian-pork-roulette",
+      "source_path": "定制美食库/237716658/猪保千猪排轮盘.png",
+      "kind": "food",
+      "display_name": "猪保千猪排轮盘",
+      "rarity": 6,
+      "description": "因为猪保千，现在保千猪的信誉分已经不够刷共享单车赶去加餐了；这盘猪排轮盘先垫垫肚子，剩下的账单留给表情包的笑脸去还。",
+      "recipe_tags": [
+        "群友定制",
+        "保千",
+        "猪排",
+        "轮盘"
+      ],
+      "group_scope_id": "qq:237716658",
+      "effect_id": "weekly-window-catches",
+      "effect_params": {
+        "count": 5
+      }
     }
   ]
 }

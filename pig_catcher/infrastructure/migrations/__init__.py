@@ -11,6 +11,8 @@ from .v0007_paired_six_star_recipes import MIGRATION_0007
 from .v0008_catch_quota_bonuses import MIGRATION_0008
 from .v0009_player_restrictions import MIGRATION_0009
 from .v0010_split_social_blacklists import MIGRATION_0010
+from .v0011_pig_alternate_image import MIGRATION_0011
+from .v0012_pig_display_variant import MIGRATION_0012
 
 MIGRATIONS: tuple[Migration, ...] = (
     MIGRATION_0001,
@@ -23,6 +25,8 @@ MIGRATIONS: tuple[Migration, ...] = (
     MIGRATION_0008,
     MIGRATION_0009,
     MIGRATION_0010,
+    MIGRATION_0011,
+    MIGRATION_0012,
 )
 
 __all__ = ["MIGRATIONS", "Migration"]
