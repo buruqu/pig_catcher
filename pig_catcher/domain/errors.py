@@ -77,6 +77,22 @@ class CatchCooldownError(GameplayError):
         super().__init__(f"抓猪冷却中，还需等待 {self.remaining_seconds} 秒。")
 
 
+class CookCooldownError(GameplayError):
+    """玩家仍处于做菜冷却。"""
+
+    def __init__(self, remaining_seconds: int) -> None:
+        self.remaining_seconds = max(1, int(remaining_seconds))
+        super().__init__(f"做菜冷却中，还需等待 {self.remaining_seconds} 秒。")
+
+
+class NoCookablePigError(GameplayError):
+    """批量做菜时没有符合条件的原料猪。"""
+
+
+class BatchCookRestrictedError(GameplayError):
+    """持有多次数做菜效果期间禁止批量做菜。"""
+
+
 class PigNotFoundError(GameplayError):
     """当前玩家的有效猪库存中找不到选择目标。"""
 

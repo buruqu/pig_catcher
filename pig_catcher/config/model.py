@@ -521,6 +521,17 @@ class CookingSection(PluginConfigBase):
             disabled=True,
         ),
     )
+    cook_cooldown_seconds: int = Field(
+        default=10,
+        ge=0,
+        le=3600,
+        description="单次做菜冷却秒数，用于防止连续做菜",
+        json_schema_extra=_ui(
+            "做菜冷却",
+            "每次做菜后需等待该秒数才能再次做菜或批量做菜",
+            disabled=False,
+        ),
+    )
 
 
 class EconomySection(PluginConfigBase):

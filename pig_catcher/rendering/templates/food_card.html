@@ -60,7 +60,10 @@
       <p class="pig-card__subline">
         效果：{{ view.effect_summary }} · 获得于 {{ view.acquired_at }}
         {% if view.probability_summary %}<br>最终品质概率：{{ view.probability_summary }}{% endif %}
+        {% if view.probability_line %}<br>本次最终概率：{{ view.probability_line }}{% endif %}
+        {% if view.probability_sources %}<br>概率来源：{{ view.probability_sources }}{% endif %}
         {% if view.effect_summaries %}<br>本次美食加成：{{ view.effect_summaries | join("；") }}{% endif %}
+        {% if view.excluded_summaries %}<br>互斥未叠加：{{ view.excluded_summaries | join("；") }}{% endif %}
       </p>
     </section>
 

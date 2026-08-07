@@ -22,6 +22,7 @@ from .pig_catcher.commands import (
     format_help,
     matched_group,
     parse_action_type,
+    parse_batch_cook_query,
     parse_batch_sale_query,
     parse_catalog_query,
     parse_food_inventory_query,
@@ -54,6 +55,7 @@ from .pig_catcher.rendering import (
     RenderDelivery,
     RenderedImage,
     RenderOptions,
+    batch_cook_view,
     batch_sale_receipt_view,
     catalog_media_paths,
     catalog_view,
@@ -958,6 +960,54 @@ class PigCatcherPlugin(MaiBotPlugin):
             )
 
     @Command(
+        "pig_catcher_reset_quota_chance",
+        description="消耗一次重置机会，为当前群重置本时段抓猪次数",
+        pattern=r"^/重置额度\s*$",
+    )
+    async def handle_reset_quota_chance(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        """让持有六星菜“重置机会”的玩家为命令所在群重置一次额度。"""
+
+        identity, rejected = await self._prepare_command(
+            stream_id,
+            kwargs,
+            feature_enabled=self.settings.features.catching_enabled,
+            feature_label="抓猪",
+        )
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            service = cast(CatchQuotaResetService, self._quota_reset_service)
+            result = await service.reset_from_quota_chance(
+                data_dir=Path(self.ctx.paths.data_dir).resolve(),
+                identity=identity,
+            )
+            if result.receipt is None:
+                raise RuntimeError("重置额度机会没有生成幂等回执。")
+            self.ctx.logger.info(
+                "玩家使用重置机会完成群额度重置：scope=%s，window=%s，cleared=%s，players=%s，audit=%s，backup=%s",
+                result.scope_id,
+                result.window.label,
+                result.cleared_catches,
+                result.affected_players,
+                result.audit_event_id,
+                result.backup_path,
+            )
+            return await self._deliver_text_receipt(
+                stream_id=identity.stream_id,
+                receipt=result.receipt,
+            )
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation="使用重置机会",
+                error=exc,
+            )
+
+    @Command(
         "pig_catcher_catch",
         description="在当前群抓取一只猪猪",
         pattern=r"^/(?:抓猪|抓群友)\s*$",
@@ -1372,6 +1422,55 @@ class PigCatcherPlugin(MaiBotPlugin):
             )
 
     @Command(
+        "pig_catcher_batch_cook",
+        description="把背包中全部符合条件的猪批量制作成美食",
+        pattern=r"^/批量做菜(?:\s+(?P<arguments>.*?))?\s*$",
+    )
+    async def handle_batch_cook(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_command(
+            stream_id,
+            kwargs,
+            feature_enabled=self.settings.features.cooking_enabled,
+            feature_label="批量做菜",
+        )
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            query = parse_batch_cook_query(matched_group(kwargs, "arguments"))
+            result = await cast(EconomyService, self._economy_service).batch_cook(
+                identity,
+                rarity=query.rarity,
+            )
+            renderer = cast(PigCatcherRenderer, self._renderer)
+            view = batch_cook_view(result)
+            fallback = (
+                f"【批量做菜成功】消耗 {result.pig_count} 只原料猪，"
+                f"产出 {result.food_count} 份美食，"
+                f"猪币 +{result.coin_reward}，经验 +{result.experience_reward}。"
+            )
+            data_dir = Path(self.ctx.paths.data_dir).resolve()
+            media_paths = {
+                food.food_instance_id: food_media_path(data_dir, food)
+                for food in result.foods
+                if food_media_path(data_dir, food) is not None
+            }
+            return await self._deliver_query(
+                stream_id=identity.stream_id,
+                render=lambda: renderer.render_batch_cook(view, media_paths),
+                fallback_text=fallback,
+            )
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation="批量做菜",
+                error=exc,
+            )
+
+    @Command(
         "pig_catcher_food_detail",
         description="查看一份当前持有美食的详情",
         pattern=r"^/美食详情(?:\s+(?P<selector>.*?))?\s*$",
@@ -1772,6 +1871,7 @@ class PigCatcherPlugin(MaiBotPlugin):
                 identity,
                 asset_kind=query.asset_kind.value,
                 max_rarity=3,
+                rarity=query.rarity,
             )
             renderer = cast(PigCatcherRenderer, self._renderer)
             view = batch_sale_receipt_view(result)

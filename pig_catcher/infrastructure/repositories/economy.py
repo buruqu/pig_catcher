@@ -330,7 +330,9 @@ class EconomyRepository:
         player_id: str,
         selector: AssetSelector,
     ) -> list[dict[str, object]]:
-        parameters: list[object] = [player_id, selector.name]
+        # 精确匹配优先；若未命中再按“去空白 + 忽略英文大小写”的紧凑名兜底。
+        compact_name = "".join(selector.name.split())
+        parameters: list[object] = [player_id, selector.name, compact_name]
         short_code_clause = ""
         if selector.short_code is not None:
             short_code_clause = "AND instance.short_code = ?"
@@ -341,7 +343,11 @@ class EconomyRepository:
             FROM food_instances AS instance
             WHERE instance.owner_player_id = ?
               AND instance.state = 'active'
-              AND instance.display_name_snapshot = ?
+              AND (
+                  instance.display_name_snapshot = ?
+                  OR REPLACE(REPLACE(instance.display_name_snapshot, ' ', ''), '　', '')
+                     = ? COLLATE NOCASE
+              )
               {short_code_clause}
             ORDER BY instance.acquired_at DESC
             LIMIT 20
@@ -398,13 +404,35 @@ class EconomyRepository:
         asset_kind: str,
         max_rarity: int,
         now: str,
+        rarity: int | None = None,
     ) -> tuple[int, int]:
-        """Sell all unlocked assets at or below one rarity and return count/value."""
+        """Sell all unlocked assets at or below one rarity and return count/value.
+
+        ``rarity`` 指定时只处理该品质（联动猪除外）；不指定时处理
+        ``1..max_rarity``（猪猪仍排除联动猪）。
+        """
 
         if asset_kind not in {"pig", "food"}:
             raise ValueError("asset_kind must be pig or food")
         table = "pig_instances" if asset_kind == "pig" else "food_instances"
         id_column = "pig_instance_id" if asset_kind == "pig" else "food_instance_id"
+        rarity_clause = (
+            "AND rarity = ?" if rarity is not None else "AND rarity <= ?"
+        )
+        rarity_param: object = rarity if rarity is not None else max_rarity
+        # 联动猪（有收藏图鉴条目）永远不参与批量售卖
+        collab_clause = (
+            """
+            AND NOT EXISTS (
+                SELECT 1 FROM pig_templates AS template
+                WHERE template.template_id = pig_instances.template_id
+                  AND template.collection_id IS NOT NULL
+                  AND template.collection_id != ''
+            )
+            """
+            if asset_kind == "pig"
+            else ""
+        )
         row = await session.fetch_one(
             f"""
             SELECT COUNT(*) AS asset_count, COALESCE(SUM(official_value), 0) AS total_value
@@ -413,9 +441,10 @@ class EconomyRepository:
               AND scope_id = ?
               AND state = 'active'
               AND locked_trade_id IS NULL
-              AND rarity <= ?
+              {rarity_clause}
+              {collab_clause}
             """,
-            (player_id, scope_id, max_rarity),
+            (player_id, scope_id, rarity_param),
         )
         count = int(row["asset_count"]) if row is not None else 0
         total_value = int(row["total_value"]) if row is not None else 0
@@ -429,9 +458,10 @@ class EconomyRepository:
               AND scope_id = ?
               AND state = 'active'
               AND locked_trade_id IS NULL
-              AND rarity <= ?
+              {rarity_clause}
+              {collab_clause}
             """,
-            (now, now, player_id, scope_id, max_rarity),
+            (now, now, player_id, scope_id, rarity_param),
         )
         if cursor.rowcount != count:
             raise RuntimeError("批量售卖资产数量发生变化，本次操作未结算。")
@@ -450,10 +480,11 @@ class EconomyRepository:
                     AND scope_id = ?
                     AND state = 'sold'
                     AND disposed_at = ?
-                    AND rarity <= ?
+                    {rarity_clause}
+                    {collab_clause}
               )
             """,
-            (now, player_id, player_id, scope_id, now, max_rarity),
+            (now, player_id, player_id, scope_id, now, rarity_param),
         )
         return count, total_value
 

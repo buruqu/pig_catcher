@@ -439,7 +439,10 @@ class GameplayRepository:
         player_id: str,
         selector: AssetSelector,
     ) -> list[dict[str, object]]:
-        parameters: list[object] = [player_id, selector.name]
+        # 精确匹配优先；若未命中再按“去空白 + 忽略英文大小写”的紧凑名兜底，
+        # 以兼容名称中含空格或英文大小写差异（如“白吃 Token 的猪”）。
+        compact_name = "".join(selector.name.split())
+        parameters: list[object] = [player_id, selector.name, compact_name]
         short_code_clause = ""
         if selector.short_code is not None:
             short_code_clause = "AND instance.short_code = ?"
@@ -450,10 +453,61 @@ class GameplayRepository:
             FROM pig_instances AS instance
             WHERE instance.owner_player_id = ?
               AND instance.state = 'active'
-              AND instance.display_name_snapshot = ?
+              AND (
+                  instance.display_name_snapshot = ?
+                  OR REPLACE(REPLACE(instance.display_name_snapshot, ' ', ''), '　', '')
+                     = ? COLLATE NOCASE
+              )
               {short_code_clause}
             ORDER BY instance.acquired_at DESC
             LIMIT 20
+            """,
+            parameters,
+        )
+        results: list[dict[str, object]] = []
+        for row in rows:
+            result = await self.get_pig_by_instance_id(
+                session,
+                pig_instance_id=str(row["pig_instance_id"]),
+            )
+            if result is not None:
+                results.append(result)
+        return results
+
+    async def list_cookable_pigs(
+        self,
+        session: DatabaseSession,
+        *,
+        player_id: str,
+        scope_id: str,
+        rarity: int | None,
+    ) -> list[dict[str, object]]:
+        """List active, unlocked, non-collaboration pigs eligible for batch cooking.
+
+        联动猪（有收藏图鉴条目）永远不参与批量做菜；六星定制猪也不参与，
+        避免批量操作误耗高价值原料。
+        """
+
+        rarity_clause = "AND instance.rarity = ?" if rarity is not None else "AND instance.rarity <= 5"
+        parameters: list[object] = [player_id, scope_id]
+        if rarity is not None:
+            parameters.append(rarity)
+        rows = await session.fetch_all(
+            f"""
+            SELECT instance.pig_instance_id
+            FROM pig_instances AS instance
+            WHERE instance.owner_player_id = ?
+              AND instance.scope_id = ?
+              AND instance.state = 'active'
+              AND instance.locked_trade_id IS NULL
+              AND NOT EXISTS (
+                  SELECT 1 FROM pig_templates AS template
+                  WHERE template.template_id = instance.template_id
+                    AND template.collection_id IS NOT NULL
+                    AND template.collection_id != ''
+              )
+              {rarity_clause}
+            ORDER BY instance.rarity DESC, instance.acquired_at ASC
             """,
             parameters,
         )

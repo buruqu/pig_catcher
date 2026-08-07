@@ -8,6 +8,7 @@ from .context import (
 )
 from .help import format_help
 from .parsers import (
+    BatchCookQuery,
     BatchSaleQuery,
     CatalogQuery,
     GiftQuery,
@@ -19,6 +20,7 @@ from .parsers import (
     TradeListQuery,
     TradeOfferQuery,
     parse_action_type,
+    parse_batch_cook_query,
     parse_batch_sale_query,
     parse_catalog_query,
     parse_food_inventory_query,
@@ -37,6 +39,7 @@ from .parsers import (
 )
 
 __all__ = [
+    "BatchCookQuery",
     "BatchSaleQuery",
     "CatalogQuery",
     "GiftQuery",
@@ -53,6 +56,7 @@ __all__ = [
     "matched_group",
     "MentionTarget",
     "parse_action_type",
+    "parse_batch_cook_query",
     "parse_batch_sale_query",
     "parse_catalog_query",
     "parse_food_inventory_query",

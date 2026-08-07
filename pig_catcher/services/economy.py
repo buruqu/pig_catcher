@@ -31,18 +31,23 @@ from ..domain.errors import (
     AmbiguousFoodSelectorError,
     AmbiguousPigSelectorError,
     AssetStateConflictError,
+    BatchCookRestrictedError,
+    CookCooldownError,
     CookingTemplateError,
     FoodEffectError,
     FoodNotFoundError,
     InsufficientBalanceError,
     ItemInventoryError,
     LedgerReconciliationError,
+    NoCookablePigError,
     PigNotFoundError,
     ReceiptConflictError,
     StoreProductError,
     UpgradeLimitError,
 )
 from ..domain.food_effects import (
+    COOK_PROBABILITY_GROUP,
+    EXCLUSIVE_COOK_EFFECTS,
     EXTRA_CATCHES,
     NEXT_SIX_STAR_COOK,
     PERMANENT_WINDOW_CATCH,
@@ -78,10 +83,11 @@ from .command_state import (
     valid_page_count,
     validate_existing_receipt,
 )
-from .gameplay import PigView, pig_view_from_row
+from .gameplay import PigView, _cooldown_remaining, _safe_datetime, pig_view_from_row
 from .receipts import request_fingerprint
 
 _COOK_COMMAND = "pig-catcher.cook"
+_BATCH_COOK_COMMAND = "pig-catcher.batch-cook"
 _EAT_COMMAND = "pig-catcher.eat"
 _PURCHASE_COMMAND = "pig-catcher.purchase"
 _UPGRADE_COMMAND = "pig-catcher.upgrade"
@@ -192,7 +198,8 @@ class CookingResult:
     item_name: str
     weights: tuple[float, ...]
     bonus_serving: bool
-    effect_summaries: tuple[str, ...] = ()
+    effect_summaries: tuple[str, ...]
+    excluded_summaries: tuple[str, ...] = ()
 
     @property
     def probability_summary(self) -> str:
@@ -330,6 +337,44 @@ class BatchSaleResult:
     max_rarity: int
     total_value: int
     balance_after: int
+    rarity: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class BatchCookingResult:
+    """Committed batch cooking result (one pig per output, no per-item receipt)."""
+
+    source_pigs: tuple[PigView, ...]
+    foods: tuple[FoodView, ...]
+    pig_count: int
+    food_count: int
+    coin_reward: int
+    experience_reward: int
+    coin_balance: int
+    total_experience: int
+    catalog_new_count: int
+    rarity: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class _CookOutcome:
+    """One committed pig-to-food conversion shared by cook and batch_cook."""
+
+    source: PigView
+    foods: tuple[FoodView, ...]
+    food_ids: tuple[str, ...]
+    coin_reward: int
+    experience_reward: int
+    coin_balance: int
+    total_experience: int
+    catalog_new_count: int
+    cookware_level: int
+    item_id: str
+    item_name: str
+    weights: tuple[float, ...]
+    bonus_serving: bool
+    effect_summaries: tuple[str, ...]
+    excluded_summaries: tuple[str, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -467,6 +512,16 @@ def format_cooking_summary(result: CookingResult) -> str:
         if result.effect_summaries
         else ""
     )
+    excluded_text = (
+        f"\n互斥未叠加：{'；'.join(result.excluded_summaries)}"
+        if result.excluded_summaries
+        else ""
+    )
+    probability_line = " ".join(
+        f"{index + 1}★{value:.1f}%"
+        for index, value in enumerate(result.weights)
+        if value > 0
+    )
     return (
         "【做菜成功】\n"
         f"原料：{result.source_pig.selector}（{result.source_pig.stars}）\n"
@@ -478,7 +533,8 @@ def format_cooking_summary(result: CookingResult) -> str:
         f"{result.total_experience}/{progress.next_threshold} EXP\n"
         f"当前余额：{result.coin_balance} 猪币\n"
         f"厨具：Lv.{result.cookware_level}；本次道具：{item}\n"
-        f"最终品质概率：{result.probability_summary}{effect_text}"
+        f"最终品质概率：{result.probability_summary}\n"
+        f"本次最终概率：{probability_line}{effect_text}{excluded_text}"
     )
 
 
@@ -677,13 +733,18 @@ def format_batch_sale_summary(result: BatchSaleResult) -> str:
     """Return a complete batch-sale fallback."""
 
     kind = "猪猪" if result.asset_kind == "pig" else "美食"
+    scope = (
+        f"{result.rarity} 星{kind}"
+        if result.rarity is not None
+        else f"1 至 {result.max_rarity} 星{kind}"
+    )
     return (
         "【批量售卖成功】\n"
-        f"范围：1 至 {result.max_rarity} 星{kind}\n"
+        f"范围：{scope}\n"
         f"售出：{result.asset_count} 件\n"
         f"收入：{result.total_value} 猪币\n"
         f"当前余额：{result.balance_after}\n"
-        "交易锁定的资产未被处理，已解锁图鉴记录不会减少。"
+        "联动猪与交易锁定的资产未被处理，已解锁图鉴记录不会减少。"
     )
 
 
@@ -790,335 +851,66 @@ class EconomyService:
                 identity=identity,
                 now=now,
             )
+            await self._ensure_cook_cooldown(
+                session,
+                player_id=identity.player_id,
+                now_datetime=self.clock.now(),
+            )
             source = await self._resolve_pig_for_action(
                 session,
                 identity,
                 normalized_selector,
             )
-            upgrades = await self.repository.get_upgrade_levels(
+            outcome = await self._cook_one(
                 session,
-                player_id=identity.player_id,
-            )
-            cookware_level = upgrades["cookware"]
-            probability_experience = (
-                await self.gameplay_repository.get_player_experience(
-                    session,
-                    player_id=identity.player_id,
-                )
-            )
-            probability_level = level_progress(probability_experience).level
-            armed_row = await self.gameplay_repository.get_armed_item(
-                session,
-                player_id=identity.player_id,
-                action_type="cooking",
-            )
-            armed_item, _ = self._armed_item(armed_row)
-            active_effects = tuple(
-                active_effect_from_row(row)
-                for row in await self.repository.list_active_food_effects(
-                    session,
-                    player_id=identity.player_id,
-                    now=now,
-                )
-            )
-            has_six_star_food_effect = any(
-                effect.effect_id == NEXT_SIX_STAR_COOK for effect in active_effects
-            )
-            item_compatible = bool(
-                armed_item is not None
-                and (
-                    (
-                        source.rarity <= 5
-                        and armed_item.item_id
-                        in {
-                            "chef-spice",
-                            "precision-knife",
-                            "slow-cook-seasoning",
-                            "large-lunch-box",
-                        }
-                    )
-                    or (
-                        source.rarity == 6
-                        and armed_item.item_id == "super-chef-spice"
-                        and not has_six_star_food_effect
-                    )
-                )
-            )
-            applied_item = armed_item if item_compatible else None
-            weights = adjusted_cooking_weights(
-                source.rarity,
-                size_percentile=source.size_percentile,
-                weight_percentile=source.weight_percentile,
-                cookware_level=cookware_level,
-                player_level=probability_level,
-                chef_spice=(
-                    applied_item is not None and applied_item.item_id == "chef-spice"
-                ),
-                super_chef_spice=(
-                    applied_item is not None
-                    and applied_item.item_id == "super-chef-spice"
-                ),
-            )
-            effect_application = apply_cooking_effects(
-                weights,
-                active_effects,
-                source_rarity=source.rarity,
-            )
-            weights = effect_application.weights
-            rarity_roll = self.random_source.random()
-            output_rarity = choose_rarity(weights, rarity_roll)
-            templates = await self.repository.list_drawable_food_templates(
-                session,
-                scope_id=identity.scope.value,
-                rarity=int(output_rarity),
-            )
-            if not templates:
-                raise CookingTemplateError(
-                    f"当前群没有可用的 {int(output_rarity)} 星美食模板，原料猪未消耗。"
-                )
-            desired_affinity = source.fat_category
-            if source.rarity == 6 and int(output_rarity) == 6:
-                paired_template_id = source.paired_food_template_id
-                candidates = [
-                    candidate
-                    for candidate in templates
-                    if str(candidate["template_id"]) == paired_template_id
-                ]
-                if not paired_template_id or not candidates:
-                    raise CookingTemplateError(
-                        "这只六星猪没有当前群可用的对应定制六星菜，原料猪未消耗。"
-                    )
-            else:
-                paired_template_id = ""
-                if applied_item is not None and applied_item.item_id == "precision-knife":
-                    desired_affinity = "lean"
-                elif applied_item is not None and applied_item.item_id == "slow-cook-seasoning":
-                    desired_affinity = "fatty"
-                candidates = self._affinity_candidates(templates, desired_affinity)
-            template_roll = self.random_source.random()
-            template = candidates[
-                min(int(template_roll * len(candidates)), len(candidates) - 1)
-            ]
-            portion_roll = self.random_source.random()
-            main_attributes = generate_food_attributes(
-                rarity=output_rarity,
-                template_id=str(template["template_id"]),
-                source_weight=source.weight_value,
-                source_weight_percentile=source.weight_percentile,
-                portion_roll=portion_roll,
-            )
-            bonus_roll: float | None = None
-            bonus_portion_roll: float | None = None
-            bonus_attributes: FoodAttributes | None = None
-            bonus_serving = False
-            if (
-                applied_item is not None
-                and applied_item.item_id == "large-lunch-box"
-                and source.rarity <= 5
-                and int(output_rarity) <= 5
-            ):
-                bonus_roll = self.random_source.random()
-                bonus_serving = bonus_roll < 0.25
-                if bonus_serving:
-                    bonus_portion_roll = self.random_source.random()
-                    bonus_attributes = generate_food_attributes(
-                        rarity=output_rarity,
-                        template_id=str(template["template_id"]),
-                        source_weight=source.weight_value,
-                        source_weight_percentile=source.weight_percentile,
-                        portion_roll=bonus_portion_roll,
-                    )
-
-            food_specs = [main_attributes]
-            if bonus_attributes is not None:
-                food_specs.append(bonus_attributes)
-            food_ids = [self._new_identifier() for _ in food_specs]
-            short_codes: list[str] = []
-            for _ in food_specs:
-                short_code = await self._new_unique_short_code(
-                    session,
-                    reserved=short_codes,
-                )
-                short_codes.append(short_code)
-            consumed = await self.repository.consume_pig_for_cooking(
-                session,
-                pig_instance_id=source.pig_instance_id,
-                player_id=identity.player_id,
-                scope_id=identity.scope.value,
+                identity=identity,
+                source=source,
                 now=now,
-            )
-            if not consumed:
-                raise AssetStateConflictError("原料猪已不在有效背包中，本次做菜未结算。")
-            await self.social_repository.clear_showcase_asset(
-                session,
-                player_id=identity.player_id,
-                asset_kind=AssetKind.PIG,
-                asset_instance_id=source.pig_instance_id,
-                now=now,
-            )
-
-            snapshot_base = {
-                "ruleset_version": RULESET_VERSION,
-                "source_pig_instance_id": source.pig_instance_id,
-                "source_rarity": source.rarity,
-                "weights": [round(value, 8) for value in weights],
-                "cookware_level": cookware_level,
-                "player_level": probability_level,
-                "item_id": applied_item.item_id if applied_item is not None else "",
-                "rarity_roll": rarity_roll,
-                "template_roll": template_roll,
-                "desired_affinity": desired_affinity,
-                "paired_food_template_id": paired_template_id,
-                "bonus_roll": bonus_roll,
-                "bonus_serving": bonus_serving,
-                "food_effect_entry_ids": list(
-                    effect_application.consumed_entry_ids
-                ),
-                "food_effect_summaries": list(effect_application.summaries),
-            }
-            catalog_new_count = 0
-            for index, (food_id, short_code, attributes) in enumerate(
-                zip(food_ids, short_codes, food_specs, strict=True)
-            ):
-                random_snapshot = {
-                    **snapshot_base,
-                    "serving_index": index,
-                    "portion_roll": (
-                        portion_roll
-                        if index == 0
-                        else bonus_portion_roll
-                    ),
-                    "recipe_factor": attributes.recipe_factor,
-                }
-                await self.repository.insert_food_instance(
-                    session,
-                    values={
-                        "food_instance_id": food_id,
-                        "short_code": short_code,
-                        "scope_id": identity.scope.value,
-                        "owner_player_id": identity.player_id,
-                        "template_id": str(template["template_id"]),
-                        "template_version": int(template["template_version"]),
-                        "source_pig_instance_id": source.pig_instance_id,
-                        "rarity": int(output_rarity),
-                        "display_name_snapshot": str(template["display_name"]),
-                        "portion_weight": attributes.portion_weight,
-                        "fat_category": source.fat_category,
-                        "official_value": attributes.official_value,
-                        "effect_id": str(template.get("effect_id") or ""),
-                        "effect_params_json": str(
-                            template.get("effect_params_json") or "{}"
-                        ),
-                        "ruleset_version": RULESET_VERSION,
-                        "random_snapshot_json": self._snapshot_json(random_snapshot),
-                        "acquired_at": now,
-                        "updated_at": now,
-                    },
-                )
-                catalog_new_count += int(
-                    await self.repository.upsert_food_catalog(
-                        session,
-                        player_id=identity.player_id,
-                        template_id=str(template["template_id"]),
-                        portion_weight=attributes.portion_weight,
-                        now=now,
-                    )
-                )
-
-            coin_reward = COOK_COIN_REWARDS[output_rarity]
-            experience_reward = COOK_EXPERIENCE_REWARDS[output_rarity]
-            coin_balance = await self.repository.apply_currency_change(
-                session,
-                player_id=identity.player_id,
-                scope_id=identity.scope.value,
-                amount=coin_reward,
-                reason_code="cook-reward",
-                reason_text="做菜奖励",
-                source_object_type="food",
-                source_object_id=food_ids[0],
-                ledger_entry_id=self._new_identifier(),
-                idempotency_key=f"{idempotency_key}:coin",
-                now=now,
-            )
-            if coin_balance is None:
-                raise RuntimeError("正数做菜奖励无法写入玩家余额。")
-            total_experience = await self.repository.add_experience(
-                session,
-                player_id=identity.player_id,
-                experience=experience_reward,
-                now=now,
-            )
-            await self.social_repository.increment_statistic(
-                session,
-                player_id=identity.player_id,
-                field="total_cooks",
-                now=now,
-            )
-            if applied_item is not None:
-                item_consumed = await self.gameplay_repository.consume_armed_item(
-                    session,
-                    player_id=identity.player_id,
-                    action_type="cooking",
-                    item_id=applied_item.item_id,
-                    now=now,
-                )
-                if not item_consumed:
-                    raise ItemInventoryError(
-                        f"已装备的“{applied_item.display_name}”库存不足，本次做菜未结算。"
-                    )
-            if effect_application.consumed_entry_ids:
-                await self.repository.consume_food_effects(
-                    session,
-                    player_id=identity.player_id,
-                    effect_entry_ids=effect_application.consumed_entry_ids,
-                    now=now,
-                )
-            foods = tuple(
-                [
-                    await self._food_by_id(session, food_id)
-                    for food_id in food_ids
-                ]
+                idempotency_key=idempotency_key,
+                apply_armed_item=True,
             )
             payload = {
-                "source_pig_instance_id": source.pig_instance_id,
-                "food_instance_ids": food_ids,
-                "coin_reward": coin_reward,
-                "experience_reward": experience_reward,
-                "coin_balance": coin_balance,
-                "total_experience": total_experience,
-                "catalog_new_count": catalog_new_count,
-                "cookware_level": cookware_level,
-                "item_id": applied_item.item_id if applied_item is not None else "",
-                "item_name": applied_item.display_name if applied_item is not None else "",
-                "weights": [round(value, 8) for value in weights],
-                "bonus_serving": bonus_serving,
-                "effect_summaries": list(effect_application.summaries),
+                "source_pig_instance_id": outcome.source.pig_instance_id,
+                "food_instance_ids": list(outcome.food_ids),
+                "coin_reward": outcome.coin_reward,
+                "experience_reward": outcome.experience_reward,
+                "coin_balance": outcome.coin_balance,
+                "total_experience": outcome.total_experience,
+                "catalog_new_count": outcome.catalog_new_count,
+                "cookware_level": outcome.cookware_level,
+                "item_id": outcome.item_id,
+                "item_name": outcome.item_name,
+                "weights": [round(value, 8) for value in outcome.weights],
+                "bonus_serving": outcome.bonus_serving,
+                "effect_summaries": list(outcome.effect_summaries),
+                "excluded_summaries": list(outcome.excluded_summaries),
             }
             provisional = CookingResult(
-                source_pig=source,
-                foods=foods,
+                source_pig=outcome.source,
+                foods=outcome.foods,
                 receipt=self._provisional_receipt(
                     idempotency_key=idempotency_key,
                     identity=identity,
                     command_name=_COOK_COMMAND,
                     request_payload=request_payload,
                     result_type="cooking",
-                    result_object_id=food_ids[0],
+                    result_object_id=outcome.food_ids[0],
                     result_payload=payload,
                     now=now,
                 ),
                 receipt_created=True,
-                coin_reward=coin_reward,
-                experience_reward=experience_reward,
-                coin_balance=coin_balance,
-                total_experience=total_experience,
-                catalog_new_count=catalog_new_count,
-                cookware_level=cookware_level,
-                item_id=applied_item.item_id if applied_item is not None else "",
-                item_name=applied_item.display_name if applied_item is not None else "",
-                weights=weights,
-                bonus_serving=bonus_serving,
-                effect_summaries=effect_application.summaries,
+                coin_reward=outcome.coin_reward,
+                experience_reward=outcome.experience_reward,
+                coin_balance=outcome.coin_balance,
+                total_experience=outcome.total_experience,
+                catalog_new_count=outcome.catalog_new_count,
+                cookware_level=outcome.cookware_level,
+                item_id=outcome.item_id,
+                item_name=outcome.item_name,
+                weights=outcome.weights,
+                bonus_serving=outcome.bonus_serving,
+                effect_summaries=outcome.effect_summaries,
+                excluded_summaries=outcome.excluded_summaries,
             )
             reservation = await self._reserve(
                 session,
@@ -1127,28 +919,476 @@ class EconomyService:
                 command_name=_COOK_COMMAND,
                 request_payload=request_payload,
                 result_type="cooking",
-                result_object_id=food_ids[0],
+                result_object_id=outcome.food_ids[0],
                 result_payload=payload,
                 text_summary=format_cooking_summary(provisional),
                 now=now,
             )
             return CookingResult(
-                source_pig=source,
-                foods=foods,
+                source_pig=outcome.source,
+                foods=outcome.foods,
                 receipt=reservation,
                 receipt_created=True,
+                coin_reward=outcome.coin_reward,
+                experience_reward=outcome.experience_reward,
+                coin_balance=outcome.coin_balance,
+                total_experience=outcome.total_experience,
+                catalog_new_count=outcome.catalog_new_count,
+                cookware_level=outcome.cookware_level,
+                item_id=outcome.item_id,
+                item_name=outcome.item_name,
+                weights=outcome.weights,
+                bonus_serving=outcome.bonus_serving,
+                effect_summaries=outcome.effect_summaries,
+                excluded_summaries=outcome.excluded_summaries,
+            )
+
+    async def _ensure_cook_cooldown(
+        self,
+        session: DatabaseSession,
+        *,
+        player_id: str,
+        now_datetime: datetime,
+    ) -> None:
+        """Raise CookCooldownError when the player cooked too recently."""
+
+        last_cook_at = await self.social_repository.get_last_cook_at(
+            session,
+            player_id=player_id,
+        )
+        remaining = _cooldown_remaining(
+            now=now_datetime,
+            last_acquired_at=last_cook_at,
+            cooldown_seconds=self.cooking.cook_cooldown_seconds,
+        )
+        if remaining:
+            raise CookCooldownError(remaining)
+
+    async def batch_cook(
+        self,
+        identity: CommandIdentity,
+        rarity: int | None,
+    ) -> BatchCookingResult:
+        """Cook every eligible pig (non-collaboration, unlocked) in one transaction.
+
+        Batch cooking never consumes armed items and never touches six-star or
+        collaboration pigs, so it is safe to run on a whole inventory page.
+        """
+
+        if rarity is not None and not 1 <= int(rarity) <= 5:
+            raise NoCookablePigError("批量做菜只支持一星至五星原料猪。")
+        await self._expire_stale_offers()
+        now_datetime = _safe_datetime(self.clock.now())
+        now = iso_timestamp(now_datetime)
+        async with self.database.transaction() as session:
+            await self.framework_repository.touch_identity(
+                session,
+                identity=identity,
+                now=now,
+            )
+            await self._ensure_cook_cooldown(
+                session,
+                player_id=identity.player_id,
+                now_datetime=now_datetime,
+            )
+            active_effects = tuple(
+                active_effect_from_row(row)
+                for row in await self.repository.list_active_food_effects(
+                    session,
+                    player_id=identity.player_id,
+                    now=now,
+                )
+            )
+            # 多次数做菜效果（如“接下来 5 次必出五星菜”）持有期间全程禁止批量做菜，
+            # 直到效果剩余次数用尽。
+            restricted_effects = [
+                effect
+                for effect in active_effects
+                if effect.effect_id in COOK_PROBABILITY_GROUP
+                and (effect.granted_uses - effect.consumed_uses) >= 1
+            ]
+            if restricted_effects:
+                summaries = "；".join(
+                    resolve_food_effect(effect.effect_id, effect.params).summary
+                    for effect in restricted_effects
+                )
+                raise BatchCookRestrictedError(
+                    f"你持有多次做菜的美食效果（{summaries}），"
+                    "期间只能逐个使用 /做菜，不能批量做菜。"
+                )
+            rows = await self.gameplay_repository.list_cookable_pigs(
+                session,
+                player_id=identity.player_id,
+                scope_id=identity.scope.value,
+                rarity=rarity,
+            )
+            if not rows:
+                raise NoCookablePigError(
+                    "背包中没有可批量做菜的猪猪；联动猪和六星定制猪不会参与批量做菜。"
+                )
+            source_pigs = tuple(pig_view_from_row(row) for row in rows)
+            foods: list[FoodView] = []
+            coin_reward = 0
+            experience_reward = 0
+            catalog_new_count = 0
+            last_coin_balance = 0
+            last_total_experience = 0
+            batch_key = MessageKeyFactory.build(identity, _BATCH_COOK_COMMAND)
+            for source in source_pigs:
+                outcome = await self._cook_one(
+                    session,
+                    identity=identity,
+                    source=source,
+                    now=now,
+                    idempotency_key=f"{batch_key}:{source.pig_instance_id}",
+                    apply_armed_item=False,
+                )
+                foods.extend(outcome.foods)
+                coin_reward += outcome.coin_reward
+                experience_reward += outcome.experience_reward
+                catalog_new_count += outcome.catalog_new_count
+                last_coin_balance = outcome.coin_balance
+                last_total_experience = outcome.total_experience
+            return BatchCookingResult(
+                source_pigs=source_pigs,
+                foods=tuple(foods),
+                pig_count=len(source_pigs),
+                food_count=len(foods),
                 coin_reward=coin_reward,
                 experience_reward=experience_reward,
-                coin_balance=coin_balance,
-                total_experience=total_experience,
+                coin_balance=last_coin_balance,
+                total_experience=last_total_experience,
                 catalog_new_count=catalog_new_count,
-                cookware_level=cookware_level,
-                item_id=applied_item.item_id if applied_item is not None else "",
-                item_name=applied_item.display_name if applied_item is not None else "",
-                weights=weights,
-                bonus_serving=bonus_serving,
-                effect_summaries=effect_application.summaries,
+                rarity=rarity,
             )
+
+    async def _cook_one(
+        self,
+        session: DatabaseSession,
+        *,
+        identity: CommandIdentity,
+        source: PigView,
+        now: str,
+        idempotency_key: str,
+        apply_armed_item: bool,
+    ) -> _CookOutcome:
+        """Consume one pig and produce foods inside an open transaction.
+
+        Shared by ``cook`` and ``batch_cook``; the caller owns receipts,
+        idempotency handling, and player touch.
+        """
+
+        upgrades = await self.repository.get_upgrade_levels(
+            session,
+            player_id=identity.player_id,
+        )
+        cookware_level = upgrades["cookware"]
+        probability_experience = (
+            await self.gameplay_repository.get_player_experience(
+                session,
+                player_id=identity.player_id,
+            )
+        )
+        probability_level = level_progress(probability_experience).level
+        active_effects = tuple(
+            active_effect_from_row(row)
+            for row in await self.repository.list_active_food_effects(
+                session,
+                player_id=identity.player_id,
+                now=now,
+            )
+        )
+        # 六星菜独占效果：本次做菜忽略装备道具（道具保留、不消耗、不参与权重）
+        if apply_armed_item and any(
+            effect.effect_id in EXCLUSIVE_COOK_EFFECTS
+            for effect in active_effects
+        ):
+            apply_armed_item = False
+        armed_row = (
+            await self.gameplay_repository.get_armed_item(
+                session,
+                player_id=identity.player_id,
+                action_type="cooking",
+            )
+            if apply_armed_item
+            else None
+        )
+        armed_item, _ = self._armed_item(armed_row)
+        has_six_star_food_effect = any(
+            effect.effect_id == NEXT_SIX_STAR_COOK for effect in active_effects
+        )
+        item_compatible = bool(
+            armed_item is not None
+            and (
+                (
+                    source.rarity <= 5
+                    and armed_item.item_id
+                    in {
+                        "chef-spice",
+                        "precision-knife",
+                        "slow-cook-seasoning",
+                        "large-lunch-box",
+                    }
+                )
+                or (
+                    source.rarity == 6
+                    and armed_item.item_id == "super-chef-spice"
+                    and not has_six_star_food_effect
+                )
+            )
+        )
+        applied_item = armed_item if item_compatible else None
+        weights = adjusted_cooking_weights(
+            source.rarity,
+            size_percentile=source.size_percentile,
+            weight_percentile=source.weight_percentile,
+            cookware_level=cookware_level,
+            player_level=probability_level,
+            chef_spice=(
+                applied_item is not None and applied_item.item_id == "chef-spice"
+            ),
+            super_chef_spice=(
+                applied_item is not None
+                and applied_item.item_id == "super-chef-spice"
+            ),
+        )
+        effect_application = apply_cooking_effects(
+            weights,
+            active_effects,
+            source_rarity=source.rarity,
+        )
+        weights = effect_application.weights
+        rarity_roll = self.random_source.random()
+        output_rarity = choose_rarity(weights, rarity_roll)
+        templates = await self.repository.list_drawable_food_templates(
+            session,
+            scope_id=identity.scope.value,
+            rarity=int(output_rarity),
+        )
+        if not templates:
+            raise CookingTemplateError(
+                f"当前群没有可用的 {int(output_rarity)} 星美食模板，原料猪未消耗。"
+            )
+        desired_affinity = source.fat_category
+        if source.rarity == 6 and int(output_rarity) == 6:
+            paired_template_id = source.paired_food_template_id
+            candidates = [
+                candidate
+                for candidate in templates
+                if str(candidate["template_id"]) == paired_template_id
+            ]
+            if not paired_template_id or not candidates:
+                raise CookingTemplateError(
+                    "这只六星猪没有当前群可用的对应定制六星菜，原料猪未消耗。"
+                )
+        else:
+            paired_template_id = ""
+            if applied_item is not None and applied_item.item_id == "precision-knife":
+                desired_affinity = "lean"
+            elif applied_item is not None and applied_item.item_id == "slow-cook-seasoning":
+                desired_affinity = "fatty"
+            candidates = self._affinity_candidates(templates, desired_affinity)
+        template_roll = self.random_source.random()
+        template = candidates[
+            min(int(template_roll * len(candidates)), len(candidates) - 1)
+        ]
+        portion_roll = self.random_source.random()
+        main_attributes = generate_food_attributes(
+            rarity=output_rarity,
+            template_id=str(template["template_id"]),
+            source_weight=source.weight_value,
+            source_weight_percentile=source.weight_percentile,
+            portion_roll=portion_roll,
+        )
+        bonus_roll: float | None = None
+        bonus_portion_roll: float | None = None
+        bonus_attributes: FoodAttributes | None = None
+        bonus_serving = False
+        if (
+            applied_item is not None
+            and applied_item.item_id == "large-lunch-box"
+            and source.rarity <= 5
+            and int(output_rarity) <= 5
+        ):
+            bonus_roll = self.random_source.random()
+            bonus_serving = bonus_roll < 0.25
+            if bonus_serving:
+                bonus_portion_roll = self.random_source.random()
+                bonus_attributes = generate_food_attributes(
+                    rarity=output_rarity,
+                    template_id=str(template["template_id"]),
+                    source_weight=source.weight_value,
+                    source_weight_percentile=source.weight_percentile,
+                    portion_roll=bonus_portion_roll,
+                )
+
+        food_specs = [main_attributes]
+        if bonus_attributes is not None:
+            food_specs.append(bonus_attributes)
+        food_ids = [self._new_identifier() for _ in food_specs]
+        short_codes: list[str] = []
+        for _ in food_specs:
+            short_code = await self._new_unique_short_code(
+                session,
+                reserved=short_codes,
+            )
+            short_codes.append(short_code)
+        consumed = await self.repository.consume_pig_for_cooking(
+            session,
+            pig_instance_id=source.pig_instance_id,
+            player_id=identity.player_id,
+            scope_id=identity.scope.value,
+            now=now,
+        )
+        if not consumed:
+            raise AssetStateConflictError("原料猪已不在有效背包中，本次做菜未结算。")
+        await self.social_repository.clear_showcase_asset(
+            session,
+            player_id=identity.player_id,
+            asset_kind=AssetKind.PIG,
+            asset_instance_id=source.pig_instance_id,
+            now=now,
+        )
+
+        snapshot_base = {
+            "ruleset_version": RULESET_VERSION,
+            "source_pig_instance_id": source.pig_instance_id,
+            "source_rarity": source.rarity,
+            "weights": [round(value, 8) for value in weights],
+            "cookware_level": cookware_level,
+            "player_level": probability_level,
+            "item_id": applied_item.item_id if applied_item is not None else "",
+            "rarity_roll": rarity_roll,
+            "template_roll": template_roll,
+            "desired_affinity": desired_affinity,
+            "paired_food_template_id": paired_template_id,
+            "bonus_roll": bonus_roll,
+            "bonus_serving": bonus_serving,
+            "food_effect_entry_ids": list(
+                effect_application.consumed_entry_ids
+            ),
+            "food_effect_summaries": list(effect_application.summaries),
+        }
+        catalog_new_count = 0
+        for index, (food_id, short_code, attributes) in enumerate(
+            zip(food_ids, short_codes, food_specs, strict=True)
+        ):
+            random_snapshot = {
+                **snapshot_base,
+                "serving_index": index,
+                "portion_roll": (
+                    portion_roll
+                    if index == 0
+                    else bonus_portion_roll
+                ),
+                "recipe_factor": attributes.recipe_factor,
+            }
+            await self.repository.insert_food_instance(
+                session,
+                values={
+                    "food_instance_id": food_id,
+                    "short_code": short_code,
+                    "scope_id": identity.scope.value,
+                    "owner_player_id": identity.player_id,
+                    "template_id": str(template["template_id"]),
+                    "template_version": int(template["template_version"]),
+                    "source_pig_instance_id": source.pig_instance_id,
+                    "rarity": int(output_rarity),
+                    "display_name_snapshot": str(template["display_name"]),
+                    "portion_weight": attributes.portion_weight,
+                    "fat_category": source.fat_category,
+                    "official_value": attributes.official_value,
+                    "effect_id": str(template.get("effect_id") or ""),
+                    "effect_params_json": str(
+                        template.get("effect_params_json") or "{}"
+                    ),
+                    "ruleset_version": RULESET_VERSION,
+                    "random_snapshot_json": self._snapshot_json(random_snapshot),
+                    "acquired_at": now,
+                    "updated_at": now,
+                },
+            )
+            catalog_new_count += int(
+                await self.repository.upsert_food_catalog(
+                    session,
+                    player_id=identity.player_id,
+                    template_id=str(template["template_id"]),
+                    portion_weight=attributes.portion_weight,
+                    now=now,
+                )
+            )
+
+        coin_reward = COOK_COIN_REWARDS[output_rarity]
+        experience_reward = COOK_EXPERIENCE_REWARDS[output_rarity]
+        coin_balance = await self.repository.apply_currency_change(
+            session,
+            player_id=identity.player_id,
+            scope_id=identity.scope.value,
+            amount=coin_reward,
+            reason_code="cook-reward",
+            reason_text="做菜奖励",
+            source_object_type="food",
+            source_object_id=food_ids[0],
+            ledger_entry_id=self._new_identifier(),
+            idempotency_key=f"{idempotency_key}:coin",
+            now=now,
+        )
+        if coin_balance is None:
+            raise RuntimeError("正数做菜奖励无法写入玩家余额。")
+        total_experience = await self.repository.add_experience(
+            session,
+            player_id=identity.player_id,
+            experience=experience_reward,
+            now=now,
+        )
+        await self.social_repository.increment_statistic(
+            session,
+            player_id=identity.player_id,
+            field="total_cooks",
+            now=now,
+        )
+        if applied_item is not None:
+            item_consumed = await self.gameplay_repository.consume_armed_item(
+                session,
+                player_id=identity.player_id,
+                action_type="cooking",
+                item_id=applied_item.item_id,
+                now=now,
+            )
+            if not item_consumed:
+                raise ItemInventoryError(
+                    f"已装备的“{applied_item.display_name}”库存不足，本次做菜未结算。"
+                )
+        if effect_application.consumed_entry_ids:
+            await self.repository.consume_food_effects(
+                session,
+                player_id=identity.player_id,
+                effect_entry_ids=effect_application.consumed_entry_ids,
+                now=now,
+            )
+        foods = tuple(
+            [
+                await self._food_by_id(session, food_id)
+                for food_id in food_ids
+            ]
+        )
+        return _CookOutcome(
+            source=source,
+            foods=foods,
+            food_ids=tuple(food_ids),
+            coin_reward=coin_reward,
+            experience_reward=experience_reward,
+            coin_balance=coin_balance,
+            total_experience=total_experience,
+            catalog_new_count=catalog_new_count,
+            cookware_level=cookware_level,
+            item_id=applied_item.item_id if applied_item is not None else "",
+            item_name=applied_item.display_name if applied_item is not None else "",
+            weights=weights,
+            bonus_serving=bonus_serving,
+            effect_summaries=effect_application.summaries,
+            excluded_summaries=effect_application.skipped_summaries,
+        )
 
     async def food_detail(
         self,
@@ -1723,12 +1963,19 @@ class EconomyService:
         *,
         asset_kind: str,
         max_rarity: int = 3,
+        rarity: int | None = None,
     ) -> BatchSaleResult:
-        """Sell every unlocked low-rarity pig or food in one transaction."""
+        """Sell every unlocked low-rarity pig or food in one transaction.
+
+        ``rarity`` 指定时只处理该品质；不指定时处理 ``1..max_rarity``。
+        联动猪（有收藏图鉴条目）始终不会参与猪猪批量售卖。
+        """
 
         if asset_kind not in {"pig", "food"}:
             raise StoreProductError("批量售卖类型只能是“猪猪”或“美食”。")
-        if not 1 <= int(max_rarity) <= 3:
+        if rarity is not None and not 1 <= int(rarity) <= 5:
+            raise StoreProductError("批量售卖指定品质只支持一星至五星。")
+        if rarity is None and not 1 <= int(max_rarity) <= 3:
             raise StoreProductError("批量售卖只允许处理 1 至 3 星资产。")
         await self._expire_stale_offers()
         command_name = (
@@ -1740,6 +1987,7 @@ class EconomyService:
             "command_version": 1,
             "asset_kind": asset_kind,
             "max_rarity": int(max_rarity),
+            "rarity": rarity,
         }
         idempotency_key = MessageKeyFactory.build(identity, command_name)
         now = iso_timestamp(self.clock.now())
@@ -1770,14 +2018,21 @@ class EconomyService:
                 scope_id=identity.scope.value,
                 asset_kind=asset_kind,
                 max_rarity=int(max_rarity),
+                rarity=rarity,
                 now=now,
             )
             if count == 0:
                 noun = "猪猪" if asset_kind == "pig" else "美食"
-                error = (
-                    f"背包中没有可批量售卖的 1 至 {max_rarity} 星{noun}；"
-                    "交易锁定资产不会被处理。"
-                )
+                if rarity is not None:
+                    error = (
+                        f"背包中没有可批量售卖的 {rarity} 星{noun}；"
+                        "联动猪与交易锁定资产不会被处理。"
+                    )
+                else:
+                    error = (
+                        f"背包中没有可批量售卖的 1 至 {max_rarity} 星{noun}；"
+                        "联动猪与交易锁定资产不会被处理。"
+                    )
                 if asset_kind == "pig":
                     raise PigNotFoundError(error)
                 raise FoodNotFoundError(error)
@@ -1787,9 +2042,12 @@ class EconomyService:
                 scope_id=identity.scope.value,
                 amount=total_value,
                 reason_code=f"batch-sell-{asset_kind}",
-                reason_text=f"批量售卖低星{'猪猪' if asset_kind == 'pig' else '美食'}",
+                reason_text="批量售卖低星"
+                + ("猪猪" if asset_kind == "pig" else "美食"),
                 source_object_type=asset_kind,
-                source_object_id=f"rarity-1-{max_rarity}",
+                source_object_id=(
+                    f"rarity-{rarity}" if rarity is not None else f"rarity-1-{max_rarity}"
+                ),
                 ledger_entry_id=self._new_identifier(),
                 idempotency_key=f"{idempotency_key}:coin",
                 now=now,
@@ -1800,6 +2058,7 @@ class EconomyService:
                 "asset_kind": asset_kind,
                 "asset_count": count,
                 "max_rarity": int(max_rarity),
+                "rarity": rarity,
                 "total_value": total_value,
                 "balance_after": balance_after,
             }
@@ -1810,7 +2069,11 @@ class EconomyService:
                     command_name=command_name,
                     request_payload=request_payload,
                     result_type="batch-sale",
-                    result_object_id=f"{asset_kind}:rarity-1-{max_rarity}",
+                    result_object_id=(
+                        f"{asset_kind}:rarity-{rarity}"
+                        if rarity is not None
+                        else f"{asset_kind}:rarity-1-{max_rarity}"
+                    ),
                     result_payload=payload,
                     now=now,
                 ),
@@ -1820,6 +2083,7 @@ class EconomyService:
                 max_rarity=int(max_rarity),
                 total_value=total_value,
                 balance_after=balance_after,
+                rarity=rarity,
             )
             receipt = await self._reserve(
                 session,
@@ -1828,7 +2092,11 @@ class EconomyService:
                 command_name=command_name,
                 request_payload=request_payload,
                 result_type="batch-sale",
-                result_object_id=f"{asset_kind}:rarity-1-{max_rarity}",
+                result_object_id=(
+                    f"{asset_kind}:rarity-{rarity}"
+                    if rarity is not None
+                    else f"{asset_kind}:rarity-1-{max_rarity}"
+                ),
                 result_payload=payload,
                 text_summary=format_batch_sale_summary(provisional),
                 now=now,
@@ -1841,6 +2109,7 @@ class EconomyService:
                 max_rarity=int(max_rarity),
                 total_value=total_value,
                 balance_after=balance_after,
+                rarity=rarity,
             )
 
     async def ledger(self, identity: CommandIdentity, *, page: int) -> LedgerPage:
@@ -2327,6 +2596,9 @@ class EconomyService:
             max_rarity=int(payload["max_rarity"]),
             total_value=int(payload["total_value"]),
             balance_after=int(payload["balance_after"]),
+            rarity=(
+                int(payload["rarity"]) if payload.get("rarity") is not None else None
+            ),
         )
 
     async def _sale_from_receipt(

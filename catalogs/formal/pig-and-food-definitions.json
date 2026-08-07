@@ -1720,7 +1720,7 @@
       ],
       "effect_id": "next-cook-quality",
       "effect_params": {
-        "shift_percent": 20
+        "shift_percent": 14
       }
     },
     {
@@ -1809,7 +1809,7 @@
       "group_scope_id": "qq:1092931381",
       "effect_id": "next-six-star-catch",
       "effect_params": {
-        "six_star_percent": 50
+        "six_star_percent": 60
       }
     },
     {
@@ -1864,7 +1864,7 @@
       "group_scope_id": "qq:237716658",
       "effect_id": "next-six-star-catch",
       "effect_params": {
-        "six_star_percent": 50
+        "six_star_percent": 60
       }
     },
     {
@@ -2196,8 +2196,8 @@
       ],
       "effect_id": "next-food-rarity",
       "effect_params": {
-        "rarity": 4,
-        "multiplier": 1.6
+        "rarity": 3,
+        "multiplier": 3.0
       }
     },
     {
@@ -2214,7 +2214,7 @@
       ],
       "effect_id": "next-catch-quality",
       "effect_params": {
-        "multiplier": 1.5
+        "multiplier": 2.0
       }
     },
     {
@@ -2247,7 +2247,7 @@
       ],
       "effect_id": "extra-catches",
       "effect_params": {
-        "count": 1
+        "count": 3
       }
     },
     {
@@ -2331,9 +2331,12 @@
         "大福"
       ],
       "group_scope_id": "qq:1092931381",
-      "effect_id": "next-six-star-catch",
+      "effect_id": "next-high-star-catch",
       "effect_params": {
-        "six_star_percent": 50
+        "uses": 5,
+        "four_star_percent": 60,
+        "five_star_percent": 30,
+        "six_star_percent": 10
       }
     },
     {
@@ -2399,9 +2402,12 @@
         "大福"
       ],
       "group_scope_id": "qq:237716658",
-      "effect_id": "next-six-star-catch",
+      "effect_id": "next-high-star-catch",
       "effect_params": {
-        "six_star_percent": 50
+        "uses": 5,
+        "four_star_percent": 60,
+        "five_star_percent": 30,
+        "six_star_percent": 10
       }
     },
     {
@@ -2560,9 +2566,9 @@
         "草莓"
       ],
       "group_scope_id": "qq:1092931381",
-      "effect_id": "weekly-window-catches",
+      "effect_id": "next-five-star-cook",
       "effect_params": {
-        "count": 5
+        "uses": 5
       }
     },
     {
@@ -2596,9 +2602,9 @@
         "草莓"
       ],
       "group_scope_id": "qq:237716658",
-      "effect_id": "weekly-window-catches",
+      "effect_id": "next-five-star-cook",
       "effect_params": {
-        "count": 5
+        "uses": 5
       }
     },
     {
@@ -2620,7 +2626,7 @@
         "collection_id": "bandori-hello-happy-world",
         "collection_name": "Hello, Happy World!",
         "slot": 1,
-        "total": 5,
+        "total": 6,
         "character_id": "tsurumaki-kokoro",
         "character_name": "弦卷心",
         "official_profile_url": "https://bang-dream.com/artist/hello-happy-world/tsurumaki-kokoro/"
@@ -2645,7 +2651,7 @@
         "collection_id": "bandori-hello-happy-world",
         "collection_name": "Hello, Happy World!",
         "slot": 2,
-        "total": 5,
+        "total": 6,
         "character_id": "seta-kaoru",
         "character_name": "濑田熏",
         "official_profile_url": "https://bang-dream.com/artist/hello-happy-world/seta-kaoru/"
@@ -2670,7 +2676,7 @@
         "collection_id": "bandori-hello-happy-world",
         "collection_name": "Hello, Happy World!",
         "slot": 3,
-        "total": 5,
+        "total": 6,
         "character_id": "matsubara-kanon",
         "character_name": "松原花音",
         "official_profile_url": "https://bang-dream.com/artist/hello-happy-world/matsubara-kanon/"
@@ -2695,7 +2701,7 @@
         "collection_id": "bandori-hello-happy-world",
         "collection_name": "Hello, Happy World!",
         "slot": 4,
-        "total": 5,
+        "total": 6,
         "character_id": "okusawa-misaki",
         "character_name": "奥泽美咲",
         "official_profile_url": "https://bang-dream.com/artist/hello-happy-world/michelle/"
@@ -2720,7 +2726,7 @@
         "collection_id": "bandori-hello-happy-world",
         "collection_name": "Hello, Happy World!",
         "slot": 5,
-        "total": 5,
+        "total": 6,
         "character_id": "kitazawa-hagumi",
         "character_name": "育美",
         "official_profile_url": "https://bang-dream.com/artist/hello-happy-world/kitazawa-hagumi/"
@@ -2739,7 +2745,17 @@
         "Hello, Happy World!",
         "DJ",
         "熊"
-      ]
+      ],
+      "collection": {
+        "collaboration_name": "BanG Dream!",
+        "collection_id": "bandori-hello-happy-world",
+        "collection_name": "Hello, Happy World!",
+        "slot": 6,
+        "total": 6,
+        "character_id": "michelle",
+        "character_name": "米歇尔",
+        "official_profile_url": "https://bang-dream.com/artist/hello-happy-world/michelle/"
+      }
     },
     {
       "template_id": "pig-g1092931381-baogian",
@@ -2789,9 +2805,9 @@
         "轮盘"
       ],
       "group_scope_id": "qq:1092931381",
-      "effect_id": "weekly-window-catches",
+      "effect_id": "even-catch-distribution",
       "effect_params": {
-        "count": 5
+        "uses": 5
       }
     },
     {
@@ -2808,9 +2824,270 @@
         "轮盘"
       ],
       "group_scope_id": "qq:237716658",
-      "effect_id": "weekly-window-catches",
+      "effect_id": "even-catch-distribution",
       "effect_params": {
-        "count": 5
+        "uses": 5
+      }
+    },
+    {
+      "template_id": "pig-bandori-roselia-yukina",
+      "source_path": "猪猪素材库/金色品质/歌姬猪.png",
+      "kind": "pig",
+      "display_name": "歌姬猪",
+      "rarity": 5,
+      "description": "顶着凑友希那的银发和蓝蔷薇气场登台，黑猫经纪人在台下监工；哪怕话筒歪了一度，也要重唱到完美。",
+      "fat_profile": "balanced",
+      "recipe_tags": [
+        "BanG Dream!",
+        "Roselia",
+        "主唱",
+        "蓝蔷薇"
+      ],
+      "collection": {
+        "collaboration_name": "BanG Dream!",
+        "collection_id": "bandori-roselia",
+        "collection_name": "Roselia",
+        "slot": 1,
+        "total": 5,
+        "character_id": "yukina",
+        "character_name": "凑友希那",
+        "official_profile_url": "https://bang-dream.com/artist/roselia/yukina/"
+      }
+    },
+    {
+      "template_id": "pig-bandori-roselia-lisa",
+      "source_path": "猪猪素材库/金色品质/妈妈猪.png",
+      "kind": "pig",
+      "display_name": "妈妈猪",
+      "rarity": 5,
+      "description": "绑着今井莉莎的温柔卷马尾，贝斯包里藏着刚烤好的曲奇；队友饿不饿不知道，它先问你红茶要几块糖。",
+      "fat_profile": "fatty",
+      "recipe_tags": [
+        "BanG Dream!",
+        "Roselia",
+        "贝斯",
+        "曲奇"
+      ],
+      "collection": {
+        "collaboration_name": "BanG Dream!",
+        "collection_id": "bandori-roselia",
+        "collection_name": "Roselia",
+        "slot": 2,
+        "total": 5,
+        "character_id": "lisa",
+        "character_name": "今井莉莎",
+        "official_profile_url": "https://bang-dream.com/artist/roselia/lisa/"
+      }
+    },
+    {
+      "template_id": "pig-bandori-roselia-sayo",
+      "source_path": "猪猪素材库/紫色品质/薯条猪.png",
+      "kind": "pig",
+      "display_name": "薯条猪",
+      "rarity": 4,
+      "description": "水蓝色长发编成侧麻花辫，表情认真得像在练新乐句；哪怕只是啃薯条，也要一根一根数清楚，绝不接受节奏混乱。",
+      "fat_profile": "lean",
+      "recipe_tags": [
+        "BanG Dream!",
+        "Roselia",
+        "吉他",
+        "薯条"
+      ],
+      "collection": {
+        "collaboration_name": "BanG Dream!",
+        "collection_id": "bandori-roselia",
+        "collection_name": "Roselia",
+        "slot": 3,
+        "total": 5,
+        "character_id": "sayo",
+        "character_name": "冰川纱夜",
+        "official_profile_url": "https://bang-dream.com/artist/roselia/sayo/"
+      }
+    },
+    {
+      "template_id": "pig-bandori-roselia-ako",
+      "source_path": "猪猪素材库/金色品质/魔王猪.png",
+      "kind": "pig",
+      "display_name": "魔王猪",
+      "rarity": 5,
+      "description": "扎着宇田川亚子的双马尾顶着漆黑皇冠，背靠暗红魔导阵，旁边还摆着装饰玫瑰的鼓；中二气场全开，敲下的每个鼓点都在宣告此乃黑暗魔王的独奏。",
+      "fat_profile": "balanced",
+      "recipe_tags": [
+        "BanG Dream!",
+        "Roselia",
+        "鼓手",
+        "中二"
+      ],
+      "collection": {
+        "collaboration_name": "BanG Dream!",
+        "collection_id": "bandori-roselia",
+        "collection_name": "Roselia",
+        "slot": 4,
+        "total": 5,
+        "character_id": "ako",
+        "character_name": "宇田川亚子",
+        "official_profile_url": "https://bang-dream.com/artist/roselia/ako/"
+      }
+    },
+    {
+      "template_id": "pig-bandori-roselia-rinko",
+      "source_path": "猪猪素材库/紫色品质/宅宅猪.png",
+      "kind": "pig",
+      "display_name": "宅宅猪",
+      "rarity": 4,
+      "description": "留着白金燐子的黑长直，抱着键盘和热可可缩在猪圈最里面；线上副本打得飞稳，被点名只会小声说“我、我在”。",
+      "fat_profile": "fatty",
+      "recipe_tags": [
+        "BanG Dream!",
+        "Roselia",
+        "键盘",
+        "热可可"
+      ],
+      "collection": {
+        "collaboration_name": "BanG Dream!",
+        "collection_id": "bandori-roselia",
+        "collection_name": "Roselia",
+        "slot": 5,
+        "total": 5,
+        "character_id": "rinko",
+        "character_name": "白金燐子",
+        "official_profile_url": "https://bang-dream.com/artist/roselia/rinko/"
+      }
+    },
+    {
+      "template_id": "pig-g1092931381-ob-yichuan",
+      "source_path": "定制猪群友库/1092931381/ob一串猪.png",
+      "kind": "pig",
+      "display_name": "ob一串猪",
+      "rarity": 6,
+      "description": "297千线什么的，忘了吧，无所谓的，先吃糖醋排骨最重要。",
+      "fat_profile": "balanced",
+      "recipe_tags": [
+        "群友定制",
+        "ob一串",
+        "糖醋排骨"
+      ],
+      "group_scope_id": "qq:1092931381",
+      "paired_food_template_id": "food-g1092931381-tangcu-paigu"
+    },
+    {
+      "template_id": "pig-g237716658-ob-yichuan",
+      "source_path": "定制猪群友库/237716658/ob一串猪.png",
+      "kind": "pig",
+      "display_name": "ob一串猪",
+      "rarity": 6,
+      "description": "297千线什么的，忘了吧，无所谓的，先吃糖醋排骨最重要。",
+      "fat_profile": "balanced",
+      "recipe_tags": [
+        "群友定制",
+        "ob一串",
+        "糖醋排骨"
+      ],
+      "group_scope_id": "qq:237716658",
+      "paired_food_template_id": "food-g237716658-tangcu-paigu"
+    },
+    {
+      "template_id": "food-g1092931381-tangcu-paigu",
+      "source_path": "定制美食库/1092931381/糖醋排骨.png",
+      "kind": "food",
+      "display_name": "糖醋排骨",
+      "rarity": 6,
+      "description": "国服 BanG Dream! 第 297 期活动结活日的名场面之菜：ob一串猪笃定“他们不吃饭后面会降速”，于是安心啃完这盘糖醋排骨；结果盘子见底，千线也见底。酸甜可口，遗憾入味。",
+      "recipe_tags": [
+        "群友定制",
+        "糖醋排骨",
+        "297期"
+      ],
+      "group_scope_id": "qq:1092931381",
+      "effect_id": "exclusive-catch-quality",
+      "effect_params": {
+        "multiplier": 3.0
+      }
+    },
+    {
+      "template_id": "food-g237716658-tangcu-paigu",
+      "source_path": "定制美食库/237716658/糖醋排骨.png",
+      "kind": "food",
+      "display_name": "糖醋排骨",
+      "rarity": 6,
+      "description": "国服 BanG Dream! 第 297 期活动结活日的名场面之菜：ob一串猪笃定“他们不吃饭后面会降速”，于是安心啃完这盘糖醋排骨；结果盘子见底，千线也见底。酸甜可口，遗憾入味。",
+      "recipe_tags": [
+        "群友定制",
+        "糖醋排骨",
+        "297期"
+      ],
+      "group_scope_id": "qq:237716658",
+      "effect_id": "exclusive-catch-quality",
+      "effect_params": {
+        "multiplier": 3.0
+      }
+    },
+    {
+      "template_id": "pig-qo5e5854406d0297d6feae696a13e3a339-ob-yichuan",
+      "source_path": "定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/ob一串猪.png",
+      "kind": "pig",
+      "display_name": "ob一串猪",
+      "rarity": 6,
+      "description": "297千线什么的，忘了吧，无所谓的，先吃糖醋排骨最重要。",
+      "fat_profile": "balanced",
+      "recipe_tags": [
+        "群友定制",
+        "ob一串",
+        "糖醋排骨"
+      ],
+      "group_scope_id": "qq-official:5E5854406D0297D6FEAE696A13E3A339",
+      "paired_food_template_id": "food-qo5e5854406d0297d6feae696a13e3a339-tangcu-paigu"
+    },
+    {
+      "template_id": "food-qo5e5854406d0297d6feae696a13e3a339-tangcu-paigu",
+      "source_path": "定制美食库/5E5854406D0297D6FEAE696A13E3A339/糖醋排骨.png",
+      "kind": "food",
+      "display_name": "糖醋排骨",
+      "rarity": 6,
+      "description": "国服 BanG Dream! 第 297 期活动结活日的名场面之菜：ob一串猪笃定“他们不吃饭后面会降速”，于是安心啃完这盘糖醋排骨；结果盘子见底，千线也见底。酸甜可口，遗憾入味。",
+      "recipe_tags": [
+        "群友定制",
+        "糖醋排骨",
+        "297期"
+      ],
+      "group_scope_id": "qq-official:5E5854406D0297D6FEAE696A13E3A339",
+      "effect_id": "exclusive-catch-quality",
+      "effect_params": {
+        "multiplier": 3.0
+      }
+    },
+    {
+      "template_id": "pig-qo9ea2810f378fbd7dc3219c56ceab3520-ob-yichuan",
+      "source_path": "定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/ob一串猪.png",
+      "kind": "pig",
+      "display_name": "ob一串猪",
+      "rarity": 6,
+      "description": "297千线什么的，忘了吧，无所谓的，先吃糖醋排骨最重要。",
+      "fat_profile": "balanced",
+      "recipe_tags": [
+        "群友定制",
+        "ob一串",
+        "糖醋排骨"
+      ],
+      "group_scope_id": "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
+      "paired_food_template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-tangcu-paigu"
+    },
+    {
+      "template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-tangcu-paigu",
+      "source_path": "定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/糖醋排骨.png",
+      "kind": "food",
+      "display_name": "糖醋排骨",
+      "rarity": 6,
+      "description": "国服 BanG Dream! 第 297 期活动结活日的名场面之菜：ob一串猪笃定“他们不吃饭后面会降速”，于是安心啃完这盘糖醋排骨；结果盘子见底，千线也见底。酸甜可口，遗憾入味。",
+      "recipe_tags": [
+        "群友定制",
+        "糖醋排骨",
+        "297期"
+      ],
+      "group_scope_id": "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
+      "effect_id": "exclusive-catch-quality",
+      "effect_params": {
+        "multiplier": 3.0
       }
     }
   ]

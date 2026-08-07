@@ -24,7 +24,11 @@ from ..domain.errors import (
     PigNotFoundError,
     ReceiptConflictError,
 )
-from ..domain.food_effects import active_effect_from_row, apply_catch_effects
+from ..domain.food_effects import (
+    EXCLUSIVE_CATCH_EFFECTS,
+    active_effect_from_row,
+    apply_catch_effects,
+)
 from ..domain.gameplay import (
     CATCH_COIN_REWARDS,
     CATCH_EXPERIENCE_REWARDS,
@@ -170,6 +174,7 @@ class CatchResult:
     item_name: str
     weights: tuple[float, ...]
     effect_summaries: tuple[str, ...] = ()
+    excluded_summaries: tuple[str, ...] = ()
     global_size_record: bool = False
     global_weight_record: bool = False
     giant_sighting: bool = False
@@ -490,6 +495,16 @@ def format_catch_summary(result: CatchResult) -> str:
         if result.effect_summaries
         else ""
     )
+    excluded_text = (
+        f"\n互斥未叠加：{'；'.join(result.excluded_summaries)}"
+        if result.excluded_summaries
+        else ""
+    )
+    probability_line = " ".join(
+        f"{index + 1}★{value:.1f}%"
+        for index, value in enumerate(result.weights)
+        if value > 0
+    )
     return (
         "【抓猪成功】\n"
         f"{result.pig.owner_display_name} 抓到了 {result.pig.stars} {result.pig.display_name}\n"
@@ -507,7 +522,8 @@ def format_catch_summary(result: CatchResult) -> str:
         f"当前余额：{result.coin_balance} 猪币\n"
         f"本时段抓猪：{result.daily_count}/{result.daily_limit}\n"
         f"本次道具：{item_text}\n"
-        f"群纪录：{record_text}{effect_text}"
+        f"本次最终概率：{probability_line}\n"
+        f"群纪录：{record_text}{effect_text}{excluded_text}"
     )
 
 
@@ -838,6 +854,21 @@ class GameplayService:
                 action_type="catching",
             )
             armed_item, armed_quantity = self._armed_item(armed_row, "catching")
+            active_effects = tuple(
+                active_effect_from_row(row)
+                for row in await self.economy_repository.list_active_food_effects(
+                    session,
+                    player_id=identity.player_id,
+                    now=now,
+                )
+            )
+            # 六星菜独占效果：本次抓猪忽略装备道具（道具保留、不消耗、不参与权重）
+            exclusive_effect_active = any(
+                effect.effect_id in EXCLUSIVE_CATCH_EFFECTS
+                for effect in active_effects
+            )
+            if exclusive_effect_active:
+                armed_item = None
             weights = self._available_weights(
                 buckets=buckets,
                 feed_level=feed_level,
@@ -849,14 +880,6 @@ class GameplayService:
                     armed_item is not None
                     and armed_item.item_id == "super-lucky-whistle"
                 ),
-            )
-            active_effects = tuple(
-                active_effect_from_row(row)
-                for row in await self.economy_repository.list_active_food_effects(
-                    session,
-                    player_id=identity.player_id,
-                    now=now,
-                )
             )
             effect_application = apply_catch_effects(weights, active_effects)
             weights = effect_application.weights
@@ -1072,6 +1095,7 @@ class GameplayService:
                 "item_name": armed_item.display_name if armed_item is not None else "",
                 "weights": [round(value, 8) for value in weights],
                 "effect_summaries": list(effect_application.summaries),
+                "excluded_summaries": list(effect_application.skipped_summaries),
             }
             provisional_receipt = CommandReceipt(
                 receipt_id="",
@@ -1106,6 +1130,7 @@ class GameplayService:
                 item_name=armed_item.display_name if armed_item is not None else "",
                 weights=weights,
                 effect_summaries=effect_application.summaries,
+                excluded_summaries=effect_application.skipped_summaries,
                 global_size_record=global_size_record,
                 global_weight_record=global_weight_record,
                 giant_sighting=giant_sighting,
@@ -1147,6 +1172,7 @@ class GameplayService:
                 item_name=armed_item.display_name if armed_item is not None else "",
                 weights=weights,
                 effect_summaries=effect_application.summaries,
+                excluded_summaries=effect_application.skipped_summaries,
                 global_size_record=global_size_record,
                 global_weight_record=global_weight_record,
                 giant_sighting=giant_sighting,
@@ -1757,6 +1783,11 @@ class GameplayService:
             effect_summaries=tuple(
                 str(value)
                 for value in payload.get("effect_summaries", [])
+                if str(value).strip()
+            ),
+            excluded_summaries=tuple(
+                str(value)
+                for value in payload.get("excluded_summaries", [])
                 if str(value).strip()
             ),
             global_size_record=bool(payload.get("global_size_record") or False),

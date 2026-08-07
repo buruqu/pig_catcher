@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root { --font-family: {{ font_family }}; }
+    {{ theme_css | safe }}
+  </style>
+</head>
+<body>
+  <main class="game-sheet inventory-sheet" data-pig-catcher-root data-render-ready="true">
+    <header class="game-header">
+      <div class="game-header__copy">
+        <p class="game-header__eyebrow">批量做菜 · 一次产出全部美食</p>
+        <h1 style="font-size: {% if view.display_name|length > 60 %}16{% elif view.display_name|length > 40 %}20{% elif view.display_name|length > 24 %}31{% else %}42{% endif %}px">{{ view.display_name }}</h1>
+      </div>
+      <div class="game-header__meta">
+        <span>本次产出</span>
+        <strong>{{ view.food_count }} 份</strong>
+      </div>
+    </header>
+
+    <section class="list-summary">
+      <p>消耗 {{ view.pig_count }} 只原料猪 · 按品质从高到低排列</p>
+      <div class="pill-row">
+        <span class="pill">{{ view.rarity ~ " 星" if view.rarity is not none else "全部 1-5 星" }}</span>
+        <span class="pill pill--strong">联动猪与六星猪不参与</span>
+      </div>
+    </section>
+
+    <section style="display:flex;gap:12px;padding:0 38px 18px;flex-wrap:wrap">
+      <div style="flex:1;min-width:140px;background:rgba(255,105,180,0.08);border:1px solid rgba(255,105,180,0.25);border-radius:12px;padding:12px 16px;display:flex;flex-direction:column;gap:4px"><span style="font-size:12px;color:#888">猪币</span><strong style="font-size:20px;color:#e91e63">+{{ view.coin_reward }}</strong></div>
+      <div style="flex:1;min-width:140px;background:rgba(63,81,181,0.08);border:1px solid rgba(63,81,181,0.25);border-radius:12px;padding:12px 16px;display:flex;flex-direction:column;gap:4px"><span style="font-size:12px;color:#888">经验</span><strong style="font-size:20px;color:#3f51b5">+{{ view.experience_reward }}</strong></div>
+      <div style="flex:1;min-width:140px;background:rgba(0,150,136,0.08);border:1px solid rgba(0,150,136,0.25);border-radius:12px;padding:12px 16px;display:flex;flex-direction:column;gap:4px"><span style="font-size:12px;color:#888">新图鉴</span><strong style="font-size:20px;color:#009688">{{ view.catalog_new_count }}</strong></div>
+    </section>
+
+    {% if view.items %}
+    <section class="inventory-grid">
+      {% for item in view.items %}
+      <article class="inventory-item rarity-{{ item.rarity }}">
+        <div class="inventory-item__media">
+          {% if media_data_urls.get(item.key) %}
+          <img src="{{ media_data_urls[item.key] }}" alt="{{ item.display_name }}" style="object-fit: {{ item.image_fit }}">
+          {% elif item.is_animated and item.media_visible %}
+          <span>动态美食<br>详情查看</span>
+          {% elif not item.media_visible %}
+          <span>授权已撤回</span>
+          {% else %}
+          <span>暂无预览</span>
+          {% endif %}
+        </div>
+        <h2 style="font-size: {% if item.display_name|length > 45 %}12{% elif item.display_name|length > 28 %}15{% elif item.display_name|length > 18 %}18{% else %}21{% endif %}px">{{ item.display_name }}</h2>
+        <div class="inventory-item__code">{{ "★" * item.rarity }} · #{{ item.short_code }}</div>
+        <div class="inventory-item__facts">
+          <span>{{ "%.2f"|format(item.portion_weight) }} kg</span>
+          <span>{{ item.fat_label }}</span>
+          <span class="inventory-item__value">{{ item.official_value }} 猪币</span>
+        </div>
+      </article>
+      {% endfor %}
+    </section>
+    {% else %}
+    <section style="padding:32px 38px"><div class="empty-state">本次没有产出美食</div></section>
+    {% endif %}
+
+    <footer class="game-footer">
+      <span>做菜冷却 10 秒；联动猪和六星定制猪始终受保护</span>
+      <strong>{{ view.food_count }}/{{ view.food_count }}</strong>
+    </footer>
+  </main>
+</body>
+</html>

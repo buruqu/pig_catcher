@@ -75,6 +75,7 @@
         {% if view.collection_name %}{{ view.collection_name }}{% if view.character_name %} · {{ view.character_name }}{% endif %} · {% endif %}
         获得于 {{ view.acquired_at }}
         {% if view.effect_summaries %}<br>美食加成：{{ view.effect_summaries | join("；") }}{% endif %}
+        {% if view.excluded_summaries %}<br>互斥未叠加：{{ view.excluded_summaries | join("；") }}{% endif %}
       </p>
     </section>
 
@@ -105,6 +106,13 @@
         <span>本时段 / 道具</span>
         <strong>{{ view.daily_count }}/{{ view.daily_limit }} · {{ view.item_name or "无" }}</strong>
       </div>
+      {% if view.probability_line %}
+      <div class="pig-card__receipt-item" style="grid-column: 1 / -1;flex-direction:column;gap:2px">
+        <span>本次最终概率</span>
+        <strong style="font-size:15px;line-height:1.5;white-space:normal">{{ view.probability_line }}</strong>
+        <small style="font-size:12px;color:#888">{{ view.probability_sources }}</small>
+      </div>
+      {% endif %}
       {% else %}
       <div class="pig-card__receipt-item">
         <span>实例编号</span>

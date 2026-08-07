@@ -11,6 +11,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from ..domain.errors import DomainValidationError, ReceiptConflictError
+from ..domain.food_effects import QUOTA_RESET_CHANCE
 from ..domain.models import CommandIdentity, CommandReceipt, ScopeKey
 from ..domain.ports import Clock, MessageKeyFactory, SystemClock
 from ..domain.quota import CatchQuotaWindow, catch_quota_window
@@ -30,6 +31,8 @@ from .receipts import request_fingerprint
 
 _RESET_COMMAND = "pig-catcher.reset-quota"
 _RESET_REQUEST = {"command_version": 1}
+_CHANCE_COMMAND = "pig-catcher.reset-quota-chance"
+_CHANCE_REQUEST = {"command_version": 1}
 
 
 @dataclass(frozen=True, slots=True)
@@ -108,6 +111,48 @@ class CatchQuotaResetService:
         return await self._reset_command_transaction(
             identity=identity,
             source=source,
+            backup_path=backup_path,
+            now=now,
+            idempotency_key=idempotency_key,
+        )
+
+    async def reset_from_quota_chance(
+        self,
+        *,
+        data_dir: Path,
+        identity: CommandIdentity,
+    ) -> CatchQuotaResetResult:
+        """玩家消耗一次六星菜“重置额度机会”重置本群当前额度窗口。
+
+        与管理员 /重置 走相同的备份、审计与幂等回执流程，并在同一事务内
+        扣减玩家持有的 quota-reset 效果一次，避免重复使用。
+        """
+
+        idempotency_key = MessageKeyFactory.build(identity, _CHANCE_COMMAND)
+        existing = await self._command_receipt(idempotency_key)
+        if existing is not None:
+            validate_existing_receipt(
+                existing,
+                identity=identity,
+                command_name=_CHANCE_COMMAND,
+                request_payload=_CHANCE_REQUEST,
+            )
+            return self._result_from_receipt(existing, receipt_created=False)
+
+        if not await self._scope_exists(identity.scope.value):
+            raise DomainValidationError(
+                f"数据库中不存在群范围 {identity.scope.value}，拒绝重置。"
+            )
+        now = self.clock.now()
+        backup_path = self._backup_path(
+            data_dir=data_dir,
+            platform=identity.scope.platform,
+            scope_id=identity.scope.value,
+            now=now,
+        )
+        await self.database.backup_to(backup_path)
+        return await self._chance_reset_transaction(
+            identity=identity,
             backup_path=backup_path,
             now=now,
             idempotency_key=idempotency_key,
@@ -338,6 +383,169 @@ class CatchQuotaResetService:
                 ),
                 now=now_text,
             )
+        return CatchQuotaResetResult(
+            audit_event_id=audit_event_id,
+            scope_id=scope_id,
+            window=window,
+            cleared_catches=cleared_catches,
+            affected_players=affected_players,
+            backup_path=backup_path,
+            created_at=now_text,
+            receipt=reservation.receipt,
+            receipt_created=True,
+        )
+
+    async def _chance_reset_transaction(
+        self,
+        *,
+        identity: CommandIdentity,
+        backup_path: Path,
+        now: datetime,
+        idempotency_key: str,
+    ) -> CatchQuotaResetResult:
+        """在单事务内完成重置并消耗玩家的一次重置机会效果。"""
+
+        scope_id = identity.scope.value
+        window = catch_quota_window(
+            now,
+            refresh_hours=self.refresh_hours,
+            timezone_name=self.timezone_name,
+        )
+        now_text = iso_timestamp(now)
+        window_start = iso_timestamp(window.start)
+        window_end = iso_timestamp(window.end)
+        audit_event_id = self.id_factory()
+        async with self.database.transaction() as session:
+            existing = await self.receipt_repository.get_by_key(
+                session,
+                idempotency_key,
+            )
+            if existing is not None:
+                validate_existing_receipt(
+                    existing,
+                    identity=identity,
+                    command_name=_CHANCE_COMMAND,
+                    request_payload=_CHANCE_REQUEST,
+                )
+                return self._result_from_receipt(existing, receipt_created=False)
+            effect_row = await session.fetch_one(
+                """
+                SELECT effect_entry_id
+                FROM player_food_effects
+                WHERE player_id = ?
+                  AND effect_id = ?
+                  AND consumed_uses < granted_uses
+                  AND (expires_at IS NULL OR expires_at > ?)
+                ORDER BY created_at, effect_entry_id
+                LIMIT 1
+                """,
+                (identity.player_id, QUOTA_RESET_CHANCE, now_text),
+            )
+            if effect_row is None:
+                raise DomainValidationError(
+                    "你没有可用的重置额度机会；食用六星菜“糖醋排骨”可获得一次，"
+                    "发送 /重置额度 即可使用。"
+                )
+            await self.framework_repository.touch_identity(
+                session,
+                identity=identity,
+                now=now_text,
+            )
+            effective_start = await self.repository.effective_window_start(
+                session,
+                scope_id=scope_id,
+                window_start=window_start,
+                window_end=window_end,
+            )
+            cleared_catches, affected_players = await self.repository.usage_since(
+                session,
+                scope_id=scope_id,
+                effective_start=effective_start,
+                window_end=window_end,
+            )
+            detail = self._reset_detail(
+                source="quota-chance",
+                window_start=window_start,
+                window_end=window_end,
+                previous_effective_start=effective_start,
+                cleared_catches=cleared_catches,
+                affected_players=affected_players,
+                backup_path=backup_path,
+            )
+            result_payload = {
+                "audit_event_id": audit_event_id,
+                "scope_id": scope_id,
+                "window_start": window_start,
+                "window_end": window_end,
+                "window_label": window.label,
+                "next_refresh_label": window.next_refresh_label,
+                "cleared_catches": cleared_catches,
+                "affected_players": affected_players,
+                "backup_path": str(backup_path),
+                "created_at": now_text,
+            }
+            summary = self._command_summary(
+                identity=identity,
+                window=window,
+                cleared_catches=cleared_catches,
+                affected_players=affected_players,
+            )
+            reservation = await self.receipt_repository.reserve(
+                session,
+                idempotency_key=idempotency_key,
+                scope_id=scope_id,
+                player_id=identity.player_id,
+                command_name=_CHANCE_COMMAND,
+                request_fingerprint=request_fingerprint(_CHANCE_REQUEST),
+                result_type="catch-quota-reset",
+                result_object_id=audit_event_id,
+                result_json=json.dumps(
+                    result_payload,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ),
+                text_summary=summary,
+                now=now_text,
+            )
+            if not reservation.created:
+                validate_existing_receipt(
+                    reservation.receipt,
+                    identity=identity,
+                    command_name=_CHANCE_COMMAND,
+                    request_payload=_CHANCE_REQUEST,
+                )
+                return self._result_from_receipt(
+                    reservation.receipt,
+                    receipt_created=False,
+                )
+            await self.repository.insert_reset_event(
+                session,
+                audit_event_id=audit_event_id,
+                scope_id=scope_id,
+                actor_user_id=identity.user_id,
+                object_id=window_start,
+                detail_json=json.dumps(
+                    detail,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ),
+                now=now_text,
+            )
+            cursor = await session.execute(
+                """
+                UPDATE player_food_effects
+                SET consumed_uses = consumed_uses + 1,
+                    updated_at = ?
+                WHERE effect_entry_id = ?
+                  AND player_id = ?
+                  AND consumed_uses < granted_uses
+                """,
+                (now_text, str(effect_row["effect_entry_id"]), identity.player_id),
+            )
+            if cursor.rowcount != 1:
+                raise RuntimeError("重置额度机会状态已变化，本次操作未结算。")
         return CatchQuotaResetResult(
             audit_event_id=audit_event_id,
             scope_id=scope_id,

@@ -2,6 +2,7 @@
 
 from .assets import AssetCatalogService, CatalogImportResult, CollectionProgress
 from .economy import (
+    BatchCookingResult,
     BatchSaleResult,
     CookingResult,
     EatResult,
@@ -80,6 +81,7 @@ __all__ = [
     "AssetCatalogService",
     "AnnouncementAdminService",
     "AnnouncementClaim",
+    "BatchCookingResult",
     "BatchSaleResult",
     "CatalogImportResult",
     "CollectionProgress",

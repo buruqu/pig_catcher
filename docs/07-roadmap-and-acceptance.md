@@ -765,3 +765,104 @@
   七类排行和重启幂等正常。
 - 审计同时修复了 UAT 工具自身的旧组件计数、全库转移事件误计数及 Windows GBK 输出
   问题。所有演练只修改 `artifacts/` 内的数据库副本；真实群公告和处罚仍未触发。
+
+## 29. v1.5.1 做菜冷却、联动保护与批量做菜验收
+
+- 验收日期：`2026-08-07`。插件升级为 `local.pig-catcher v1.5.1`，Schema `12`、
+  Asset Manifest `4`、Ruleset `12` 保持不变，旧数据不需要迁移。
+- 做菜与批量做菜共用 `cook_cooldown_seconds`（默认 10 秒）冷却，基于
+  `player_statistics.last_cook_at` 判断，冷却中抛出 `CookCooldownError` 并提示剩余秒数。
+- 米歇尔猪加入 Hello, Happy World! 联动收藏（槽位 6/6），HHW 收集从 5 槽扩为 6 槽；
+  素材目录同步重建，新目录哈希
+  `7176eb8675e45a684c5ba271cff55dd0eabd9cef3b00eb4a118bdd70ef04039f`。
+- 批量售卖与批量做菜在 SQL 层排除 `collection_id` 非空的全部联动猪；`/批量售卖 猪猪`
+  支持 `一星` 至 `五星` 品质过滤，`/批量做菜` 支持可选品质且跳过六星定制猪。
+- 选择器匹配改为“精确优先 + 去空白忽略英文大小写兜底”，覆盖售卖、赠送、交易、做菜
+  与批量操作；“白吃 Token 的猪”等含空格英文名不再要求逐字输入。
+- 批量做菜使用多菜合一模板 `batch_cook.html`，产出按品质降序展示，一次渲染不再逐菜出图；
+  单次批量做菜不消耗装备道具。
+- 自动回归为 pytest `183 passed`；Ruff、Python `compileall` 全部通过。命令组件从
+  32 增至 33，`/批量做菜` 已注册并可被帮助命令检索。
+
+## 30. v1.6.0 菜品与道具体系审计重构验收
+
+- 验收日期：`2026-08-07`。插件升级为 `local.pig-catcher v1.6.0`，Schema `12`、
+  Asset Manifest `4`、Ruleset `12` 保持不变，旧数据不需要迁移。
+- 全量审计 45 道美食：29 道带效果、16 道基础经验；修复 6 处不同名菜同效果问题
+  （做菜品质转移、指定品质加权、6 星抓猪概率、额外次数、周额度），调整 12 道菜参数后
+  不同名菜效果签名全部唯一，群专属双群复制保持同菜同效果。
+- 效果互斥重构：`CATCH_PROBABILITY_GROUP`、`CATCH_STATURE_GROUP`、`COOK_PROBABILITY_GROUP`
+  三组；抓猪概率组与做菜概率组内一次动作最多生效最早的一个，其余记入
+  `skipped_summaries` 并在结果中提示“互斥未叠加”；体型组与概率组正交可并存。
+- 菜品与道具、等级加成可共用：最终概率由基础权重依次叠加饲料/厨具、数值等级、
+  道具（唯一装备）与互斥选一的菜品效果后归一化得出。
+- 概率展示落地：抓猪卡片与文字摘要展示六档最终概率；做菜卡片与摘要展示成品品质概率
+  与最终概率行；均标注来源（等级、饲料/厨具、道具、美食加成）与互斥未叠加项。
+- 素材目录重建导入：新目录哈希
+  `b10da3ad0252cfc6fb367106d4594ac7f6f3f4849fc054ab38b64ed87f03280f`，
+  运行库 `food_templates.effect_params_json` 已更新（如白菜炖粉条 shift 14、猪饺 3 星 ×3）。
+- 自动回归为 pytest `185 passed`（新增 2 个互斥分组测试）；Ruff、Python `compileall`
+  全部通过。
+
+## 31. v1.6.1 Roselia 联动与 297 期名场面定制验收
+
+- 验收日期：`2026-08-07`。插件升级为 `local.pig-catcher v1.6.1`，Schema `12`、
+  Asset Manifest `4`、Ruleset `12` 保持不变，旧数据不需要迁移。
+- 新增 Roselia 五只联动猪：歌姬猪（凑友希那，5★）、妈妈猪（今井莉莎，5★）、
+  魔王猪（宇田川亚子，5★）、薯条猪（冰川纱夜，4★）、宅宅猪（白金燐子，4★），
+  收藏组 `bandori-roselia` 槽位 1-5、进度 `5/5`，全部使用官方角色资料页。
+- 新增六星定制猪 ob一串猪 与六星定制美食 糖醋排骨（297 期活动结活名场面），
+  在 `qq:1092931381` 与 `qq:237716658` 两个已授权群均可见；糖醋排骨效果为
+  下一次抓猪 4 至 6 星相对权重 `×3.0`（参数唯一）。
+- 模板总数 169 → 178（猪 124 → 131、菜 45 → 47）；群专属条目 28 → 32
+  （每群 8 猪 + 8 菜）；每个授权群可见 123 只猪、39 道菜。
+- 素材目录重建导入：178 项模板、162 份唯一内容、179 份隔离存储媒体，
+  新目录哈希 `c503edfc2a20ca09252d09d7863e3e4ee4dfb3f16d72f5d91ada791e828c16ec`。
+- 自动回归为 pytest `185 passed`；Ruff、Python `compileall` 全部通过。
+
+## 32. v1.6.2 QQ 官方双 Bot 群内容同步验收
+
+- 验收日期：`2026-08-07`。插件升级为 `local.pig-catcher v1.6.2`，Schema `12`、
+  Asset Manifest `4`、Ruleset `12` 保持不变，旧数据不需要迁移。
+- 根据 `local.qq-official-adapter` 运行数据，主机器人（`2682203558304385787`）最近群
+  openid `5E5854406D0297D6FEAE696A13E3A339`，第二机器人（`12855103089515654682`）
+  最近群 openid `9EA2810F378FBD7DC3219C56CEAB3520`。
+- 为上述两个 `qq-official:<openid>` 数据域新增 ob一串猪 与糖醋排骨（各 1 猪 1 菜），
+  模板总数 178 → 182；Roselia 联动为公共素材，QQ 官方群自动可见。
+- `template_id` 内 openid 采用小写以满足 `^[a-z0-9]+(?:-[a-z0-9]+)*$` 命名约束，
+  `group_scope_id` 保留官方原值（全大写 openid）。
+- 素材目录重建导入：182 项模板、162 份唯一内容、183 份隔离存储媒体，
+  新目录哈希 `4655105bae94b7973b224c9048f6f99436ba89f3cdbac94a46f9cacdcae100b3`。
+- 自动回归为 pytest `185 passed`；Ruff、Python `compileall` 全部通过。
+
+## 33. v1.6.3 六星菜效果重做与重置额度机会验收
+
+- 验收日期：`2026-08-07`。插件升级为 `local.pig-catcher v1.6.3`，Schema `12`、
+  Asset Manifest `4`、Ruleset `12` 保持不变，旧数据不需要迁移。
+- 六星菜效果全部改为独立生效：新增 `EXCLUSIVE_CATCH_EFFECTS`/`EXCLUSIVE_COOK_EFFECTS`，
+  激活独占效果时本次抓猪/做菜跳过装备道具（不消耗、保留），权重从纯基础计算；互斥组约束
+  同时保证与其他菜品效果不叠加。
+- 新增效果类型：`next-high-star-catch`（固定高星分布 uses）、`next-five-star-cook`
+  （必出五星菜 uses）、`even-catch-distribution`（六档均等 uses）、
+  `exclusive-catch-quality`（糖醋排骨独占加权）、`quota-reset`（重置机会）；
+  多 uses 效果复用 `player_food_effects.granted_uses` 逐次扣减。
+- 小马猪蒙布朗 6 星概率 50→60（上限同步 50→60）；雾蓝键盘大福、彩彩修车猪慕斯、
+  猪保千猪排轮盘、糖醋排骨效果按运营要求重做。
+- 新增 `/重置额度` 命令（组件 33→34）与 `CatchQuotaResetService.reset_from_quota_chance`：
+  单事务内校验效果、备份、重置、审计并消耗一次机会；无机会时给出明确提示。
+- 素材目录重建导入：新目录哈希
+  `a9b9b5b27d329d48502de20aa15ece53118fbbcfd6463d15b06e704042a8d720`。
+- 自动回归为 pytest `188 passed`（新增独占效果、重置机会领域/命令测试）；Ruff、
+  Python `compileall` 全部通过。
+
+## 34. v1.6.4 多次数做菜效果与批量做菜互斥验收
+
+- 验收日期：`2026-08-07`。插件升级为 `local.pig-catcher v1.6.4`，Schema `12`、
+  Asset Manifest `4`、Ruleset `12` 保持不变，旧数据不需要迁移。
+- `EconomyService.batch_cook` 在事务内检查玩家有效果队列：存在 `COOK_PROBABILITY_GROUP`
+  且剩余次数大于等于 1 的效果时抛出 `BatchCookRestrictedError`，提示“只能逐个使用 /做菜，
+  不能批量做菜”；效果剩余 1 次时仍然禁止，直到剩余次数用尽。
+- 通用判定（效果分组 + 剩余次数）保证未来新增的多次数做菜六星菜效果自动适用，
+  无需逐效果枚举。新增端到端测试：持有 5 次必出五星效果拒绝批量做菜，消耗至 1 次后放行。
+- 糖醋排骨吃菜结果（图片 note 与文字摘要）展示“可发送 /重置额度 使用”；无机会时
+  /重置额度 也会提示获取途径。自动回归为 pytest `189 passed`；Ruff、compileall 通过。

@@ -15,11 +15,11 @@ def _entries() -> list[dict[str, object]]:
     return list(payload["entries"])
 
 
-def test_formal_catalog_has_all_169_named_assets_and_stable_ids() -> None:
+def test_formal_catalog_has_all_182_named_assets_and_stable_ids() -> None:
     entries = _entries()
-    assert len(entries) == 169
-    assert len({entry["template_id"] for entry in entries}) == 169
-    assert len({entry["source_path"] for entry in entries}) == 169
+    assert len(entries) == 182
+    assert len({entry["template_id"] for entry in entries}) == 182
+    assert len({entry["source_path"] for entry in entries}) == 182
     assert all(str(entry["description"]).strip() for entry in entries)
     pig_counts = Counter(
         int(entry["rarity"])
@@ -31,8 +31,8 @@ def test_formal_catalog_has_all_169_named_assets_and_stable_ids() -> None:
         for entry in entries
         if entry["kind"] == "food"
     )
-    assert pig_counts == {1: 20, 2: 20, 3: 21, 4: 24, 5: 25, 6: 14}
-    assert food_counts == {1: 3, 2: 6, 3: 7, 4: 8, 5: 7, 6: 14}
+    assert pig_counts == {1: 20, 2: 20, 3: 21, 4: 26, 5: 28, 6: 18}
+    assert food_counts == {1: 3, 2: 6, 3: 7, 4: 8, 5: 7, 6: 18}
 
 
 def test_high_rarity_food_effects_cover_new_gameplay_families() -> None:
@@ -46,17 +46,40 @@ def test_high_rarity_food_effects_cover_new_gameplay_families() -> None:
     assert foods["猪寿司拼盘"]["effect_params"] == {"count": 2}
     assert foods["一猪六吃"]["effect_params"] == {"six_star_percent": 20}
     assert foods["一盒油炸猪"]["effect_params"] == {"count": 1}
-    assert foods["猪猪白菜炖粉条"]["effect_params"] == {"shift_percent": 20}
+    assert foods["猪猪白菜炖粉条"]["effect_params"] == {"shift_percent": 14}
     assert foods["猪咪莓蛋糕"]["effect_params"] == {"shift_percent": 20}
     assert foods["猪皮奶"]["effect_params"] == {"rarity": 5, "multiplier": 5.0}
-    assert foods["小马猪蒙布朗"]["effect_params"] == {"six_star_percent": 50}
+    assert foods["小马猪蒙布朗"]["effect_params"] == {"six_star_percent": 60}
+    assert foods["雾蓝键盘大福"]["effect_params"] == {
+        "uses": 5,
+        "four_star_percent": 60,
+        "five_star_percent": 30,
+        "six_star_percent": 10,
+    }
+    assert foods["雾蓝键盘大福"]["effect_id"] == "next-high-star-catch"
+    assert foods["彩彩修车猪慕斯"]["effect_id"] == "next-five-star-cook"
+    assert foods["彩彩修车猪慕斯"]["effect_params"] == {"uses": 5}
+    assert foods["猪保千猪排轮盘"]["effect_id"] == "even-catch-distribution"
+    assert foods["猪保千猪排轮盘"]["effect_params"] == {"uses": 5}
+    assert foods["糖醋排骨"]["effect_id"] == "exclusive-catch-quality"
+    assert foods["糖醋排骨"]["effect_params"] == {"multiplier": 3.0}
     assert foods["猪鼻蛋包饭"]["effect_params"] == {"six_star_percent": 60}
     assert foods["撅撅猪派"]["effect_params"] == {"count": 1, "max_bonus": 5}
     assert foods["向你道早猪猪巧克力螺"]["effect_params"] == {"count": 5}
-    assert foods["雾蓝键盘大福"]["effect_params"] == {"six_star_percent": 50}
-    assert foods["彩彩修车猪慕斯"]["effect_params"] == {"count": 5}
-    assert foods["猪保千猪排轮盘"]["effect_params"] == {"count": 5}
-    assert foods["猪果冻"]["effect_params"] == {"count": 1}
+    assert foods["猪果冻"]["effect_params"] == {"count": 3}
+    # 每道不同名菜的效果签名必须唯一（群专属双群复制品除外）
+    signatures: dict[tuple[str, str], list[str]] = {}
+    for entry in _entries():
+        if entry["kind"] != "food" or not entry.get("effect_id"):
+            continue
+        key = (
+            entry["effect_id"],
+            str(sorted((entry.get("effect_params") or {}).items())),
+        )
+        signatures.setdefault(key, []).append(entry["display_name"])
+    for names in signatures.values():
+        # 同一道菜在多个群的作用域复制允许相同签名
+        assert len(set(names)) == 1, f"不同菜品效果重复：{set(names)}"
 
 
 def test_semantic_body_ranges_match_visual_scale_without_changing_normal_pigs() -> None:
@@ -83,10 +106,12 @@ def test_group_custom_assets_are_confined_and_keep_user_text() -> None:
         for entry in entries
         if entry.get("group_scope_id")
     ]
-    assert len(group_entries) == 28
+    assert len(group_entries) == 36
     assert {entry["group_scope_id"] for entry in group_entries} == {
         "qq:1092931381",
         "qq:237716658",
+        "qq-official:5E5854406D0297D6FEAE696A13E3A339",
+        "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
     }
     assert all(
         f"/{str(entry['group_scope_id']).split(':', 1)[1]}/"
@@ -105,9 +130,12 @@ def test_group_custom_assets_are_confined_and_keep_user_text() -> None:
         "小马猪蒙布朗",
         "彩彩修车猪",
         "彩彩修车猪慕斯",
+        "ob一串猪",
+        "糖醋排骨",
     } <= set(descriptions)
     assert "社区" in descriptions["彩彩修车猪"]
     assert "不是官方职业设定" in descriptions["彩彩修车猪"]
+    assert "糖醋排骨" in descriptions["ob一串猪"]
 
 
 def test_every_custom_six_star_pig_has_one_same_group_food_pair() -> None:
@@ -176,9 +204,18 @@ def test_bandori_collaboration_mappings_use_official_profiles_and_five_slots() -
         "迷路猪": ("松原花音", "Hello, Happy World!"),
         "美咲猪": ("奥泽美咲", "Hello, Happy World!"),
         "可乐饼猪": ("育美", "Hello, Happy World!"),
+        "米歇尔猪": ("米歇尔", "Hello, Happy World!"),
+        "歌姬猪": ("凑友希那", "Roselia"),
+        "妈妈猪": ("今井莉莎", "Roselia"),
+        "薯条猪": ("冰川纱夜", "Roselia"),
+        "魔王猪": ("宇田川亚子", "Roselia"),
+        "宅宅猪": ("白金燐子", "Roselia"),
     }
     assert all(
-        value["total"] == (1 if value["collection_id"] == "bandori-yumemita-viola" else 5)
+        value["total"] == (
+            6 if value["collection_id"] == "bandori-hello-happy-world" else
+            (1 if value["collection_id"] == "bandori-yumemita-viola" else 5)
+        )
         for value in collabs.values()
     )
     assert all(
@@ -225,7 +262,18 @@ def test_bandori_collaboration_mappings_use_official_profiles_and_five_slots() -
         for value in collabs.values()
         if value["collection_name"] == "Hello, Happy World!"
     }
-    assert hhw_slots == {1, 2, 3, 4, 5}
+    assert hhw_slots == {1, 2, 3, 4, 5, 6}
+    roselia_slots = {
+        int(value["slot"])
+        for value in collabs.values()
+        if value["collection_name"] == "Roselia"
+    }
+    assert roselia_slots == {1, 2, 3, 4, 5}
+    assert collabs["歌姬猪"]["character_id"] == "yukina"
+    assert collabs["妈妈猪"]["character_id"] == "lisa"
+    assert collabs["薯条猪"]["character_id"] == "sayo"
+    assert collabs["魔王猪"]["character_id"] == "ako"
+    assert collabs["宅宅猪"]["character_id"] == "rinko"
 
 
 def test_new_pigs_keep_reviewed_descriptions_and_rarities() -> None:
@@ -319,8 +367,42 @@ def test_new_pigs_keep_reviewed_descriptions_and_rarities() -> None:
     assert pigs["可乐饼猪"]["collection"]["character_name"] == "育美"
     assert pigs["米歇尔猪"]["rarity"] == 3
     assert "米歇尔" in pigs["米歇尔猪"]["description"]
+    assert pigs["米歇尔猪"]["collection"]["character_name"] == "米歇尔"
+    assert pigs["米歇尔猪"]["collection"]["collection_id"] == "bandori-hello-happy-world"
+    assert pigs["米歇尔猪"]["collection"]["slot"] == 6
+    assert pigs["米歇尔猪"]["collection"]["total"] == 6
     assert pigs["保千猪"]["rarity"] == 6
     assert pigs["保千猪"]["alternate_image"].endswith("猪保千表情包.png")
     assert pigs["保千猪"]["paired_food_template_id"].endswith(
         "baogian-pork-roulette"
     )
+    # Roselia 联动与 ob 一串六星定制（按模板遍历，QQ 官方群与普通群均有复制）
+    ob_pigs = [
+        entry
+        for entry in _entries()
+        if entry["kind"] == "pig" and entry["display_name"] == "ob一串猪"
+    ]
+    assert len(ob_pigs) == 4
+    for entry in ob_pigs:
+        assert entry["rarity"] == 6
+        assert "糖醋排骨" in entry["description"]
+        assert entry["paired_food_template_id"].endswith("tangcu-paigu")
+        scope_suffix = str(entry["group_scope_id"]).split(":", 1)[1]
+        expected_prefix = (
+            "food-g" + scope_suffix
+            if entry["group_scope_id"].startswith("qq:")
+            else "food-qo" + scope_suffix.lower()
+        )
+        assert entry["paired_food_template_id"].startswith(expected_prefix)
+    assert pigs["歌姬猪"]["rarity"] == 5
+    assert "凑友希那" in pigs["歌姬猪"]["description"]
+    assert pigs["歌姬猪"]["collection"]["character_name"] == "凑友希那"
+    assert pigs["妈妈猪"]["rarity"] == 5
+    assert "今井莉莎" in pigs["妈妈猪"]["description"]
+    assert pigs["薯条猪"]["rarity"] == 4
+    assert "侧麻花辫" in pigs["薯条猪"]["description"]
+    assert pigs["薯条猪"]["collection"]["character_name"] == "冰川纱夜"
+    assert pigs["魔王猪"]["rarity"] == 5
+    assert "宇田川亚子" in pigs["魔王猪"]["description"]
+    assert pigs["宅宅猪"]["rarity"] == 4
+    assert "白金燐子" in pigs["宅宅猪"]["description"]

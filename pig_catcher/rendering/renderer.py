@@ -15,6 +15,7 @@ from PIL import Image, UnidentifiedImageError
 from ..domain.errors import RenderError
 from .models import (
     AssetPreviewViewModel,
+    BatchCookingViewModel,
     CatalogViewModel,
     EconomyReceiptViewModel,
     FoodCardViewModel,
@@ -310,6 +311,26 @@ class PigCatcherRenderer:
         )
         return await self._render_template(
             "food_catalog.html",
+            view=view,
+            media_data_urls=media_data_urls,
+        )
+
+    async def render_batch_cook(
+        self,
+        view: BatchCookingViewModel,
+        media_paths: Mapping[str, Path],
+    ) -> RenderedImage:
+        """Render one batch-cooking grid with all produced foods."""
+
+        media_data_urls = self._list_media_data_urls(
+            (
+                (item.key, item.media_visible, item.is_animated)
+                for item in view.items
+            ),
+            media_paths,
+        )
+        return await self._render_template(
+            "batch_cook.html",
             view=view,
             media_data_urls=media_data_urls,
         )

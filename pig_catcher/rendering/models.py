@@ -130,7 +130,10 @@ class PigCardViewModel:
     size_label: str = ""
     weight_label: str = ""
     effect_summaries: tuple[str, ...] = ()
+    excluded_summaries: tuple[str, ...] = ()
     tutorial_text: str = ""
+    probability_line: str = ""
+    probability_sources: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -333,6 +336,9 @@ class FoodCardViewModel:
     bonus_selector: str = ""
     probability_summary: str = ""
     effect_summaries: tuple[str, ...] = ()
+    excluded_summaries: tuple[str, ...] = ()
+    probability_line: str = ""
+    probability_sources: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -391,6 +397,37 @@ class FoodCatalogViewModel:
     collected_count: int
     visible_catalog_total: int
     items: tuple[FoodCatalogItemViewModel, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class BatchCookingItemViewModel:
+    """One food tile produced by batch cooking."""
+
+    key: str
+    display_name: str
+    short_code: str
+    rarity: int
+    portion_weight: float
+    fat_label: str
+    official_value: int
+    media_visible: bool
+    is_animated: bool
+    image_fit: str
+    source_pig_name: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class BatchCookingViewModel:
+    """One grid of foods produced by batch cooking, ordered by rarity desc."""
+
+    display_name: str
+    pig_count: int
+    food_count: int
+    coin_reward: int
+    experience_reward: int
+    catalog_new_count: int
+    rarity: int | None
+    items: tuple[BatchCookingItemViewModel, ...]
 
 
 @dataclass(frozen=True, slots=True)

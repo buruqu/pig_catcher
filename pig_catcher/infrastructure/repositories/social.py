@@ -29,6 +29,22 @@ def _asset_table(kind: AssetKind) -> tuple[str, str]:
 class SocialRepository:
     """Run social and ranking SQL without owning transaction boundaries."""
 
+    async def get_last_cook_at(
+        self,
+        session: DatabaseSession,
+        *,
+        player_id: str,
+    ) -> str | None:
+        row = await session.fetch_one(
+            """
+            SELECT last_cook_at
+            FROM player_statistics
+            WHERE player_id = ?
+            """,
+            (player_id,),
+        )
+        return str(row["last_cook_at"]) if row is not None and row["last_cook_at"] else None
+
     async def increment_statistic(
         self,
         session: DatabaseSession,

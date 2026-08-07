@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 
@@ -15,6 +16,7 @@ from ..domain.gameplay import level_progress, size_label, weight_label
 from ..domain.rules import catch_weights, cooking_weights
 from ..domain.social import TRADE_STATUS_LABELS
 from ..services.economy import (
+    BatchCookingResult,
     BatchSaleResult,
     CookingResult,
     EatResult,
@@ -45,6 +47,8 @@ from ..services.social import (
     TradePage,
 )
 from .models import (
+    BatchCookingItemViewModel,
+    BatchCookingViewModel,
     CatalogItemViewModel,
     CatalogViewModel,
     CollectionProgressViewModel,
@@ -96,6 +100,40 @@ def _collection_view(collection: object) -> CollectionProgressViewModel:
         available_count=int(collection.available_count),
         total_count=int(collection.total_count),
     )
+
+
+def _probability_line(weights: Sequence[float]) -> str:
+    """Format final rarity weights as a compact probability line."""
+
+    return " ".join(
+        f"{index + 1}★{value:.1f}%"
+        for index, value in enumerate(weights)
+        if value > 0
+    )
+
+
+def _probability_sources(
+    *,
+    player_level: int | None,
+    feed_level: int | None,
+    cookware_level: int | None,
+    item_name: str,
+    effect_count: int,
+) -> str:
+    """Summarize every factor that shaped the final probability."""
+
+    parts: list[str] = []
+    if player_level:
+        parts.append(f"等级 Lv.{player_level}")
+    if feed_level is not None:
+        parts.append(f"饲料 Lv.{feed_level}")
+    if cookware_level is not None:
+        parts.append(f"厨具 Lv.{cookware_level}")
+    if item_name:
+        parts.append(f"道具·{item_name}")
+    if effect_count:
+        parts.append(f"美食加成 ×{effect_count}")
+    return "、".join(parts) if parts else "无额外加成"
 
 
 def pig_card_view(
@@ -170,9 +208,26 @@ def pig_card_view(
         effect_summaries=(
             catch.effect_summaries if catch is not None else ()
         ),
+        excluded_summaries=(
+            catch.excluded_summaries if catch is not None else ()
+        ),
         tutorial_text=(
             "输入 /切换 猪保千 可在猪猪立绘与表情包之间切换"
             if pig.alternate_image_relpath
+            else ""
+        ),
+        probability_line=(
+            _probability_line(catch.weights) if catch is not None else ""
+        ),
+        probability_sources=(
+            _probability_sources(
+                player_level=progress.level if progress is not None else None,
+                feed_level=catch.feed_level,
+                cookware_level=None,
+                item_name=catch.item_name,
+                effect_count=len(catch.effect_summaries),
+            )
+            if catch is not None
             else ""
         ),
     )
@@ -419,6 +474,29 @@ def food_card_view(
         effect_summaries=(
             cooking.effect_summaries if cooking is not None else ()
         ),
+        excluded_summaries=(
+            cooking.excluded_summaries if cooking is not None else ()
+        ),
+        probability_line=(
+            _probability_line(cooking.weights) if cooking is not None else ""
+        ),
+        probability_sources=(
+            _probability_sources(
+                player_level=progress.level if progress is not None else None,
+                feed_level=None,
+                cookware_level=(
+                    cooking.cookware_level if cooking is not None else None
+                ),
+                item_name=cooking.item_name if cooking is not None else "",
+                effect_count=(
+                    len(cooking.effect_summaries)
+                    if cooking is not None
+                    else 0
+                ),
+            )
+            if cooking is not None
+            else ""
+        ),
     )
 
 
@@ -616,18 +694,55 @@ def batch_sale_receipt_view(result: BatchSaleResult) -> EconomyReceiptViewModel:
     """Build one low-rarity batch-sale receipt."""
 
     kind = "猪猪" if result.asset_kind == "pig" else "美食"
+    scope = (
+        f"{result.rarity} 星{kind}"
+        if result.rarity is not None
+        else f"1 至 {result.max_rarity} 星{kind}"
+    )
     return EconomyReceiptViewModel(
         eyebrow="官方回收 · 原子批量结算",
         title="批量售卖成功",
         badge_label="当前余额",
         badge_value=str(result.balance_after),
-        summary=f"1 至 {result.max_rarity} 星{kind} ×{result.asset_count}",
+        summary=f"{scope} ×{result.asset_count}",
         rows=(
             EconomyReceiptRowViewModel("售出数量", f"{result.asset_count} 件"),
             EconomyReceiptRowViewModel("本次收入", f"{result.total_value} 猪币"),
-            EconomyReceiptRowViewModel("处理范围", f"1 至 {result.max_rarity} 星"),
+            EconomyReceiptRowViewModel("处理范围", scope),
         ),
-        note="交易锁定资产未被处理；历史图鉴不会减少。",
+        note="联动猪与交易锁定资产未被处理；历史图鉴不会减少。",
+    )
+
+
+def batch_cook_view(result: BatchCookingResult) -> BatchCookingViewModel:
+    """Build one grid of batch-cooked foods ordered by rarity descending."""
+
+    items = tuple(
+        BatchCookingItemViewModel(
+            key=food.food_instance_id,
+            display_name=food.display_name,
+            short_code=food.short_code,
+            rarity=food.rarity,
+            portion_weight=food.portion_weight,
+            fat_label=food.fat_label,
+            official_value=food.official_value,
+            media_visible=True,
+            is_animated=food.is_animated,
+            image_fit=food.image_fit,
+        )
+        for food in sorted(result.foods, key=lambda item: (-item.rarity, item.acquired_at))
+    )
+    return BatchCookingViewModel(
+        display_name=result.source_pigs[0].owner_display_name
+        if result.source_pigs
+        else "",
+        pig_count=result.pig_count,
+        food_count=result.food_count,
+        coin_reward=result.coin_reward,
+        experience_reward=result.experience_reward,
+        catalog_new_count=result.catalog_new_count,
+        rarity=result.rarity,
+        items=items,
     )
 
 

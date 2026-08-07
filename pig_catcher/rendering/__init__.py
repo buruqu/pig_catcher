@@ -1,6 +1,7 @@
 """白底淡粉图片渲染与发送降级。"""
 
 from .adapters import (
+    batch_cook_view,
     batch_sale_receipt_view,
     catalog_media_paths,
     catalog_view,
@@ -34,6 +35,8 @@ from .animation import AnimatedCardComposer
 from .delivery import RenderDelivery
 from .models import (
     AssetPreviewViewModel,
+    BatchCookingItemViewModel,
+    BatchCookingViewModel,
     CatalogItemViewModel,
     CatalogViewModel,
     CollectionProgressViewModel,
@@ -73,6 +76,8 @@ from .renderer import PigCatcherRenderer
 __all__ = [
     "AnimatedCardComposer",
     "AssetPreviewViewModel",
+    "BatchCookingItemViewModel",
+    "BatchCookingViewModel",
     "CatalogItemViewModel",
     "CatalogViewModel",
     "CollectionProgressViewModel",
@@ -108,6 +113,7 @@ __all__ = [
     "StoreViewModel",
     "TradeListItemViewModel",
     "TradeListViewModel",
+    "batch_cook_view",
     "catalog_media_paths",
     "batch_sale_receipt_view",
     "catalog_view",

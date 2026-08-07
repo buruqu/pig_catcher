@@ -52,9 +52,17 @@ class PurchaseQuery:
 
 @dataclass(frozen=True, slots=True)
 class BatchSaleQuery:
-    """Asset type for one low-rarity batch sale."""
+    """Asset type and optional exact rarity for one batch sale."""
 
     asset_kind: AssetKind
+    rarity: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class BatchCookQuery:
+    """Optional exact rarity for one batch cooking operation."""
+
+    rarity: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -276,10 +284,37 @@ def parse_upgrade_name(arguments: str) -> str:
         ) from exc
 
 
-def parse_batch_sale_query(arguments: str) -> BatchSaleQuery:
-    """解析 `/批量售卖 <猪猪|美食>`，固定处理全部一至三星资产。"""
+_RARITY_LABELS = {
+    "一星": 1,
+    "二星": 2,
+    "三星": 3,
+    "四星": 4,
+    "五星": 5,
+}
 
-    normalized = str(arguments or "").strip()
+
+def _optional_rarity(token: str) -> int | None:
+    """解析可选品质参数：“一星”~“五星”或数字 1~5。"""
+
+    normalized = str(token or "").strip()
+    if not normalized:
+        return None
+    if normalized in _RARITY_LABELS:
+        return _RARITY_LABELS[normalized]
+    if normalized.isdecimal() and 1 <= int(normalized) <= 5:
+        return int(normalized)
+    return None
+
+
+def parse_batch_sale_query(arguments: str) -> BatchSaleQuery:
+    """解析 `/批量售卖 <猪猪|美食> [一星|二星|三星|四星|五星]`。
+
+    指定品质时只售卖该品质；不指定时按原规则售卖 1 至 3 星。
+    """
+
+    tokens = str(arguments or "").split()
+    if not tokens:
+        raise DomainValidationError("格式：/批量售卖 猪猪 或 /批量售卖 猪猪 三星。")
     mapping = {
         "猪猪": AssetKind.PIG,
         "猪": AssetKind.PIG,
@@ -287,12 +322,41 @@ def parse_batch_sale_query(arguments: str) -> BatchSaleQuery:
         "菜": AssetKind.FOOD,
     }
     try:
-        asset_kind = mapping[normalized]
+        asset_kind = mapping[tokens[0]]
     except KeyError as exc:
         raise DomainValidationError(
-            "格式：/批量售卖 猪猪 或 /批量售卖 美食。"
+            "格式：/批量售卖 猪猪 或 /批量售卖 美食；"
+            "可用品质：一星 至 五星。"
         ) from exc
-    return BatchSaleQuery(asset_kind=asset_kind)
+    rarity: int | None = None
+    if len(tokens) > 1:
+        rarity = _optional_rarity(tokens[1])
+        if rarity is None:
+            raise DomainValidationError(
+                "批量售卖品质只能是：一星、二星、三星、四星、五星。"
+            )
+    if len(tokens) > 2:
+        raise DomainValidationError(f"无法识别批量售卖参数“{tokens[2]}”。")
+    return BatchSaleQuery(asset_kind=asset_kind, rarity=rarity)
+
+
+def parse_batch_cook_query(arguments: str) -> BatchCookQuery:
+    """解析 `/批量做菜 [一星|二星|三星|四星|五星]`。
+
+    指定品质时只做该品质的原料猪；不指定时处理全部一至五星非联动猪。
+    """
+
+    tokens = str(arguments or "").split()
+    if not tokens:
+        return BatchCookQuery(rarity=None)
+    rarity = _optional_rarity(tokens[0])
+    if rarity is None:
+        raise DomainValidationError(
+            "批量做菜品质只能是：一星、二星、三星、四星、五星。"
+        )
+    if len(tokens) > 1:
+        raise DomainValidationError(f"无法识别批量做菜参数“{tokens[1]}”。")
+    return BatchCookQuery(rarity=rarity)
 
 
 def parse_ledger_page(arguments: str) -> int:

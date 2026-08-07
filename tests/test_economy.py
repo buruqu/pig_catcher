@@ -28,6 +28,7 @@ from pig_catcher.domain.economy import (
 )
 from pig_catcher.domain.enums import AssetKind, Rarity
 from pig_catcher.domain.errors import (
+    CookCooldownError,
     CookingTemplateError,
     DailyCatchLimitError,
     FoodEffectError,
@@ -343,7 +344,7 @@ async def test_cooking_commits_once_and_rehydrates_after_restart(
     identity = _identity(message_id="cook-1")
     first_service = EconomyService(
         database,
-        CookingSection(),
+        CookingSection(cook_cooldown_seconds=0),
         EconomySection(),
         random_source=SequenceRandom(0.0, 0.0, 0.5),
         clock=clock,
@@ -368,7 +369,7 @@ async def test_cooking_commits_once_and_rehydrates_after_restart(
     await database.open()
     after_restart = await EconomyService(
         database,
-        CookingSection(),
+        CookingSection(cook_cooldown_seconds=0),
         EconomySection(),
         random_source=SequenceRandom(),
         clock=clock,
@@ -410,7 +411,7 @@ async def test_numeric_level_changes_the_committed_cooking_probability(
         )
     service = EconomyService(
         database,
-        CookingSection(),
+        CookingSection(cook_cooldown_seconds=0),
         EconomySection(),
         random_source=SequenceRandom(0.705, 0.0, 0.5),
         clock=clock,
@@ -458,7 +459,7 @@ async def test_missing_food_template_rolls_back_pig_and_item(
         )
     service = EconomyService(
         database,
-        CookingSection(),
+        CookingSection(cook_cooldown_seconds=0),
         EconomySection(),
         random_source=SequenceRandom(0.99),
         clock=clock,
@@ -501,7 +502,7 @@ async def test_large_lunch_box_produces_two_foods_and_consumes_once(
     short_codes = iter(("B19F2C3D", "B19F2C3D", "C19F2C3D"))
     service = EconomyService(
         database,
-        CookingSection(),
+        CookingSection(cook_cooldown_seconds=0),
         EconomySection(),
         random_source=SequenceRandom(0.0, 0.0, 0.4, 0.1, 0.8),
         clock=clock,
@@ -560,7 +561,7 @@ async def test_super_chef_spice_turns_six_star_cook_to_15_percent_and_consumes_o
         )
     economy = EconomyService(
         database,
-        CookingSection(),
+        CookingSection(cook_cooldown_seconds=0),
         EconomySection(),
         random_source=SequenceRandom(0.86, 0.0, 0.5),
         clock=clock,
@@ -603,7 +604,7 @@ async def test_incompatible_super_chef_spice_stays_armed_for_a_later_six_star_pi
         )
     economy = EconomyService(
         database,
-        CookingSection(),
+        CookingSection(cook_cooldown_seconds=0),
         EconomySection(),
         random_source=SequenceRandom(0.0, 0.0, 0.5),
         clock=clock,
@@ -644,7 +645,7 @@ async def test_eating_unknown_effect_does_not_consume_then_blank_effect_is_idemp
     _, caught = await _catch_one_star(database, clock=clock)
     cooking = EconomyService(
         database,
-        CookingSection(),
+        CookingSection(cook_cooldown_seconds=0),
         EconomySection(),
         random_source=SequenceRandom(0.0, 0.0, 0.5),
         clock=clock,
@@ -672,7 +673,7 @@ async def test_eating_unknown_effect_does_not_consume_then_blank_effect_is_idemp
     _, caught = await _catch_one_star(database, clock=clock)
     service = EconomyService(
         database,
-        CookingSection(),
+        CookingSection(cook_cooldown_seconds=0),
         EconomySection(),
         random_source=SequenceRandom(0.0, 0.0, 0.5),
         clock=clock,
@@ -720,7 +721,7 @@ async def test_high_rarity_food_effect_survives_restart_and_is_consumed_once(
 
     economy = EconomyService(
         database,
-        CookingSection(),
+        CookingSection(cook_cooldown_seconds=0),
         EconomySection(),
         random_source=SequenceRandom(0.5, 0.0, 0.5),
         clock=clock,
@@ -794,7 +795,7 @@ async def test_extra_catch_food_extends_today_limit_and_consumes_only_bonus_uses
     source = await source_catching.catch(_identity(message_id="quota-source"))
     economy = EconomyService(
         database,
-        CookingSection(),
+        CookingSection(cook_cooldown_seconds=0),
         EconomySection(),
         random_source=SequenceRandom(0.5, 0.0, 0.5),
         clock=clock,
@@ -914,7 +915,7 @@ async def test_weekly_window_food_adds_five_to_every_window_without_stacking(
     source = await catching.catch(_identity(message_id="weekly-source"))
     economy = EconomyService(
         database,
-        CookingSection(),
+        CookingSection(cook_cooldown_seconds=0),
         EconomySection(),
         random_source=SequenceRandom(0.5, 0.0, 0.5),
         clock=clock,
@@ -972,7 +973,7 @@ async def test_permanent_window_food_refuses_to_consume_at_plus_five_cap(
     source = await catching.catch(_identity(message_id="permanent-source"))
     economy = EconomyService(
         database,
-        CookingSection(),
+        CookingSection(cook_cooldown_seconds=0),
         EconomySection(),
         random_source=SequenceRandom(0.5, 0.0, 0.5),
         clock=clock,
@@ -1076,7 +1077,7 @@ async def test_empty_selector_sells_cheapest_low_star_then_batch_sells_rest_once
 
     economy = EconomyService(
         database,
-        CookingSection(),
+        CookingSection(cook_cooldown_seconds=0),
         EconomySection(),
         clock=clock,
         id_factory=iter(("cheap-sale-ledger", "batch-sale-ledger")).__next__,
@@ -1120,7 +1121,7 @@ async def test_store_purchase_upgrade_insufficient_balance_and_ledger(
     await _grant_coins(database, seed_identity, 2000)
     service = EconomyService(
         database,
-        CookingSection(),
+        CookingSection(cook_cooldown_seconds=0),
         EconomySection(),
         clock=clock,
         id_factory=iter(
@@ -1214,7 +1215,7 @@ async def test_official_sales_credit_exact_value_once(
     _, caught = await _catch_one_star(database, clock=clock)
     service = EconomyService(
         database,
-        CookingSection(),
+        CookingSection(cook_cooldown_seconds=0),
         EconomySection(),
         clock=clock,
         id_factory=iter(("sale-ledger",)).__next__,
@@ -1273,7 +1274,7 @@ async def test_six_star_food_templates_are_group_isolated(tmp_path: Path) -> Non
     assert len(allowed) == 1
     assert denied == []
 
-    service = EconomyService(database, CookingSection(), EconomySection())
+    service = EconomyService(database, CookingSection(cook_cooldown_seconds=0), EconomySection())
     authorized_catalog = await service.food_catalog(
         _identity(group_id="100", user_id="201", message_id="authorized-food-catalog"),
         rarity=None,
@@ -1337,7 +1338,7 @@ async def test_six_star_pig_can_only_produce_its_paired_six_star_food(
     assert caught.pig.template_id == "pig-6-group"
     cooked = await EconomyService(
         database,
-        CookingSection(),
+        CookingSection(cook_cooldown_seconds=0),
         EconomySection(),
         random_source=SequenceRandom(0.999, 0.999, 0.5),
         clock=clock,
@@ -1384,7 +1385,7 @@ async def test_missing_six_star_pair_rolls_back_the_source_pig(
     ).catch(_identity(group_id="100", message_id="catch-six-unpaired"))
     cooking = EconomyService(
         database,
-        CookingSection(),
+        CookingSection(cook_cooldown_seconds=0),
         EconomySection(),
         random_source=SequenceRandom(0.999),
         clock=clock,
@@ -1436,4 +1437,399 @@ async def test_food_catalog_returns_every_visible_entry_without_page_limit(
     assert [entry.rarity for entry in catalog.entries] == sorted(
         entry.rarity for entry in catalog.entries
     )
+    await database.close()
+
+
+def _collab_pig_entry(rarity: int, *, suffix: str) -> dict[str, object]:
+    """合成一只带收藏图鉴的联动猪。"""
+    entry = _pig_entry(rarity, template_suffix=suffix)
+    entry["template_id"] = f"pig-collab-{suffix}"
+    entry["display_name"] = f"联动猪{suffix}"
+    entry["image"] = f"pig-collab-{suffix}.png"
+    entry["collection"] = {
+        "collaboration_name": "测试联动",
+        "collection_id": "test-collab",
+        "collection_name": "测试系列",
+        "slot": 1,
+        "total": 1,
+        "character_id": "test",
+        "character_name": "测试角色",
+        "official_profile_url": "https://bang-dream.com/artist/test/",
+    }
+    return entry
+
+
+@pytest.mark.asyncio
+async def test_cook_cooldown_blocks_second_cook_within_window(
+    tmp_path: Path,
+) -> None:
+    database = await _database_with_catalog(tmp_path)
+    clock = FixedClock()
+    _, caught = await _catch_one_star(database, clock=clock)
+    identity = _identity(message_id="cook-cd-1")
+    service = EconomyService(
+        database,
+        CookingSection(cook_cooldown_seconds=10),
+        EconomySection(),
+        random_source=SequenceRandom(0.0, 0.0, 0.5),
+        clock=clock,
+        id_factory=iter(("food-cd-1", "ledger-cd-1")).__next__,
+        short_code_factory=lambda: "CD000001",
+    )
+    first = await service.cook(identity, caught.pig.selector)
+    assert first.foods
+    # 同一时钟下第二次做菜应立即被冷却拦截，且不消耗原料
+    second_pig = await _catch_one_star(
+        database, clock=clock, message_id="cook-cd-2", short_code="CD000002"
+    )
+    with pytest.raises(CookCooldownError):
+        await service.cook(
+            _identity(message_id="cook-cd-2"),
+            second_pig[1].pig.selector,
+        )
+    leftover = await database.fetch_one(
+        "SELECT COUNT(*) AS count FROM pig_instances WHERE state = 'active'"
+    )
+    assert leftover is not None and leftover["count"] == 1
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_cook_cooldown_elapses_after_configured_seconds(
+    tmp_path: Path,
+) -> None:
+    database = await _database_with_catalog(tmp_path)
+    clock = FixedClock()
+    _, caught = await _catch_one_star(database, clock=clock)
+    service = EconomyService(
+        database,
+        CookingSection(cook_cooldown_seconds=10),
+        EconomySection(),
+        random_source=SequenceRandom(0.0, 0.0, 0.5, 0.0, 0.0, 0.5),
+        clock=clock,
+        id_factory=iter(("food-cd-a", "ledger-cd-a", "food-cd-b", "ledger-cd-b")).__next__,
+        short_code_factory=iter(("CDA00001", "CDB00002")).__next__,
+    )
+    await service.cook(_identity(message_id="cook-cd-a"), caught.pig.selector)
+    clock.value = clock.value + timedelta(seconds=11)
+    second = await _catch_one_star(
+        database, clock=clock, message_id="cook-cd-b", short_code="CD00000B"
+    )
+    result = await service.cook(
+        _identity(message_id="cook-cd-b"),
+        second[1].pig.selector,
+    )
+    assert result.foods
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_selector_matches_names_without_spaces_or_case(
+    tmp_path: Path,
+) -> None:
+    from pig_catcher.domain.selectors import parse_asset_selector
+    from pig_catcher.infrastructure.repositories import GameplayRepository
+
+    entry = _pig_entry(1, template_suffix="token")
+    entry["template_id"] = "pig-token-eater"
+    entry["display_name"] = "白吃 Token 的猪"
+    entry["image"] = "pig-token-eater.png"
+    database = await _database_with_catalog(
+        tmp_path,
+        pig_rarities=(),
+        food_rarities=(),
+        extra_entries=(entry,),
+    )
+    service = GameplayService(
+        database,
+        CatchingSection(cooldown_seconds=0),
+        random_source=SequenceRandom(0.0, 0.0, 0.5, 0.5, 0.5, 0.5, 0.5),
+        clock=FixedClock(),
+        id_factory=iter(("pig-token-1", "ledger-token-1")).__next__,
+        short_code_factory=lambda: "A11E8888",
+    )
+    identity = _identity(message_id="token-catch")
+    result = await service.catch(identity)
+    assert result.pig.display_name == "白吃 Token 的猪"
+    repository = GameplayRepository()
+    async with database.transaction() as session:
+        for variant in (
+            "白吃Token的猪",
+            "白吃token的猪",
+            "白吃 TOKEN 的猪",
+            "白吃token的猪#A11E8888",
+            "白吃 Token 的猪",
+        ):
+            rows = await repository.find_active_pigs(
+                session,
+                player_id=identity.player_id,
+                selector=parse_asset_selector(variant),
+            )
+            assert len(rows) == 1, f"variant failed: {variant}"
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_batch_sell_keeps_collaboration_pigs_and_supports_rarity_filter(
+    tmp_path: Path,
+) -> None:
+    database = await _database_with_catalog(
+        tmp_path,
+        pig_rarities=(1, 2),
+        food_rarities=(),
+        extra_entries=(_collab_pig_entry(1, suffix="a"),),
+    )
+    clock = FixedClock()
+    service = GameplayService(
+        database,
+        CatchingSection(cooldown_seconds=0),
+        random_source=SequenceRandom(
+            # 1 星普通猪
+            0.0, 0.0, 0.5, 0.5, 0.5, 0.5, 0.5,
+            # 2 星普通猪（仅 1/2 星模板时二星区间约 0.57~1.0）
+            0.8, 0.0, 0.5, 0.5, 0.5, 0.5, 0.5,
+            # 1 星联动猪（template_roll=0.9 选中后插入的联动模板）
+            0.0, 0.9, 0.5, 0.5, 0.5, 0.5, 0.5,
+        ),
+        clock=clock,
+        id_factory=iter(
+            (
+                "pig-b1", "ledger-b1",
+                "pig-b2", "ledger-b2",
+                "pig-b3", "ledger-b3",
+            )
+        ).__next__,
+        short_code_factory=iter(("B1000001", "B1000002", "B1000003")).__next__,
+    )
+    identity = _identity(message_id="batch-sell")
+    # 抓 1 星普通、2 星普通、1 星联动
+    for mid in ("batch-1", "batch-2", "batch-3"):
+        await service.catch(_identity(message_id=mid, user_id="200"))
+
+    economy = EconomyService(
+        database,
+        CookingSection(cook_cooldown_seconds=0),
+        EconomySection(),
+        clock=clock,
+        id_factory=iter(("ledger-bx", "ledger-by")).__next__,
+    )
+    # 指定品质：二星 → 只卖 2 星普通猪
+    sold = await economy.batch_sell_low_rarity(
+        identity,
+        asset_kind="pig",
+        max_rarity=3,
+        rarity=2,
+    )
+    assert sold.asset_count == 1
+    assert sold.rarity == 2
+    remaining = await database.fetch_one(
+        """
+        SELECT COUNT(*) AS count
+        FROM pig_instances
+        WHERE owner_player_id = ? AND state = 'active'
+        """,
+        (identity.player_id,),
+    )
+    assert remaining is not None and remaining["count"] == 2  # 1 星普通 + 1 星联动
+    # 不指定品质（1-3 星）：1 星普通被卖，联动猪仍保护
+    sold_all = await economy.batch_sell_low_rarity(
+        _identity(message_id="batch-sell-2", user_id="200"),
+        asset_kind="pig",
+        max_rarity=3,
+    )
+    assert sold_all.asset_count == 1
+    collab_left = await database.fetch_one(
+        "SELECT COUNT(*) AS count FROM pig_instances WHERE state = 'active'"
+    )
+    assert collab_left is not None and collab_left["count"] == 1
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_batch_cook_skips_collaboration_pigs_and_sorts_by_rarity_desc(
+    tmp_path: Path,
+) -> None:
+    from pig_catcher.rendering import batch_cook_view
+
+    database = await _database_with_catalog(
+        tmp_path,
+        pig_rarities=(1,),
+        food_rarities=(1,),
+        extra_entries=(_collab_pig_entry(1, suffix="a"),),
+    )
+    clock = FixedClock()
+    service = GameplayService(
+        database,
+        CatchingSection(cooldown_seconds=0),
+        random_source=SequenceRandom(
+            # 1 星普通猪
+            0.0, 0.0, 0.5, 0.5, 0.5, 0.5, 0.5,
+            # 1 星普通猪
+            0.0, 0.0, 0.5, 0.5, 0.5, 0.5, 0.5,
+            # 1 星联动猪
+            0.0, 0.9, 0.5, 0.5, 0.5, 0.5, 0.5,
+        ),
+        clock=clock,
+        id_factory=iter(
+            (
+                "pig-k1", "ledger-k1",
+                "pig-k2", "ledger-k2",
+                "pig-k3", "ledger-k3",
+            )
+        ).__next__,
+        short_code_factory=iter(("A1000001", "A1000002", "A1000003")).__next__,
+    )
+    identity = _identity(message_id="batch-cook")
+    for mid in ("cook-1", "cook-2", "cook-3"):
+        await service.catch(_identity(message_id=mid, user_id="200"))
+
+    economy = EconomyService(
+        database,
+        CookingSection(cook_cooldown_seconds=0),
+        EconomySection(),
+        random_source=SequenceRandom(0.0, 0.0, 0.5, 0.0, 0.0, 0.5),
+        clock=clock,
+        id_factory=iter(("ck-food-1", "ck-ledger-1", "ck-food-2", "ck-ledger-2")).__next__,
+        short_code_factory=iter(("ABAD0001", "ABAD0002", "ABAD0003")).__next__,
+    )
+    result = await economy.batch_cook(identity, rarity=None)
+    assert result.pig_count == 2  # 联动猪被保护
+    assert result.food_count == 2
+    # 联动猪仍在背包
+    collab_left = await database.fetch_one(
+        "SELECT COUNT(*) AS count FROM pig_instances WHERE state = 'active'"
+    )
+    assert collab_left is not None and collab_left["count"] == 1
+    view = batch_cook_view(result)
+    assert view.food_count == 2
+    rarities = [item.rarity for item in view.items]
+    assert rarities == sorted(rarities, reverse=True)
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_batch_cook_is_blocked_while_multi_use_cook_effect_is_held(
+    tmp_path: Path,
+) -> None:
+    from pig_catcher.domain.errors import BatchCookRestrictedError
+
+    database = await _database_with_catalog(
+        tmp_path,
+        pig_rarities=(1,),
+        food_rarities=(1, 5),
+    )
+    clock = FixedClock()
+    service = GameplayService(
+        database,
+        CatchingSection(cooldown_seconds=0),
+        random_source=SequenceRandom(
+            0.0, 0.0, 0.5, 0.5, 0.5, 0.5, 0.5,
+            0.0, 0.0, 0.5, 0.5, 0.5, 0.5, 0.5,
+            0.0, 0.0, 0.5, 0.5, 0.5, 0.5, 0.5,
+        ),
+        clock=clock,
+        id_factory=iter(
+            (
+                "pig-m1", "ledger-m1",
+                "pig-m2", "ledger-m2",
+                "pig-m3", "ledger-m3",
+            )
+        ).__next__,
+        short_code_factory=iter(("A1000001", "A1000002", "A1000003")).__next__,
+    )
+    identity = _identity(message_id="batch-cook-limit")
+    for mid in ("cook-a", "cook-b", "cook-c"):
+        await service.catch(_identity(message_id=mid, user_id="200"))
+
+    # 先单做一次，产生一个真实美食实例作为效果来源（外键约束）
+    pig_row = await database.fetch_one(
+        """
+        SELECT display_name_snapshot, short_code
+        FROM pig_instances
+        WHERE owner_player_id = ? AND state = 'active'
+        ORDER BY acquired_at DESC LIMIT 1
+        """,
+        (identity.player_id,),
+    )
+    assert pig_row is not None
+    economy = EconomyService(
+        database,
+        CookingSection(cook_cooldown_seconds=0),
+        EconomySection(),
+        random_source=SequenceRandom(
+            0.0, 0.0, 0.5,
+            0.0, 0.0, 0.5,
+            0.0, 0.0, 0.5,
+        ),
+        clock=clock,
+        id_factory=iter(
+            (
+                "ec-food-1", "ec-ledger-1",
+                "ec-food-2", "ec-ledger-2",
+                "ec-food-3", "ec-ledger-3",
+            )
+        ).__next__,
+        short_code_factory=iter(("ABAD0001", "ABAD0002", "ABAD0003")).__next__,
+    )
+    await economy.cook(
+        _identity(message_id="cook-one"),
+        f"{pig_row['display_name_snapshot']}#{pig_row['short_code']}",
+    )
+    food_row = await database.fetch_one(
+        "SELECT food_instance_id FROM food_instances WHERE owner_player_id = ? LIMIT 1",
+        (identity.player_id,),
+    )
+    assert food_row is not None
+    async with database.transaction() as session:
+        await session.execute(
+            """
+            INSERT INTO player_food_effects(
+                effect_entry_id, player_id, source_food_instance_id,
+                effect_id, params_json, granted_uses, consumed_uses,
+                expires_at, created_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, 0, NULL, ?, ?)
+            """,
+            (
+                "multi-cook-effect",
+                identity.player_id,
+                str(food_row["food_instance_id"]),
+                "next-five-star-cook",
+                '{"uses":5}',
+                5,
+                "2026-07-28T00:00:00.000Z",
+                "2026-07-28T00:00:00.000Z",
+            ),
+        )
+
+    # 持有 5 次必出五星菜效果：批量做菜被拒绝
+    with pytest.raises(BatchCookRestrictedError) as excinfo:
+        await economy.batch_cook(identity, rarity=None)
+    assert "只能逐个使用 /做菜" in str(excinfo.value)
+
+    # 效果剩余 1 次：仍然全程禁止批量做菜
+    async with database.transaction() as session:
+        await session.execute(
+            """
+            UPDATE player_food_effects
+            SET consumed_uses = 4, updated_at = ?
+            WHERE effect_entry_id = 'multi-cook-effect'
+            """,
+            ("2026-07-28T00:00:00.000Z",),
+        )
+    with pytest.raises(BatchCookRestrictedError):
+        await economy.batch_cook(identity, rarity=None)
+
+    # 效果用尽（剩余 0）后：放行批量做菜
+    async with database.transaction() as session:
+        await session.execute(
+            """
+            UPDATE player_food_effects
+            SET consumed_uses = 5, updated_at = ?
+            WHERE effect_entry_id = 'multi-cook-effect'
+            """,
+            ("2026-07-28T00:00:00.000Z",),
+        )
+    result = await economy.batch_cook(identity, rarity=None)
+    assert result.pig_count == 2
     await database.close()

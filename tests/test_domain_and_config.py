@@ -296,6 +296,148 @@ def test_food_rarity_effect_cannot_bypass_six_star_cooking_rule() -> None:
         )
 
 
+def _active_effect(
+    effect_entry_id: str,
+    effect_id: str,
+    params: dict[str, object],
+    *,
+    created_at: str,
+) -> ActiveFoodEffect:
+    return ActiveFoodEffect(
+        effect_entry_id=effect_entry_id,
+        effect_id=effect_id,
+        params=params,
+        granted_uses=1,
+        consumed_uses=0,
+        expires_at="",
+        created_at=created_at,
+    )
+
+
+def test_same_family_catch_effects_do_not_stack_and_report_skipped() -> None:
+    # 同属“抓猪概率组”的三个效果：只应生效最早的一个，其余被互斥跳过
+    quality = _active_effect(
+        "quality",
+        "next-catch-quality",
+        {"multiplier": 2.0},
+        created_at="2026-08-07T00:00:00.000Z",
+    )
+    exact_six = _active_effect(
+        "exact-six",
+        "next-six-star-catch",
+        {"six_star_percent": 50},
+        created_at="2026-08-07T00:00:01.000Z",
+    )
+    rarity = _active_effect(
+        "rarity",
+        "next-pig-rarity",
+        {"rarity": 5, "multiplier": 3.0},
+        created_at="2026-08-07T00:00:02.000Z",
+    )
+    application = apply_catch_effects(BASE_CATCH_WEIGHTS, [quality, exact_six, rarity])
+    assert application.consumed_entry_ids == ("quality",)
+    assert len(application.summaries) == 1
+    assert len(application.skipped_summaries) == 2
+    assert all("未叠加" in text for text in application.skipped_summaries)
+    # 体型组与概率组正交，可同时生效
+    stature = _active_effect(
+        "stature",
+        "next-pig-stature",
+        {"mode": "giant", "strength": 0.2},
+        created_at="2026-08-07T00:00:00.000Z",
+    )
+    combined = apply_catch_effects(BASE_CATCH_WEIGHTS, [quality, stature])
+    assert combined.consumed_entry_ids == ("quality", "stature")
+    assert combined.stature_bias == pytest.approx(0.2)
+
+
+def test_same_family_cooking_effects_do_not_stack_and_report_skipped() -> None:
+    shift = _active_effect(
+        "shift",
+        "next-cook-quality",
+        {"shift_percent": 8},
+        created_at="2026-08-07T00:00:00.000Z",
+    )
+    rarity = _active_effect(
+        "rarity",
+        "next-food-rarity",
+        {"rarity": 4, "multiplier": 2.0},
+        created_at="2026-08-07T00:00:01.000Z",
+    )
+    application = apply_cooking_effects(
+        cooking_weights(3),
+        [shift, rarity],
+        source_rarity=3,
+    )
+    assert application.consumed_entry_ids == ("shift",)
+    assert len(application.skipped_summaries) == 1
+    assert "未叠加" in application.skipped_summaries[0]
+    # 不同名菜效果签名唯一性由目录测试覆盖；此处仅验证互斥分组
+
+
+def test_six_star_exclusive_effects_override_weights_with_multi_uses() -> None:
+    # 雾蓝键盘大福：固定高星分布 4/5/6 = 60/30/10，uses=5
+    high_star = _active_effect(
+        "high-star",
+        "next-high-star-catch",
+        {"uses": 5, "four_star_percent": 60, "five_star_percent": 30, "six_star_percent": 10},
+        created_at="2026-08-07T00:00:00.000Z",
+    )
+    application = apply_catch_effects(BASE_CATCH_WEIGHTS, [high_star])
+    assert application.weights == pytest.approx((0.0, 0.0, 0.0, 60.0, 30.0, 10.0))
+    assert application.consumed_entry_ids == ("high-star",)
+    # 彩彩修车猪慕斯：必出五星菜
+    five_cook = _active_effect(
+        "five-cook",
+        "next-five-star-cook",
+        {"uses": 5},
+        created_at="2026-08-07T00:00:00.000Z",
+    )
+    cook_application = apply_cooking_effects(
+        cooking_weights(3),
+        [five_cook],
+        source_rarity=3,
+    )
+    assert cook_application.weights == pytest.approx((0.0, 0.0, 0.0, 0.0, 100.0, 0.0))
+    # 猪保千猪排轮盘：六档等概率
+    even = _active_effect(
+        "even",
+        "even-catch-distribution",
+        {"uses": 5},
+        created_at="2026-08-07T00:00:00.000Z",
+    )
+    even_application = apply_catch_effects(BASE_CATCH_WEIGHTS, [even])
+    assert all(
+        pytest.approx(value) == pytest.approx(100.0 / 6)
+        for value in even_application.weights
+    )
+    # 无六星素材时，轮盘效果把六星份额并入五星
+    no_six = list(BASE_CATCH_WEIGHTS)
+    no_six[5] = 0.0
+    even_no_six = apply_catch_effects(no_six, [even])
+    assert even_no_six.weights[4] == pytest.approx(100.0 / 6 * 2)
+    assert even_no_six.weights[5] == 0.0
+    # 糖醋排骨独占加权
+    exclusive = _active_effect(
+        "exclusive",
+        "exclusive-catch-quality",
+        {"multiplier": 3.0},
+        created_at="2026-08-07T00:00:00.000Z",
+    )
+    exclusive_application = apply_catch_effects(BASE_CATCH_WEIGHTS, [exclusive])
+    assert sum(exclusive_application.weights[3:]) > sum(BASE_CATCH_WEIGHTS[3:])
+    # 独占效果与普通加权效果同属互斥组：只生效最早的一个
+    mixed = apply_catch_effects(BASE_CATCH_WEIGHTS, [exclusive, high_star])
+    assert mixed.consumed_entry_ids == ("exclusive",)
+    assert len(mixed.skipped_summaries) == 1
+
+
+def test_quota_reset_chance_resolves_to_one_use_grant() -> None:
+    grant = resolve_food_effect("quota-reset", {"count": 1})
+    assert grant.granted_uses == 1
+    assert "/重置额度" in grant.summary
+
+
 def test_numeric_level_and_honor_title_remain_separate_progress_tracks() -> None:
     assert level_progress(0).level == 1
     assert level_progress(50).level == 2

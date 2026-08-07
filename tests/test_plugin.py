@@ -236,7 +236,7 @@ async def test_group_reset_command_rejects_unconfigured_user_before_backup(
 def test_plugin_registers_only_explicit_production_commands() -> None:
     plugin = create_plugin()
     components = plugin.get_components()
-    assert len(components) == 32
+    assert len(components) == 34
     commands = {
         component["name"]
         for component in components
@@ -245,6 +245,7 @@ def test_plugin_registers_only_explicit_production_commands() -> None:
     assert commands == {
         "pig_catcher_help",
         "pig_catcher_reset_quota",
+        "pig_catcher_reset_quota_chance",
         "pig_catcher_catch",
         "pig_catcher_profile",
         "pig_catcher_pig_detail",
@@ -254,6 +255,7 @@ def test_plugin_registers_only_explicit_production_commands() -> None:
         "pig_catcher_use_item",
         "pig_catcher_cancel_item",
         "pig_catcher_cook",
+        "pig_catcher_batch_cook",
         "pig_catcher_food_detail",
         "pig_catcher_food_inventory",
         "pig_catcher_food_catalog",
@@ -568,7 +570,7 @@ async def test_complete_third_round_command_flow_and_duplicate_publication(
 ) -> None:
     plugin, context = await create_test_plugin(
         tmp_path,
-        config_updates={"catching": {"cooldown_seconds": 0}},
+        config_updates={"catching": {"cooldown_seconds": 0}, "cooking": {"cook_cooldown_seconds": 0}},
     )
     await _install_test_pig(plugin, tmp_path)
     message = build_message(message_id="catch-once")
@@ -628,7 +630,7 @@ async def test_alternate_catch_preface_is_not_resent_for_duplicate_delivery(
 ) -> None:
     plugin, context = await create_test_plugin(
         tmp_path,
-        config_updates={"catching": {"cooldown_seconds": 0}},
+        config_updates={"catching": {"cooldown_seconds": 0}, "cooking": {"cook_cooldown_seconds": 0}},
     )
     await _install_test_pig(plugin, tmp_path, alternate=True)
     message = build_message(message_id="alternate-catch-once")
@@ -654,7 +656,7 @@ async def test_complete_fourth_round_command_flow_and_duplicate_publication(
 ) -> None:
     plugin, context = await create_test_plugin(
         tmp_path,
-        config_updates={"catching": {"cooldown_seconds": 0}},
+        config_updates={"catching": {"cooldown_seconds": 0}, "cooking": {"cook_cooldown_seconds": 0}},
     )
     await _install_test_pig(plugin, tmp_path, include_food=True)
 
@@ -865,7 +867,7 @@ async def test_complete_fifth_round_command_flow_with_structured_mention(
 ) -> None:
     plugin, context = await create_test_plugin(
         tmp_path,
-        config_updates={"catching": {"cooldown_seconds": 0}},
+        config_updates={"catching": {"cooldown_seconds": 0}, "cooking": {"cook_cooldown_seconds": 0}},
     )
     await _install_test_pig(plugin, tmp_path)
     for index in range(2):
@@ -1006,7 +1008,7 @@ async def test_cooking_render_failure_falls_back_once_without_rollback(
 ) -> None:
     plugin, context = await create_test_plugin(
         tmp_path,
-        config_updates={"catching": {"cooldown_seconds": 0}},
+        config_updates={"catching": {"cooldown_seconds": 0}, "cooking": {"cook_cooldown_seconds": 0}},
     )
     await _install_test_pig(plugin, tmp_path, include_food=True)
     await plugin.handle_catch(
@@ -1056,7 +1058,7 @@ async def test_catch_render_failure_falls_back_once_without_rollback(
 ) -> None:
     plugin, context = await create_test_plugin(
         tmp_path,
-        config_updates={"catching": {"cooldown_seconds": 0}},
+        config_updates={"catching": {"cooldown_seconds": 0}, "cooking": {"cook_cooldown_seconds": 0}},
     )
     await _install_test_pig(plugin, tmp_path)
     context.render.error = RuntimeError("chromium unavailable")
@@ -1088,7 +1090,7 @@ async def test_catch_image_send_failure_falls_back_once_across_restart(
 ) -> None:
     first_plugin, first_context = await create_test_plugin(
         tmp_path,
-        config_updates={"catching": {"cooldown_seconds": 0}},
+        config_updates={"catching": {"cooldown_seconds": 0}, "cooking": {"cook_cooldown_seconds": 0}},
     )
     await _install_test_pig(first_plugin, tmp_path)
     first_context.send.image_error = RuntimeError("qq image transport unavailable")
@@ -1113,7 +1115,7 @@ async def test_catch_image_send_failure_falls_back_once_across_restart(
 
     second_plugin, second_context = await create_test_plugin(
         tmp_path,
-        config_updates={"catching": {"cooldown_seconds": 0}},
+        config_updates={"catching": {"cooldown_seconds": 0}, "cooking": {"cook_cooldown_seconds": 0}},
     )
     duplicate = await second_plugin.handle_catch(
         stream_id="stream-10001",
@@ -1134,7 +1136,7 @@ async def test_missing_pig_asset_uses_image_placeholder(
 ) -> None:
     plugin, context = await create_test_plugin(
         tmp_path,
-        config_updates={"catching": {"cooldown_seconds": 0}},
+        config_updates={"catching": {"cooldown_seconds": 0}, "cooking": {"cook_cooldown_seconds": 0}},
     )
     await _install_test_pig(plugin, tmp_path, animated=animated)
     row = await plugin.database.fetch_one(
@@ -1297,7 +1299,7 @@ async def test_sent_receipt_remains_suppressed_after_plugin_restart(
 ) -> None:
     first_plugin, first_context = await create_test_plugin(
         tmp_path,
-        config_updates={"catching": {"cooldown_seconds": 0}},
+        config_updates={"catching": {"cooldown_seconds": 0}, "cooking": {"cook_cooldown_seconds": 0}},
     )
     await _install_test_pig(first_plugin, tmp_path)
     message = build_message(message_id="restart-duplicate")
@@ -1310,7 +1312,7 @@ async def test_sent_receipt_remains_suppressed_after_plugin_restart(
 
     second_plugin, second_context = await create_test_plugin(
         tmp_path,
-        config_updates={"catching": {"cooldown_seconds": 0}},
+        config_updates={"catching": {"cooldown_seconds": 0}, "cooking": {"cook_cooldown_seconds": 0}},
     )
     duplicate = await second_plugin.handle_catch(
         stream_id="stream-10001",
@@ -1329,7 +1331,7 @@ async def test_animated_catch_command_preserves_all_frames_and_loop(
 ) -> None:
     plugin, context = await create_test_plugin(
         tmp_path,
-        config_updates={"catching": {"cooldown_seconds": 0}},
+        config_updates={"catching": {"cooldown_seconds": 0}, "cooking": {"cook_cooldown_seconds": 0}},
     )
     await _install_test_pig(plugin, tmp_path, animated=True)
     result = await plugin.handle_catch(
@@ -1348,4 +1350,113 @@ async def test_animated_catch_command_preserves_all_frames_and_loop(
             image.seek(frame_index)
             durations.append(image.info["duration"])
     assert durations == [80, 120, 160]
+    await plugin.on_unload()
+
+
+@pytest.mark.asyncio
+async def test_quota_reset_chance_requires_held_effect_and_consumes_once(
+    tmp_path: Path,
+) -> None:
+    plugin, context = await create_test_plugin(
+        tmp_path,
+        config_updates={"catching": {"cooldown_seconds": 0}, "cooking": {"cook_cooldown_seconds": 0}},
+    )
+    await _install_test_pig(plugin, tmp_path, include_food=True)
+    # 抓猪 + 做菜，产生一个真实美食实例作为效果来源（外键约束）
+    await plugin.handle_catch(
+        stream_id="stream-10001",
+        **_command_kwargs(build_message(message_id="chance-seed-catch")),
+    )
+    pig_row = await plugin.database.fetch_one(
+        """
+        SELECT display_name_snapshot, short_code
+        FROM pig_instances
+        WHERE owner_player_id = 'qq:10001:20001' AND state = 'active'
+        ORDER BY acquired_at DESC LIMIT 1
+        """
+    )
+    assert pig_row is not None
+    await plugin.handle_cook(
+        stream_id="stream-10001",
+        **_command_kwargs(
+            build_message(message_id="chance-seed-cook"),
+            selector=f"{pig_row['display_name_snapshot']}#{pig_row['short_code']}",
+        ),
+    )
+    food_row = await plugin.database.fetch_one(
+        """
+        SELECT food_instance_id
+        FROM food_instances
+        WHERE owner_player_id = 'qq:10001:20001'
+        ORDER BY acquired_at DESC LIMIT 1
+        """
+    )
+    assert food_row is not None
+    food_id = str(food_row["food_instance_id"])
+    chance_message = build_message(
+        group_id="10001",
+        user_id="20001",
+        display_name="普通成员",
+        message_id="chance-reset-1",
+    )
+    # 未持有重置机会：拒绝
+    denied = await plugin.handle_reset_quota_chance(
+        stream_id="stream-10001",
+        **_command_kwargs(chance_message),
+    )
+    assert denied[0] is False
+    assert "糖醋排骨" in denied[1]
+
+    # 插入一次 quota-reset 效果后再次调用：成功且只消耗一次
+    async with plugin.database.transaction() as session:
+        await session.execute(
+            """
+            INSERT INTO player_food_effects(
+                effect_entry_id, player_id, source_food_instance_id,
+                effect_id, params_json, granted_uses, consumed_uses,
+                expires_at, created_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, 0, NULL, ?, ?)
+            """,
+            (
+                "chance-effect-1",
+                "qq:10001:20001",
+                food_id,
+                "quota-reset",
+                '{"count":1}',
+                1,
+                "2026-07-28T00:00:00.000Z",
+                "2026-07-28T00:00:00.000Z",
+            ),
+        )
+    granted = await plugin.handle_reset_quota_chance(
+        stream_id="stream-10001",
+        **_command_kwargs(chance_message),
+    )
+    assert granted[0] is True
+    assert "已归零：1 次" in granted[1]
+    assert len(context.send.texts) == 2  # 拒绝提示 + 成功回执
+    leftover = await plugin.database.fetch_one(
+        """
+        SELECT consumed_uses, granted_uses
+        FROM player_food_effects
+        WHERE effect_entry_id = 'chance-effect-1'
+        """
+    )
+    assert leftover is not None
+    assert leftover["consumed_uses"] == 1
+    assert leftover["granted_uses"] == 1
+    # 效果已用尽：再次使用被拒绝
+    exhausted = await plugin.handle_reset_quota_chance(
+        stream_id="stream-10001",
+        **_command_kwargs(
+            build_message(
+                group_id="10001",
+                user_id="20001",
+                display_name="普通成员",
+                message_id="chance-reset-2",
+            )
+        ),
+    )
+    assert exhausted[0] is False
     await plugin.on_unload()
