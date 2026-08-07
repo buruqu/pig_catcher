@@ -888,3 +888,18 @@
   审计事件 `cbe5e669…`、`d6fc91f3…`。19:00 窗口切换后全量自动恢复每时段 5 次。
 - 自动回归为 pytest `191 passed`（新增提额端到端测试与面板一次性提额测试）；Ruff、
   Python `compileall` 全部通过。
+## 36. v1.6.7 六星内容四群全量开放与跨群授权修复验收
+
+- 验收日期：`2026-08-07`。插件升级为 `local.pig-catcher v1.6.7`，Schema `13`、
+  Asset Manifest `4`、Ruleset `12` 保持不变；旧数据不需要迁移。
+- 目录新增：两个 `qq-official:<openid>` 数据域各 7 猪 + 7 菜（NapCat 双群六星
+  定制内容的官方群副本，`template_id` 前缀 `qo<openid>`，`paired_food_template_id`
+  同域配对），模板总数 182 → 210；全部 8 道六星菜（含糖醋排骨）在四个群可抓、可做、可吃。
+- 修复 v1.6.2 遗留跨群授权 bug：官方群 scope 曾错误持有 NapCat `qq:237716658`
+  的 7 猪 + 7 菜授权（在线备份 `pre-sixstar-cleanup-20260807-152540` 佐证）。
+  一次性修正脚本清理 28 条脏授权，并把官方群已持有的 118 只实例、129 条图鉴
+  记录迁移合并到官方群 `qo` 模板（图鉴合并 acquired_count/best_size/best_weight，
+  first/last 取极值）；执行后孤儿实例/图鉴为 0。
+- 素材目录重建导入：210 项模板、162 份唯一内容、213 份隔离存储媒体，
+  新目录哈希 `976761ab88…`，运行库 catalog hash `69c2dc82…`。
+- 自动回归为 pytest `191 passed`；Ruff、Python `compileall` 全部通过。

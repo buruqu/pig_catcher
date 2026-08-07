@@ -3089,6 +3089,506 @@
       "effect_params": {
         "multiplier": 3.0
       }
+    },
+    {
+      "template_id": "pig-qo5e5854406d0297d6feae696a13e3a339-juejue",
+      "source_path": "定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/撅撅猪.jpg",
+      "kind": "pig",
+      "display_name": "撅撅猪",
+      "rarity": 6,
+      "description": "撅撅。",
+      "fat_profile": "balanced",
+      "recipe_tags": [
+        "群友定制",
+        "动画"
+      ],
+      "group_scope_id": "qq-official:5E5854406D0297D6FEAE696A13E3A339",
+      "paired_food_template_id": "food-qo5e5854406d0297d6feae696a13e3a339-juejue-pie"
+    },
+    {
+      "template_id": "pig-qo5e5854406d0297d6feae696a13e3a339-1004",
+      "source_path": "定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/1004猪鼻哥.jpg",
+      "kind": "pig",
+      "display_name": "1004猪鼻哥",
+      "rarity": 6,
+      "description": "救我！！！！！晚上救来不及咯！",
+      "fat_profile": "balanced",
+      "recipe_tags": [
+        "群友定制",
+        "冲榜"
+      ],
+      "group_scope_id": "qq-official:5E5854406D0297D6FEAE696A13E3A339",
+      "paired_food_template_id": "food-qo5e5854406d0297d6feae696a13e3a339-1004-omelette"
+    },
+    {
+      "template_id": "pig-qo5e5854406d0297d6feae696a13e3a339-xiaoma",
+      "source_path": "定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/小马猪.png",
+      "kind": "pig",
+      "display_name": "小马猪",
+      "rarity": 6,
+      "length_min_cm": 120,
+      "length_max_cm": 260,
+      "weight_min_kg": 250,
+      "weight_max_kg": 1200,
+      "stature_profile": "giant",
+      "description": "马头、猪身、贝斯和咖啡同台营业，物种鉴定卡在半路，演出与加餐倒是从不迟到。",
+      "fat_profile": "balanced",
+      "recipe_tags": [
+        "群友定制",
+        "小马哥",
+        "贝斯",
+        "咖啡"
+      ],
+      "group_scope_id": "qq-official:5E5854406D0297D6FEAE696A13E3A339",
+      "paired_food_template_id": "food-qo5e5854406d0297d6feae696a13e3a339-xiaoma-mont-blanc"
+    },
+    {
+      "template_id": "pig-qo5e5854406d0297d6feae696a13e3a339-soft-sakiko",
+      "source_path": "定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/软糯丰川祥猪.png",
+      "kind": "pig",
+      "display_name": "软糯丰川祥猪",
+      "rarity": 6,
+      "description": "把丰川祥的端正气质揉进软糯猪团里，外表温温柔柔，心里却像琴键一样有清晰分寸。",
+      "fat_profile": "balanced",
+      "recipe_tags": [
+        "群友定制",
+        "丰川祥",
+        "软糯"
+      ],
+      "group_scope_id": "qq-official:5E5854406D0297D6FEAE696A13E3A339",
+      "paired_food_template_id": "food-qo5e5854406d0297d6feae696a13e3a339-mist-blue-keyboard-daifuku"
+    },
+    {
+      "template_id": "pig-qo5e5854406d0297d6feae696a13e3a339-xiangni-daozao",
+      "source_path": "定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/向你道早猪.gif",
+      "kind": "pig",
+      "display_name": "向你道早猪",
+      "rarity": 6,
+      "description": "一边晃着动态图小身板，一边认真把“早”递到你面前；早安说得很轻，存在感却会循环播放。",
+      "fat_profile": "balanced",
+      "recipe_tags": [
+        "群友定制",
+        "早安",
+        "动态"
+      ],
+      "group_scope_id": "qq-official:5E5854406D0297D6FEAE696A13E3A339",
+      "paired_food_template_id": "food-qo5e5854406d0297d6feae696a13e3a339-xiangni-daozao-chocolate-cornet"
+    },
+    {
+      "template_id": "pig-qo5e5854406d0297d6feae696a13e3a339-aya-repair",
+      "source_path": "定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/彩彩修车猪.png",
+      "kind": "pig",
+      "display_name": "彩彩修车猪",
+      "rarity": 6,
+      "description": "从玩家社区“しゅわ≈修哇、联机房≈车”的谐音梗里开出来的彩彩修车猪；顶着丸山彩的粉发，带着紧张汗滴和星形小车，攥紧扳手也要把每趟联机修得闪闪发光——这不是官方职业设定。",
+      "fat_profile": "balanced",
+      "recipe_tags": [
+        "群友定制",
+        "Pastel＊Palettes",
+        "彩彩修车",
+        "社区梗"
+      ],
+      "group_scope_id": "qq-official:5E5854406D0297D6FEAE696A13E3A339",
+      "paired_food_template_id": "food-qo5e5854406d0297d6feae696a13e3a339-aya-repair-mousse"
+    },
+    {
+      "template_id": "pig-qo5e5854406d0297d6feae696a13e3a339-baogian",
+      "source_path": "定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/保千猪.png",
+      "kind": "pig",
+      "display_name": "保千猪",
+      "rarity": 6,
+      "description": "因为猪保千，现在保千猪的信誉分已经不够刷共享单车赶去加餐了。",
+      "fat_profile": "balanced",
+      "recipe_tags": [
+        "群友定制",
+        "保千",
+        "表情包"
+      ],
+      "group_scope_id": "qq-official:5E5854406D0297D6FEAE696A13E3A339",
+      "paired_food_template_id": "food-qo5e5854406d0297d6feae696a13e3a339-baogian-pork-roulette",
+      "alternate_image": "定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/猪保千表情包.png"
+    },
+    {
+      "template_id": "food-qo5e5854406d0297d6feae696a13e3a339-juejue-pie",
+      "source_path": "定制美食库/5E5854406D0297D6FEAE696A13E3A339/撅撅猪派.png",
+      "kind": "food",
+      "display_name": "撅撅猪派",
+      "rarity": 6,
+      "description": "两只软乎乎的撅撅猪叠在酥皮上，派还没切，它们先把姿势撅整齐了。",
+      "recipe_tags": [
+        "群友定制",
+        "甜点"
+      ],
+      "group_scope_id": "qq-official:5E5854406D0297D6FEAE696A13E3A339",
+      "effect_id": "permanent-window-catch",
+      "effect_params": {
+        "count": 1,
+        "max_bonus": 5
+      }
+    },
+    {
+      "template_id": "food-qo5e5854406d0297d6feae696a13e3a339-1004-omelette",
+      "source_path": "定制美食库/5E5854406D0297D6FEAE696A13E3A339/猪鼻蛋包饭.png",
+      "kind": "food",
+      "display_name": "猪鼻蛋包饭",
+      "rarity": 6,
+      "description": "冲榜差四名的遗憾被完整包进蛋皮，21:50 才醒的猪鼻哥现在终于赶上了出餐。",
+      "recipe_tags": [
+        "群友定制",
+        "蛋包饭",
+        "冲榜"
+      ],
+      "group_scope_id": "qq-official:5E5854406D0297D6FEAE696A13E3A339",
+      "effect_id": "next-six-star-cook",
+      "effect_params": {
+        "six_star_percent": 60
+      }
+    },
+    {
+      "template_id": "food-qo5e5854406d0297d6feae696a13e3a339-xiaoma-mont-blanc",
+      "source_path": "定制美食库/5E5854406D0297D6FEAE696A13E3A339/小马猪蒙布朗.png",
+      "kind": "food",
+      "display_name": "小马猪蒙布朗",
+      "rarity": 6,
+      "description": "蒙布朗栗子奶油梳成小马猪长鬃，背上再顶一颗栗子；贝斯靠边一放，甜点也能开一场低音专场。",
+      "recipe_tags": [
+        "群友定制",
+        "小马哥",
+        "蒙布朗",
+        "栗子"
+      ],
+      "group_scope_id": "qq-official:5E5854406D0297D6FEAE696A13E3A339",
+      "effect_id": "next-six-star-catch",
+      "effect_params": {
+        "six_star_percent": 60
+      }
+    },
+    {
+      "template_id": "food-qo5e5854406d0297d6feae696a13e3a339-mist-blue-keyboard-daifuku",
+      "source_path": "定制美食库/5E5854406D0297D6FEAE696A13E3A339/雾蓝键盘大福.png",
+      "kind": "food",
+      "display_name": "雾蓝键盘大福",
+      "rarity": 6,
+      "description": "雾蓝色大福排成一段安静键盘，糯皮下藏着细腻甜馅；每按一格，都像给软糯丰川祥猪配了一枚和弦。",
+      "recipe_tags": [
+        "群友定制",
+        "键盘",
+        "大福"
+      ],
+      "group_scope_id": "qq-official:5E5854406D0297D6FEAE696A13E3A339",
+      "effect_id": "next-high-star-catch",
+      "effect_params": {
+        "uses": 5,
+        "four_star_percent": 60,
+        "five_star_percent": 30,
+        "six_star_percent": 10
+      }
+    },
+    {
+      "template_id": "food-qo5e5854406d0297d6feae696a13e3a339-xiangni-daozao-chocolate-cornet",
+      "source_path": "定制美食库/5E5854406D0297D6FEAE696A13E3A339/向你道早猪猪巧克力螺.png",
+      "kind": "food",
+      "display_name": "向你道早猪猪巧克力螺",
+      "rarity": 6,
+      "description": "巧克力螺卷成一声软乎乎的早安，猪猪鼻尖沾着可可香，咬下去会把困意卷走。",
+      "recipe_tags": [
+        "群友定制",
+        "巧克力螺",
+        "早安"
+      ],
+      "group_scope_id": "qq-official:5E5854406D0297D6FEAE696A13E3A339",
+      "effect_id": "weekly-window-catches",
+      "effect_params": {
+        "count": 5
+      }
+    },
+    {
+      "template_id": "food-qo5e5854406d0297d6feae696a13e3a339-aya-repair-mousse",
+      "source_path": "定制美食库/5E5854406D0297D6FEAE696A13E3A339/彩彩修车猪慕斯.png",
+      "kind": "food",
+      "display_name": "彩彩修车猪慕斯",
+      "rarity": 6,
+      "description": "粉色猪形慕斯把草莓夹心、星形车轮巧克力和银色扳手糖饰装进同一座甜点修车间；吃完像替本周每趟联机做了一次闪亮保养。",
+      "recipe_tags": [
+        "群友定制",
+        "彩彩修车",
+        "慕斯",
+        "草莓"
+      ],
+      "group_scope_id": "qq-official:5E5854406D0297D6FEAE696A13E3A339",
+      "effect_id": "next-five-star-cook",
+      "effect_params": {
+        "uses": 5
+      }
+    },
+    {
+      "template_id": "food-qo5e5854406d0297d6feae696a13e3a339-baogian-pork-roulette",
+      "source_path": "定制美食库/5E5854406D0297D6FEAE696A13E3A339/猪保千猪排轮盘.png",
+      "kind": "food",
+      "display_name": "猪保千猪排轮盘",
+      "rarity": 6,
+      "description": "因为猪保千，现在保千猪的信誉分已经不够刷共享单车赶去加餐了；这盘猪排轮盘先垫垫肚子，剩下的账单留给表情包的笑脸去还。",
+      "recipe_tags": [
+        "群友定制",
+        "保千",
+        "猪排",
+        "轮盘"
+      ],
+      "group_scope_id": "qq-official:5E5854406D0297D6FEAE696A13E3A339",
+      "effect_id": "even-catch-distribution",
+      "effect_params": {
+        "uses": 5
+      }
+    },
+    {
+      "template_id": "pig-qo9ea2810f378fbd7dc3219c56ceab3520-juejue",
+      "source_path": "定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/撅撅猪.jpg",
+      "kind": "pig",
+      "display_name": "撅撅猪",
+      "rarity": 6,
+      "description": "撅撅。",
+      "fat_profile": "balanced",
+      "recipe_tags": [
+        "群友定制",
+        "动画"
+      ],
+      "group_scope_id": "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
+      "paired_food_template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-juejue-pie"
+    },
+    {
+      "template_id": "pig-qo9ea2810f378fbd7dc3219c56ceab3520-1004",
+      "source_path": "定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/1004猪鼻哥.jpg",
+      "kind": "pig",
+      "display_name": "1004猪鼻哥",
+      "rarity": 6,
+      "description": "救我！！！！！晚上救来不及咯！",
+      "fat_profile": "balanced",
+      "recipe_tags": [
+        "群友定制",
+        "冲榜"
+      ],
+      "group_scope_id": "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
+      "paired_food_template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-1004-omelette"
+    },
+    {
+      "template_id": "pig-qo9ea2810f378fbd7dc3219c56ceab3520-xiaoma",
+      "source_path": "定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/小马猪.png",
+      "kind": "pig",
+      "display_name": "小马猪",
+      "rarity": 6,
+      "length_min_cm": 120,
+      "length_max_cm": 260,
+      "weight_min_kg": 250,
+      "weight_max_kg": 1200,
+      "stature_profile": "giant",
+      "description": "马头、猪身、贝斯和咖啡同台营业，物种鉴定卡在半路，演出与加餐倒是从不迟到。",
+      "fat_profile": "balanced",
+      "recipe_tags": [
+        "群友定制",
+        "小马哥",
+        "贝斯",
+        "咖啡"
+      ],
+      "group_scope_id": "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
+      "paired_food_template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-xiaoma-mont-blanc"
+    },
+    {
+      "template_id": "pig-qo9ea2810f378fbd7dc3219c56ceab3520-soft-sakiko",
+      "source_path": "定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/软糯丰川祥猪.png",
+      "kind": "pig",
+      "display_name": "软糯丰川祥猪",
+      "rarity": 6,
+      "description": "把丰川祥的端正气质揉进软糯猪团里，外表温温柔柔，心里却像琴键一样有清晰分寸。",
+      "fat_profile": "balanced",
+      "recipe_tags": [
+        "群友定制",
+        "丰川祥",
+        "软糯"
+      ],
+      "group_scope_id": "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
+      "paired_food_template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-mist-blue-keyboard-daifuku"
+    },
+    {
+      "template_id": "pig-qo9ea2810f378fbd7dc3219c56ceab3520-xiangni-daozao",
+      "source_path": "定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/向你道早猪.gif",
+      "kind": "pig",
+      "display_name": "向你道早猪",
+      "rarity": 6,
+      "description": "一边晃着动态图小身板，一边认真把“早”递到你面前；早安说得很轻，存在感却会循环播放。",
+      "fat_profile": "balanced",
+      "recipe_tags": [
+        "群友定制",
+        "早安",
+        "动态"
+      ],
+      "group_scope_id": "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
+      "paired_food_template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-xiangni-daozao-chocolate-cornet"
+    },
+    {
+      "template_id": "pig-qo9ea2810f378fbd7dc3219c56ceab3520-aya-repair",
+      "source_path": "定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/彩彩修车猪.png",
+      "kind": "pig",
+      "display_name": "彩彩修车猪",
+      "rarity": 6,
+      "description": "从玩家社区“しゅわ≈修哇、联机房≈车”的谐音梗里开出来的彩彩修车猪；顶着丸山彩的粉发，带着紧张汗滴和星形小车，攥紧扳手也要把每趟联机修得闪闪发光——这不是官方职业设定。",
+      "fat_profile": "balanced",
+      "recipe_tags": [
+        "群友定制",
+        "Pastel＊Palettes",
+        "彩彩修车",
+        "社区梗"
+      ],
+      "group_scope_id": "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
+      "paired_food_template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-aya-repair-mousse"
+    },
+    {
+      "template_id": "pig-qo9ea2810f378fbd7dc3219c56ceab3520-baogian",
+      "source_path": "定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/保千猪.png",
+      "kind": "pig",
+      "display_name": "保千猪",
+      "rarity": 6,
+      "description": "因为猪保千，现在保千猪的信誉分已经不够刷共享单车赶去加餐了。",
+      "fat_profile": "balanced",
+      "recipe_tags": [
+        "群友定制",
+        "保千",
+        "表情包"
+      ],
+      "group_scope_id": "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
+      "paired_food_template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-baogian-pork-roulette",
+      "alternate_image": "定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/猪保千表情包.png"
+    },
+    {
+      "template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-juejue-pie",
+      "source_path": "定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/撅撅猪派.png",
+      "kind": "food",
+      "display_name": "撅撅猪派",
+      "rarity": 6,
+      "description": "两只软乎乎的撅撅猪叠在酥皮上，派还没切，它们先把姿势撅整齐了。",
+      "recipe_tags": [
+        "群友定制",
+        "甜点"
+      ],
+      "group_scope_id": "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
+      "effect_id": "permanent-window-catch",
+      "effect_params": {
+        "count": 1,
+        "max_bonus": 5
+      }
+    },
+    {
+      "template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-1004-omelette",
+      "source_path": "定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/猪鼻蛋包饭.png",
+      "kind": "food",
+      "display_name": "猪鼻蛋包饭",
+      "rarity": 6,
+      "description": "冲榜差四名的遗憾被完整包进蛋皮，21:50 才醒的猪鼻哥现在终于赶上了出餐。",
+      "recipe_tags": [
+        "群友定制",
+        "蛋包饭",
+        "冲榜"
+      ],
+      "group_scope_id": "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
+      "effect_id": "next-six-star-cook",
+      "effect_params": {
+        "six_star_percent": 60
+      }
+    },
+    {
+      "template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-xiaoma-mont-blanc",
+      "source_path": "定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/小马猪蒙布朗.png",
+      "kind": "food",
+      "display_name": "小马猪蒙布朗",
+      "rarity": 6,
+      "description": "蒙布朗栗子奶油梳成小马猪长鬃，背上再顶一颗栗子；贝斯靠边一放，甜点也能开一场低音专场。",
+      "recipe_tags": [
+        "群友定制",
+        "小马哥",
+        "蒙布朗",
+        "栗子"
+      ],
+      "group_scope_id": "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
+      "effect_id": "next-six-star-catch",
+      "effect_params": {
+        "six_star_percent": 60
+      }
+    },
+    {
+      "template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-mist-blue-keyboard-daifuku",
+      "source_path": "定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/雾蓝键盘大福.png",
+      "kind": "food",
+      "display_name": "雾蓝键盘大福",
+      "rarity": 6,
+      "description": "雾蓝色大福排成一段安静键盘，糯皮下藏着细腻甜馅；每按一格，都像给软糯丰川祥猪配了一枚和弦。",
+      "recipe_tags": [
+        "群友定制",
+        "键盘",
+        "大福"
+      ],
+      "group_scope_id": "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
+      "effect_id": "next-high-star-catch",
+      "effect_params": {
+        "uses": 5,
+        "four_star_percent": 60,
+        "five_star_percent": 30,
+        "six_star_percent": 10
+      }
+    },
+    {
+      "template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-xiangni-daozao-chocolate-cornet",
+      "source_path": "定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/向你道早猪猪巧克力螺.png",
+      "kind": "food",
+      "display_name": "向你道早猪猪巧克力螺",
+      "rarity": 6,
+      "description": "巧克力螺卷成一声软乎乎的早安，猪猪鼻尖沾着可可香，咬下去会把困意卷走。",
+      "recipe_tags": [
+        "群友定制",
+        "巧克力螺",
+        "早安"
+      ],
+      "group_scope_id": "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
+      "effect_id": "weekly-window-catches",
+      "effect_params": {
+        "count": 5
+      }
+    },
+    {
+      "template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-aya-repair-mousse",
+      "source_path": "定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/彩彩修车猪慕斯.png",
+      "kind": "food",
+      "display_name": "彩彩修车猪慕斯",
+      "rarity": 6,
+      "description": "粉色猪形慕斯把草莓夹心、星形车轮巧克力和银色扳手糖饰装进同一座甜点修车间；吃完像替本周每趟联机做了一次闪亮保养。",
+      "recipe_tags": [
+        "群友定制",
+        "彩彩修车",
+        "慕斯",
+        "草莓"
+      ],
+      "group_scope_id": "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
+      "effect_id": "next-five-star-cook",
+      "effect_params": {
+        "uses": 5
+      }
+    },
+    {
+      "template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-baogian-pork-roulette",
+      "source_path": "定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/猪保千猪排轮盘.png",
+      "kind": "food",
+      "display_name": "猪保千猪排轮盘",
+      "rarity": 6,
+      "description": "因为猪保千，现在保千猪的信誉分已经不够刷共享单车赶去加餐了；这盘猪排轮盘先垫垫肚子，剩下的账单留给表情包的笑脸去还。",
+      "recipe_tags": [
+        "群友定制",
+        "保千",
+        "猪排",
+        "轮盘"
+      ],
+      "group_scope_id": "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
+      "effect_id": "even-catch-distribution",
+      "effect_params": {
+        "uses": 5
+      }
     }
   ]
 }
