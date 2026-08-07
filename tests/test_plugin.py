@@ -1460,3 +1460,170 @@ async def test_quota_reset_chance_requires_held_effect_and_consumes_once(
     )
     assert exhausted[0] is False
     await plugin.on_unload()
+
+
+@pytest.mark.asyncio
+async def test_window_quota_boost_overrides_limit_and_bypasses_restriction(
+    tmp_path: Path,
+) -> None:
+    """提额窗口内额度按提升值计算并暂时无视违规限制，窗口切换后自动恢复。"""
+
+    plugin, _ = await create_test_plugin(
+        tmp_path,
+        config_updates={"catching": {"cooldown_seconds": 0}},
+    )
+    await _install_test_pig(plugin, tmp_path)
+    scope_id = "qq:10001"
+    player_id = f"{scope_id}:20001"
+
+    # 建立群作用域与玩家（profile 不产生抓猪回执，不占窗口额度）
+    await plugin.gameplay_service.profile(
+        CommandIdentity(
+            scope=ScopeKey("qq", "10001"),
+            stream_id="stream-10001",
+            user_id="20001",
+            display_name="测试成员",
+            message_id="boost-seed",
+            group_name="抓猪测试群",
+        )
+    )
+
+    # 给玩家加 catch-window-limit 限制（额度 1）模拟违规者
+    now_text = "2026-08-07T06:00:00.000Z"
+    async with plugin.database.transaction() as session:
+        await session.execute(
+            """
+            INSERT INTO player_restrictions(
+                restriction_id, player_id, restriction_type, limit_value,
+                starts_at, expires_at, reason, source, created_by,
+                created_at, updated_at
+            )
+            VALUES (?, ?, 'catch-window-limit', 1, ?, NULL,
+                    '测试违规限制', 'test', 'tester', ?, ?)
+            """,
+            (
+                "boost-restriction-1",
+                player_id,
+                now_text,
+                now_text,
+                now_text,
+            ),
+        )
+
+    service = plugin._quota_reset_service
+    assert service is not None
+    boosted = await service.apply_window_boost(
+        data_dir=tmp_path,
+        scope_ids=[scope_id],
+        limit_value=15,
+        created_by="test-operator",
+        reason="测试提额",
+        source="test",
+    )
+    assert boosted.scope_ids == (scope_id,)
+    assert boosted.limit_value == 15
+    assert len(boosted.audit_event_ids) == 1
+    assert tuple((tmp_path / "backups").glob("*.sqlite3"))
+
+    # 提额记录以 (scope_id, window_start) 主键落库
+    async with plugin.database.transaction(immediate=False) as session:
+        stored = await service.repository.active_window_boost(
+            session,
+            scope_id=scope_id,
+            window_start=boosted.window_start,
+        )
+        assert stored is not None
+        assert stored["limit_value"] == 15
+
+    # 违规者（原限制 1）在提额窗口内可抓满 15 次
+    for index in range(1, 16):
+        ok, _, _ = await plugin.handle_catch(
+            stream_id="stream-10001",
+            **_command_kwargs(
+                build_message(message_id=f"boost-catch-{index}")
+            ),
+        )
+        assert ok is True, f"第 {index} 次抓猪应成功"
+
+    # 第 16 次被拒绝（15/15）
+    denied = await plugin.handle_catch(
+        stream_id="stream-10001",
+        **_command_kwargs(build_message(message_id="boost-catch-16")),
+    )
+    assert denied[0] is False
+    assert "15/15" in denied[1]
+
+    # 另一个额度窗口无提额记录：自动恢复每时段 5 次
+    async with plugin.database.transaction(immediate=False) as session:
+        next_window = await service.repository.active_window_boost(
+            session,
+            scope_id=scope_id,
+            window_start="2099-01-01T04:00:00.000Z",
+        )
+        assert next_window is None
+    await plugin.on_unload()
+
+
+@pytest.mark.asyncio
+async def test_admin_panel_boost_one_shot_is_scoped_and_audited(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    plugin, _ = await create_test_plugin(tmp_path)
+    assert plugin.gameplay_service is not None
+    await plugin.gameplay_service.profile(
+        CommandIdentity(
+            scope=ScopeKey("qq", "10001"),
+            stream_id="stream-10001",
+            user_id="20001",
+            display_name="测试管理员",
+            message_id="profile-before-boost",
+            group_name="抓猪测试群",
+        )
+    )
+    cleared: list[bool] = []
+    monkeypatch.setattr(
+        plugin,
+        "_clear_administration_triggers",
+        lambda: cleared.append(True),
+    )
+    config = plugin.get_plugin_config_data()
+    config["quota_administration"] = {
+        "group_id": "10001",
+        "platform": "qq",
+        "execute_current_window_reset": True,
+        "boost_window_limit": 15,
+    }
+    plugin.set_plugin_config(config)
+    await plugin.on_config_update(
+        CONFIG_RELOAD_SCOPE_SELF,
+        config,
+        "admin-boost",
+    )
+    assert cleared == [True]
+    assert plugin.database is not None
+    async with plugin.database.transaction(immediate=False) as session:
+        row = await session.fetch_one(
+            """
+            SELECT scope_id, actor_user_id, action, detail_json
+            FROM audit_events
+            WHERE action = 'catch-quota-window-boost'
+            """
+        )
+        assert row is not None
+        assert tuple(row[:3]) == (
+            "qq:10001",
+            "maibot-admin-panel",
+            "catch-quota-window-boost",
+        )
+        assert '"limit_value":15' in str(row["detail_json"])
+        boost_row = await session.fetch_one(
+            """
+            SELECT limit_value FROM quota_window_boosts
+            WHERE scope_id = 'qq:10001'
+            """
+        )
+        assert boost_row is not None
+        assert boost_row["limit_value"] == 15
+    assert tuple((tmp_path / "backups").glob("*.sqlite3"))
+    await plugin.on_unload()

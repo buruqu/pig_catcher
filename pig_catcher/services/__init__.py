@@ -50,7 +50,11 @@ from .gameplay import (
     format_records_summary,
 )
 from .maintenance import MaintenanceOptions, MaintenanceReport, MaintenanceRunner
-from .quota import CatchQuotaResetResult, CatchQuotaResetService
+from .quota import (
+    CatchQuotaResetResult,
+    CatchQuotaResetService,
+    QuotaWindowBoostResult,
+)
 from .receipts import ReceiptService
 from .restrictions import (
     AnnouncementAdminService,
@@ -100,6 +104,7 @@ __all__ = [
     "CatchResult",
     "CatchQuotaResetResult",
     "CatchQuotaResetService",
+    "QuotaWindowBoostResult",
     "GameplayService",
     "GiantSightingEntry",
     "InventoryPage",

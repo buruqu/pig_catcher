@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from hashlib import sha256
@@ -48,6 +48,22 @@ class CatchQuotaResetResult:
     created_at: str
     receipt: CommandReceipt | None = None
     receipt_created: bool = True
+
+
+@dataclass(frozen=True, slots=True)
+class QuotaWindowBoostResult:
+    """一次群级窗口提额（含额度重置）的审计结果。"""
+
+    scope_ids: tuple[str, ...]
+    window: CatchQuotaWindow
+    window_start: str
+    window_end: str
+    limit_value: int
+    backup_path: Path
+    cleared_catches: int
+    affected_players: int
+    created_at: str
+    audit_event_ids: tuple[str, ...]
 
 
 class CatchQuotaResetService:
@@ -187,6 +203,135 @@ class CatchQuotaResetService:
             source=source,
             backup_path=backup_path,
             now=now,
+        )
+
+    async def apply_window_boost(
+        self,
+        *,
+        data_dir: Path,
+        scope_ids: Sequence[str],
+        limit_value: int,
+        created_by: str = "local-operator",
+        reason: str = "",
+        source: str = "manual",
+        window_start: str | None = None,
+    ) -> QuotaWindowBoostResult:
+        """为一个或多个群作用域的当前额度窗口提升额度并重置计数。
+
+        提额记录以 (scope_id, window_start) 为主键：窗口切换后自动失效，
+        无需定时器即可在下一个刷新时段恢复每时段基础额度；窗口内生效期间
+        抓猪额度按 limit_value 计算，并暂时忽略玩家违规限制（违规者在提额
+        窗口内同样可抓满提升额度）。
+        """
+
+        normalized = tuple(
+            dict.fromkeys(
+                str(value).strip()
+                for value in scope_ids
+                if str(value).strip()
+            )
+        )
+        if not normalized:
+            raise DomainValidationError("至少需要指定一个群作用域。")
+        if not 1 <= int(limit_value) <= 1000:
+            raise DomainValidationError("提额度数必须在 1 至 1000 之间。")
+        now = self.clock.now()
+        window = catch_quota_window(
+            now,
+            refresh_hours=self.refresh_hours,
+            timezone_name=self.timezone_name,
+        )
+        requested_start = str(window_start or "").strip()
+        target_start = (
+            iso_timestamp(window.start)
+            if not requested_start
+            else requested_start
+        )
+        target_end = iso_timestamp(window.end)
+        now_text = iso_timestamp(now)
+        backup_path = self._backup_path(
+            data_dir=data_dir,
+            platform="multi",
+            scope_id="-".join(normalized),
+            now=now,
+        )
+        await self.database.backup_to(backup_path)
+        audit_event_ids: list[str] = []
+        total_cleared = 0
+        total_players = 0
+        async with self.database.transaction() as session:
+            for scope_id in normalized:
+                if not await self.repository.scope_exists(
+                    session,
+                    scope_id=scope_id,
+                ):
+                    raise DomainValidationError(
+                        f"数据库中不存在群范围 {scope_id}，拒绝提额。"
+                    )
+                effective_start = await self.repository.effective_window_start(
+                    session,
+                    scope_id=scope_id,
+                    window_start=target_start,
+                    window_end=target_end,
+                )
+                cleared, affected = await self.repository.usage_since(
+                    session,
+                    scope_id=scope_id,
+                    effective_start=effective_start,
+                    window_end=target_end,
+                )
+                total_cleared += cleared
+                total_players += affected
+                await self.repository.upsert_window_boost(
+                    session,
+                    scope_id=scope_id,
+                    window_start=target_start,
+                    limit_value=int(limit_value),
+                    created_by=created_by,
+                    reason=reason,
+                    now=now_text,
+                )
+                audit_event_id = self.id_factory()
+                audit_event_ids.append(audit_event_id)
+                detail = {
+                    "source": str(source or "").strip() or "manual",
+                    "ruleset_version": RULESET_VERSION,
+                    "window_start": target_start,
+                    "window_end": target_end,
+                    "limit_value": int(limit_value),
+                    "created_by": str(created_by or "").strip(),
+                    "reason": str(reason or "").strip(),
+                    "cleared_catches": cleared,
+                    "affected_players": affected,
+                    "backup_path": str(Path(backup_path).resolve()),
+                }
+                await self.repository.insert_boost_event(
+                    session,
+                    audit_event_id=audit_event_id,
+                    scope_id=scope_id,
+                    actor_user_id=(
+                        str(created_by or "").strip() or "local-operator"
+                    ),
+                    object_id=target_start,
+                    detail_json=json.dumps(
+                        detail,
+                        ensure_ascii=False,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    ),
+                    now=now_text,
+                )
+        return QuotaWindowBoostResult(
+            scope_ids=normalized,
+            window=window,
+            window_start=target_start,
+            window_end=target_end,
+            limit_value=int(limit_value),
+            backup_path=Path(backup_path).resolve(),
+            cleared_catches=total_cleared,
+            affected_players=total_players,
+            created_at=now_text,
+            audit_event_ids=tuple(audit_event_ids),
         )
 
     async def reset_current_window(

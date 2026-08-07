@@ -59,6 +59,7 @@ from ..infrastructure.repositories import (
     EconomyRepository,
     FrameworkRepository,
     GameplayRepository,
+    QuotaRepository,
     ReceiptRepository,
     RestrictionRepository,
     SocialRepository,
@@ -717,6 +718,7 @@ class GameplayService:
         economy_repository: EconomyRepository | None = None,
         social_repository: SocialRepository | None = None,
         restriction_repository: RestrictionRepository | None = None,
+        quota_repository: QuotaRepository | None = None,
         random_source: RandomSource | None = None,
         clock: Clock | None = None,
         id_factory: Callable[[], str] | None = None,
@@ -732,6 +734,7 @@ class GameplayService:
         self.economy_repository = economy_repository or EconomyRepository()
         self.social_repository = social_repository or SocialRepository()
         self.restriction_repository = restriction_repository or RestrictionRepository()
+        self.quota_repository = quota_repository or QuotaRepository()
         self.random_source = random_source or SystemRandomSource()
         self.clock = clock or SystemClock()
         self.id_factory = id_factory or (lambda: uuid4().hex)
@@ -793,7 +796,21 @@ class GameplayService:
                 restriction_type=CATCH_WINDOW_LIMIT,
                 now=now,
             )
-            base_window_limit = self.catching.daily_limit + permanent_bonus + weekly_bonus
+            window_boost = await self.quota_repository.active_window_boost(
+                session,
+                scope_id=identity.scope.value,
+                window_start=window_start,
+            )
+            if window_boost is not None:
+                # 提额窗口：本时段额度按提升值计算，且无视玩家违规限制
+                base_window_limit = int(window_boost["limit_value"])
+                catch_restriction = None
+            else:
+                base_window_limit = (
+                    self.catching.daily_limit
+                    + permanent_bonus
+                    + weekly_bonus
+                )
             normal_daily_limit = effective_catch_limit(
                 base_limit=base_window_limit,
                 used_count=daily_count,
@@ -930,6 +947,11 @@ class GameplayService:
                     str(catch_restriction.get("expires_at") or "")
                     if catch_restriction is not None
                     else ""
+                ),
+                "quota_window_boost_limit": (
+                    int(window_boost["limit_value"])
+                    if window_boost is not None
+                    else 0
                 ),
             }
             await self.repository.insert_pig_instance(
@@ -1249,6 +1271,20 @@ class GameplayService:
                 restriction_type=CATCH_WINDOW_LIMIT,
                 now=now,
             )
+            window_boost = await self.quota_repository.active_window_boost(
+                session,
+                scope_id=identity.scope.value,
+                window_start=window_start,
+            )
+            if window_boost is not None:
+                base_window_limit = int(window_boost["limit_value"])
+                catch_restriction = None
+            else:
+                base_window_limit = (
+                    self.catching.daily_limit
+                    + permanent_bonus
+                    + weekly_bonus
+                )
             feed_level = await self.repository.get_feed_level(
                 session,
                 player_id=identity.player_id,
@@ -1318,11 +1354,7 @@ class GameplayService:
             daily_count=daily_count,
             daily_limit=self._restricted_daily_limit(
                 normal_limit=effective_catch_limit(
-                    base_limit=(
-                        self.catching.daily_limit
-                        + permanent_bonus
-                        + weekly_bonus
-                    ),
+                    base_limit=base_window_limit,
                     used_count=daily_count,
                     extra_granted=extra_granted,
                     extra_consumed=extra_consumed,

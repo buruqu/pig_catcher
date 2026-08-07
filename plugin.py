@@ -47,7 +47,11 @@ from .pig_catcher.domain.errors import (
     PigCatcherError,
 )
 from .pig_catcher.domain.gameplay import ITEM_DEFINITIONS
-from .pig_catcher.domain.models import CommandIdentity, CommandReceipt
+from .pig_catcher.domain.models import (
+    CommandIdentity,
+    CommandReceipt,
+    ScopeKey,
+)
 from .pig_catcher.infrastructure import PigCatcherDatabase, safe_database_path
 from .pig_catcher.rendering import (
     AnimatedCardComposer,
@@ -395,21 +399,50 @@ class PigCatcherPlugin(MaiBotPlugin):
                 service = self._quota_reset_service
                 if service is None:
                     raise RuntimeError("抓猪额度重置服务尚未就绪。")
-                result = await service.backup_and_reset_current_window(
-                    data_dir=data_dir,
-                    group_id=quota.group_id,
-                    actor_user_id="maibot-admin-panel",
-                    source=source,
-                )
-                self.ctx.logger.info(
-                    "抓猪额度已精准重置：scope=%s，window=%s，cleared=%s，players=%s，audit=%s，backup=%s",
-                    result.scope_id,
-                    result.window.label,
-                    result.cleared_catches,
-                    result.affected_players,
-                    result.audit_event_id,
-                    result.backup_path,
-                )
+                platform = str(quota.platform or "").strip() or "qq"
+                if quota.boost_window_limit > 0:
+                    result = await service.apply_window_boost(
+                        data_dir=data_dir,
+                        scope_ids=[
+                            ScopeKey(
+                                platform=platform,
+                                group_id=quota.group_id,
+                            ).value
+                        ],
+                        limit_value=quota.boost_window_limit,
+                        created_by="maibot-admin-panel",
+                        reason=(
+                            f"控制面板提额至 {quota.boost_window_limit} 次/时段"
+                        ),
+                        source=source,
+                    )
+                    self.ctx.logger.info(
+                        "抓猪额度已提升：scope=%s，window=%s，limit=%s，cleared=%s，players=%s，audit=%s，backup=%s",
+                        ",".join(result.scope_ids),
+                        result.window.label,
+                        result.limit_value,
+                        result.cleared_catches,
+                        result.affected_players,
+                        ",".join(result.audit_event_ids),
+                        result.backup_path,
+                    )
+                else:
+                    result = await service.backup_and_reset_current_window(
+                        data_dir=data_dir,
+                        group_id=quota.group_id,
+                        platform=platform,
+                        actor_user_id="maibot-admin-panel",
+                        source=source,
+                    )
+                    self.ctx.logger.info(
+                        "抓猪额度已精准重置：scope=%s，window=%s，cleared=%s，players=%s，audit=%s，backup=%s",
+                        result.scope_id,
+                        result.window.label,
+                        result.cleared_catches,
+                        result.affected_players,
+                        result.audit_event_id,
+                        result.backup_path,
+                    )
             except Exception:
                 self.ctx.logger.exception("控制面板抓猪额度重置失败；触发开关已关闭，不会自动重试")
 

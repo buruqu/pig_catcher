@@ -13,6 +13,7 @@ from .v0009_player_restrictions import MIGRATION_0009
 from .v0010_split_social_blacklists import MIGRATION_0010
 from .v0011_pig_alternate_image import MIGRATION_0011
 from .v0012_pig_display_variant import MIGRATION_0012
+from .v0013_quota_window_boosts import MIGRATION_0013
 
 MIGRATIONS: tuple[Migration, ...] = (
     MIGRATION_0001,
@@ -27,6 +28,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     MIGRATION_0010,
     MIGRATION_0011,
     MIGRATION_0012,
+    MIGRATION_0013,
 )
 
 __all__ = ["MIGRATIONS", "Migration"]

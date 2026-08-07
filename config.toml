@@ -1,6 +1,6 @@
 [plugin]
 enabled = true
-config_version = "1.6.5"
+config_version = "1.6.6"
 framework_phase = "6"
 
 [features]
@@ -107,7 +107,9 @@ font_family = "\"Noto Sans CJK SC\", \"Microsoft YaHei\", sans-serif"
 
 [quota_administration]
 group_id = "9EA2810F378FBD7DC3219C56CEAB3520"
+platform = ""
 execute_current_window_reset = false
+boost_window_limit = 0
 
 [blacklist_administration]
 group_id = ""

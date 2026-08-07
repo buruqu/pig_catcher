@@ -866,3 +866,25 @@
   无需逐效果枚举。新增端到端测试：持有 5 次必出五星效果拒绝批量做菜，消耗至 1 次后放行。
 - 糖醋排骨吃菜结果（图片 note 与文字摘要）展示“可发送 /重置额度 使用”；无机会时
   /重置额度 也会提示获取途径。自动回归为 pytest `189 passed`；Ruff、compileall 通过。
+## 35. v1.6.6 群级窗口提额与官方双群 15 次提额验收
+
+- 验收日期：`2026-08-07`。插件升级为 `local.pig-catcher v1.6.6`，Schema `12 → 13`
+  （新增 `quota_window_boosts` 表，主键 `scope_id + window_start`），Asset Manifest
+  `4`、Ruleset `12` 保持不变；迁移只做加法，旧数据零改动。
+- 机制：`CatchQuotaResetService.apply_window_boost` 在单事务内完成作用域校验、在线备份、
+  写入提额记录（`limit_value` 1–1000）、按 `catch-quota-window-boost` 归零窗口用量并审计；
+  可一次指定多个作用域。提额记录绑定窗口起始时间，刷新小时 `0/9/12/19` 切换后自动失效，
+  无需定时器即可恢复到每时段基础额度。
+- 生效规则：`GameplayService.catch` / `profile` 命中当前窗口提额记录时，本时段额度按提升值
+  计算，并暂时忽略 `catch-window-limit` 违规限制（违规者在提额窗口内同样可抓满提升额度；
+  限制记录不删除，窗口结束后自动恢复）。随机快照新增 `quota_window_boost_limit` 字段。
+- 运营面板：`QuotaAdministrationSection` 新增“平台（可选）”与“提额度数”，支持精确操作
+  `qq` / `qq-official` 群并执行提额。
+- 运营执行（`source=manual-2026-08-07`）：`qq-official:5E5854406D0297D6FEAE696A13E3A339`
+  与 `qq-official:9EA2810F378FBD7DC3219C56CEAB3520` 两个官方群当前窗口
+  （2026-08-07 12:00–19:00）提额至 15 次/时段；清空 409 次用量、涉及 49 名玩家，
+  含四名违规者（千早の花火、纯良小白、软糯丰川祥、xc，其中 xc 限制 1 次至 8/8）。
+  备份：`backups/pig_catcher-pre-quota-reset-multi-72593c8b17f7-20260807-071432.sqlite3`；
+  审计事件 `cbe5e669…`、`d6fc91f3…`。19:00 窗口切换后全量自动恢复每时段 5 次。
+- 自动回归为 pytest `191 passed`（新增提额端到端测试与面板一次性提额测试）；Ruff、
+  Python `compileall` 全部通过。

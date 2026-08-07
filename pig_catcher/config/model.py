@@ -788,6 +788,16 @@ class QuotaAdministrationSection(PluginConfigBase):
             placeholder="填写需要重置的群号",
         ),
     )
+    platform: str = Field(
+        default="",
+        max_length=40,
+        description="同一群号在多个平台重复时用于精确选择平台",
+        json_schema_extra=_ui(
+            "平台（可选）",
+            "通常留空自动识别；需要时填写 qq 或 qq-official",
+            placeholder="留空自动识别",
+        ),
+    )
     execute_current_window_reset: bool = Field(
         default=False,
         description="保存配置后立即备份数据库并重置指定群当前时段额度",
@@ -796,11 +806,26 @@ class QuotaAdministrationSection(PluginConfigBase):
             "填写群号后打开并保存；成功后会写审计记录并自动恢复为关闭",
         ),
     )
+    boost_window_limit: int = Field(
+        default=0,
+        ge=0,
+        le=1000,
+        description="提额度数；大于 0 时保存后为指定群当前时段提升额度并重置",
+        json_schema_extra=_ui(
+            "提额度数",
+            "如 15；大于 0 时保存后立即为指定群当前时段提额并重置该群额度，窗口切换后自动恢复；0 表示不提升",
+        ),
+    )
 
     @field_validator("group_id")
     @classmethod
     def validate_group_id(cls, value: str) -> str:
         return _validate_group_id(value)
+
+    @field_validator("platform")
+    @classmethod
+    def validate_platform(cls, value: str) -> str:
+        return _validate_platform(value)
 
 
 class BlacklistAdministrationSection(PluginConfigBase):
