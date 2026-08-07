@@ -236,7 +236,7 @@ async def test_group_reset_command_rejects_unconfigured_user_before_backup(
 def test_plugin_registers_only_explicit_production_commands() -> None:
     plugin = create_plugin()
     components = plugin.get_components()
-    assert len(components) == 34
+    assert len(components) == 36
     commands = {
         component["name"]
         for component in components
@@ -276,6 +276,8 @@ def test_plugin_registers_only_explicit_production_commands() -> None:
         "pig_catcher_showcase",
         "pig_catcher_ranking",
         "pig_catcher_toggle_baogian",
+        "pig_catcher_enable_batch_keep",
+        "pig_catcher_disable_batch_keep",
     }
     home_card = next(
         component
@@ -1626,4 +1628,56 @@ async def test_admin_panel_boost_one_shot_is_scoped_and_audited(
         assert boost_row is not None
         assert boost_row["limit_value"] == 15
     assert tuple((tmp_path / "backups").glob("*.sqlite3"))
+    await plugin.on_unload()
+
+
+
+@pytest.mark.asyncio
+async def test_batch_keep_commands_toggle_player_preference(
+    tmp_path: Path,
+) -> None:
+    plugin, _ = await create_test_plugin(
+        tmp_path,
+        config_updates={"catching": {"cooldown_seconds": 0}},
+    )
+    await _install_test_pig(plugin, tmp_path)
+    await plugin.handle_catch(
+        stream_id="stream-10001",
+        **_command_kwargs(build_message(message_id="batch-keep-seed")),
+    )
+    player_id = "qq:10001:20001"
+
+    enabled, message, _ = await plugin.handle_enable_batch_keep(
+        stream_id="stream-10001",
+        **_command_kwargs(
+            build_message(
+                display_name="测试成员",
+                message_id="batch-keep-on",
+            )
+        ),
+    )
+    assert enabled is True
+    assert "已开启批量保留" in message
+    row = await plugin.database.fetch_one(
+        "SELECT batch_keep_highest FROM players WHERE player_id = ?",
+        (player_id,),
+    )
+    assert row is not None and row["batch_keep_highest"] == 1
+
+    disabled, message, _ = await plugin.handle_disable_batch_keep(
+        stream_id="stream-10001",
+        **_command_kwargs(
+            build_message(
+                display_name="测试成员",
+                message_id="batch-keep-off",
+            )
+        ),
+    )
+    assert disabled is True
+    assert "已关闭批量保留" in message
+    row = await plugin.database.fetch_one(
+        "SELECT batch_keep_highest FROM players WHERE player_id = ?",
+        (player_id,),
+    )
+    assert row is not None and row["batch_keep_highest"] == 0
     await plugin.on_unload()

@@ -1136,6 +1136,59 @@ class PigCatcherPlugin(MaiBotPlugin):
             )
 
     @Command(
+        "pig_catcher_enable_batch_keep",
+        description="开启批量保留：批量售卖/做菜时保留一只价值最高的猪猪与美食",
+        pattern=r"^/开启批量保留\s*$",
+    )
+    async def handle_enable_batch_keep(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        return await self._set_batch_keep(stream_id, kwargs, enabled=True)
+
+    @Command(
+        "pig_catcher_disable_batch_keep",
+        description="关闭批量保留效果",
+        pattern=r"^/关闭批量保留\s*$",
+    )
+    async def handle_disable_batch_keep(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        return await self._set_batch_keep(stream_id, kwargs, enabled=False)
+
+    async def _set_batch_keep(
+        self,
+        stream_id: str,
+        kwargs: dict[str, Any],
+        *,
+        enabled: bool,
+    ) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_command(
+            stream_id,
+            kwargs,
+            feature_enabled=self.settings.features.selling_enabled,
+            feature_label="批量保留",
+        )
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            service = cast(EconomyService, self._economy_service)
+            _, message = await service.set_batch_keep_highest(
+                identity,
+                enabled=enabled,
+            )
+            return await self._reply_text(identity.stream_id, message, success=True)
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation=("开启批量保留" if enabled else "关闭批量保留"),
+                error=exc,
+            )
+
+    @Command(
         "pig_catcher_profile",
         description="查看当前群的个人抓猪档案",
         pattern=r"^/抓猪档案\s*$",

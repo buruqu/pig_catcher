@@ -1021,6 +1021,10 @@ class EconomyService:
                 player_id=identity.player_id,
                 scope_id=identity.scope.value,
                 rarity=rarity,
+                keep_highest=await self.gameplay_repository.batch_keep_highest(
+                    session,
+                    player_id=identity.player_id,
+                ),
             )
             if not rows:
                 raise NoCookablePigError(
@@ -2012,6 +2016,10 @@ class EconomyService:
                 identity=identity,
                 now=now,
             )
+            keep_highest = await self.gameplay_repository.batch_keep_highest(
+                session,
+                player_id=identity.player_id,
+            )
             count, total_value = await self.repository.batch_sell_low_rarity(
                 session,
                 player_id=identity.player_id,
@@ -2019,6 +2027,7 @@ class EconomyService:
                 asset_kind=asset_kind,
                 max_rarity=int(max_rarity),
                 rarity=rarity,
+                keep_highest=keep_highest,
                 now=now,
             )
             if count == 0:
@@ -2579,6 +2588,41 @@ class EconomyService:
             inventory_quantity=int(payload["inventory_quantity"]),
             upgrade_type=str(payload["upgrade_type"]),
             upgrade_level=int(payload["upgrade_level"]),
+        )
+
+    async def set_batch_keep_highest(
+        self,
+        identity: CommandIdentity,
+        *,
+        enabled: bool,
+    ) -> tuple[bool, str]:
+        """开启或关闭玩家的“批量保留”偏好。
+
+        开启后，批量售卖与批量做菜会额外保留一只价值最高的普通猪猪和一只
+        价值最高的美食；联动猪始终默认保留一只价值最高者（不受开关影响）。
+        """
+
+        now = iso_timestamp(self.clock.now())
+        async with self.database.transaction() as session:
+            await self.framework_repository.touch_identity(
+                session,
+                identity=identity,
+                now=now,
+            )
+            await self.gameplay_repository.set_batch_keep_highest(
+                session,
+                player_id=identity.player_id,
+                enabled=enabled,
+                now=now,
+            )
+        if enabled:
+            return True, (
+                "已开启批量保留：批量售卖与批量做菜时，会额外保留一只价值最高的"
+                "普通猪猪和一只价值最高的美食；联动猪始终默认保留一只价值最高者。"
+            )
+        return True, (
+            "已关闭批量保留：批量操作不再额外保留普通猪猪和美食；"
+            "联动猪仍默认保留一只价值最高者。"
         )
 
     @staticmethod

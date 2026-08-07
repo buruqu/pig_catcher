@@ -481,17 +481,35 @@ class GameplayRepository:
         player_id: str,
         scope_id: str,
         rarity: int | None,
+        keep_highest: bool = False,
     ) -> list[dict[str, object]]:
-        """List active, unlocked, non-collaboration pigs eligible for batch cooking.
+        """List active, unlocked pigs eligible for batch cooking.
 
-        联动猪（有收藏图鉴条目）永远不参与批量做菜；六星定制猪也不参与，
-        避免批量操作误耗高价值原料。
+        默认只处理一至三星低星原料猪（``rarity`` 指定时按指定品质）；联动猪
+        默认只保留一只价值最高者，其余可被批量做菜；``keep_highest`` 开启时
+        额外保留一只价值最高的普通猪猪。
         """
 
-        rarity_clause = "AND instance.rarity = ?" if rarity is not None else "AND instance.rarity <= 5"
+        rarity_clause = (
+            "AND instance.rarity = ?"
+            if rarity is not None
+            else "AND instance.rarity <= 3"
+        )
+        keep_ids = await self._batch_keep_pig_ids(
+            session,
+            player_id=player_id,
+            scope_id=scope_id,
+            rarity=rarity,
+            keep_highest=bool(keep_highest),
+        )
+        keep_clause = ""
+        if keep_ids:
+            placeholders = ",".join("?" for _ in keep_ids)
+            keep_clause = f"AND instance.pig_instance_id NOT IN ({placeholders})"
         parameters: list[object] = [player_id, scope_id]
         if rarity is not None:
             parameters.append(rarity)
+        parameters.extend(keep_ids)
         rows = await session.fetch_all(
             f"""
             SELECT instance.pig_instance_id
@@ -500,13 +518,8 @@ class GameplayRepository:
               AND instance.scope_id = ?
               AND instance.state = 'active'
               AND instance.locked_trade_id IS NULL
-              AND NOT EXISTS (
-                  SELECT 1 FROM pig_templates AS template
-                  WHERE template.template_id = instance.template_id
-                    AND template.collection_id IS NOT NULL
-                    AND template.collection_id != ''
-              )
               {rarity_clause}
+              {keep_clause}
             ORDER BY instance.rarity DESC, instance.acquired_at ASC
             """,
             parameters,
@@ -520,6 +533,70 @@ class GameplayRepository:
             if result is not None:
                 results.append(result)
         return results
+
+    async def _batch_keep_pig_ids(
+        self,
+        session: DatabaseSession,
+        *,
+        player_id: str,
+        scope_id: str,
+        rarity: int | None,
+        keep_highest: bool,
+    ) -> list[str]:
+        """Return pig instance ids kept from one batch cooking/selling operation.
+
+        联动猪只保留一只价值最高者（同价值取最小实例 id）；``keep_highest``
+        开启时额外保留一只价值最高的普通猪猪。范围限定在批量做菜的品质区间。
+        """
+
+        rarity_clause = (
+            "AND candidate.rarity = ?"
+            if rarity is not None
+            else "AND candidate.rarity <= ?"
+        )
+        rarity_param: object = rarity if rarity is not None else 3
+        keep: list[str] = []
+        row = await session.fetch_one(
+            f"""
+            SELECT candidate.pig_instance_id
+            FROM pig_instances AS candidate
+            JOIN pig_templates AS template
+              ON template.template_id = candidate.template_id
+            WHERE candidate.owner_player_id = ?
+              AND candidate.scope_id = ?
+              AND candidate.state = 'active'
+              AND candidate.locked_trade_id IS NULL
+              AND template.collection_id IS NOT NULL
+              AND template.collection_id != ''
+              {rarity_clause}
+            ORDER BY candidate.official_value DESC, candidate.pig_instance_id ASC
+            LIMIT 1
+            """,
+            (player_id, scope_id, rarity_param),
+        )
+        if row is not None:
+            keep.append(str(row["pig_instance_id"]))
+        if keep_highest:
+            row = await session.fetch_one(
+                f"""
+                SELECT candidate.pig_instance_id
+                FROM pig_instances AS candidate
+                JOIN pig_templates AS template
+                  ON template.template_id = candidate.template_id
+                WHERE candidate.owner_player_id = ?
+                  AND candidate.scope_id = ?
+                  AND candidate.state = 'active'
+                  AND candidate.locked_trade_id IS NULL
+                  AND (template.collection_id IS NULL OR template.collection_id = '')
+                  {rarity_clause}
+                ORDER BY candidate.official_value DESC, candidate.pig_instance_id ASC
+                LIMIT 1
+                """,
+                (player_id, scope_id, rarity_param),
+            )
+            if row is not None:
+                keep.append(str(row["pig_instance_id"]))
+        return keep
 
     async def profile_row(
         self,
@@ -911,4 +988,34 @@ class GameplayRepository:
             ensure_ascii=False,
             sort_keys=True,
             separators=(",", ":"),
+        )
+
+
+    async def batch_keep_highest(
+        self,
+        session: DatabaseSession,
+        *,
+        player_id: str,
+    ) -> bool:
+        row = await session.fetch_one(
+            "SELECT batch_keep_highest FROM players WHERE player_id = ?",
+            (player_id,),
+        )
+        return bool(row is not None and int(row["batch_keep_highest"]))
+
+    async def set_batch_keep_highest(
+        self,
+        session: DatabaseSession,
+        *,
+        player_id: str,
+        enabled: bool,
+        now: str,
+    ) -> None:
+        await session.execute(
+            """
+            UPDATE players
+            SET batch_keep_highest = ?, updated_at = ?
+            WHERE player_id = ?
+            """,
+            (1 if enabled else 0, now, player_id),
         )

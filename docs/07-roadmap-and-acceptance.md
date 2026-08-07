@@ -903,3 +903,19 @@
 - 素材目录重建导入：210 项模板、162 份唯一内容、213 份隔离存储媒体，
   新目录哈希 `976761ab88…`，运行库 catalog hash `69c2dc82…`。
 - 自动回归为 pytest `191 passed`；Ruff、Python `compileall` 全部通过。
+## 37. v1.6.8 批量保留开关与批量做菜低星范围验收
+
+- 验收日期：`2026-08-07`。插件升级为 `local.pig-catcher v1.6.8`，Schema `13 → 14`
+  （`players.batch_keep_highest` 玩家偏好列），Asset Manifest `4`、Ruleset `12`
+  保持不变；迁移只做加法，旧数据零改动。
+- 保留规则：联动猪默认只保留一只价值最高者（同价值取实例编号最小），其余联动猪
+  可被批量售卖/做菜；`/开启批量保留` 后额外保留一只价值最高的普通猪猪与一只
+  价值最高的美食（美食仅批量售卖），`/关闭批量保留` 恢复默认。保留目标限定在
+  本批操作的品质与解锁范围内，由 `EconomyRepository._batch_keep_ids` /
+  `GameplayRepository._batch_keep_pig_ids` 在事务内查询后以 `NOT IN` 排除。
+- 批量做菜范围：不填品质时默认只处理一至三星低星原料猪（原为 ≤5 星），
+  `/批量做菜 四星` 等指定品质行为不变；联动保留与普通保留同样适用。
+- 新增命令 `/开启批量保留`、`/关闭批量保留`（组件 34 → 36），走
+  `EconomyService.set_batch_keep_highest`，玩家偏好按 `(scope, player)` 持久化。
+- 自动回归为 pytest `195 passed`（新增 4 个测试：开关命令端到端、联动保一只最高、
+  保留最高价值猪/美食、批量做菜低星范围）；Ruff、Python `compileall` 全部通过。
