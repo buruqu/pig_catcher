@@ -1681,3 +1681,232 @@ async def test_batch_keep_commands_toggle_player_preference(
     )
     assert row is not None and row["batch_keep_highest"] == 0
     await plugin.on_unload()
+
+
+
+async def _install_baogian_template(plugin: Any, tmp_path: Path) -> None:
+    """安装一只带备用表情包图的保千猪模板（公共素材，四个群通用）。"""
+
+    source = tmp_path / "baogian-assets"
+    source.mkdir()
+    Image.new("RGBA", (64, 64), "#F58CAD").save(source / "baogian.png", format="PNG")
+    Image.new("RGBA", (64, 64), "#66BFA3").save(
+        source / "baogian-sticker.png", format="PNG"
+    )
+    manifest = source / "assets.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "manifest_version": 2,
+                "catalog_id": "baogian-tests",
+                "source_label": "pytest baogian catalog",
+                "entries": [
+                    {
+                        "template_id": "pig-test-baogian",
+                        "kind": "pig",
+                        "display_name": "保千猪",
+                        "rarity": 1,
+                        "scope": "common",
+                        "group_scope_id": None,
+                        "description": "测试保千猪",
+                        "image": "baogian.png",
+                        "alternate_image": "baogian-sticker.png",
+                        "fit": "contain",
+                        "source": "pytest",
+                        "license": "test-only",
+                        "consent_status": "not-required",
+                        "length_min_cm": 30,
+                        "length_max_cm": 60,
+                        "weight_min_kg": 20,
+                        "weight_max_kg": 90,
+                        "fat_profile": "balanced",
+                        "recipe_tags": ["测试"],
+                    }
+                ],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    from pig_catcher.assets import AssetCatalogStorage
+    from pig_catcher.services import AssetCatalogService
+
+    await AssetCatalogService(
+        plugin.database,
+        AssetCatalogStorage(tmp_path / "data"),
+        min_image_side=32,
+        max_image_bytes=1024 * 1024,
+    ).import_manifest(manifest)
+
+
+async def _insert_baogian(
+    plugin: Any,
+    *,
+    scope_id: str,
+    player_id: str,
+    short_code: str,
+    instance_id: str,
+    variant: str = "pig",
+) -> None:
+    async with plugin.database.transaction() as session:
+        await session.execute(
+            """
+            INSERT INTO pig_instances(
+                pig_instance_id, short_code, scope_id, owner_player_id, template_id,
+                template_version, rarity, display_name_snapshot,
+                size_value, size_percentile, weight_value, weight_percentile,
+                fat_ratio, official_value, ruleset_version, random_snapshot_json,
+                display_variant, state, acquired_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, 'pig-test-baogian', 1, 1, '保千猪',
+                    50.0, 0.5, 60.0, 0.5, 50.0, 100, 1, '{"test":true}',
+                    ?, 'active', ?, ?)
+            """,
+            (
+                instance_id, short_code, scope_id, player_id,
+                variant, "2026-07-28T04:00:00.000Z", "2026-07-28T04:00:00.000Z",
+            ),
+        )
+
+
+@pytest.mark.asyncio
+async def test_toggle_baogian_works_across_groups_and_requires_code_when_multiple(
+    tmp_path: Path,
+) -> None:
+    """修复官方群保千猪切换 bug；背包里有多只保千猪时必须指定编号。"""
+
+    plugin, _ = await create_test_plugin(
+        tmp_path,
+        config_updates={"catching": {"cooldown_seconds": 0}},
+    )
+    await _install_baogian_template(plugin, tmp_path)
+    # 官方群作用域建玩家（QQ 官方群的保千猪此前无法切换）
+    official_scope = "qq-official:OFFICIAL001"
+    await plugin.gameplay_service.profile(
+        CommandIdentity(
+            scope=ScopeKey.parse(official_scope),
+            stream_id="stream-official",
+            user_id="U001",
+            display_name="官方成员",
+            message_id="baogian-profile",
+            group_name="官方群",
+        )
+    )
+    player_id = f"{official_scope}:U001"
+    await _insert_baogian(
+        plugin, scope_id=official_scope, player_id=player_id,
+        short_code="BA0A0001", instance_id="baogian-1",
+    )
+    await _insert_baogian(
+        plugin, scope_id=official_scope, player_id=player_id,
+        short_code="BA0A0002", instance_id="baogian-2",
+    )
+
+    # 多只且未给编号：提示需要编号
+    ok, message, _ = await plugin.handle_toggle_baogian(
+        stream_id="stream-official",
+        **_command_kwargs(
+            build_message(
+                platform="qq-official",
+                group_id="OFFICIAL001",
+                user_id="U001",
+                display_name="官方成员",
+                message_id="baogian-toggle-1",
+            ),
+            arguments="",
+        ),
+    )
+    assert ok is False
+    assert "请指定编号" in message
+    assert "BA0A0001" in message and "BA0A0002" in message
+
+    # 指定编号：只切换那一只
+    ok, message, _ = await plugin.handle_toggle_baogian(
+        stream_id="stream-official",
+        **_command_kwargs(
+            build_message(
+                platform="qq-official",
+                group_id="OFFICIAL001",
+                user_id="U001",
+                display_name="官方成员",
+                message_id="baogian-toggle-2",
+            ),
+            arguments="BA0A0002",
+        ),
+    )
+    assert ok is True
+    assert "BA0A0002" in message
+    assert "表情包" in message
+    row = await plugin.database.fetch_one(
+        "SELECT display_variant FROM pig_instances WHERE pig_instance_id = 'baogian-2'"
+    )
+    assert row is not None and row["display_variant"] == "sticker"
+    row = await plugin.database.fetch_one(
+        "SELECT display_variant FROM pig_instances WHERE pig_instance_id = 'baogian-1'"
+    )
+    assert row is not None and row["display_variant"] == "pig"
+
+    # 不存在的编号：明确提示
+    ok, message, _ = await plugin.handle_toggle_baogian(
+        stream_id="stream-official",
+        **_command_kwargs(
+            build_message(
+                platform="qq-official",
+                group_id="OFFICIAL001",
+                user_id="U001",
+                display_name="官方成员",
+                message_id="baogian-toggle-3",
+            ),
+            arguments="BA0A9999",
+        ),
+    )
+    assert ok is False
+    assert "没有编号 BA0A9999" in message
+    await plugin.on_unload()
+
+
+@pytest.mark.asyncio
+async def test_toggle_baogian_single_instance_needs_no_code(
+    tmp_path: Path,
+) -> None:
+    """背包里只有一只保千猪时，不带编号直接切换。"""
+
+    plugin, _ = await create_test_plugin(
+        tmp_path,
+        config_updates={"catching": {"cooldown_seconds": 0}},
+    )
+    await _install_baogian_template(plugin, tmp_path)
+    scope_id = "qq:10001"
+    await plugin.gameplay_service.profile(
+        CommandIdentity(
+            scope=ScopeKey("qq", "10001"),
+            stream_id="stream-10001",
+            user_id="20001",
+            display_name="测试成员",
+            message_id="baogian-single-profile",
+            group_name="抓猪测试群",
+        )
+    )
+    await _insert_baogian(
+        plugin, scope_id=scope_id, player_id=f"{scope_id}:20001",
+        short_code="BA0B0001", instance_id="baogian-single",
+    )
+    ok, message, _ = await plugin.handle_toggle_baogian(
+        stream_id="stream-10001",
+        **_command_kwargs(
+            build_message(
+                group_id="10001",
+                user_id="20001",
+                display_name="测试成员",
+                message_id="baogian-single-toggle",
+            ),
+            arguments="",
+        ),
+    )
+    assert ok is True
+    assert "BA0B0001" in message
+    row = await plugin.database.fetch_one(
+        "SELECT display_variant FROM pig_instances WHERE pig_instance_id = 'baogian-single'"
+    )
+    assert row is not None and row["display_variant"] == "sticker"
+    await plugin.on_unload()

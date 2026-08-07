@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 
 from ...domain.enums import RecordType
 from ...domain.models import AssetSelector
@@ -945,26 +945,62 @@ class GameplayRepository:
         )
         return str(row["item_id"])
 
-    async def toggle_pig_display_variant(
+    async def list_baogian_instances(
         self,
         session: DatabaseSession,
         *,
         player_id: str,
-        template_id: str,
+    ) -> list[dict[str, object]]:
+        """List active baogian pig instances owned by the player.
+
+        保千猪按显示名快照与模板备用图判定，覆盖四个群（NapCat 双群 + QQ
+        官方双群）的所有保千猪模板副本。
+        """
+
+        rows = await session.fetch_all(
+            """
+            SELECT instance.pig_instance_id, instance.short_code,
+                   instance.display_variant
+            FROM pig_instances AS instance
+            JOIN pig_templates AS template
+              ON template.template_id = instance.template_id
+            WHERE instance.owner_player_id = ?
+              AND instance.state = 'active'
+              AND instance.display_name_snapshot = '保千猪'
+              AND template.alternate_image_relpath IS NOT NULL
+              AND template.alternate_image_relpath != ''
+            ORDER BY instance.acquired_at ASC, instance.pig_instance_id ASC
+            """,
+            (player_id,),
+        )
+        return [dict(row) for row in rows]
+
+    async def toggle_baogian_instances(
+        self,
+        session: DatabaseSession,
+        *,
+        player_id: str,
+        instance_ids: Sequence[str],
         now: str,
     ) -> tuple[int, str]:
-        """Toggle display_variant for all active owned instances of a template.
+        """Toggle display_variant for the given active baogian instances.
 
         Returns (updated_count, new_variant).
         """
+
+        normalized = tuple(dict.fromkeys(instance_ids))
+        if not normalized:
+            return 0, "pig"
+        placeholders = ",".join("?" for _ in normalized)
         rows = await session.fetch_all(
-            """
+            f"""
             SELECT pig_instance_id, display_variant
             FROM pig_instances
-            WHERE owner_player_id = ? AND template_id = ? AND state = 'active'
-            ORDER BY acquired_at DESC
+            WHERE owner_player_id = ?
+              AND state = 'active'
+              AND pig_instance_id IN ({placeholders})
             """,
-            (player_id, template_id),
+            (player_id, *normalized),
         )
         if not rows:
             return 0, "pig"
@@ -972,12 +1008,14 @@ class GameplayRepository:
             str(row["display_variant"]) != "sticker" for row in rows
         ) else "pig"
         await session.execute(
-            """
+            f"""
             UPDATE pig_instances
             SET display_variant = ?, updated_at = ?
-            WHERE owner_player_id = ? AND template_id = ? AND state = 'active'
+            WHERE owner_player_id = ?
+              AND state = 'active'
+              AND pig_instance_id IN ({placeholders})
             """,
-            (new_variant, now, player_id, template_id),
+            (new_variant, now, player_id, *normalized),
         )
         return len(rows), new_variant
 

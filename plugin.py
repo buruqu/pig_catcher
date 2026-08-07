@@ -1085,8 +1085,8 @@ class PigCatcherPlugin(MaiBotPlugin):
 
     @Command(
         "pig_catcher_toggle_baogian",
-        description="切换保千猪的立绘与表情包显示",
-        pattern=r"^/切换\s+猪保千\s*$",
+        description="切换保千猪的立绘与表情包显示；背包里有多只保千猪时需指定编号",
+        pattern=r"^/切换\s+猪保千(?:\s+([0-9A-Za-z]{8}))?\s*$",
     )
     async def handle_toggle_baogian(
         self,
@@ -1101,32 +1101,17 @@ class PigCatcherPlugin(MaiBotPlugin):
         )
         if rejected is not None or identity is None:
             return rejected or (False, "", 0)
-        baogian_template_ids = {
-            "pig-g1092931381-baogian",
-            "pig-g237716658-baogian",
-        }
         try:
             service = cast(GameplayService, self._gameplay_service)
-            total = 0
-            new_variant = "pig"
-            for template_id in baogian_template_ids:
-                count, variant = await service.toggle_pig_display_variant(
-                    identity,
-                    template_id=template_id,
-                )
-                total += count
-                new_variant = variant
-            if total == 0:
-                return await self._reply_text(
-                    identity.stream_id,
-                    "你还没有保千猪，无法切换立绘。",
-                    success=False,
-                )
-            label = "表情包" if new_variant == "sticker" else "猪猪立绘"
+            short_code = matched_group(kwargs, "arguments") or None
+            count, _, message = await service.toggle_baogian(
+                identity,
+                short_code=short_code,
+            )
             return await self._reply_text(
                 identity.stream_id,
-                f"已将你的 {total} 只保千猪切换为 {label}。",
-                success=True,
+                message,
+                success=count > 0,
             )
         except Exception as exc:
             return await self._command_error(

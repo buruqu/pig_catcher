@@ -1200,12 +1200,18 @@ class GameplayService:
                 giant_sighting=giant_sighting,
             )
 
-    async def toggle_pig_display_variant(
+    async def toggle_baogian(
         self,
         identity: CommandIdentity,
-        template_id: str,
-    ) -> tuple[int, str]:
-        """Toggle alternate display art for all active instances of a template."""
+        *,
+        short_code: str | None = None,
+    ) -> tuple[int, str, str]:
+        """切换玩家持有的保千猪立绘与表情包。
+
+        覆盖四个群（NapCat 双群 + QQ 官方双群）的保千猪实例；背包里有多只
+        保千猪时必须通过 ``short_code`` 指定目标实例，否则返回编号提示。
+        返回 (切换数量, 新变体, 提示文案)。
+        """
 
         now_datetime = _safe_datetime(self.clock.now())
         now = iso_timestamp(now_datetime)
@@ -1215,13 +1221,50 @@ class GameplayService:
                 identity=identity,
                 now=now,
             )
-            count, new_variant = await self.repository.toggle_pig_display_variant(
+            instances = await self.repository.list_baogian_instances(
                 session,
                 player_id=identity.player_id,
-                template_id=template_id,
+            )
+        if not instances:
+            return 0, "", "你还没有保千猪，无法切换立绘。"
+        target: dict[str, object] | None = None
+        if short_code:
+            normalized = str(short_code).strip().upper()
+            matches = [
+                instance
+                for instance in instances
+                if str(instance["short_code"]).upper() == normalized
+            ]
+            if not matches:
+                codes = "、".join(
+                    str(instance["short_code"]) for instance in instances
+                )
+                return 0, "", (
+                    f"背包中没有编号 {short_code} 的保千猪；"
+                    f"你当前持有的保千猪编号：{codes}"
+                )
+            target = matches[0]
+        elif len(instances) > 1:
+            codes = "、".join(
+                str(instance["short_code"]) for instance in instances
+            )
+            return 0, "", (
+                f"你有 {len(instances)} 只保千猪，请指定编号切换："
+                f"/切换 猪保千 {codes}"
+            )
+        else:
+            target = instances[0]
+        async with self.database.transaction() as session:
+            count, new_variant = await self.repository.toggle_baogian_instances(
+                session,
+                player_id=identity.player_id,
+                instance_ids=[str(target["pig_instance_id"])],
                 now=now,
             )
-            return count, new_variant
+        label = "表情包" if new_variant == "sticker" else "猪猪立绘"
+        return count, new_variant, (
+            f"已将保千猪 {target['short_code']} 切换为 {label}。"
+        )
 
     async def profile(self, identity: CommandIdentity) -> PlayerProfile:
         """Read the current-group player profile."""

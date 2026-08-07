@@ -919,3 +919,18 @@
   `EconomyService.set_batch_keep_highest`，玩家偏好按 `(scope, player)` 持久化。
 - 自动回归为 pytest `195 passed`（新增 4 个测试：开关命令端到端、联动保一只最高、
   保留最高价值猪/美食、批量做菜低星范围）；Ruff、Python `compileall` 全部通过。
+## 38. v1.6.9 保千猪切换修复与多实例编号验收
+
+- 验收日期：`2026-08-07`。插件升级为 `local.pig-catcher v1.6.9`，Schema `14`、
+  Asset Manifest `4`、Ruleset `12` 保持不变；无数据迁移。
+- 根因：v1.6.7 将保千猪复制到 QQ 官方双群后，`handle_toggle_baogian` 仍只查询
+  NapCat 两个群的写死 `template_id`，官方群玩家的保千猪永远匹配不到，误报
+  “你还没有保千猪”。
+- 修复：改为按玩家实际持有实例判定——`GameplayRepository.list_baogian_instances`
+  以显示名快照 `保千猪` + 模板备用图非空识别四群副本；`toggle_baogian_instances`
+  实例级切换；`GameplayService.toggle_baogian(identity, short_code=None)` 覆盖
+  无保千猪 / 多只缺编号（列出编号）/ 编号无效（列出持有编号）/ 单只免编号 /
+  指定编号五种分支。
+- 命令 pattern：`^/切换\s+猪保千(?:\s+([0-9A-Za-z]{8}))?\s*$`。
+- 自动回归为 pytest `197 passed`（新增 2 个端到端测试：官方群多只编号切换与
+  单只免编号）；Ruff、Python `compileall` 全部通过。
