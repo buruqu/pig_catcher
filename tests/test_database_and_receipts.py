@@ -201,6 +201,63 @@ async def test_legacy_v9_social_ban_splits_into_two_permanent_blacklists(
             disposed_at TEXT,
             updated_at TEXT NOT NULL
         );
+        CREATE TABLE food_templates (
+            template_id TEXT PRIMARY KEY,
+            catalog_hash TEXT NOT NULL,
+            template_version INTEGER NOT NULL DEFAULT 1,
+            display_name TEXT NOT NULL,
+            rarity INTEGER NOT NULL,
+            scope_type TEXT NOT NULL,
+            description TEXT NOT NULL,
+            image_relpath TEXT NOT NULL,
+            image_sha256 TEXT NOT NULL,
+            image_fit TEXT NOT NULL,
+            recipe_tags_json TEXT NOT NULL DEFAULT '[]',
+            effect_id TEXT NOT NULL DEFAULT '',
+            effect_params_json TEXT NOT NULL DEFAULT '{}',
+            source_label TEXT NOT NULL,
+            license TEXT NOT NULL,
+            consent_status TEXT NOT NULL,
+            enabled INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE TABLE food_instances (
+            food_instance_id TEXT PRIMARY KEY,
+            short_code TEXT NOT NULL UNIQUE,
+            scope_id TEXT NOT NULL,
+            owner_player_id TEXT NOT NULL,
+            template_id TEXT NOT NULL,
+            template_version INTEGER NOT NULL,
+            source_pig_instance_id TEXT,
+            rarity INTEGER NOT NULL,
+            display_name_snapshot TEXT NOT NULL,
+            portion_weight REAL NOT NULL,
+            fat_category TEXT NOT NULL,
+            official_value INTEGER NOT NULL,
+            effect_id TEXT NOT NULL DEFAULT '',
+            effect_params_json TEXT NOT NULL DEFAULT '{}',
+            ruleset_version INTEGER NOT NULL,
+            random_snapshot_json TEXT NOT NULL,
+            state TEXT NOT NULL,
+            locked_trade_id TEXT,
+            acquired_at TEXT NOT NULL,
+            disposed_at TEXT,
+            updated_at TEXT NOT NULL
+        );
+        CREATE TABLE currency_ledger (
+            ledger_entry_id TEXT PRIMARY KEY,
+            player_id TEXT NOT NULL,
+            scope_id TEXT NOT NULL,
+            amount INTEGER NOT NULL,
+            balance_after INTEGER NOT NULL,
+            reason_code TEXT NOT NULL,
+            reason_text TEXT NOT NULL,
+            source_object_type TEXT NOT NULL DEFAULT '',
+            source_object_id TEXT NOT NULL DEFAULT '',
+            idempotency_key TEXT UNIQUE,
+            created_at TEXT NOT NULL
+        );
         INSERT INTO scopes(
             scope_id, platform, group_id, created_at, updated_at
         ) VALUES ('qq-official:group', 'qq-official', 'group', 'now', 'now');

@@ -1,5 +1,10 @@
 """应用服务。"""
 
+from .administration import (
+    AdminBlacklistSnapshot,
+    AdminCommandResult,
+    AdministrationService,
+)
 from .assets import AssetCatalogService, CatalogImportResult, CollectionProgress
 from .economy import (
     BatchCookingResult,
@@ -83,6 +88,9 @@ from .social import (
 
 __all__ = [
     "AssetCatalogService",
+    "AdminBlacklistSnapshot",
+    "AdminCommandResult",
+    "AdministrationService",
     "AnnouncementAdminService",
     "AnnouncementClaim",
     "BatchCookingResult",

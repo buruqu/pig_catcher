@@ -22,6 +22,11 @@ from .pig_catcher.commands import (
     format_help,
     matched_group,
     parse_action_type,
+    parse_admin_asset_grant,
+    parse_admin_asset_selector,
+    parse_admin_blacklist_query,
+    parse_admin_coin_amount,
+    parse_admin_target_arguments,
     parse_batch_cook_query,
     parse_batch_sale_query,
     parse_catalog_query,
@@ -90,6 +95,7 @@ from .pig_catcher.rendering import (
     trade_receipt_view,
 )
 from .pig_catcher.services import (
+    AdministrationService,
     AnnouncementAdminService,
     AssetCatalogService,
     CatchQuotaResetService,
@@ -163,6 +169,7 @@ class PigCatcherPlugin(MaiBotPlugin):
         self._social_service: SocialService | None = None
         self._receipt_service: ReceiptService | None = None
         self._quota_reset_service: CatchQuotaResetService | None = None
+        self._administration_service: AdministrationService | None = None
         self._restriction_admin_service: RestrictionAdminService | None = None
         self._announcement_admin_service: AnnouncementAdminService | None = None
         self._renderer: PigCatcherRenderer | None = None
@@ -329,6 +336,11 @@ class PigCatcherPlugin(MaiBotPlugin):
                 timezone_name=settings.catching.daily_reset_timezone,
                 window_limit=settings.catching.daily_limit,
             )
+            self._administration_service = AdministrationService(
+                database,
+                refresh_hours=settings.catching.quota_refresh_hours,
+                timezone_name=settings.catching.daily_reset_timezone,
+            )
             self._restriction_admin_service = RestrictionAdminService(database)
             self._announcement_admin_service = AnnouncementAdminService(database)
             self._renderer = renderer
@@ -361,6 +373,7 @@ class PigCatcherPlugin(MaiBotPlugin):
         self._animation_composer = None
         self._renderer = None
         self._quota_reset_service = None
+        self._administration_service = None
         self._restriction_admin_service = None
         self._announcement_admin_service = None
         self._receipt_service = None
@@ -636,6 +649,95 @@ class PigCatcherPlugin(MaiBotPlugin):
             group_name=actor.group_name,
         )
 
+    def _is_configured_admin(self, identity: CommandIdentity) -> bool:
+        return self._access_policy().is_admin(
+            platform=identity.scope.platform,
+            user_id=identity.user_id,
+            admin_user_ids=self.settings.access.admin_user_ids,
+        )
+
+    async def _is_operationally_blacklisted(self, identity: CommandIdentity) -> bool:
+        """Apply the current-group DB blacklist while keeping configured admins recoverable."""
+
+        if self._is_configured_admin(identity):
+            return False
+        service = self._administration_service
+        if service is None:
+            return False
+        return await service.is_plugin_access_banned(
+            scope_id=identity.scope.value,
+            platform_user_id=identity.user_id,
+        )
+
+    async def _prepare_admin_command(
+        self,
+        stream_id: str,
+        kwargs: dict[str, Any],
+    ) -> tuple[CommandIdentity | None, tuple[bool, str, int] | None]:
+        identity, rejected = await self._prepare_command(
+            stream_id,
+            kwargs,
+            feature_enabled=True,
+            feature_label="插件管理",
+        )
+        if rejected is not None or identity is None:
+            return identity, rejected
+        if not self._is_configured_admin(identity):
+            self.ctx.logger.warning(
+                "拒绝非管理员执行猪管命令：platform=%s，scope=%s，user_id=%s",
+                identity.scope.platform,
+                identity.scope.value,
+                identity.user_id,
+            )
+            return None, await self._reply_text(
+                identity.stream_id,
+                "只有插件配置中的管理员可以使用猪管命令。QQ 官方机器人请配置成员 OpenID。",
+                success=False,
+            )
+        if self._administration_service is None:
+            return None, await self._reply_text(
+                identity.stream_id,
+                "抓猪管理服务尚未就绪，请稍后再试。",
+                success=False,
+            )
+        return identity, None
+
+    @staticmethod
+    def _optional_mention_target(kwargs: dict[str, Any]) -> MentionTarget | None:
+        try:
+            return extract_mention_target(kwargs)
+        except MentionTargetError as exc:
+            if "一次只能" in str(exc):
+                raise
+            return None
+
+    @staticmethod
+    def _admin_kind(value: str) -> AssetKind:
+        normalized = str(value or "").strip()
+        if normalized in {"猪猪", "猪"}:
+            return AssetKind.PIG
+        if normalized in {"美食", "菜"}:
+            return AssetKind.FOOD
+        raise ValueError(f"未知管理员资产类别：{value}")
+
+    def _target_is_configured_admin(
+        self,
+        identity: CommandIdentity,
+        target_user_id: str,
+    ) -> bool:
+        normalized = str(target_user_id or "").strip()
+        scope_prefix = f"{identity.scope.value}:"
+        platform_prefix = f"{identity.scope.platform}:"
+        if normalized.startswith(scope_prefix):
+            normalized = normalized[len(scope_prefix) :]
+        elif normalized.startswith(platform_prefix):
+            normalized = normalized[len(platform_prefix) :]
+        return self._access_policy().is_admin(
+            platform=identity.scope.platform,
+            user_id=normalized,
+            admin_user_ids=self.settings.access.admin_user_ids,
+        )
+
     async def _reply_text(
         self,
         stream_id: str,
@@ -675,6 +777,15 @@ class PigCatcherPlugin(MaiBotPlugin):
                 rejected = await self._reply_text(
                     identity.stream_id,
                     decision.reason,
+                    success=False,
+                )
+                return None, rejected
+            return None, (False, "", 0)
+        if await self._is_operationally_blacklisted(identity):
+            if self.settings.access.notify_denied:
+                rejected = await self._reply_text(
+                    identity.stream_id,
+                    self.settings.access.denied_message,
                     success=False,
                 )
                 return None, rejected
@@ -912,6 +1023,14 @@ class PigCatcherPlugin(MaiBotPlugin):
                         success=False,
                     )
                 return False, "", 0
+            if await self._is_operationally_blacklisted(identity):
+                if self.settings.access.notify_denied:
+                    return await self._reply_text(
+                        identity.stream_id,
+                        self.settings.access.denied_message,
+                        success=False,
+                    )
+                return False, "", 0
             if not self.settings.features.help_enabled:
                 return await self._reply_text(
                     identity.stream_id,
@@ -991,6 +1110,391 @@ class PigCatcherPlugin(MaiBotPlugin):
             return await self._command_error(
                 stream_id=identity.stream_id,
                 operation="重置抓猪次数",
+                error=exc,
+            )
+
+    @Command(
+        "pig_catcher_admin_help",
+        description="查看仅限插件管理员使用的猪管命令",
+        pattern=r"^/猪管帮助\s*$",
+    )
+    async def handle_admin_help(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_admin_command(stream_id, kwargs)
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        text = "\n".join(
+            (
+                "【抓猪插件·管理员指令】",
+                "/猪管发币 <@玩家|用户ID> <数量>",
+                "/猪管全员发币 <数量>",
+                "/猪管扣币 <@玩家|用户ID> <数量>（余额可为负）",
+                "/猪管全员扣币 <数量>（余额可为负）",
+                "/猪管发猪 <@玩家|用户ID> <猪名或模板ID> [8位编号]",
+                "/猪管发菜 <@玩家|用户ID> <美食名或模板ID> [8位编号]",
+                "/猪管删猪 <@玩家|用户ID> <猪名#8位编号>",
+                "/猪管删菜 <@玩家|用户ID> <美食名#8位编号>",
+                "/猪管黑名单",
+                "/猪管黑名单 <加入|移除> <插件|赠送|交易> <@玩家|用户ID> [原因]",
+                "/猪管重置玩家 <@玩家|用户ID>",
+                "",
+                "所有操作只作用于当前群；全员指当前群已登记玩家。",
+                "管理员发放资产不增加抓猪/做菜统计；删除保留历史实例与图鉴。",
+            )
+        )
+        return await self._reply_text(identity.stream_id, text, success=True)
+
+    @Command(
+        "pig_catcher_admin_grant_coins",
+        description="插件管理员给当前群一名玩家发放猪币",
+        pattern=r"^/猪管发币(?:\s+(?P<arguments>.*?))?\s*$",
+    )
+    async def handle_admin_grant_coins(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        return await self._handle_admin_target_coin_adjustment(
+            stream_id,
+            kwargs,
+            deduct=False,
+        )
+
+    @Command(
+        "pig_catcher_admin_deduct_coins",
+        description="插件管理员扣除当前群一名玩家的猪币，允许负余额",
+        pattern=r"^/猪管扣币(?:\s+(?P<arguments>.*?))?\s*$",
+    )
+    async def handle_admin_deduct_coins(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        return await self._handle_admin_target_coin_adjustment(
+            stream_id,
+            kwargs,
+            deduct=True,
+        )
+
+    async def _handle_admin_target_coin_adjustment(
+        self,
+        stream_id: str,
+        kwargs: dict[str, Any],
+        *,
+        deduct: bool,
+    ) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_admin_command(stream_id, kwargs)
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            mention = self._optional_mention_target(kwargs)
+            target = parse_admin_target_arguments(
+                matched_group(kwargs, "arguments"),
+                mentioned_user_id=mention.user_id if mention is not None else "",
+                mentioned_display_name=(mention.display_name if mention is not None else ""),
+            )
+            amount = parse_admin_coin_amount(target.remaining)
+            result = await cast(
+                AdministrationService,
+                self._administration_service,
+            ).adjust_coins(
+                identity,
+                command_name="pig-catcher.admin-coins",
+                amount=-amount if deduct else amount,
+                target_user_id=target.user_id,
+            )
+            return await self._deliver_text_receipt(
+                stream_id=identity.stream_id,
+                receipt=result.receipt,
+            )
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation="管理员扣除猪币" if deduct else "管理员发放猪币",
+                error=exc,
+            )
+
+    @Command(
+        "pig_catcher_admin_grant_coins_all",
+        description="插件管理员给当前群所有已登记玩家发放猪币",
+        pattern=r"^/猪管全员发币(?:\s+(?P<amount>\S+))?\s*$",
+    )
+    async def handle_admin_grant_coins_all(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        return await self._handle_admin_all_coin_adjustment(
+            stream_id,
+            kwargs,
+            deduct=False,
+        )
+
+    @Command(
+        "pig_catcher_admin_deduct_coins_all",
+        description="插件管理员扣除当前群所有已登记玩家猪币，允许负余额",
+        pattern=r"^/猪管全员扣币(?:\s+(?P<amount>\S+))?\s*$",
+    )
+    async def handle_admin_deduct_coins_all(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        return await self._handle_admin_all_coin_adjustment(
+            stream_id,
+            kwargs,
+            deduct=True,
+        )
+
+    async def _handle_admin_all_coin_adjustment(
+        self,
+        stream_id: str,
+        kwargs: dict[str, Any],
+        *,
+        deduct: bool,
+    ) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_admin_command(stream_id, kwargs)
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            amount = parse_admin_coin_amount(matched_group(kwargs, "amount"))
+            result = await cast(
+                AdministrationService,
+                self._administration_service,
+            ).adjust_coins(
+                identity,
+                command_name="pig-catcher.admin-coins",
+                amount=-amount if deduct else amount,
+                all_players=True,
+            )
+            return await self._deliver_text_receipt(
+                stream_id=identity.stream_id,
+                receipt=result.receipt,
+            )
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation="管理员全员扣币" if deduct else "管理员全员发币",
+                error=exc,
+            )
+
+    @Command(
+        "pig_catcher_admin_grant_asset",
+        description="插件管理员为当前群玩家生成并发放一只指定猪猪或美食",
+        pattern=(
+            r"^/猪管(?:发放|发)(?P<kind>猪猪|猪|美食|菜)"
+            r"(?:\s+(?P<arguments>.*?))?\s*$"
+        ),
+    )
+    async def handle_admin_grant_asset(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_admin_command(stream_id, kwargs)
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            mention = self._optional_mention_target(kwargs)
+            target = parse_admin_target_arguments(
+                matched_group(kwargs, "arguments"),
+                mentioned_user_id=mention.user_id if mention is not None else "",
+                mentioned_display_name=(mention.display_name if mention is not None else ""),
+            )
+            query = parse_admin_asset_grant(target.remaining)
+            result = await cast(
+                AdministrationService,
+                self._administration_service,
+            ).grant_asset(
+                identity,
+                command_name="pig-catcher.admin-grant-asset",
+                target_user_id=target.user_id,
+                asset_kind=self._admin_kind(matched_group(kwargs, "kind")),
+                template_selector=query.template_selector,
+                requested_short_code=query.short_code,
+            )
+            return await self._deliver_text_receipt(
+                stream_id=identity.stream_id,
+                receipt=result.receipt,
+            )
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation="管理员发放资产",
+                error=exc,
+            )
+
+    @Command(
+        "pig_catcher_admin_remove_asset",
+        description="插件管理员从当前群玩家背包移除一只精确猪猪或美食",
+        pattern=(
+            r"^/猪管(?:删除|删)(?P<kind>猪猪|猪|美食|菜)"
+            r"(?:\s+(?P<arguments>.*?))?\s*$"
+        ),
+    )
+    async def handle_admin_remove_asset(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_admin_command(stream_id, kwargs)
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            mention = self._optional_mention_target(kwargs)
+            target = parse_admin_target_arguments(
+                matched_group(kwargs, "arguments"),
+                mentioned_user_id=mention.user_id if mention is not None else "",
+                mentioned_display_name=(mention.display_name if mention is not None else ""),
+            )
+            selector = parse_admin_asset_selector(target.remaining)
+            result = await cast(
+                AdministrationService,
+                self._administration_service,
+            ).remove_asset(
+                identity,
+                command_name="pig-catcher.admin-remove-asset",
+                target_user_id=target.user_id,
+                asset_kind=self._admin_kind(matched_group(kwargs, "kind")),
+                selector_text=selector,
+            )
+            return await self._deliver_text_receipt(
+                stream_id=identity.stream_id,
+                receipt=result.receipt,
+            )
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation="管理员删除资产",
+                error=exc,
+            )
+
+    @Command(
+        "pig_catcher_admin_blacklist",
+        description="插件管理员查看或修改当前群插件、赠送、交易黑名单",
+        pattern=r"^/猪管黑名单(?:\s+(?P<arguments>.*?))?\s*$",
+    )
+    async def handle_admin_blacklist(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_admin_command(stream_id, kwargs)
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            arguments = matched_group(kwargs, "arguments")
+            service = cast(AdministrationService, self._administration_service)
+            if not arguments:
+                snapshot = await service.blacklist_snapshot(identity)
+                category_labels = {
+                    "plugin-access-ban": "插件",
+                    "gift-transfer-ban": "赠送/收赠",
+                    "trade-ban": "交易",
+                }
+                grouped: dict[str, list[str]] = {
+                    "plugin-access-ban": [],
+                    "gift-transfer-ban": [],
+                    "trade-ban": [],
+                }
+                for row in snapshot.rows:
+                    restriction_type = str(row["restriction_type"])
+                    reason = str(row.get("reason") or "").strip()
+                    grouped[restriction_type].append(
+                        f"- {row['display_name']}（{row['platform_user_id']}）"
+                        + (f"｜{reason}" if reason else "")
+                    )
+                lines = [f"【猪管·当前群黑名单】\n范围：{snapshot.scope_id}"]
+                for category, label in category_labels.items():
+                    entries = grouped[category]
+                    lines.append(f"\n{label}黑名单（{len(entries)} 人）")
+                    lines.extend(entries or ["- 无"])
+                static_users = tuple(self.settings.access.user_blacklist)
+                lines.append(f"\n配置静态用户黑名单（{len(static_users)} 项，全局）")
+                lines.extend(
+                    [f"- {value}" for value in static_users]
+                    if static_users
+                    else ["- 无"]
+                )
+                return await self._reply_text(
+                    identity.stream_id,
+                    "\n".join(lines),
+                    success=True,
+                )
+            mention = self._optional_mention_target(kwargs)
+            query = parse_admin_blacklist_query(
+                arguments,
+                mentioned_user_id=mention.user_id if mention is not None else "",
+                mentioned_display_name=(mention.display_name if mention is not None else ""),
+            )
+            if (
+                query.action == "add"
+                and query.category == "plugin"
+                and self._target_is_configured_admin(identity, query.target.user_id)
+            ):
+                raise MentionTargetError(
+                    "配置管理员不能加入插件访问黑名单，以免失去紧急解除权限。"
+                )
+            result = await service.update_blacklist(
+                identity,
+                command_name="pig-catcher.admin-blacklist",
+                target_user_id=query.target.user_id,
+                category=query.category,
+                action=query.action,
+                reason=query.reason,
+            )
+            return await self._deliver_text_receipt(
+                stream_id=identity.stream_id,
+                receipt=result.receipt,
+            )
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation="管理员黑名单管理",
+                error=exc,
+            )
+
+    @Command(
+        "pig_catcher_admin_reset_player_quota",
+        description="插件管理员只重置当前群一名玩家的本时段抓猪次数",
+        pattern=r"^/猪管重置玩家(?:\s+(?P<arguments>.*?))?\s*$",
+    )
+    async def handle_admin_reset_player_quota(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_admin_command(stream_id, kwargs)
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            mention = self._optional_mention_target(kwargs)
+            target = parse_admin_target_arguments(
+                matched_group(kwargs, "arguments"),
+                mentioned_user_id=mention.user_id if mention is not None else "",
+                mentioned_display_name=(mention.display_name if mention is not None else ""),
+            )
+            if target.remaining:
+                raise MentionTargetError("玩家额度重置命令只能指定一名玩家。")
+            result = await cast(
+                AdministrationService,
+                self._administration_service,
+            ).reset_player_quota(
+                identity,
+                command_name="pig-catcher.admin-reset-player-quota",
+                target_user_id=target.user_id,
+            )
+            return await self._deliver_text_receipt(
+                stream_id=identity.stream_id,
+                receipt=result.receipt,
+            )
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation="管理员重置玩家抓猪次数",
                 error=exc,
             )
 

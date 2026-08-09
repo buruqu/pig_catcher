@@ -72,16 +72,28 @@ class GameplayRepository:
             effective_window AS (
                 SELECT COALESCE(MAX(reset.created_at), ?) AS effective_start
                 FROM audit_events AS reset
-                WHERE reset.action IN (
-                        'daily-catch-quota-reset',
-                        'catch-quota-window-reset'
+                WHERE (
+                    (
+                        reset.action IN (
+                            'daily-catch-quota-reset',
+                            'catch-quota-window-reset',
+                            'catch-quota-window-boost'
+                        )
+                        AND reset.created_at >= ?
+                        AND reset.created_at < ?
+                        AND (
+                            reset.scope_id IS NULL
+                            OR reset.scope_id = (SELECT scope_id FROM player_scope)
+                        )
                     )
-                  AND reset.created_at >= ?
-                  AND reset.created_at < ?
-                  AND (
-                      reset.scope_id IS NULL
-                      OR reset.scope_id = (SELECT scope_id FROM player_scope)
-                  )
+                    OR (
+                        reset.action = 'player-catch-quota-window-reset'
+                        AND reset.scope_id = (SELECT scope_id FROM player_scope)
+                        AND reset.object_id = ?
+                        AND reset.created_at >= ?
+                        AND reset.created_at < ?
+                    )
+                )
             )
             SELECT
                 COUNT(*) AS daily_count,
@@ -96,6 +108,9 @@ class GameplayRepository:
             (
                 player_id,
                 window_start,
+                window_start,
+                window_end,
+                player_id,
                 window_start,
                 window_end,
                 player_id,

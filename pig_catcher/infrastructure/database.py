@@ -119,6 +119,10 @@ class PigCatcherDatabase:
                 self._is_open = False
 
     async def _migrate(self, connection: aiosqlite.Connection) -> None:
+        # SQLite table-rebuild migrations require foreign-key enforcement to be
+        # disabled before the transaction begins. Every rebuilt schema is checked
+        # again with foreign_key_check before commit, then enforcement is restored.
+        await connection.execute("PRAGMA foreign_keys = OFF")
         await connection.execute("BEGIN IMMEDIATE")
         try:
             await connection.execute(_SCHEMA_MIGRATIONS_SQL)
@@ -150,10 +154,20 @@ class PigCatcherDatabase:
                 user_version = migration.version
             if user_version != SCHEMA_VERSION:
                 raise MigrationError(f"迁移结束版本 {user_version} 与代码版本 {SCHEMA_VERSION} 不一致。")
+            foreign_key_rows = await (
+                await connection.execute("PRAGMA foreign_key_check")
+            ).fetchall()
+            if foreign_key_rows:
+                first = tuple(foreign_key_rows[0])
+                raise MigrationError(
+                    f"迁移后外键检查失败，共 {len(foreign_key_rows)} 条，首条={first}。"
+                )
             await connection.commit()
         except BaseException:
             await connection.rollback()
             raise
+        finally:
+            await connection.execute("PRAGMA foreign_keys = ON")
 
     def _require_open(self) -> None:
         if not self._is_open:

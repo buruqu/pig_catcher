@@ -717,10 +717,11 @@ class EconomyRepository:
         ledger_entry_id: str,
         idempotency_key: str,
         now: str,
+        allow_negative: bool = False,
     ) -> int | None:
         if amount == 0:
             raise ValueError("Currency mutation amount cannot be zero.")
-        if amount < 0:
+        if amount < 0 and not allow_negative:
             cursor = await session.execute(
                 """
                 UPDATE players

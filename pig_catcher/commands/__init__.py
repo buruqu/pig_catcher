@@ -8,6 +8,9 @@ from .context import (
 )
 from .help import format_help
 from .parsers import (
+    AdminAssetGrantQuery,
+    AdminBlacklistQuery,
+    AdminTargetArguments,
     BatchCookQuery,
     BatchSaleQuery,
     CatalogQuery,
@@ -20,6 +23,11 @@ from .parsers import (
     TradeListQuery,
     TradeOfferQuery,
     parse_action_type,
+    parse_admin_asset_grant,
+    parse_admin_asset_selector,
+    parse_admin_blacklist_query,
+    parse_admin_coin_amount,
+    parse_admin_target_arguments,
     parse_batch_cook_query,
     parse_batch_sale_query,
     parse_catalog_query,
@@ -39,6 +47,9 @@ from .parsers import (
 )
 
 __all__ = [
+    "AdminAssetGrantQuery",
+    "AdminBlacklistQuery",
+    "AdminTargetArguments",
     "BatchCookQuery",
     "BatchSaleQuery",
     "CatalogQuery",
@@ -56,6 +67,11 @@ __all__ = [
     "matched_group",
     "MentionTarget",
     "parse_action_type",
+    "parse_admin_asset_grant",
+    "parse_admin_asset_selector",
+    "parse_admin_blacklist_query",
+    "parse_admin_coin_amount",
+    "parse_admin_target_arguments",
     "parse_batch_cook_query",
     "parse_batch_sale_query",
     "parse_catalog_query",

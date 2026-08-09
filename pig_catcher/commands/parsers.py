@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from ..domain.enums import AssetKind, TradeStatus
@@ -103,6 +104,166 @@ class RankingQuery:
 
     ranking_type: str = "综合"
     page: int = 1
+
+
+@dataclass(frozen=True, slots=True)
+class AdminTargetArguments:
+    """One exact player target plus the remaining admin-command payload."""
+
+    user_id: str
+    remaining: str
+
+
+@dataclass(frozen=True, slots=True)
+class AdminAssetGrantQuery:
+    """Template name/id and an optional administrator-selected short code."""
+
+    template_selector: str
+    short_code: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class AdminBlacklistQuery:
+    """One current-group operational blacklist update."""
+
+    action: str
+    category: str
+    target: AdminTargetArguments
+    reason: str
+
+
+_ADMIN_SHORT_CODE_PATTERN = re.compile(r"^[A-Fa-f0-9]{8}$")
+
+
+def _validate_admin_user_id(value: str) -> str:
+    normalized = str(value or "").strip()
+    if (
+        not normalized
+        or len(normalized) > 1024
+        or any(ord(character) < 32 for character in normalized)
+    ):
+        raise DomainValidationError("管理员目标用户 ID/OpenID 不合法。")
+    return normalized
+
+
+def parse_admin_target_arguments(
+    arguments: str,
+    *,
+    mentioned_user_id: str = "",
+    mentioned_display_name: str = "",
+) -> AdminTargetArguments:
+    """Parse a structured @ target, or fall back to one explicit stable user ID."""
+
+    normalized = str(arguments or "").strip()
+    mentioned = str(mentioned_user_id or "").strip()
+    if mentioned:
+        remaining = _remove_mention_marker(
+            normalized,
+            display_name=mentioned_display_name,
+            user_id=mentioned,
+        )
+        return AdminTargetArguments(
+            user_id=_validate_admin_user_id(mentioned),
+            remaining=remaining,
+        )
+    user_id, separator, remaining = normalized.partition(" ")
+    if not user_id:
+        raise DomainValidationError("请明确 @ 一位玩家，或填写该群中的用户 ID/OpenID。")
+    return AdminTargetArguments(
+        user_id=_validate_admin_user_id(user_id),
+        remaining=remaining.strip() if separator else "",
+    )
+
+
+def parse_admin_coin_amount(value: str) -> int:
+    """Parse a positive administrator-entered quantity; deduction may cross zero."""
+
+    normalized = str(value or "").strip()
+    try:
+        amount = int(normalized)
+    except (TypeError, ValueError) as exc:
+        raise DomainValidationError("猪币数量必须是正整数。") from exc
+    if amount <= 0:
+        raise DomainValidationError("猪币数量必须是正整数；扣币后余额允许为负数。")
+    if amount > 9_000_000_000_000_000:
+        raise DomainValidationError("单次猪币数量超出安全整数范围。")
+    return amount
+
+
+def parse_admin_asset_grant(value: str) -> AdminAssetGrantQuery:
+    """Parse ``<模板名称或ID> [8位短编号]`` and ``名称#短编号``."""
+
+    normalized = str(value or "").strip()
+    if not normalized:
+        raise DomainValidationError("请填写要发放的猪猪或美食名称。")
+    name, separator, possible_code = normalized.rpartition("#")
+    if separator:
+        if not name.strip() or not _ADMIN_SHORT_CODE_PATTERN.fullmatch(possible_code.strip()):
+            raise DomainValidationError("手动编号必须使用 8 位十六进制字符。")
+        return AdminAssetGrantQuery(
+            template_selector=name.strip(),
+            short_code=possible_code.strip().upper(),
+        )
+    tokens = normalized.split()
+    if len(tokens) >= 2 and _ADMIN_SHORT_CODE_PATTERN.fullmatch(tokens[-1]):
+        return AdminAssetGrantQuery(
+            template_selector=" ".join(tokens[:-1]).strip(),
+            short_code=tokens[-1].upper(),
+        )
+    return AdminAssetGrantQuery(template_selector=normalized)
+
+
+def parse_admin_asset_selector(value: str) -> str:
+    """Require an exact ``名称#8位短编号`` for destructive removal."""
+
+    normalized = str(value or "").strip()
+    name, separator, short_code = normalized.rpartition("#")
+    if (
+        not separator
+        or not name.strip()
+        or not _ADMIN_SHORT_CODE_PATTERN.fullmatch(short_code.strip())
+    ):
+        raise DomainValidationError("删除资产必须填写“名称#8位短编号”，避免误删同名资产。")
+    return f"{name.strip()}#{short_code.strip().upper()}"
+
+
+def parse_admin_blacklist_query(
+    arguments: str,
+    *,
+    mentioned_user_id: str = "",
+    mentioned_display_name: str = "",
+) -> AdminBlacklistQuery:
+    """Parse ``加入|移除 插件|赠送|交易 <目标> [原因]``."""
+
+    normalized = str(arguments or "").strip()
+    action, separator, remainder = normalized.partition(" ")
+    if not separator or action not in {"加入", "移除"}:
+        raise DomainValidationError(
+            "格式：/猪管黑名单 <加入|移除> <插件|赠送|交易> <@玩家|用户ID> [原因]。"
+        )
+    category_text, separator, target_text = remainder.strip().partition(" ")
+    aliases = {
+        "插件": "plugin",
+        "访问": "plugin",
+        "赠送": "gift",
+        "收赠": "gift",
+        "赠送收赠": "gift",
+        "交易": "trade",
+    }
+    if not separator or category_text not in aliases:
+        raise DomainValidationError("黑名单类别只能是：插件、赠送、交易。")
+    target = parse_admin_target_arguments(
+        target_text,
+        mentioned_user_id=mentioned_user_id,
+        mentioned_display_name=mentioned_display_name,
+    )
+    reason = target.remaining.strip()
+    return AdminBlacklistQuery(
+        action="add" if action == "加入" else "remove",
+        category=aliases[category_text],
+        target=AdminTargetArguments(user_id=target.user_id, remaining=""),
+        reason=reason,
+    )
 
 
 def _positive_page(value: str) -> int:

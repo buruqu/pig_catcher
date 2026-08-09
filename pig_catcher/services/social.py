@@ -45,7 +45,11 @@ from ..infrastructure.repositories import (
     RestrictionRepository,
     SocialRepository,
 )
-from ..infrastructure.repositories.restrictions import GIFT_TRANSFER_BAN, TRADE_BAN
+from ..infrastructure.repositories.restrictions import (
+    GIFT_TRANSFER_BAN,
+    PLUGIN_ACCESS_BAN,
+    TRADE_BAN,
+)
 from .command_state import (
     iso_timestamp,
     receipt_payload,
@@ -1480,13 +1484,22 @@ class SocialService:
         restriction_type: str,
         now: str,
     ) -> None:
-        restrictions = (
-            await self.restriction_repository.active_restrictions_for_players(
-                session,
-                player_ids=player_ids,
-                restriction_type=restriction_type,
-                now=now,
+        plugin_restrictions = await self.restriction_repository.active_restrictions_for_players(
+            session,
+            player_ids=player_ids,
+            restriction_type=PLUGIN_ACCESS_BAN,
+            now=now,
+        )
+        if plugin_restrictions:
+            raise SocialTransferRestrictedError(
+                "参与方账号已被列入插件黑名单，禁止参与赠送、收赠和交易；"
+                "解除需由管理员复核。"
             )
+        restrictions = await self.restriction_repository.active_restrictions_for_players(
+            session,
+            player_ids=player_ids,
+            restriction_type=restriction_type,
+            now=now,
         )
         if not restrictions:
             return

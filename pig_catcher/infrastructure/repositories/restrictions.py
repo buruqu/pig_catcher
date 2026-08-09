@@ -9,6 +9,7 @@ from ..database import DatabaseSession
 GIFT_TRANSFER_BAN = "gift-transfer-ban"
 TRADE_BAN = "trade-ban"
 CATCH_WINDOW_LIMIT = "catch-window-limit"
+PLUGIN_ACCESS_BAN = "plugin-access-ban"
 
 
 class RestrictionRepository:
@@ -35,6 +36,69 @@ class RestrictionRepository:
             (player_id, restriction_type, now, now),
         )
         return dict(row) if row is not None else None
+
+    async def active_plugin_access_ban(
+        self,
+        session: DatabaseSession,
+        *,
+        scope_id: str,
+        platform_user_id: str,
+        now: str,
+    ) -> dict[str, object] | None:
+        """Resolve one current-group operational plugin blacklist entry."""
+
+        row = await session.fetch_one(
+            """
+            SELECT restriction.restriction_id, restriction.player_id,
+                   restriction.reason, restriction.starts_at,
+                   player.display_name, player.platform_user_id
+            FROM player_restrictions AS restriction
+            JOIN players AS player ON player.player_id = restriction.player_id
+            WHERE player.scope_id = ?
+              AND player.platform_user_id = ?
+              AND restriction.restriction_type = ?
+              AND restriction.starts_at <= ?
+              AND (restriction.expires_at IS NULL OR restriction.expires_at > ?)
+            """,
+            (scope_id, platform_user_id, PLUGIN_ACCESS_BAN, now, now),
+        )
+        return dict(row) if row is not None else None
+
+    async def list_active_blacklists(
+        self,
+        session: DatabaseSession,
+        *,
+        scope_id: str,
+        now: str,
+    ) -> list[dict[str, object]]:
+        """List all operational plugin/gift/trade blacklist rows in one group."""
+
+        rows = await session.fetch_all(
+            """
+            SELECT restriction.restriction_id, restriction.restriction_type,
+                   restriction.reason, restriction.source,
+                   restriction.created_by, restriction.starts_at,
+                   player.player_id, player.platform_user_id, player.display_name
+            FROM player_restrictions AS restriction
+            JOIN players AS player ON player.player_id = restriction.player_id
+            WHERE player.scope_id = ?
+              AND restriction.restriction_type IN (?, ?, ?)
+              AND restriction.starts_at <= ?
+              AND (restriction.expires_at IS NULL OR restriction.expires_at > ?)
+            ORDER BY restriction.restriction_type,
+                     player.display_name COLLATE NOCASE,
+                     player.platform_user_id
+            """,
+            (
+                scope_id,
+                PLUGIN_ACCESS_BAN,
+                GIFT_TRANSFER_BAN,
+                TRADE_BAN,
+                now,
+                now,
+            ),
+        )
+        return [dict(row) for row in rows]
 
     async def active_restrictions_for_players(
         self,

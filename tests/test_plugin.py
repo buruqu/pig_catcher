@@ -236,7 +236,7 @@ async def test_group_reset_command_rejects_unconfigured_user_before_backup(
 def test_plugin_registers_only_explicit_production_commands() -> None:
     plugin = create_plugin()
     components = plugin.get_components()
-    assert len(components) == 36
+    assert len(components) == 45
     commands = {
         component["name"]
         for component in components
@@ -246,6 +246,15 @@ def test_plugin_registers_only_explicit_production_commands() -> None:
         "pig_catcher_help",
         "pig_catcher_reset_quota",
         "pig_catcher_reset_quota_chance",
+        "pig_catcher_admin_help",
+        "pig_catcher_admin_grant_coins",
+        "pig_catcher_admin_deduct_coins",
+        "pig_catcher_admin_grant_coins_all",
+        "pig_catcher_admin_deduct_coins_all",
+        "pig_catcher_admin_grant_asset",
+        "pig_catcher_admin_remove_asset",
+        "pig_catcher_admin_blacklist",
+        "pig_catcher_admin_reset_player_quota",
         "pig_catcher_catch",
         "pig_catcher_profile",
         "pig_catcher_pig_detail",
@@ -335,6 +344,42 @@ def test_store_command_patterns_do_not_claim_livehouse_commands() -> None:
         assert re.search(purchase_pattern, text) is None, text
     assert re.search(upgrade_pattern, "/升级 #3 满级") is None
     assert re.search(upgrade_pattern, "/升级 户山香澄") is None
+
+
+def test_admin_command_patterns_claim_only_the_documented_syntax() -> None:
+    components = {
+        component["name"]: component
+        for component in create_plugin().get_components()
+    }
+    examples = {
+        "pig_catcher_admin_help": ("/猪管帮助",),
+        "pig_catcher_admin_grant_coins": ("/猪管发币 @玩家 100",),
+        "pig_catcher_admin_deduct_coins": ("/猪管扣币 official-openid 100",),
+        "pig_catcher_admin_grant_coins_all": ("/猪管全员发币 100",),
+        "pig_catcher_admin_deduct_coins_all": ("/猪管全员扣币 100",),
+        "pig_catcher_admin_grant_asset": (
+            "/猪管发猪 @玩家 地球猪",
+            "/猪管发菜 official-openid 彩彩修车饭 A1B2C3D4",
+        ),
+        "pig_catcher_admin_remove_asset": (
+            "/猪管删猪 @玩家 地球猪#A1B2C3D4",
+            "/猪管删菜 official-openid 彩彩修车饭#1234ABCD",
+        ),
+        "pig_catcher_admin_blacklist": (
+            "/猪管黑名单",
+            "/猪管黑名单 加入 交易 @玩家 复核原因",
+        ),
+        "pig_catcher_admin_reset_player_quota": ("/猪管重置玩家 @玩家",),
+    }
+    for component_name, commands in examples.items():
+        pattern = components[component_name]["metadata"]["command_pattern"]
+        for command in commands:
+            assert re.search(pattern, command), (component_name, command)
+
+    asset_pattern = components["pig_catcher_admin_grant_asset"]["metadata"][
+        "command_pattern"
+    ]
+    assert re.search(asset_pattern, "/猪管发币 @玩家 100") is None
 
 
 def test_plugin_exposes_fully_chinese_webui_schema() -> None:
