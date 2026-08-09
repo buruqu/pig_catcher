@@ -44,6 +44,7 @@ from pig_catcher.domain.quota import catch_quota_window, effective_catch_limit
 from pig_catcher.domain.rules import (
     BASE_CATCH_WEIGHTS,
     LEVEL_CATCH_BONUS_CAP_LEVEL,
+    apply_monotonic_high_rarity_multipliers,
     catch_weights,
     choose_rarity,
     cooking_weights,
@@ -142,6 +143,38 @@ def test_feed_and_lucky_item_improve_high_rarity_share() -> None:
     assert radar == pytest.approx((0.0, 0.0, 45.0, 30.0, 18.0, 7.0))
     with pytest.raises(DomainValidationError, match="一个"):
         catch_weights(lucky_whistle=True, super_lucky_whistle=True)
+
+
+def test_monotonic_high_rarity_layer_holds_a_squeezed_tier_at_baseline() -> None:
+    skewed = (0.0, 0.0, 10.0, 80.0, 9.0, 1.0)
+    adjusted = apply_monotonic_high_rarity_multipliers(
+        skewed,
+        (1.0, 1.0, 1.0, 1.10, 1.20, 1.30),
+    )
+    assert sum(adjusted) == pytest.approx(100.0)
+    assert adjusted[3] == pytest.approx(skewed[3])
+    assert adjusted[4] > skewed[4]
+    assert adjusted[5] > skewed[5]
+
+
+@pytest.mark.parametrize(
+    "item_id",
+    ("", "lucky-whistle", "super-lucky-whistle", "star-pig-radar"),
+)
+def test_feed_and_level_never_reduce_any_high_rarity_tier(item_id: str) -> None:
+    item_baseline = catch_weights(item_id=item_id)
+    for feed_level in range(6):
+        for player_level in (1, 5, 9, 13, 17, 21, 999):
+            adjusted = catch_weights(
+                item_id=item_id,
+                feed_level=feed_level,
+                player_level=player_level,
+            )
+            assert sum(adjusted) == pytest.approx(100.0)
+            assert all(
+                adjusted[index] >= item_baseline[index] - 1e-10
+                for index in range(3, 6)
+            )
 
 
 def test_rebalanced_item_catalog_is_unique_and_priced_by_strength() -> None:
@@ -351,6 +384,11 @@ def test_food_rarity_effect_cannot_bypass_six_star_cooking_rule() -> None:
             "next-food-rarity",
             {"rarity": 6, "multiplier": 1.5},
         )
+    with pytest.raises(FoodEffectError):
+        resolve_food_effect(
+            "next-pig-rarity",
+            {"rarity": 1, "multiplier": 2.0},
+        )
 
 
 def _active_effect(
@@ -369,6 +407,61 @@ def _active_effect(
         expires_at="",
         created_at=created_at,
     )
+
+
+def test_targeted_probability_food_only_uses_lower_rarity_as_donor() -> None:
+    four_star_catch = _active_effect(
+        "four-star-catch",
+        "next-pig-rarity",
+        {"rarity": 4, "multiplier": 2.4},
+        created_at="2026-08-09T00:00:00.000Z",
+    )
+    catch_application = apply_catch_effects(BASE_CATCH_WEIGHTS, [four_star_catch])
+    assert catch_application.weights[3] > BASE_CATCH_WEIGHTS[3]
+    assert catch_application.weights[4:] == pytest.approx(BASE_CATCH_WEIGHTS[4:])
+
+    five_star_catch = _active_effect(
+        "five-star-catch",
+        "next-pig-rarity",
+        {"rarity": 5, "multiplier": 6.0},
+        created_at="2026-08-09T00:00:00.000Z",
+    )
+    five_star_application = apply_catch_effects(BASE_CATCH_WEIGHTS, [five_star_catch])
+    assert five_star_application.weights[4] > BASE_CATCH_WEIGHTS[4]
+    assert five_star_application.weights[5] == pytest.approx(BASE_CATCH_WEIGHTS[5])
+
+    four_star_food = _active_effect(
+        "four-star-food",
+        "next-food-rarity",
+        {"rarity": 4, "multiplier": 2.4},
+        created_at="2026-08-09T00:00:00.000Z",
+    )
+    base_cooking = cooking_weights(3)
+    cooking_application = apply_cooking_effects(
+        base_cooking,
+        [four_star_food],
+        source_rarity=3,
+    )
+    assert cooking_application.weights[3] > base_cooking[3]
+    assert cooking_application.weights[4:] == pytest.approx(base_cooking[4:])
+
+
+@pytest.mark.parametrize(
+    "item_id",
+    ("", "lucky-whistle", "super-lucky-whistle", "star-pig-radar"),
+)
+def test_group_probability_food_never_reduces_high_rarity_after_progression(
+    item_id: str,
+) -> None:
+    before = catch_weights(item_id=item_id, feed_level=5, player_level=21)
+    effect = _active_effect(
+        "group-quality",
+        "next-catch-quality",
+        {"multiplier": 2.2},
+        created_at="2026-08-09T00:00:00.000Z",
+    )
+    after = apply_catch_effects(before, [effect]).weights
+    assert all(after[index] >= before[index] - 1e-10 for index in range(3, 6))
 
 
 def test_same_family_catch_effects_do_not_stack_and_report_skipped() -> None:

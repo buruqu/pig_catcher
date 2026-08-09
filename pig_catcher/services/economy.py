@@ -617,15 +617,14 @@ def format_eat_summary(result: EatResult) -> str:
 def format_store_summary(result: StorePage) -> str:
     """Return a complete store fallback."""
 
-    feed_probabilities = tuple(
-        sum(
-            catch_weights(
-                result.catch_base_weights,
-                feed_level=level,
-            )[3:]
+    feed_distributions = tuple(
+        catch_weights(
+            result.catch_base_weights,
+            feed_level=level,
         )
         for level in range(6)
     )
+    feed_probabilities = tuple(sum(weights[3:]) for weights in feed_distributions)
     cookware_bonuses = tuple((cookware_higher_rarity_multiplier(level) - 1.0) * 100.0 for level in range(6))
     lucky_before = catch_weights(result.catch_base_weights)
     def catch_item_summary(item_id: str) -> str:
@@ -664,7 +663,14 @@ def format_store_summary(result: StorePage) -> str:
         f"分类：{result.category}；单页展示全部 {result.total_count} 项",
         f"猪饲料 Lv.{result.feed_level}；厨具 Lv.{result.cookware_level}",
         "猪饲料 Lv.0-5 的 4-6 星合计概率：" + " / ".join(f"{value:.2f}%" for value in feed_probabilities),
+        "猪饲料逐档 4★/5★/6★："
+        + " / ".join(
+            f"Lv.{level} {weights[3]:.2f}%/{weights[4]:.2f}%/{weights[5]:.2f}%"
+            for level, weights in enumerate(feed_distributions)
+        ),
         "厨具 Lv.0-5 的高档菜相对权重增幅：" + " / ".join(f"+{value:.0f}%" for value in cookware_bonuses),
+        "单调增益规则：等级、饲料与概率道具组合后，4/5/6 星均不会低于组合前；"
+        "定向菜品只从更低星级转移概率，不压低更高星级。",
         f"幸运猪哨（基础权重，使用前→使用后）：{catch_item_summary('lucky-whistle')}",
         f"超级幸运猪哨（基础权重，使用前→使用后）：{catch_item_summary('super-lucky-whistle')}",
         f"星辉探猪镜（基础权重，使用前→使用后）：{catch_item_summary('star-pig-radar')}",

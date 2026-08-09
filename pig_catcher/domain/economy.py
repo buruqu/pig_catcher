@@ -10,8 +10,8 @@ from .errors import DomainValidationError, StoreProductError
 from .gameplay import ITEM_DEFINITIONS, ItemDefinition
 from .rules import cooking_weights, level_catch_bonus_scale, normalize_weights
 
-COOKWARE_HIGHER_RARITY_STEP = 0.02
-LEVEL_COOKING_HIGHER_RARITY_STEP = 0.01
+COOKWARE_HIGHER_RARITY_STEP = 0.04
+LEVEL_COOKING_HIGHER_RARITY_STEP = 0.02
 
 FOOD_RARITY_NAMES: dict[Rarity, str] = {
     Rarity.ONE: "猪食",

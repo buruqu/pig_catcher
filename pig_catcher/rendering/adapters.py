@@ -500,16 +500,19 @@ def food_catalog_view(page: FoodCatalogPage) -> FoodCatalogViewModel:
 def store_view(page: StorePage) -> StoreViewModel:
     """Build one store rendering view."""
 
-    base_high_probability = sum(catch_weights(page.catch_base_weights, feed_level=0)[3:])
     feed_probability_rows = tuple(
         StoreProbabilityRowViewModel(
             level=level,
             value=f"{high_probability:.2f}%",
-            delta=("基准" if level == 0 else f"+{high_probability - base_high_probability:.2f} 点"),
+            delta=" · ".join(
+                f"{rarity}★{weights[rarity - 1]:.2f}"
+                for rarity in range(4, 7)
+            ),
             current=level == page.feed_level,
         )
         for level in range(6)
-        for high_probability in (sum(catch_weights(page.catch_base_weights, feed_level=level)[3:]),)
+        for weights in (catch_weights(page.catch_base_weights, feed_level=level),)
+        for high_probability in (sum(weights[3:]),)
     )
     cookware_probability_rows = tuple(
         StoreProbabilityRowViewModel(

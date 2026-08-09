@@ -243,7 +243,7 @@ async def test_numeric_level_changes_the_committed_catch_probability(
     service = GameplayService(
         database,
         CatchingSection(cooldown_seconds=0),
-        random_source=SequenceRandom(*_catch_rolls(rarity_roll=0.39)),
+        random_source=SequenceRandom(*_catch_rolls(rarity_roll=0.395)),
         short_code_factory=lambda: "ABCDEF21",
     )
 
@@ -267,11 +267,11 @@ async def test_numeric_level_changes_the_committed_catch_probability(
         profile.level_catch_adjusted_high_percent
         > profile.level_catch_base_high_percent
     )
-    assert profile.level_cooking_bonus_percent == pytest.approx(5.0)
+    assert profile.level_cooking_bonus_percent == pytest.approx(10.0)
     profile_card = profile_view(profile)
     assert profile_card.level_bonus_cap_level == 21
     assert "等级概率加成：抓猪 4-6 星" in format_profile_summary(profile)
-    assert "普通做菜高档权重 +5.00%" in format_profile_summary(profile)
+    assert "普通做菜高档权重 +10.00%" in format_profile_summary(profile)
     await database.close()
 
 

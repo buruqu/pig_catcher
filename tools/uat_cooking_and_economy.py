@@ -43,6 +43,7 @@ def configure_plugin(plugin: Any) -> None:
     config["maintenance"]["enabled"] = False
     config["catching"]["cooldown_seconds"] = 0
     config["catching"]["daily_limit"] = 100
+    config["cooking"]["cook_cooldown_seconds"] = 0
     plugin.set_plugin_config(config)
 
 

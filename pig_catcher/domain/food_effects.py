@@ -8,7 +8,11 @@ from dataclasses import dataclass
 
 from .enums import Rarity
 from .errors import FoodEffectError
-from .rules import normalize_weights
+from .rules import (
+    apply_monotonic_high_rarity_multipliers,
+    lift_target_rarity_from_lower,
+    normalize_weights,
+)
 
 NEXT_CATCH_QUALITY = "next-catch-quality"
 NEXT_COOK_QUALITY = "next-cook-quality"
@@ -298,7 +302,7 @@ def resolve_food_effect(
         )
     if normalized_id in {NEXT_PIG_RARITY, NEXT_FOOD_RARITY}:
         rarity_upper = 6 if normalized_id == NEXT_PIG_RARITY else 5
-        rarity = _integer(raw, "rarity", lower=1, upper=rarity_upper)
+        rarity = _integer(raw, "rarity", lower=2, upper=rarity_upper)
         multiplier_upper = 12.0 if normalized_id == NEXT_PIG_RARITY and rarity == 6 else 8.0
         multiplier = _number(
             raw,
@@ -312,7 +316,8 @@ def resolve_food_effect(
             normalized_id,
             {"rarity": rarity, "multiplier": multiplier},
             1,
-            f"下一次{target}时，{rarity} 星{noun}相对权重提升至 ×{multiplier:g}。",
+            f"下一次{target}时，{rarity} 星{noun}相对权重提升至 ×{multiplier:g}；"
+            "新增概率仅从更低星级转移，不压低更高星级。",
         )
     if normalized_id == NEXT_PIG_STATURE:
         mode = str(raw.get("mode") or "").strip()
@@ -511,8 +516,12 @@ def apply_catch_effects(
             adjusted = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0] if adjusted[5] > 0 else [1.0, 1.0, 1.0, 1.0, 2.0, 0.0]
         elif exclusive.effect_id == EXCLUSIVE_CATCH_QUALITY:
             multiplier = float(grant.params["multiplier"])
-            for index in range(3, 6):
-                adjusted[index] *= multiplier
+            adjusted = list(
+                apply_monotonic_high_rarity_multipliers(
+                    adjusted,
+                    (1.0, 1.0, 1.0, multiplier, multiplier, multiplier),
+                )
+            )
         consumed.append(exclusive.effect_entry_id)
         summaries.append(grant.summary)
         already_reported = {
@@ -541,11 +550,20 @@ def apply_catch_effects(
         grant = resolve_food_effect(chosen.effect_id, chosen.params)
         if chosen.effect_id == NEXT_CATCH_QUALITY:
             multiplier = float(grant.params["multiplier"])
-            for index in range(3, 6):
-                adjusted[index] *= multiplier
+            adjusted = list(
+                apply_monotonic_high_rarity_multipliers(
+                    adjusted,
+                    (1.0, 1.0, 1.0, multiplier, multiplier, multiplier),
+                )
+            )
         elif chosen.effect_id == NEXT_PIG_RARITY:
-            target_index = int(grant.params["rarity"]) - 1
-            adjusted[target_index] *= float(grant.params["multiplier"])
+            adjusted = list(
+                lift_target_rarity_from_lower(
+                    adjusted,
+                    target_rarity=int(grant.params["rarity"]),
+                    multiplier=float(grant.params["multiplier"]),
+                )
+            )
         elif chosen.effect_id == NEXT_PIG_STATURE:
             direction = 1.0 if grant.params["mode"] == "giant" else -1.0
             stature_bias += direction * float(grant.params["strength"])
@@ -637,8 +655,13 @@ def apply_cooking_effects(
             adjusted[lowest_index] -= shift
             adjusted[target_index] += shift
         elif chosen.effect_id == NEXT_FOOD_RARITY:
-            target_index = int(grant.params["rarity"]) - 1
-            adjusted[target_index] *= float(grant.params["multiplier"])
+            adjusted = list(
+                lift_target_rarity_from_lower(
+                    adjusted,
+                    target_rarity=int(grant.params["rarity"]),
+                    multiplier=float(grant.params["multiplier"]),
+                )
+            )
         elif chosen.effect_id == NEXT_SIX_STAR_COOK_BONUS:
             bonus = float(grant.params["bonus_percent"])
             shifted = min(adjusted[4], bonus, max(0.0, 50.0 - adjusted[5]))

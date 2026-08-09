@@ -632,8 +632,8 @@ async def test_third_round_templates_render_all_business_views(
             armed_item_quantity=2,
             collections=collections,
             level_catch_base_high_percent=13.0,
-            level_catch_adjusted_high_percent=13.54,
-            level_cooking_bonus_percent=2.0,
+            level_catch_adjusted_high_percent=13.16,
+            level_cooking_bonus_percent=1.0,
             level_bonus_cap_level=21,
         )
     )
@@ -642,7 +642,7 @@ async def test_third_round_templates_render_all_business_views(
     assert "Poppin&#39;Party" in profile_html
     assert "等级概率加成" in profile_html
     assert "13.00%" in profile_html
-    assert "13.54%" in profile_html
+    assert "13.16%" in profile_html
     assert "荣誉称号不改变概率" in profile_html
 
     inventory = InventoryViewModel(
@@ -957,7 +957,7 @@ async def test_fourth_round_templates_render_food_and_economy_views(
             cookware_probability_rows=tuple(
                 StoreProbabilityRowViewModel(
                     level=level,
-                    value=f"+{level * 2}%",
+                    value=f"+{level * 4}%",
                     delta="相对权重",
                     current=level == 2,
                 )
@@ -1001,7 +1001,7 @@ async def test_fourth_round_templates_render_food_and_economy_views(
     assert "幸运猪哨" in store_html
     assert "猪饲料" in store_html
     assert "4-6 星合计概率" in store_html
-    assert "+10%" in store_html
+    assert "+20%" in store_html
     assert "Lv.2 · 当前" in store_html
     assert "幸运猪哨" in store_html
     assert "1.00% → 1.50%" in store_html

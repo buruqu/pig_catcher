@@ -359,10 +359,10 @@ def test_level_and_cookware_probability_bonuses_are_exact_and_bounded() -> None:
     assert tuple(
         round((cookware_higher_rarity_multiplier(level) - 1.0) * 100)
         for level in range(6)
-    ) == (0, 2, 4, 6, 8, 10)
+    ) == (0, 4, 8, 12, 16, 20)
     assert level_cooking_higher_rarity_multiplier(1) == 1.0
-    assert level_cooking_higher_rarity_multiplier(21) == pytest.approx(1.05)
-    assert level_cooking_higher_rarity_multiplier(999) == pytest.approx(1.05)
+    assert level_cooking_higher_rarity_multiplier(21) == pytest.approx(1.10)
+    assert level_cooking_higher_rarity_multiplier(999) == pytest.approx(1.10)
     assert sum(boosted[3:5]) > sum(baseline[3:5])
     assert adjusted_cooking_weights(
         6,
@@ -372,6 +372,46 @@ def test_level_and_cookware_probability_bonuses_are_exact_and_bounded() -> None:
         player_level=999,
         chef_spice=True,
     ) == (0.0, 0.0, 0.0, 0.0, 90.0, 10.0)
+
+
+@pytest.mark.parametrize(
+    ("item_id", "chef_spice"),
+    (
+        ("", False),
+        ("chef-spice", False),
+        ("no-downgrade-lid", False),
+        ("ascension-stove-core", False),
+        ("", True),
+    ),
+)
+def test_cookware_and_level_never_reduce_reachable_higher_results(
+    item_id: str,
+    chef_spice: bool,
+) -> None:
+    for source_rarity in range(1, 6):
+        baseline = adjusted_cooking_weights(
+            source_rarity,
+            size_percentile=0.5,
+            weight_percentile=0.5,
+            cookware_level=0,
+            player_level=1,
+            chef_spice=chef_spice,
+            item_id=item_id,
+        )
+        boosted = adjusted_cooking_weights(
+            source_rarity,
+            size_percentile=0.5,
+            weight_percentile=0.5,
+            cookware_level=5,
+            player_level=21,
+            chef_spice=chef_spice,
+            item_id=item_id,
+        )
+        assert sum(boosted) == pytest.approx(100.0)
+        assert all(
+            boosted[index] >= baseline[index] - 1e-10
+            for index in range(source_rarity, 5)
+        )
 
 
 @pytest.mark.asyncio
@@ -1183,19 +1223,19 @@ async def test_store_purchase_upgrade_insufficient_balance_and_ledger(
     store_card = store_view(store)
     assert tuple(row.value for row in store_card.feed_probability_rows) == (
         "13.00%",
-        "13.27%",
-        "13.54%",
-        "13.80%",
-        "14.05%",
+        "13.33%",
+        "13.66%",
+        "13.98%",
         "14.30%",
+        "14.62%",
     )
     assert tuple(row.value for row in store_card.cookware_probability_rows) == (
         "+0%",
-        "+2%",
         "+4%",
-        "+6%",
         "+8%",
-        "+10%",
+        "+12%",
+        "+16%",
+        "+20%",
     )
     assert store_card.feed_probability_rows[0].current is True
     assert store_card.cookware_probability_rows[0].current is True
