@@ -1472,7 +1472,13 @@ async def test_window_quota_boost_overrides_limit_and_bypasses_restriction(
 
     plugin, _ = await create_test_plugin(
         tmp_path,
-        config_updates={"catching": {"cooldown_seconds": 0}},
+        config_updates={
+            "catching": {"cooldown_seconds": 0},
+            "features": {
+                "selling_enabled": False,
+                "cooking_enabled": True,
+            },
+        },
     )
     await _install_test_pig(plugin, tmp_path)
     scope_id = "qq:10001"
@@ -1658,6 +1664,8 @@ async def test_batch_keep_commands_toggle_player_preference(
     )
     assert enabled is True
     assert "已开启批量保留" in message
+    assert "每个普通猪猪品种" in message
+    assert "所有联动猪始终全部保护" in message
     row = await plugin.database.fetch_one(
         "SELECT batch_keep_highest FROM players WHERE player_id = ?",
         (player_id,),
@@ -1675,6 +1683,7 @@ async def test_batch_keep_commands_toggle_player_preference(
     )
     assert disabled is True
     assert "已关闭批量保留" in message
+    assert "所有联动猪仍始终全部保护" in message
     row = await plugin.database.fetch_one(
         "SELECT batch_keep_highest FROM players WHERE player_id = ?",
         (player_id,),

@@ -969,10 +969,11 @@ class EconomyService:
         identity: CommandIdentity,
         rarity: int | None,
     ) -> BatchCookingResult:
-        """Cook every eligible pig (non-collaboration, unlocked) in one transaction.
+        """Cook every eligible unlocked non-collaboration pig in one transaction.
 
-        Batch cooking never consumes armed items and never touches six-star or
-        collaboration pigs, so it is safe to run on a whole inventory page.
+        Batch cooking never consumes armed items or collaboration pigs. It defaults
+        to rarities 1-3; an explicit rarity may select 1-5. When batch keeping is
+        enabled, one highest-value ordinary pig per template is also excluded.
         """
 
         if rarity is not None and not 1 <= int(rarity) <= 5:
@@ -2598,8 +2599,8 @@ class EconomyService:
     ) -> tuple[bool, str]:
         """开启或关闭玩家的“批量保留”偏好。
 
-        开启后，批量售卖与批量做菜会额外保留一只价值最高的普通猪猪和一只
-        价值最高的美食；联动猪始终默认保留一只价值最高者（不受开关影响）。
+        开启后，批量售卖与批量做菜会按模板各保留一只价值最高的普通猪猪或
+        美食；所有联动猪始终默认保护，不受开关影响。
         """
 
         now = iso_timestamp(self.clock.now())
@@ -2617,12 +2618,12 @@ class EconomyService:
             )
         if enabled:
             return True, (
-                "已开启批量保留：批量售卖与批量做菜时，会额外保留一只价值最高的"
-                "普通猪猪和一只价值最高的美食；联动猪始终默认保留一只价值最高者。"
+                "已开启批量保留：批量售卖与批量做菜时，每个普通猪猪品种和每道"
+                "美食品种都会保留一只价值最高的实例；所有联动猪始终全部保护。"
             )
         return True, (
             "已关闭批量保留：批量操作不再额外保留普通猪猪和美食；"
-            "联动猪仍默认保留一只价值最高者。"
+            "所有联动猪仍始终全部保护。"
         )
 
     @staticmethod

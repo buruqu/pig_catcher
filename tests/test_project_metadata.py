@@ -24,9 +24,11 @@ def test_checked_in_config_parses_with_current_model() -> None:
 
 def test_manifest_versions_dependencies_and_capabilities_are_narrow() -> None:
     manifest = json.loads((_PROJECT_ROOT / "_manifest.json").read_text(encoding="utf-8"))
+    pyproject = tomllib.loads((_PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     assert manifest["manifest_version"] == 2
     assert manifest["id"] == "local.pig-catcher"
     assert manifest["version"] == PLUGIN_VERSION
+    assert pyproject["project"]["version"] == PLUGIN_VERSION
     assert manifest["host_application"]["min_version"] == "1.0.12"
     assert manifest["sdk"]["min_version"] == "2.7.0"
     assert manifest["capabilities"] == [

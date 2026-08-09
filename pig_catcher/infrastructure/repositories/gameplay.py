@@ -8,6 +8,10 @@ from collections.abc import Mapping, Sequence
 from ...domain.enums import RecordType
 from ...domain.models import AssetSelector
 from ..database import DatabaseSession
+from .batch_safety import (
+    collaboration_pig_exclusion_sql,
+    highest_instance_ids_per_template,
+)
 
 _INVENTORY_ORDER_SQL = {
     "获得时间": "instance.acquired_at DESC, instance.pig_instance_id",
@@ -485,9 +489,8 @@ class GameplayRepository:
     ) -> list[dict[str, object]]:
         """List active, unlocked pigs eligible for batch cooking.
 
-        默认只处理一至三星低星原料猪（``rarity`` 指定时按指定品质）；联动猪
-        默认只保留一只价值最高者，其余可被批量做菜；``keep_highest`` 开启时
-        额外保留一只价值最高的普通猪猪。
+        默认只处理一至三星低星原料猪（``rarity`` 指定时按指定品质）；所有联动猪
+        始终排除。``keep_highest`` 开启时，普通猪按模板各保留一只价值最高实例。
         """
 
         rarity_clause = (
@@ -506,6 +509,7 @@ class GameplayRepository:
         if keep_ids:
             placeholders = ",".join("?" for _ in keep_ids)
             keep_clause = f"AND instance.pig_instance_id NOT IN ({placeholders})"
+        collaboration_clause = collaboration_pig_exclusion_sql("instance")
         parameters: list[object] = [player_id, scope_id]
         if rarity is not None:
             parameters.append(rarity)
@@ -519,6 +523,7 @@ class GameplayRepository:
               AND instance.state = 'active'
               AND instance.locked_trade_id IS NULL
               {rarity_clause}
+              {collaboration_clause}
               {keep_clause}
             ORDER BY instance.rarity DESC, instance.acquired_at ASC
             """,
@@ -545,58 +550,20 @@ class GameplayRepository:
     ) -> list[str]:
         """Return pig instance ids kept from one batch cooking/selling operation.
 
-        联动猪只保留一只价值最高者（同价值取最小实例 id）；``keep_highest``
-        开启时额外保留一只价值最高的普通猪猪。范围限定在批量做菜的品质区间。
+        联动猪由批量查询独立全部保护；开关开启时，在批量做菜品质区间内按模板
+        各保留一个最高价值的普通猪实例。
         """
 
-        rarity_clause = (
-            "AND candidate.rarity = ?"
-            if rarity is not None
-            else "AND candidate.rarity <= ?"
+        if not keep_highest:
+            return []
+        return await highest_instance_ids_per_template(
+            session,
+            player_id=player_id,
+            scope_id=scope_id,
+            asset_kind="pig",
+            max_rarity=3,
+            rarity=rarity,
         )
-        rarity_param: object = rarity if rarity is not None else 3
-        keep: list[str] = []
-        row = await session.fetch_one(
-            f"""
-            SELECT candidate.pig_instance_id
-            FROM pig_instances AS candidate
-            JOIN pig_templates AS template
-              ON template.template_id = candidate.template_id
-            WHERE candidate.owner_player_id = ?
-              AND candidate.scope_id = ?
-              AND candidate.state = 'active'
-              AND candidate.locked_trade_id IS NULL
-              AND template.collection_id IS NOT NULL
-              AND template.collection_id != ''
-              {rarity_clause}
-            ORDER BY candidate.official_value DESC, candidate.pig_instance_id ASC
-            LIMIT 1
-            """,
-            (player_id, scope_id, rarity_param),
-        )
-        if row is not None:
-            keep.append(str(row["pig_instance_id"]))
-        if keep_highest:
-            row = await session.fetch_one(
-                f"""
-                SELECT candidate.pig_instance_id
-                FROM pig_instances AS candidate
-                JOIN pig_templates AS template
-                  ON template.template_id = candidate.template_id
-                WHERE candidate.owner_player_id = ?
-                  AND candidate.scope_id = ?
-                  AND candidate.state = 'active'
-                  AND candidate.locked_trade_id IS NULL
-                  AND (template.collection_id IS NULL OR template.collection_id = '')
-                  {rarity_clause}
-                ORDER BY candidate.official_value DESC, candidate.pig_instance_id ASC
-                LIMIT 1
-                """,
-                (player_id, scope_id, rarity_param),
-            )
-            if row is not None:
-                keep.append(str(row["pig_instance_id"]))
-        return keep
 
     async def profile_row(
         self,

@@ -49,3 +49,16 @@ uv run python .\tools\reset_catch_quota.py --group-id <群号>
 
 所有脚本都可先加 `--help` 查看参数。输出统一写到被 Git 忽略的 `artifacts/`，不要把
 验收图片、临时数据库或运行日志当作正式素材保存。
+
+## 全量离线审计
+
+```powershell
+uv run pytest -q
+uv run ruff check .
+uv run python -m compileall -q pig_catcher plugin.py tools tests
+uv lock --check
+git diff --check
+```
+
+批量保留相关回归同时覆盖批量售卖、批量做菜、联动猪默认保护、按模板最高价值保留、
+仅开启做菜时的开关命令，以及四个 QQ 群作用域的内容同步。

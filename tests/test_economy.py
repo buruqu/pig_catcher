@@ -1868,17 +1868,58 @@ async def _insert_pig(
         )
 
 
+async def _insert_food(
+    database: PigCatcherDatabase,
+    *,
+    player_id: str,
+    scope_id: str,
+    template_id: str,
+    display_name: str,
+    official_value: int,
+    short_code: str,
+    instance_id: str,
+    now: str = "2026-07-28T04:00:00.000Z",
+) -> None:
+    async with database.transaction() as session:
+        await session.execute(
+            """
+            INSERT INTO food_instances(
+                food_instance_id, short_code, scope_id, owner_player_id,
+                template_id, template_version, source_pig_instance_id,
+                rarity, display_name_snapshot, portion_weight, fat_category,
+                official_value, effect_id, effect_params_json,
+                ruleset_version, random_snapshot_json, state,
+                acquired_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, 1, NULL, 1, ?, 1.0, 'balanced', ?, '', '{}',
+                    1, '{"test":true}', 'active', ?, ?)
+            """,
+            (
+                instance_id,
+                short_code,
+                scope_id,
+                player_id,
+                template_id,
+                display_name,
+                official_value,
+                now,
+                now,
+            ),
+        )
+
+
 @pytest.mark.asyncio
 async def test_batch_keep_default_and_switch_keep_highest_value_assets(
     tmp_path: Path,
 ) -> None:
-    """默认只保留一只最高价值联动猪；开启批量保留后额外保留最高价值普通猪。"""
+    """联动猪默认全保留；开启后普通猪按模板各保留最高价值实例。"""
 
     database = await _database_with_catalog(
         tmp_path,
         pig_rarities=(1,),
         food_rarities=(1,),
         extra_entries=(
+            _pig_entry(1, template_suffix="other"),
             _collab_pig_entry(1, suffix="a"),
             _collab_pig_entry(1, suffix="b"),
         ),
@@ -1920,25 +1961,27 @@ async def test_batch_keep_default_and_switch_keep_highest_value_assets(
         clock=clock,
         id_factory=iter(("ledger-1", "ledger-2", "ledger-3", "ledger-4")).__next__,
     )
-    # 默认：联动猪只保留一只价值最高者（250），其余普通猪（含 seed）与低价值联动猪都被卖
+    # 默认：所有联动猪受保护，普通猪（含 seed）全部批量售卖。
     sold = await economy.batch_sell_low_rarity(
         _identity(message_id="batch-keep-sell-1", user_id="200"),
         asset_kind="pig",
         max_rarity=3,
     )
-    assert sold.asset_count == 4
-    left = await database.fetch_one(
+    assert sold.asset_count == 3
+    rows = await database.fetch_all(
         """
         SELECT template_id, official_value FROM pig_instances
         WHERE owner_player_id = ? AND state = 'active'
+        ORDER BY template_id
         """,
         (pid,),
     )
-    assert left is not None
-    assert left["template_id"] == "pig-collab-b"
-    assert left["official_value"] == 250
+    assert [(r["template_id"], r["official_value"]) for r in rows] == [
+        ("pig-collab-a", 150),
+        ("pig-collab-b", 250),
+    ]
 
-    # 开启批量保留：额外保留一只价值最高的普通猪
+    # 开启后：每个普通模板各保留一只最高价值实例，联动猪仍全部保护。
     enabled, _ = await economy.set_batch_keep_highest(
         _identity(message_id="batch-keep-enable", user_id="200"),
         enabled=True,
@@ -1953,27 +1996,38 @@ async def test_batch_keep_default_and_switch_keep_highest_value_assets(
                       display_name="1星测试猪", official_value=300,
                       short_code="A11E0021", instance_id="pig-keep-6")
     await _insert_pig(database, player_id=pid, scope_id=scope,
+                      template_id="pig-1-common-other", rarity=1,
+                      display_name="另一种1星测试猪", official_value=120,
+                      short_code="A11E0022", instance_id="pig-keep-7")
+    await _insert_pig(database, player_id=pid, scope_id=scope,
+                      template_id="pig-1-common-other", rarity=1,
+                      display_name="另一种1星测试猪", official_value=220,
+                      short_code="A11E0023", instance_id="pig-keep-8")
+    await _insert_pig(database, player_id=pid, scope_id=scope,
                       template_id="pig-collab-a", rarity=1,
                       display_name="联动猪a", official_value=150,
-                      short_code="A11E0022", instance_id="pig-keep-7")
+                      short_code="A11E0024", instance_id="pig-keep-9")
     sold = await economy.batch_sell_low_rarity(
         _identity(message_id="batch-keep-sell-2", user_id="200"),
         asset_kind="pig",
         max_rarity=3,
     )
-    # 卖出 100 普通 + 150 联动；保留 300 普通 + 250 联动
+    # 两个普通模板各卖出低价值实例；三个联动实例全部保留。
     assert sold.asset_count == 2
     rows = await database.fetch_all(
         """
         SELECT template_id, official_value FROM pig_instances
         WHERE owner_player_id = ? AND state = 'active'
-        ORDER BY official_value
+        ORDER BY template_id, official_value
         """,
         (pid,),
     )
     assert [(r["template_id"], r["official_value"]) for r in rows] == [
-        ("pig-collab-b", 250),
         ("pig-1-common", 300),
+        ("pig-1-common-other", 220),
+        ("pig-collab-a", 150),
+        ("pig-collab-a", 150),
+        ("pig-collab-b", 250),
     ]
     await database.close()
 
@@ -1982,12 +2036,13 @@ async def test_batch_keep_default_and_switch_keep_highest_value_assets(
 async def test_batch_sell_keeps_highest_value_food_when_enabled(
     tmp_path: Path,
 ) -> None:
-    """开启批量保留后，批量售卖美食会保留一只价值最高的美食。"""
+    """开启批量保留后，批量售卖美食按模板各保留最高价值实例。"""
 
     database = await _database_with_catalog(
         tmp_path,
         pig_rarities=(1,),
         food_rarities=(1,),
+        extra_entries=(_food_entry(1, template_suffix="other"),),
     )
     clock = FixedClock()
     service = GameplayService(
@@ -2013,41 +2068,40 @@ async def test_batch_sell_keeps_highest_value_food_when_enabled(
         _identity(message_id="batch-keep-food-on", user_id="200"),
         enabled=True,
     )
-    for fid, code, value in (
-        ("food-keep-1", "AF000010", 50),
-        ("food-keep-2", "AF000011", 80),
+    for fid, code, template_id, value in (
+        ("food-keep-1", "AF000010", "food-1-common", 50),
+        ("food-keep-2", "AF000011", "food-1-common", 80),
+        ("food-keep-3", "AF000012", "food-1-common-other", 40),
+        ("food-keep-4", "AF000013", "food-1-common-other", 70),
     ):
-        async with database.transaction() as session:
-            await session.execute(
-                """
-                INSERT INTO food_instances(
-                    food_instance_id, short_code, scope_id, owner_player_id,
-                    template_id, template_version, source_pig_instance_id,
-                    rarity, display_name_snapshot, portion_weight, fat_category,
-                    official_value, effect_id, effect_params_json,
-                    ruleset_version, random_snapshot_json, state,
-                    acquired_at, updated_at
-                )
-                VALUES (?, ?, ?, ?, 'food-1-common', 1, NULL, 1, '1星测试菜',
-                        1.0, 'balanced', ?, '', '{}', 1, '{"test":true}',
-                        'active', ?, ?)
-                """,
-                (
-                    fid, code, scope, pid, value,
-                    "2026-07-28T04:00:00.000Z",
-                    "2026-07-28T04:00:00.000Z",
-                ),
-            )
+        await _insert_food(
+            database,
+            player_id=pid,
+            scope_id=scope,
+            template_id=template_id,
+            display_name="1星测试菜",
+            official_value=value,
+            short_code=code,
+            instance_id=fid,
+        )
     sold = await economy.batch_sell_low_rarity(
         _identity(message_id="batch-keep-food-sell", user_id="200"),
         asset_kind="food",
         max_rarity=3,
     )
-    assert sold.asset_count == 1
-    left = await database.fetch_one(
-        "SELECT official_value FROM food_instances WHERE state = 'active'"
+    assert sold.asset_count == 2
+    rows = await database.fetch_all(
+        """
+        SELECT template_id, official_value
+        FROM food_instances
+        WHERE state = 'active'
+        ORDER BY template_id
+        """
     )
-    assert left is not None and left["official_value"] == 80
+    assert [(r["template_id"], r["official_value"]) for r in rows] == [
+        ("food-1-common", 80),
+        ("food-1-common-other", 70),
+    ]
     await database.close()
 
 
@@ -2055,12 +2109,17 @@ async def test_batch_sell_keeps_highest_value_food_when_enabled(
 async def test_batch_cook_defaults_to_low_rarity_and_keeps_highest(
     tmp_path: Path,
 ) -> None:
-    """批量做菜默认只处理一至三星；开启保留后保留一只最高价值普通猪。"""
+    """批量做菜保护全部联动猪，开启后按普通模板各保留最高价值实例。"""
 
     database = await _database_with_catalog(
         tmp_path,
-        pig_rarities=(1, 3, 4),
-        food_rarities=(1, 2, 3, 4, 5),
+        pig_rarities=(1,),
+        food_rarities=(1,),
+        extra_entries=(
+            _pig_entry(1, template_suffix="other"),
+            _collab_pig_entry(1, suffix="a"),
+            _collab_pig_entry(1, suffix="b"),
+        ),
     )
     clock = FixedClock()
     service = GameplayService(
@@ -2075,15 +2134,14 @@ async def test_batch_cook_defaults_to_low_rarity_and_keeps_highest(
     await service.catch(identity)
     pid = identity.player_id
     scope = identity.scope.value
-    for fid, code, rarity, value in (
-        ("pig-low-1", "A11E0210", 3, 50),
-        ("pig-low-2", "A11E0211", 3, 70),
-        ("pig-low-3", "A11E0212", 4, 500),
+    for fid, code, template_id, name, value in (
+        ("pig-collab-1", "A11E0210", "pig-collab-a", "联动猪a", 150),
+        ("pig-collab-2", "A11E0211", "pig-collab-b", "联动猪b", 250),
     ):
         await _insert_pig(
             database, player_id=pid, scope_id=scope,
-            template_id=f"pig-{rarity}-common", rarity=rarity,
-            display_name=f"{rarity}星测试猪", official_value=value,
+            template_id=template_id, rarity=1,
+            display_name=name, official_value=value,
             short_code=code, instance_id=fid,
         )
     economy = EconomyService(
@@ -2096,12 +2154,10 @@ async def test_batch_cook_defaults_to_low_rarity_and_keeps_highest(
                 "food-c1", "ledger-c1",
                 "food-c2", "ledger-c2",
                 "food-c3", "ledger-c3",
-                "food-c4", "ledger-c4",
-                "food-c5", "ledger-c5",
             )
         ).__next__,
         short_code_factory=iter(
-            ("ABAD0001", "ABAD0002", "ABAD0003", "ABAD0004", "ABAD0005")
+            ("ABAD0001", "ABAD0002", "ABAD0003")
         ).__next__,
         random_source=SequenceRandom(
             0.0, 0.0, 0.5,
@@ -2109,18 +2165,63 @@ async def test_batch_cook_defaults_to_low_rarity_and_keeps_highest(
             0.0, 0.0, 0.5,
         ),
     )
-    # 默认低星范围：只做低星猪（seed 1 星 + 3 星两只），4 星保留
+    # 开关默认关闭时，只处理普通 seed；两只联动猪都必须保留。
     result = await economy.batch_cook(
         _identity(message_id="batch-cook-low-1", user_id="200"),
         rarity=None,
     )
-    assert result.pig_count == 3
-    left = await database.fetch_one(
+    assert result.pig_count == 1
+    rows = await database.fetch_all(
         """
-        SELECT rarity, official_value FROM pig_instances
+        SELECT template_id, official_value FROM pig_instances
         WHERE owner_player_id = ? AND state = 'active'
+        ORDER BY template_id
         """,
         (pid,),
     )
-    assert left is not None and left["rarity"] == 4 and left["official_value"] == 500
+    assert [(r["template_id"], r["official_value"]) for r in rows] == [
+        ("pig-collab-a", 150),
+        ("pig-collab-b", 250),
+    ]
+
+    await economy.set_batch_keep_highest(
+        _identity(message_id="batch-cook-keep-on", user_id="200"),
+        enabled=True,
+    )
+    for fid, code, template_id, value in (
+        ("pig-common-low", "A11E0220", "pig-1-common", 100),
+        ("pig-common-high", "A11E0221", "pig-1-common", 300),
+        ("pig-other-low", "A11E0222", "pig-1-common-other", 120),
+        ("pig-other-high", "A11E0223", "pig-1-common-other", 220),
+    ):
+        await _insert_pig(
+            database,
+            player_id=pid,
+            scope_id=scope,
+            template_id=template_id,
+            rarity=1,
+            display_name="1星测试猪",
+            official_value=value,
+            short_code=code,
+            instance_id=fid,
+        )
+    result = await economy.batch_cook(
+        _identity(message_id="batch-cook-low-2", user_id="200"),
+        rarity=None,
+    )
+    assert result.pig_count == 2
+    rows = await database.fetch_all(
+        """
+        SELECT template_id, official_value FROM pig_instances
+        WHERE owner_player_id = ? AND state = 'active'
+        ORDER BY template_id, official_value
+        """,
+        (pid,),
+    )
+    assert [(r["template_id"], r["official_value"]) for r in rows] == [
+        ("pig-1-common", 300),
+        ("pig-1-common-other", 220),
+        ("pig-collab-a", 150),
+        ("pig-collab-b", 250),
+    ]
     await database.close()

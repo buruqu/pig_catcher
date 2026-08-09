@@ -7,3 +7,9 @@ BanG Dream 联动信息和群作用域。
 图片原件不提交到这里；本机当前素材包位于 `asset_library/current/`，MaiBot 运行副本
 位于插件数据目录。修改清单后必须运行 `tests/test_catalog_definitions.py` 和素材构建、
 导入校验，避免定义与二进制文件失配。
+
+当前群专属内容同时维护四个作用域：`qq:1092931381` 与
+`qq-official:5E5854406D0297D6FEAE696A13E3A339` 为一组，`qq:237716658` 与
+`qq-official:9EA2810F378FBD7DC3219C56CEAB3520` 为一组。每个作用域各有 8 只六星猪和
+8 道配对六星菜。修改任一群专属名称、描述、数值或效果时必须同步四份；
+`tests/test_catalog_definitions.py` 会做全字段语义对比。

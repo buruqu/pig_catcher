@@ -1122,7 +1122,7 @@ class PigCatcherPlugin(MaiBotPlugin):
 
     @Command(
         "pig_catcher_enable_batch_keep",
-        description="开启批量保留：批量售卖/做菜时保留一只价值最高的猪猪与美食",
+        description="开启批量保留：批量操作按品种保留一只最高价值的猪猪与美食",
         pattern=r"^/开启批量保留\s*$",
     )
     async def handle_enable_batch_keep(
@@ -1154,7 +1154,10 @@ class PigCatcherPlugin(MaiBotPlugin):
         identity, rejected = await self._prepare_command(
             stream_id,
             kwargs,
-            feature_enabled=self.settings.features.selling_enabled,
+            feature_enabled=(
+                self.settings.features.selling_enabled
+                or self.settings.features.cooking_enabled
+            ),
             feature_label="批量保留",
         )
         if rejected is not None or identity is None:

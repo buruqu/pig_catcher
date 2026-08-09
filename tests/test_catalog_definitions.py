@@ -8,6 +8,16 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFINITIONS = PROJECT_ROOT / "catalogs" / "formal" / "pig-and-food-definitions.json"
+PAIRED_GROUP_SCOPES = (
+    (
+        "qq:1092931381",
+        "qq-official:5E5854406D0297D6FEAE696A13E3A339",
+    ),
+    (
+        "qq:237716658",
+        "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
+    ),
+)
 
 
 def _entries() -> list[dict[str, object]]:
@@ -136,6 +146,36 @@ def test_group_custom_assets_are_confined_and_keep_user_text() -> None:
     assert "社区" in descriptions["彩彩修车猪"]
     assert "不是官方职业设定" in descriptions["彩彩修车猪"]
     assert "糖醋排骨" in descriptions["ob一串猪"]
+
+    by_scope = {
+        scope: {
+            str(entry["display_name"]): {
+                key: entry.get(key)
+                for key in (
+                    "kind",
+                    "rarity",
+                    "description",
+                    "fat_profile",
+                    "stature_profile",
+                    "length_min_cm",
+                    "length_max_cm",
+                    "weight_min_kg",
+                    "weight_max_kg",
+                    "recipe_tags",
+                    "effect_id",
+                    "effect_params",
+                )
+            }
+            for entry in group_entries
+            if entry["group_scope_id"] == scope
+        }
+        for scope in {str(entry["group_scope_id"]) for entry in group_entries}
+    }
+    baseline = by_scope[PAIRED_GROUP_SCOPES[0][0]]
+    assert len(baseline) == 16
+    assert all(scope_catalog == baseline for scope_catalog in by_scope.values())
+    for qq_scope, official_scope in PAIRED_GROUP_SCOPES:
+        assert by_scope[qq_scope] == by_scope[official_scope]
 
 
 def test_every_custom_six_star_pig_has_one_same_group_food_pair() -> None:
