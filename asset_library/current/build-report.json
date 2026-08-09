@@ -1,0 +1,1521 @@
+{
+  "source_root": "asset_library/current/media",
+  "definitions": "catalogs/formal/pig-and-food-definitions.json",
+  "entry_count": 215,
+  "unique_binary_count": 167,
+  "stored_binary_count": 218,
+  "duplicate_aliases": [
+    {
+      "source_path": "猪猪素材库/紫色品质/翻滚猪.jpg",
+      "canonical_media_path": "media/猪猪素材库/蓝色品质/可爱猪翻身.gif",
+      "sha256": "e223973ad609956ded25d475ae6cb6c0a7cc34847c455f337a77b25d1b84c176"
+    }
+  ],
+  "inventory": [
+    {
+      "template_id": "pig-r1-upscale",
+      "source_path": "猪猪素材库/白色品质/上流猪.png",
+      "media_path": "media/猪猪素材库/白色品质/上流猪.png",
+      "sha256": "d12b8fbe4b0fa9f70096c58c4b00284c0957d3f9248fa09d45d0c97ecb0e2bc4",
+      "bytes": 40472
+    },
+    {
+      "template_id": "pig-r1-harmonica",
+      "source_path": "猪猪素材库/白色品质/口琴猪.png",
+      "media_path": "media/猪猪素材库/白色品质/口琴猪.png",
+      "sha256": "624ab7628fde0a3bccb2f02be5210b45910b85fc758604a06877ef11fb360a2c",
+      "bytes": 35252
+    },
+    {
+      "template_id": "pig-r1-crying",
+      "source_path": "猪猪素材库/白色品质/哭哭猪.jpg",
+      "media_path": "media/猪猪素材库/白色品质/哭哭猪.jpg",
+      "sha256": "45203c7fe2f9f9da517282cc7e757c4948b8c65799822dbde5b859987b9fcf46",
+      "bytes": 46062
+    },
+    {
+      "template_id": "pig-r1-civil-engineer",
+      "source_path": "猪猪素材库/白色品质/土木猪.jpg",
+      "media_path": "media/猪猪素材库/白色品质/土木猪.jpg",
+      "sha256": "c816279f2333cf90d5f4ae57bb9153fbf0ff6959df4eaa45f59961a39a74351c",
+      "bytes": 105350
+    },
+    {
+      "template_id": "pig-r1-android",
+      "source_path": "猪猪素材库/白色品质/安卓猪.png",
+      "media_path": "media/猪猪素材库/白色品质/安卓猪.png",
+      "sha256": "851430d3e26b1b98697b1139b6b54e81710b350c7896f80521b538cee064219b",
+      "bytes": 172155
+    },
+    {
+      "template_id": "pig-r1-bed",
+      "source_path": "猪猪素材库/白色品质/床上猪.png",
+      "media_path": "media/猪猪素材库/白色品质/床上猪.png",
+      "sha256": "7217f26f463c5122814bbbe75c846b2277bc707af2f39d0199fe4c1bb39f72c5",
+      "bytes": 276419
+    },
+    {
+      "template_id": "pig-r1-dead",
+      "source_path": "猪猪素材库/白色品质/死掉猪.png",
+      "media_path": "media/猪猪素材库/白色品质/死掉猪.png",
+      "sha256": "97d7d2dc55f93b07326fe888f94c0580b7313cd4fca232a711b2d1ef53785faa",
+      "bytes": 14232
+    },
+    {
+      "template_id": "pig-r1-runny-nose",
+      "source_path": "猪猪素材库/白色品质/流鼻涕猪_1.png",
+      "media_path": "media/猪猪素材库/白色品质/流鼻涕猪_1.png",
+      "sha256": "8f1ba6850909553f365cd6aba1692753aaf341d20d00be00c680f76817c556c9",
+      "bytes": 20944
+    },
+    {
+      "template_id": "pig-r1-basic",
+      "source_path": "猪猪素材库/白色品质/猪.png",
+      "media_path": "media/猪猪素材库/白色品质/猪.png",
+      "sha256": "32218568d36a387094b981143efd71e50982f5ee45868a65a7b326149a8194a9",
+      "bytes": 1512304
+    },
+    {
+      "template_id": "pig-r1-letter-b",
+      "source_path": "猪猪素材库/白色品质/猪B.jpg",
+      "media_path": "media/猪猪素材库/白色品质/猪B.jpg",
+      "sha256": "1cbd365ed30824a98b281f0d2604e663e6a07d2f8f3db723ddc99e7dc8d5af57",
+      "bytes": 135866
+    },
+    {
+      "template_id": "pig-r1-spawn-egg",
+      "source_path": "猪猪素材库/白色品质/猪刷怪蛋.jpg",
+      "media_path": "media/猪猪素材库/白色品质/猪刷怪蛋.jpg",
+      "sha256": "cc3ec43941b3f83019c20914f6989fc2f1f43da23b79a089a85b10cb49df0c1e",
+      "bytes": 11176
+    },
+    {
+      "template_id": "pig-r1-chocolate",
+      "source_path": "猪猪素材库/白色品质/猪古力.png",
+      "media_path": "media/猪猪素材库/白色品质/猪古力.png",
+      "sha256": "d950490c6a7b8c950c8eb714127d991beb6a96efcd5ad44294109148a19aa9b8",
+      "bytes": 548709
+    },
+    {
+      "template_id": "pig-r1-hoof",
+      "source_path": "猪猪素材库/白色品质/猪蹄.png",
+      "media_path": "media/猪猪素材库/白色品质/猪蹄.png",
+      "sha256": "47c87c217b0a2059022e0a6d8d5c5d31fd5f55675b305fbfe530d76ee75f63bc",
+      "bytes": 434256
+    },
+    {
+      "template_id": "pig-r1-snout",
+      "source_path": "猪猪素材库/白色品质/猪鼻.jpg",
+      "media_path": "media/猪猪素材库/白色品质/猪鼻.jpg",
+      "sha256": "2e676071fb08d0c08f8a3e6a0151bedd9ec4664185296722b84ba813955ee8e4",
+      "bytes": 149902
+    },
+    {
+      "template_id": "pig-r1-skinny",
+      "source_path": "猪猪素材库/白色品质/瘦猪.png",
+      "media_path": "media/猪猪素材库/白色品质/瘦猪.png",
+      "sha256": "915cc118ed29e2ca64aac2d047b1a8765ad5da5a45ae0e5fdef50d74efa2112d",
+      "bytes": 19380
+    },
+    {
+      "template_id": "pig-r1-emperors-new-pig",
+      "source_path": "猪猪素材库/白色品质/皇帝的新猪.jpg",
+      "media_path": "media/猪猪素材库/白色品质/皇帝的新猪.jpg",
+      "sha256": "13db6d81a6b23341ee3c31e31dac0d4cd4187554996720bfacd8d1dc96251b6c",
+      "bytes": 227053
+    },
+    {
+      "template_id": "pig-r1-short-legged",
+      "source_path": "猪猪素材库/白色品质/矮脚猪.png",
+      "media_path": "media/猪猪素材库/白色品质/矮脚猪.png",
+      "sha256": "5c6314b58d502860d343f1819ce067271afa1abad3d080da090f1ef05b16700d",
+      "bytes": 23492
+    },
+    {
+      "template_id": "pig-r1-rainbow",
+      "source_path": "猪猪素材库/白色品质/色猪.jpg",
+      "media_path": "media/猪猪素材库/白色品质/色猪.jpg",
+      "sha256": "dad6c4fd2d679f784b57251132ff884371131fab016318ebeaab11b912dd15af",
+      "bytes": 149513
+    },
+    {
+      "template_id": "pig-r1-benzene",
+      "source_path": "猪猪素材库/白色品质/苯猪.jpg",
+      "media_path": "media/猪猪素材库/白色品质/苯猪.jpg",
+      "sha256": "65075ea09cd88d1d67c70b1294fea0bc429b876ab1cfd6eb997ea26d3c4e7c1a",
+      "bytes": 25889
+    },
+    {
+      "template_id": "pig-r1-boar",
+      "source_path": "猪猪素材库/白色品质/野猪.jpg",
+      "media_path": "media/猪猪素材库/白色品质/野猪.jpg",
+      "sha256": "5045fb7b9e279d5333d0686bd9fe0d4cf31414eb1e503ead300d07941d34e329",
+      "bytes": 136058
+    },
+    {
+      "template_id": "pig-r2-wall-street",
+      "source_path": "猪猪素材库/绿色品质/华尔街之猪.png",
+      "media_path": "media/猪猪素材库/绿色品质/华尔街之猪.png",
+      "sha256": "37c93c9a5eac0cf04de71ee5d9c18e905e912f6388920ede29f34b5e57915071",
+      "bytes": 108898
+    },
+    {
+      "template_id": "pig-r2-lazy",
+      "source_path": "猪猪素材库/绿色品质/大懒猪.jpg",
+      "media_path": "media/猪猪素材库/绿色品质/大懒猪.jpg",
+      "sha256": "44fee3e37dd01b03abb5ec732ad526407b01447f4bc93153ea539d99205ae790",
+      "bytes": 287857
+    },
+    {
+      "template_id": "pig-r2-stomach",
+      "source_path": "猪猪素材库/绿色品质/大胃袋.jpeg",
+      "media_path": "media/猪猪素材库/绿色品质/大胃袋.jpeg",
+      "sha256": "737f047e7a69b61f028b449e796f754ce6bfe9bbd165dfa239a58792ec77d6e2",
+      "bytes": 21632
+    },
+    {
+      "template_id": "pig-r2-elephant",
+      "source_path": "猪猪素材库/绿色品质/大象.jpg",
+      "media_path": "media/猪猪素材库/绿色品质/大象.jpg",
+      "sha256": "fcddc4b489780a670b78c32e62a4066033adf07f4d2fd9d3ec28aee5e9b6249f",
+      "bytes": 10792
+    },
+    {
+      "template_id": "pig-r2-many",
+      "source_path": "猪猪素材库/绿色品质/好多猪.jpg",
+      "media_path": "media/猪猪素材库/绿色品质/好多猪.jpg",
+      "sha256": "27135a9fe3ee879c46b15ee5be8276a2a0a853dd20bddb2d146af279a8b70969",
+      "bytes": 14872
+    },
+    {
+      "template_id": "pig-r2-roadblock",
+      "source_path": "猪猪素材库/绿色品质/挡路猪.jpg",
+      "media_path": "media/猪猪素材库/绿色品质/挡路猪.jpg",
+      "sha256": "d462dcfa9e7d2f4ad5b9f1a3f8e07eb5962b0649f1cf7054f58327b21bb95e1d",
+      "bytes": 23728
+    },
+    {
+      "template_id": "pig-r2-computer",
+      "source_path": "猪猪素材库/绿色品质/智能计算猪.jpg",
+      "media_path": "media/猪猪素材库/绿色品质/智能计算猪.jpg",
+      "sha256": "3b31beb8aff9abed646b4fb947b0744c005916d3e00310489c3692188eb86105",
+      "bytes": 32692
+    },
+    {
+      "template_id": "pig-r2-inspected",
+      "source_path": "猪猪素材库/绿色品质/检疫合格肥猪.jpg",
+      "media_path": "media/猪猪素材库/绿色品质/检疫合格肥猪.jpg",
+      "sha256": "defdf2b42100fb452bfa174d2999d3543aa4eb838e8f0f4b2597d384fbfc48d4",
+      "bytes": 38236
+    },
+    {
+      "template_id": "pig-r2-bath",
+      "source_path": "猪猪素材库/绿色品质/洗猪.jpg",
+      "media_path": "media/猪猪素材库/绿色品质/洗猪.jpg",
+      "sha256": "a81febcb99cb1c7d507671f4539f30bdb57234d04e6939f0fc921b4aa89ef4e0",
+      "bytes": 109608
+    },
+    {
+      "template_id": "pig-r2-tiny",
+      "source_path": "猪猪素材库/绿色品质/特小猪.png",
+      "media_path": "media/猪猪素材库/绿色品质/特小猪.png",
+      "sha256": "c1cff09afdc69ae42a8e9378fdef5706f0e9913b798cc10ebf097a0ec6e28b32",
+      "bytes": 218051
+    },
+    {
+      "template_id": "pig-r2-bee",
+      "source_path": "猪猪素材库/绿色品质/猪bee.png",
+      "media_path": "media/猪猪素材库/绿色品质/猪bee.png",
+      "sha256": "76e3910e96ae279782e2d93a6efda503bcd0888b2ec647d7d08900c60e4adb9c",
+      "bytes": 12692
+    },
+    {
+      "template_id": "pig-r2-engineer",
+      "source_path": "猪猪素材库/绿色品质/理工猪.png",
+      "media_path": "media/猪猪素材库/绿色品质/理工猪.png",
+      "sha256": "8e6fa13dec27f1a1e69108f2292d8bb17d1d5cb183f69a48dbdee45042bad055",
+      "bytes": 29628
+    },
+    {
+      "template_id": "pig-r2-resume",
+      "source_path": "猪猪素材库/绿色品质/老猪历.jpg",
+      "media_path": "media/猪猪素材库/绿色品质/老猪历.jpg",
+      "sha256": "9cdb1c79335baea97bab64a97ad71673ed020b08fdbec7ae16a50a5b2cc9f55f",
+      "bytes": 16406
+    },
+    {
+      "template_id": "pig-r2-fat",
+      "source_path": "猪猪素材库/绿色品质/肥猪.png",
+      "media_path": "media/猪猪素材库/绿色品质/肥猪.png",
+      "sha256": "68142d5c00cd17f328e30f59405430222f80b8076655e68a5fad322b20b4be43",
+      "bytes": 309048
+    },
+    {
+      "template_id": "pig-r2-apple",
+      "source_path": "猪猪素材库/绿色品质/苹果猪.png",
+      "media_path": "media/猪猪素材库/绿色品质/苹果猪.png",
+      "sha256": "069a58eb5850f90780c52afcf6cd770a4d4dda685ec3a7068331ddb9dd07fc7e",
+      "bytes": 183372
+    },
+    {
+      "template_id": "pig-r2-drunk",
+      "source_path": "猪猪素材库/绿色品质/酒鬼猪.png",
+      "media_path": "media/猪猪素材库/绿色品质/酒鬼猪.png",
+      "sha256": "9d0cc0c14f99a5085fa2772cbab53584b6d8fa58dd65f0af868896a4dafdc264",
+      "bytes": 39818
+    },
+    {
+      "template_id": "pig-r2-germanium",
+      "source_path": "猪猪素材库/绿色品质/锗(猪元素).jpg",
+      "media_path": "media/猪猪素材库/绿色品质/锗(猪元素).jpg",
+      "sha256": "79d705ab8a545da2306ccbc23524f3f19437fbb5b629e29ad1f267eb63aaef2c",
+      "bytes": 31884
+    },
+    {
+      "template_id": "pig-r2-chive",
+      "source_path": "猪猪素材库/绿色品质/韭菜猪.jpg",
+      "media_path": "media/猪猪素材库/绿色品质/韭菜猪.jpg",
+      "sha256": "c34061b91ae83ce8e7de33a8ca031681f95bd3baaac146a34c25ebd4628a99b2",
+      "bytes": 20302
+    },
+    {
+      "template_id": "pig-r2-hacker",
+      "source_path": "猪猪素材库/绿色品质/黑客猪.png",
+      "media_path": "media/猪猪素材库/绿色品质/黑客猪.png",
+      "sha256": "792c22992db46c41b0849c4d0cf71313d0d8295175fb71ac38fca1e7f7383098",
+      "bytes": 55294
+    },
+    {
+      "template_id": "pig-r2-turtle",
+      "source_path": "猪猪素材库/绿色品质/龟猪.png",
+      "media_path": "media/猪猪素材库/绿色品质/龟猪.png",
+      "sha256": "4b5e96a61836fd2e0799289fc78af72baa4d390afb003a6d6508c3ca62f6c1cf",
+      "bytes": 95055
+    },
+    {
+      "template_id": "pig-r3-pigseek",
+      "source_path": "猪猪素材库/蓝色品质/Pigseek.png",
+      "media_path": "media/猪猪素材库/蓝色品质/Pigseek.png",
+      "sha256": "2d68034fc23425f91fd427827118f4e4fab6736b9ee81f83b0fec7c0f9bf4272",
+      "bytes": 644506
+    },
+    {
+      "template_id": "pig-r3-no-answer",
+      "source_path": "猪猪素材库/蓝色品质/不接电话猪.jpg",
+      "media_path": "media/猪猪素材库/蓝色品质/不接电话猪.jpg",
+      "sha256": "cc7f3d178dd7564e695e212bb231709535467c3c7ecf7d33d4ae6bf92840dd0e",
+      "bytes": 10732
+    },
+    {
+      "template_id": "pig-r3-oriental-pearl",
+      "source_path": "猪猪素材库/蓝色品质/东方明猪.png",
+      "media_path": "media/猪猪素材库/蓝色品质/东方明猪.png",
+      "sha256": "45874712df19c61d5ddc98608b8d43c9daf133de6add6358738b8e72f628a638",
+      "bytes": 222647
+    },
+    {
+      "template_id": "pig-r3-freeloader",
+      "source_path": "猪猪素材库/蓝色品质/你这吃白饭的猪.jpg",
+      "media_path": "media/猪猪素材库/蓝色品质/你这吃白饭的猪.jpg",
+      "sha256": "f24687ff46cd7d07b1bfbf80fc3178e9f094fc3a441911f83eb22e6a4eafc436",
+      "bytes": 25400
+    },
+    {
+      "template_id": "pig-r3-pixel",
+      "source_path": "猪猪素材库/蓝色品质/像素猪.gif",
+      "media_path": "media/猪猪素材库/蓝色品质/像素猪.gif",
+      "sha256": "ce45538ac0f089997ba356370db759498fb072637e1c79d5194ed83e06c69dda",
+      "bytes": 27078
+    },
+    {
+      "template_id": "pig-r3-ranking",
+      "source_path": "猪猪素材库/蓝色品质/冲榜猪.jpg",
+      "media_path": "media/猪猪素材库/蓝色品质/冲榜猪.jpg",
+      "sha256": "b9bf05cccc97b46947f408994f419d4384956b7e537d3890405c778497bd1858",
+      "bytes": 55219
+    },
+    {
+      "template_id": "pig-r3-cute-roll",
+      "source_path": "猪猪素材库/蓝色品质/可爱猪翻身.gif",
+      "media_path": "media/猪猪素材库/蓝色品质/可爱猪翻身.gif",
+      "sha256": "e223973ad609956ded25d475ae6cb6c0a7cc34847c455f337a77b25d1b84c176",
+      "bytes": 493148
+    },
+    {
+      "template_id": "pig-r3-turntable",
+      "source_path": "猪猪素材库/蓝色品质/唱片猪(旋转猪).gif",
+      "media_path": "media/猪猪素材库/蓝色品质/唱片猪(旋转猪).gif",
+      "sha256": "08c76111817f30371ac4fef5d892de90d83ce3b43011582548d08e36f93dd9ce",
+      "bytes": 180483
+    },
+    {
+      "template_id": "pig-r3-miner",
+      "source_path": "猪猪素材库/蓝色品质/挖矿猪.jpg",
+      "media_path": "media/猪猪素材库/蓝色品质/挖矿猪.jpg",
+      "sha256": "aaa6fa05952820db03e8b979e76e04c62ed4244f827ae8a5f52bcc18d369160c",
+      "bytes": 232400
+    },
+    {
+      "template_id": "pig-r3-order-taker",
+      "source_path": "猪猪素材库/蓝色品质/接单猪.jpg",
+      "media_path": "media/猪猪素材库/蓝色品质/接单猪.jpg",
+      "sha256": "0843f29b31db2276a810a20e48979fba45ac5e68db196a6c7eb021f37095eb21",
+      "bytes": 84693
+    },
+    {
+      "template_id": "pig-r3-lemon",
+      "source_path": "猪猪素材库/蓝色品质/柠檬猪.jpg",
+      "media_path": "media/猪猪素材库/蓝色品质/柠檬猪.jpg",
+      "sha256": "b9b764f352de18a3d6d4a01caddcbf39f46282105caeec8277a427349068d06b",
+      "bytes": 41332
+    },
+    {
+      "template_id": "pig-r3-doctor",
+      "source_path": "猪猪素材库/蓝色品质/猪博士.jpg",
+      "media_path": "media/猪猪素材库/蓝色品质/猪博士.jpg",
+      "sha256": "06f5938a49a3e01ed8bd619ce3e76f06c1a99ee9e8b398304949e9be94b9b16c",
+      "bytes": 18021
+    },
+    {
+      "template_id": "pig-r3-streamer",
+      "source_path": "猪猪素材库/蓝色品质/猪播.jpg",
+      "media_path": "media/猪猪素材库/蓝色品质/猪播.jpg",
+      "sha256": "24629705eb02692267c2b233f67af2b35d979b897612c9c57668888562e07b96",
+      "bytes": 207413
+    },
+    {
+      "template_id": "pig-r3-red-envelope",
+      "source_path": "猪猪素材库/蓝色品质/红包猪.jpg",
+      "media_path": "media/猪猪素材库/蓝色品质/红包猪.jpg",
+      "sha256": "cb62401eb8f97aa90fda552543bcea628584090e71be43c385ab66d91b9ffe11",
+      "bytes": 76406
+    },
+    {
+      "template_id": "pig-r3-nonogram",
+      "source_path": "猪猪素材库/蓝色品质/织猪.jpg",
+      "media_path": "media/猪猪素材库/蓝色品质/织猪.jpg",
+      "sha256": "7903e2f3316978de1ac3a4e2e4131a8b89a20c7f12d0698255bffb83b457922b",
+      "bytes": 66016
+    },
+    {
+      "template_id": "pig-r3-awakened",
+      "source_path": "猪猪素材库/蓝色品质/觉醒猪.jpg",
+      "media_path": "media/猪猪素材库/蓝色品质/觉醒猪.jpg",
+      "sha256": "021b96ce6ff8e0e9062fccc42961e63c9fdf8a5986079609c854282fa8cf195e",
+      "bytes": 115054
+    },
+    {
+      "template_id": "pig-r3-golden-wings",
+      "source_path": "猪猪素材库/蓝色品质/金翅猪.jpg",
+      "media_path": "media/猪猪素材库/蓝色品质/金翅猪.jpg",
+      "sha256": "0ba2eef9df10f8b6176e612b12a69d51fd1dd6777c7757e39fca6aac35b3db0b",
+      "bytes": 18702
+    },
+    {
+      "template_id": "pig-r3-invisible",
+      "source_path": "猪猪素材库/蓝色品质/隐身猪.jpg",
+      "media_path": "media/猪猪素材库/蓝色品质/隐身猪.jpg",
+      "sha256": "51d20d1ea5c74df69cf164f95c72a7985a478270e8f38b0e5f56c3ea8b21574a",
+      "bytes": 36430
+    },
+    {
+      "template_id": "pig-r3-maimai",
+      "source_path": "猪猪素材库/蓝色品质/麦麦猪.png",
+      "media_path": "media/猪猪素材库/蓝色品质/麦麦猪.png",
+      "sha256": "b5ad9186baf7d350549b4d4f73fbccdc8e22b11b17895dde16f0388cf9026c3c",
+      "bytes": 240263
+    },
+    {
+      "template_id": "pig-r3-pig-chain",
+      "source_path": "猪猪素材库/蓝色品质/猪纵连.png",
+      "media_path": "media/猪猪素材库/蓝色品质/猪纵连.png",
+      "sha256": "2f3ac380ad2c59a6b673eb69508fba5ddaee9d71953489a694d532a2b25c1643",
+      "bytes": 207747
+    },
+    {
+      "template_id": "pig-r4-two-dimensional",
+      "source_path": "猪猪素材库/紫色品质/二维猪.png",
+      "media_path": "media/猪猪素材库/紫色品质/二维猪.png",
+      "sha256": "405b829b3e8058495866c9284372be41588553b7c3bd65f4da8fdab2bd239c1a",
+      "bytes": 9876
+    },
+    {
+      "template_id": "pig-r4-aggrieved",
+      "source_path": "猪猪素材库/紫色品质/委屈猪.jpg",
+      "media_path": "media/猪猪素材库/紫色品质/委屈猪.jpg",
+      "sha256": "f394d2dee6609f95465b7ecb26d4c7e39db7ed6061411b9ee43bf69736ae1a01",
+      "bytes": 193383
+    },
+    {
+      "template_id": "pig-r4-charge",
+      "source_path": "猪猪素材库/紫色品质/拱人猪.jpg",
+      "media_path": "media/猪猪素材库/紫色品质/拱人猪.jpg",
+      "sha256": "f38d444def2b2c006135b301562fb3fe348b16dd1829b8ccc2c02a7b506268eb",
+      "bytes": 194865
+    },
+    {
+      "template_id": "pig-r4-van-gogh",
+      "source_path": "猪猪素材库/紫色品质/梵高猪.png",
+      "media_path": "media/猪猪素材库/紫色品质/梵高猪.png",
+      "sha256": "b704507f05389c4ddfd1469c8f117350ae64a424390b305a4260586435cde927",
+      "bytes": 2578934
+    },
+    {
+      "template_id": "pig-r4-washing-machine",
+      "source_path": "猪猪素材库/紫色品质/洗衣机猪（舞萌猪）.jpg",
+      "media_path": "media/猪猪素材库/紫色品质/洗衣机猪（舞萌猪）.jpg",
+      "sha256": "3fc678397687398a032ec401de6bee6715d16dafa14bfad81faf31372d019424",
+      "bytes": 23340
+    },
+    {
+      "template_id": "pig-r4-nagisa-teardrop",
+      "source_path": "猪猪素材库/紫色品质/渚泪滴.png",
+      "media_path": "media/猪猪素材库/紫色品质/渚泪滴.png",
+      "sha256": "236b094ccacfa9a29d33e9917041cf2b63cb874ba1d5174eecd2f82947e547e3",
+      "bytes": 625872
+    },
+    {
+      "template_id": "pig-r4-chen-alter",
+      "source_path": "猪猪素材库/紫色品质/澄闪猪咪(明日方舟).jpg",
+      "media_path": "media/猪猪素材库/紫色品质/澄闪猪咪(明日方舟).jpg",
+      "sha256": "e597a5f94139c6d2868a0b8eafd40eee84d739a11b993fa85401a3dad29ebcc8",
+      "bytes": 31782
+    },
+    {
+      "template_id": "pig-r4-sisyphus",
+      "source_path": "猪猪素材库/紫色品质/猪猪弗斯.jpg",
+      "media_path": "media/猪猪素材库/紫色品质/猪猪弗斯.jpg",
+      "sha256": "ec78cbbfd4b237101f71380754798816d09218f7b7a412d5fcfe63a2b003b69b",
+      "bytes": 43674
+    },
+    {
+      "template_id": "pig-r4-pearl",
+      "source_path": "猪猪素材库/紫色品质/珍猪.jpg",
+      "media_path": "media/猪猪素材库/紫色品质/珍猪.jpg",
+      "sha256": "6b537bbbb16857d0227bdb85116217bcaca7777ab9bde521fd3ba96dcb85eba1",
+      "bytes": 149160
+    },
+    {
+      "template_id": "pig-r4-token-eater",
+      "source_path": "猪猪素材库/紫色品质/白吃token的猪.jpg",
+      "media_path": "media/猪猪素材库/紫色品质/白吃token的猪.jpg",
+      "sha256": "90a21cd4e9c59952502440c196bb68d5a5600e12a6b7fd4a9dcdbd93e011101a",
+      "bytes": 109009
+    },
+    {
+      "template_id": "pig-bandori-saya-bread-drum",
+      "source_path": "猪猪素材库/紫色品质/面包鼓猪.png",
+      "media_path": "media/猪猪素材库/紫色品质/面包鼓猪.png",
+      "sha256": "3a8939268ca64523aa5e54fee074e642713a6502e61337e4a723bae7ec8d4f2d",
+      "bytes": 2149244
+    },
+    {
+      "template_id": "pig-bandori-tae-rabbit-guitar",
+      "source_path": "猪猪素材库/紫色品质/兔吉猪.png",
+      "media_path": "media/猪猪素材库/紫色品质/兔吉猪.png",
+      "sha256": "15a96bc513af4098e937d537bcc7a18fc90841ae296911ba71724d1c26cdee44",
+      "bytes": 2032544
+    },
+    {
+      "template_id": "pig-bandori-tomoe-drum",
+      "source_path": "猪猪素材库/紫色品质/巴巴猪.png",
+      "media_path": "media/猪猪素材库/紫色品质/巴巴猪.png",
+      "sha256": "e8c0362fc55c121ba6f9e6bcd8cf3465a1f717f3065ac1f02680fc70d8a954ac",
+      "bytes": 2215378
+    },
+    {
+      "template_id": "pig-bandori-tsugumi-keyboard",
+      "source_path": "猪猪素材库/紫色品质/鸫鸫猪.png",
+      "media_path": "media/猪猪素材库/紫色品质/鸫鸫猪.png",
+      "sha256": "c53f3c9320a5c85b9501066187bad8a7bf221335a72eb0a695ae7020d5a934d4",
+      "bytes": 2050560
+    },
+    {
+      "template_id": "pig-r4-roll",
+      "source_path": "猪猪素材库/紫色品质/翻滚猪.jpg",
+      "media_path": "media/猪猪素材库/蓝色品质/可爱猪翻身.gif",
+      "sha256": "e223973ad609956ded25d475ae6cb6c0a7cc34847c455f337a77b25d1b84c176",
+      "bytes": 493148
+    },
+    {
+      "template_id": "pig-r4-disco",
+      "source_path": "猪猪素材库/紫色品质/蹦迪猪.gif",
+      "media_path": "media/猪猪素材库/紫色品质/蹦迪猪.gif",
+      "sha256": "f483a8d2d9fa3cd3ae3b1ab5eb0163929444833dd6e868a5b79e2072625d160c",
+      "bytes": 57333
+    },
+    {
+      "template_id": "pig-r4-dragon",
+      "source_path": "猪猪素材库/紫色品质/龙猪.jpg",
+      "media_path": "media/猪猪素材库/紫色品质/龙猪.jpg",
+      "sha256": "f7f331d4356028bdda4b759799834df53eff319ddf6aed2faa8f4d66f283d8bb",
+      "bytes": 18204
+    },
+    {
+      "template_id": "pig-r5-earth",
+      "source_path": "猪猪素材库/金色品质/地球猪.png",
+      "media_path": "media/猪猪素材库/金色品质/地球猪.png",
+      "sha256": "be439d73911ee3468b65aa434f4e5b6450112c4a1a52eff5f144b1a5d6abd8b9",
+      "bytes": 1414817
+    },
+    {
+      "template_id": "pig-bandori-arisa-tsundere-keyboard",
+      "source_path": "猪猪素材库/金色品质/傲娇猪.png",
+      "media_path": "media/猪猪素材库/金色品质/傲娇猪.png",
+      "sha256": "b7621187c2ffbb819efb30be4de89e44f74c4e9a42321fef58d5e982975782b5",
+      "bytes": 2282415
+    },
+    {
+      "template_id": "pig-bandori-rimi-chocolate",
+      "source_path": "猪猪素材库/金色品质/巧克力猪.png",
+      "media_path": "media/猪猪素材库/金色品质/巧克力猪.png",
+      "sha256": "5b8e645f79549d55f34d425d62ec20e5d8465ad5dd478c6a6a6e20501f6813b8",
+      "bytes": 1398456
+    },
+    {
+      "template_id": "pig-bandori-kasumi-star",
+      "source_path": "猪猪素材库/金色品质/星星猪.png",
+      "media_path": "media/猪猪素材库/金色品质/星星猪.png",
+      "sha256": "4cc3af1d38867c892cc5d45993a6323b3178b1b93a3617c347ea16acb9b05d71",
+      "bytes": 2015037
+    },
+    {
+      "template_id": "pig-r5-dragonfish-duke",
+      "source_path": "猪猪素材库/金色品质/猪龙鱼公爵.png",
+      "media_path": "media/猪猪素材库/金色品质/猪龙鱼公爵.png",
+      "sha256": "f6831d07ba9f2c8664fa85d3c347aea1a5028a1d4c97a3749238938d1988a312",
+      "bytes": 20498
+    },
+    {
+      "template_id": "pig-r5-magnetofluid",
+      "source_path": "猪猪素材库/金色品质/磁流体约束恒星物质猪.gif",
+      "media_path": "media/猪猪素材库/金色品质/磁流体约束恒星物质猪.gif",
+      "sha256": "feaaf6eae0e67031df4307cd778160c918e7569f633af7aba415753ee4a2aac3",
+      "bytes": 107754
+    },
+    {
+      "template_id": "pig-bandori-anon-pink-sound",
+      "source_path": "猪猪素材库/金色品质/粉音猪.png",
+      "media_path": "media/猪猪素材库/金色品质/粉音猪.png",
+      "sha256": "c884cd14208305c1943aef1ec5b581c59674745fdb0aa5a73b6549d740779542",
+      "bytes": 2123616
+    },
+    {
+      "template_id": "pig-bandori-himari-daihi",
+      "source_path": "猪猪素材库/金色品质/大绯猪.png",
+      "media_path": "media/猪猪素材库/金色品质/大绯猪.png",
+      "sha256": "9315283eb6e95ce6b2e11bd369d3e0292d6a9803d55bb54dd285d207b2fc7291",
+      "bytes": 2217227
+    },
+    {
+      "template_id": "pig-bandori-moca-bread",
+      "source_path": "猪猪素材库/金色品质/摩卡猪.png",
+      "media_path": "media/猪猪素材库/金色品质/摩卡猪.png",
+      "sha256": "c8ff58c45be1b0a5adbb004b197bb2a1ebf4c1abe4149118042483dfff308f43",
+      "bytes": 2287298
+    },
+    {
+      "template_id": "pig-bandori-ran-red-highlight",
+      "source_path": "猪猪素材库/金色品质/红挑染猪.png",
+      "media_path": "media/猪猪素材库/金色品质/红挑染猪.png",
+      "sha256": "7f87cb7356797b93213cd07bae9d30c96f462bd7e74f7582af99bb626689b244",
+      "bytes": 1568494
+    },
+    {
+      "template_id": "pig-bandori-soyo-black-tea",
+      "source_path": "猪猪素材库/金色品质/红茶猪.png",
+      "media_path": "media/猪猪素材库/金色品质/红茶猪.png",
+      "sha256": "698de25d66bb0c1ea8b8b79203795b53a7cc702c476e514334d4ab5d02b5fcf5",
+      "bytes": 2002417
+    },
+    {
+      "template_id": "pig-r5-group",
+      "source_path": "猪猪素材库/金色品质/群猪.jpg",
+      "media_path": "media/猪猪素材库/金色品质/群猪.jpg",
+      "sha256": "d48e8d5df1ec29ee7b1fbce4f2d45d4681ea3ef0427c4c46d1eb9486ae97b07c",
+      "bytes": 91483
+    },
+    {
+      "template_id": "pig-g1092931381-1004",
+      "source_path": "定制猪群友库/1092931381/1004猪鼻哥.jpg",
+      "media_path": "media/定制猪群友库/1092931381/1004猪鼻哥.jpg",
+      "sha256": "f34d4535a397f9593b663cc7c6ec93ef116ff5751a86567daa126afab6a90969",
+      "bytes": 101617
+    },
+    {
+      "template_id": "pig-g1092931381-juejue",
+      "source_path": "定制猪群友库/1092931381/撅撅猪.jpg",
+      "media_path": "media/定制猪群友库/1092931381/撅撅猪.jpg",
+      "sha256": "1922d2c243075c2aea59bd6cc96fbba84a1caeffdc75a9c3036f7577aa28b1d8",
+      "bytes": 383056
+    },
+    {
+      "template_id": "pig-g1092931381-xiaoma",
+      "source_path": "定制猪群友库/1092931381/小马猪.png",
+      "media_path": "media/定制猪群友库/1092931381/小马猪.png",
+      "sha256": "3b9c1accb43c3fd8beab9c082c0afd66f597923258023a09c7afd74e12f39ddf",
+      "bytes": 2091983
+    },
+    {
+      "template_id": "pig-g237716658-1004",
+      "source_path": "定制猪群友库/237716658/1004猪鼻哥.jpg",
+      "media_path": "media/定制猪群友库/237716658/1004猪鼻哥.jpg",
+      "sha256": "f34d4535a397f9593b663cc7c6ec93ef116ff5751a86567daa126afab6a90969",
+      "bytes": 101617
+    },
+    {
+      "template_id": "pig-g237716658-juejue",
+      "source_path": "定制猪群友库/237716658/撅撅猪.jpg",
+      "media_path": "media/定制猪群友库/237716658/撅撅猪.jpg",
+      "sha256": "1922d2c243075c2aea59bd6cc96fbba84a1caeffdc75a9c3036f7577aa28b1d8",
+      "bytes": 383056
+    },
+    {
+      "template_id": "pig-g237716658-xiaoma",
+      "source_path": "定制猪群友库/237716658/小马猪.png",
+      "media_path": "media/定制猪群友库/237716658/小马猪.png",
+      "sha256": "3b9c1accb43c3fd8beab9c082c0afd66f597923258023a09c7afd74e12f39ddf",
+      "bytes": 2091983
+    },
+    {
+      "template_id": "food-r1-pork-jerky",
+      "source_path": "美食素材库/猪肉脯.png",
+      "media_path": "media/美食素材库/猪肉脯.png",
+      "sha256": "49eba3eb9fc524c3c8d7a4172dd84ecfdf67f07e94f1314ac6411b000c571644",
+      "bytes": 1330346
+    },
+    {
+      "template_id": "food-r2-single-fried-pig",
+      "source_path": "美食素材库/一只油炸猪.png",
+      "media_path": "media/美食素材库/一只油炸猪.png",
+      "sha256": "c2457c51bfa7dc72585c1c0f7687c9e77aa33bb077d4f504e5a5f85a522f35ba",
+      "bytes": 1692174
+    },
+    {
+      "template_id": "food-r3-salmon-sushi",
+      "source_path": "美食素材库/三文猪寿司_寿司.png",
+      "media_path": "media/美食素材库/三文猪寿司_寿司.png",
+      "sha256": "6dd833ef1182b7dc1ed61e9eb70812e92fac8910e1cfe2924c78310af42a6650",
+      "bytes": 337834
+    },
+    {
+      "template_id": "food-r3-char-siu",
+      "source_path": "美食素材库/叉烧….jpg",
+      "media_path": "media/美食素材库/叉烧….jpg",
+      "sha256": "77cdf4c048c9fef30a1e6154a8bd69e4be487b87e460eaa9071cfaf79a56f8f8",
+      "bytes": 19394
+    },
+    {
+      "template_id": "food-r2-bacon",
+      "source_path": "美食素材库/培根.jpg",
+      "media_path": "media/美食素材库/培根.jpg",
+      "sha256": "e92bff56d70c74321228fc928a01367e35a1f88b0fb1d06d56fdd3b1c19911e3",
+      "bytes": 216824
+    },
+    {
+      "template_id": "food-r3-roast-pig",
+      "source_path": "美食素材库/烤猪.png",
+      "media_path": "media/美食素材库/烤猪.png",
+      "sha256": "2ac2151d9b258553f47b76a494ac37fb0fcb7c555d21c648fda15c83f540c6b1",
+      "bytes": 39770
+    },
+    {
+      "template_id": "food-r4-pig-cookie",
+      "source_path": "美食素材库/猪利猪.jpg",
+      "media_path": "media/美食素材库/猪利猪.jpg",
+      "sha256": "f3275e111c7ad2ba09cf445a91d5f32ce7bb7afab8ef67e27cfe8bb587e8495d",
+      "bytes": 55358
+    },
+    {
+      "template_id": "food-r4-boxed-fried-pigs",
+      "source_path": "美食素材库/一盒油炸猪.png",
+      "media_path": "media/美食素材库/一盒油炸猪.png",
+      "sha256": "c59667a3a0526de4d7ca55176954969ca8ad43a489d12e998a63c44f9d48e10e",
+      "bytes": 2622772
+    },
+    {
+      "template_id": "food-r2-pig-bun",
+      "source_path": "美食素材库/猪包.jpg",
+      "media_path": "media/美食素材库/猪包.jpg",
+      "sha256": "0a839866e4954ceca6d2fd5bf2a3aff428aba4b5b90d446a656dafae8247556c",
+      "bytes": 73974
+    },
+    {
+      "template_id": "food-r3-pig-burger",
+      "source_path": "美食素材库/猪堡.png",
+      "media_path": "media/美食素材库/猪堡.png",
+      "sha256": "2405285c27e12d76cfe2673d36dc1747384c4554566150d7efa520949233ea2e",
+      "bytes": 19360
+    },
+    {
+      "template_id": "food-r2-pig-noodles",
+      "source_path": "美食素材库/猪意味.png",
+      "media_path": "media/美食素材库/猪意味.png",
+      "sha256": "e2b2ceee4ba64fffc1fc2ec9e040f05caab9fa88b51a31d01c53681ee032b416",
+      "bytes": 899418
+    },
+    {
+      "template_id": "food-r2-pork-cutlet",
+      "source_path": "美食素材库/猪排.jpg",
+      "media_path": "media/美食素材库/猪排.jpg",
+      "sha256": "667685d9d1b95251a2d15f4f68f7dcdfa21a58eff323c99f7503e796e11c100e",
+      "bytes": 180516
+    },
+    {
+      "template_id": "food-r3-cutlet-rice",
+      "source_path": "美食素材库/猪排饭.jpg",
+      "media_path": "media/美食素材库/猪排饭.jpg",
+      "sha256": "ea87ab5c0af40af273ccc14749a20d2f9f93cb445bd42b561fed3d7c7bd3199d",
+      "bytes": 41441
+    },
+    {
+      "template_id": "food-r4-pig-roe-gunkan",
+      "source_path": "美食素材库/猪籽军舰.jpeg",
+      "media_path": "media/美食素材库/猪籽军舰.jpeg",
+      "sha256": "27a92289ba928dd2788d8cc73157f86f6d076c4cbcf5391da6e99191427f76dd",
+      "bytes": 106804
+    },
+    {
+      "template_id": "food-r4-pig-shrimp-sushi",
+      "source_path": "美食素材库/猪咪虾寿司.png",
+      "media_path": "media/美食素材库/猪咪虾寿司.png",
+      "sha256": "d33f719e61d690aa0795b59f082c6366e4c6e589a5102e2df069902b259cbc44",
+      "bytes": 407884
+    },
+    {
+      "template_id": "food-r4-pig-tamagoyaki",
+      "source_path": "美食素材库/猪猪玉子烧.png",
+      "media_path": "media/美食素材库/猪猪玉子烧.png",
+      "sha256": "f7fad6ec0a19d1214ec3af3a92f7c495c02223a0f1c32533022acf73e38489a8",
+      "bytes": 400997
+    },
+    {
+      "template_id": "food-r1-pig-rice",
+      "source_path": "美食素材库/猪饭.jpg",
+      "media_path": "media/美食素材库/猪饭.jpg",
+      "sha256": "7888162f89695bfffd1684995610a64d3ddf74aea8da6af19b8904f5b159f643",
+      "bytes": 127478
+    },
+    {
+      "template_id": "food-r5-black-pig-tangyuan",
+      "source_path": "美食素材库/黑猪麻汤圆.jpeg",
+      "media_path": "media/美食素材库/黑猪麻汤圆.jpeg",
+      "sha256": "444087e4923b528a5d4b2d696168ec45e1c4df2d8530557c54e6b38f39753093",
+      "bytes": 39058
+    },
+    {
+      "template_id": "food-r5-cabbage-vermicelli-stew",
+      "source_path": "美食素材库/猪猪白菜炖粉条.png",
+      "media_path": "media/美食素材库/猪猪白菜炖粉条.png",
+      "sha256": "13490365f8a0cede0028056c5bc82f2edca5023b1b9e3876f34e251f342c1b67",
+      "bytes": 1153562
+    },
+    {
+      "template_id": "food-r5-pig-sushi-platter",
+      "source_path": "美食素材库/猪寿司拼盘.png",
+      "media_path": "media/美食素材库/猪寿司拼盘.png",
+      "sha256": "257d61f1f72a3ce74cce3b3101c618709e84667f25fed43102477dd5afc5c80f",
+      "bytes": 773356
+    },
+    {
+      "template_id": "food-r5-six-ways-pig",
+      "source_path": "美食素材库/一猪六吃.png",
+      "media_path": "media/美食素材库/一猪六吃.png",
+      "sha256": "dab9f0634c3bf8d0f50677a1c6a8bf194c2adac38ff3b6edefebb69e21d0028e",
+      "bytes": 1072544
+    },
+    {
+      "template_id": "food-g1092931381-juejue-pie",
+      "source_path": "定制美食库/1092931381/撅撅猪派.png",
+      "media_path": "media/定制美食库/1092931381/撅撅猪派.png",
+      "sha256": "de87f3e62b5f7f26b781ac7e1a0575b7e0fbb1ac3da117790dc61ec232d0a774",
+      "bytes": 1382254
+    },
+    {
+      "template_id": "food-g1092931381-1004-omelette",
+      "source_path": "定制美食库/1092931381/猪鼻蛋包饭.png",
+      "media_path": "media/定制美食库/1092931381/猪鼻蛋包饭.png",
+      "sha256": "fe34d59f684016c5f0e792b7ac3c69d0b1b7a8d8b011c52f56eed4c7ae3c48f2",
+      "bytes": 2501516
+    },
+    {
+      "template_id": "food-g1092931381-xiaoma-mont-blanc",
+      "source_path": "定制美食库/1092931381/小马猪蒙布朗.png",
+      "media_path": "media/定制美食库/1092931381/小马猪蒙布朗.png",
+      "sha256": "6a532a674fbbb623e01517c66ef6fb4567c6415d5a7b4696d6132806fdda7aaa",
+      "bytes": 2482282
+    },
+    {
+      "template_id": "food-g237716658-juejue-pie",
+      "source_path": "定制美食库/237716658/撅撅猪派.png",
+      "media_path": "media/定制美食库/237716658/撅撅猪派.png",
+      "sha256": "de87f3e62b5f7f26b781ac7e1a0575b7e0fbb1ac3da117790dc61ec232d0a774",
+      "bytes": 1382254
+    },
+    {
+      "template_id": "food-g237716658-1004-omelette",
+      "source_path": "定制美食库/237716658/猪鼻蛋包饭.png",
+      "media_path": "media/定制美食库/237716658/猪鼻蛋包饭.png",
+      "sha256": "fe34d59f684016c5f0e792b7ac3c69d0b1b7a8d8b011c52f56eed4c7ae3c48f2",
+      "bytes": 2501516
+    },
+    {
+      "template_id": "food-g237716658-xiaoma-mont-blanc",
+      "source_path": "定制美食库/237716658/小马猪蒙布朗.png",
+      "media_path": "media/定制美食库/237716658/小马猪蒙布朗.png",
+      "sha256": "6a532a674fbbb623e01517c66ef6fb4567c6415d5a7b4696d6132806fdda7aaa",
+      "bytes": 2482282
+    },
+    {
+      "template_id": "pig-r4-flat",
+      "source_path": "猪猪素材库/紫色品质/扁猪.jpg",
+      "media_path": "media/猪猪素材库/紫色品质/扁猪.jpg",
+      "sha256": "02c1a7409623c8b5b580efd8e04166e13a5f742f5b10bb090c6b6492a2a8021d",
+      "bytes": 36750
+    },
+    {
+      "template_id": "pig-bandori-rui-violin",
+      "source_path": "猪猪素材库/紫色品质/提琴猪.png",
+      "media_path": "media/猪猪素材库/紫色品质/提琴猪.png",
+      "sha256": "8fb0a233c0d4deaa0db665a738d5bf40bb6c68a8922ef66353e0588d3e31b924",
+      "bytes": 2220187
+    },
+    {
+      "template_id": "pig-bandori-toko-fashion",
+      "source_path": "猪猪素材库/紫色品质/潮流猪.png",
+      "media_path": "media/猪猪素材库/紫色品质/潮流猪.png",
+      "sha256": "d47ddbd021a3d85b8260168aa4903efaafa80fdd26a7ca294e3f3fad435aa1ef",
+      "bytes": 1801498
+    },
+    {
+      "template_id": "pig-bandori-tsukushi-hamster",
+      "source_path": "猪猪素材库/金色品质/仓鼠猪.png",
+      "media_path": "media/猪猪素材库/金色品质/仓鼠猪.png",
+      "sha256": "365889f80d44b22f9aa6031264aaea0fe850b6c9b1b4ed6bff82b949b2198e9d",
+      "bytes": 1963934
+    },
+    {
+      "template_id": "pig-bandori-tomori-penguin",
+      "source_path": "猪猪素材库/金色品质/企鹅猪.png",
+      "media_path": "media/猪猪素材库/金色品质/企鹅猪.png",
+      "sha256": "65765346032d759cc5cade4e9bd0f7446c346f35685452f1506174d768eb30d2",
+      "bytes": 2166383
+    },
+    {
+      "template_id": "pig-bandori-rana-matcha-cat",
+      "source_path": "猪猪素材库/金色品质/抹茶猪咪.png",
+      "media_path": "media/猪猪素材库/金色品质/抹茶猪咪.png",
+      "sha256": "f321c75e39db61b92fa78874398c037deb0143798410ea4c1d8d6d49e6f8b376",
+      "bytes": 1491788
+    },
+    {
+      "template_id": "pig-bandori-nanami-normal",
+      "source_path": "猪猪素材库/金色品质/普通猪.png",
+      "media_path": "media/猪猪素材库/金色品质/普通猪.png",
+      "sha256": "225565acb1454f3138e2b8399cbda6cc6d1a5dad536423f50b0a503938de5ca7",
+      "bytes": 1952080
+    },
+    {
+      "template_id": "pig-bandori-taki-panda-drum",
+      "source_path": "猪猪素材库/金色品质/熊猫鼓猪.png",
+      "media_path": "media/猪猪素材库/金色品质/熊猫鼓猪.png",
+      "sha256": "5d6d257aa542ead8f638b34c4da3c80316814afee6256c3f45e9e5c743aab36d",
+      "bytes": 2249054
+    },
+    {
+      "template_id": "pig-bandori-mashiro-daydream",
+      "source_path": "猪猪素材库/金色品质/白日梦猪.png",
+      "media_path": "media/猪猪素材库/金色品质/白日梦猪.png",
+      "sha256": "c56d1ae67fe1c03ed8288641ae4c59a0878d76234ac028ca9796a99981c7ca2b",
+      "bytes": 1646299
+    },
+    {
+      "template_id": "pig-bandori-viola-green-tea",
+      "source_path": "猪猪素材库/金色品质/绿茶猪.png",
+      "media_path": "media/猪猪素材库/金色品质/绿茶猪.png",
+      "sha256": "5cf96d3b73bbb90cf8821e6396e9aac62021d5252427e654e581d4d698f0136e",
+      "bytes": 2288966
+    },
+    {
+      "template_id": "food-r1-pig-oil",
+      "source_path": "美食素材库/猪油.png",
+      "media_path": "media/美食素材库/猪油.png",
+      "sha256": "41871b08fc06a413882cb245a9de48b5f833ad7575ad9c9ee94899d076ddf519",
+      "bytes": 537636
+    },
+    {
+      "template_id": "food-r2-pig-in-pot",
+      "source_path": "美食素材库/猪下锅.png",
+      "media_path": "media/美食素材库/猪下锅.png",
+      "sha256": "ae002e52e643efb79d3460b676465e5c7c27912ee6c496135ad663f6c95c018a",
+      "bytes": 588424
+    },
+    {
+      "template_id": "food-r3-roast-suckling-pig",
+      "source_path": "美食素材库/烤乳猪.png",
+      "media_path": "media/美食素材库/烤乳猪.png",
+      "sha256": "227dbc9f8d343616656eb417a3bfc92f3deffab238ecb5ebd32815fe55f5bc7b",
+      "bytes": 449747
+    },
+    {
+      "template_id": "food-r3-canned-pig",
+      "source_path": "美食素材库/猪罐头.png",
+      "media_path": "media/美食素材库/猪罐头.png",
+      "sha256": "d6eb4c0e84dd0021c74f455f4bc28f5765e8931db8d4f682547ef4106ef1ca1c",
+      "bytes": 4667581
+    },
+    {
+      "template_id": "food-r4-pig-paw-lemon-tea",
+      "source_path": "美食素材库/猪趴柠檬茶.png",
+      "media_path": "media/美食素材库/猪趴柠檬茶.png",
+      "sha256": "1879531ba1a1a8b20fa5649fe6f6f7482aeec2620ed625611e66ac455ed8a817",
+      "bytes": 889870
+    },
+    {
+      "template_id": "food-r4-pig-dumpling",
+      "source_path": "美食素材库/猪饺.png",
+      "media_path": "media/美食素材库/猪饺.png",
+      "sha256": "efa774f0dde15063a31289952efb4aa9df79314642f40eeb0b53ff19b81d14a5",
+      "bytes": 235577
+    },
+    {
+      "template_id": "food-r4-pearl-pig-milk-tea",
+      "source_path": "美食素材库/珍猪奶茶.png",
+      "media_path": "media/美食素材库/珍猪奶茶.png",
+      "sha256": "e00952181d62fc77cd02c9cdc552e2f6ec7ee1481db8443e7125bdf2ec2ae00d",
+      "bytes": 1510523
+    },
+    {
+      "template_id": "food-r5-pig-berry-cake",
+      "source_path": "美食素材库/猪咪莓蛋糕.png",
+      "media_path": "media/美食素材库/猪咪莓蛋糕.png",
+      "sha256": "57a0ac672d2b054f43c06befade1beb5b0b8804aa6279d97320664ccdd48d802",
+      "bytes": 335773
+    },
+    {
+      "template_id": "food-r5-pig-jelly",
+      "source_path": "美食素材库/猪果冻.png",
+      "media_path": "media/美食素材库/猪果冻.png",
+      "sha256": "b06c0ea76ecc029614def48dcd69d0835517c257c01be703e2929084bb1188e3",
+      "bytes": 475714
+    },
+    {
+      "template_id": "food-r5-pig-skin-milk",
+      "source_path": "美食素材库/猪皮奶.png",
+      "media_path": "media/美食素材库/猪皮奶.png",
+      "sha256": "e071fa291c5ddcedee4cad899529eff2cbf22f5b5ce235a231ca12a322ec98b7",
+      "bytes": 417098
+    },
+    {
+      "template_id": "pig-g1092931381-xiangni-daozao",
+      "source_path": "定制猪群友库/1092931381/向你道早猪.gif",
+      "media_path": "media/定制猪群友库/1092931381/向你道早猪.gif",
+      "sha256": "b4f3ea67e20d3da33a3109310036dec4e64b7193e982cb2b5e9e4754e69d824d",
+      "bytes": 5032736
+    },
+    {
+      "template_id": "pig-g1092931381-soft-sakiko",
+      "source_path": "定制猪群友库/1092931381/软糯丰川祥猪.png",
+      "media_path": "media/定制猪群友库/1092931381/软糯丰川祥猪.png",
+      "sha256": "89e1ade4f49695f9e5001fe41951572f0216d00b6cff630b1c0da163f58d04ac",
+      "bytes": 2353668
+    },
+    {
+      "template_id": "food-g1092931381-xiangni-daozao-chocolate-cornet",
+      "source_path": "定制美食库/1092931381/向你道早猪猪巧克力螺.png",
+      "media_path": "media/定制美食库/1092931381/向你道早猪猪巧克力螺.png",
+      "sha256": "1fbbad9cf0947e986ac78e2a2af4061e47159753d9c1e5a3b18b7fc9f83e7560",
+      "bytes": 2763070
+    },
+    {
+      "template_id": "food-g1092931381-mist-blue-keyboard-daifuku",
+      "source_path": "定制美食库/1092931381/雾蓝键盘大福.png",
+      "media_path": "media/定制美食库/1092931381/雾蓝键盘大福.png",
+      "sha256": "85b44a9ccec2cd003f6ee2bffb13d9cd612ac21a6d9670f9deb9ddf3ddf25485",
+      "bytes": 2517621
+    },
+    {
+      "template_id": "pig-g237716658-xiangni-daozao",
+      "source_path": "定制猪群友库/237716658/向你道早猪.gif",
+      "media_path": "media/定制猪群友库/237716658/向你道早猪.gif",
+      "sha256": "b4f3ea67e20d3da33a3109310036dec4e64b7193e982cb2b5e9e4754e69d824d",
+      "bytes": 5032736
+    },
+    {
+      "template_id": "pig-g237716658-soft-sakiko",
+      "source_path": "定制猪群友库/237716658/软糯丰川祥猪.png",
+      "media_path": "media/定制猪群友库/237716658/软糯丰川祥猪.png",
+      "sha256": "89e1ade4f49695f9e5001fe41951572f0216d00b6cff630b1c0da163f58d04ac",
+      "bytes": 2353668
+    },
+    {
+      "template_id": "food-g237716658-xiangni-daozao-chocolate-cornet",
+      "source_path": "定制美食库/237716658/向你道早猪猪巧克力螺.png",
+      "media_path": "media/定制美食库/237716658/向你道早猪猪巧克力螺.png",
+      "sha256": "1fbbad9cf0947e986ac78e2a2af4061e47159753d9c1e5a3b18b7fc9f83e7560",
+      "bytes": 2763070
+    },
+    {
+      "template_id": "food-g237716658-mist-blue-keyboard-daifuku",
+      "source_path": "定制美食库/237716658/雾蓝键盘大福.png",
+      "media_path": "media/定制美食库/237716658/雾蓝键盘大福.png",
+      "sha256": "85b44a9ccec2cd003f6ee2bffb13d9cd612ac21a6d9670f9deb9ddf3ddf25485",
+      "bytes": 2517621
+    },
+    {
+      "template_id": "pig-bandori-aya-idol",
+      "source_path": "猪猪素材库/金色品质/偶像猪.png",
+      "media_path": "media/猪猪素材库/金色品质/偶像猪.png",
+      "sha256": "54ae850a2098fac0b2aa4b340a46795063be04209ebe6762f8b310703e3ab9e0",
+      "bytes": 2317338
+    },
+    {
+      "template_id": "pig-bandori-hina-genius",
+      "source_path": "猪猪素材库/金色品质/天才猪.png",
+      "media_path": "media/猪猪素材库/金色品质/天才猪.png",
+      "sha256": "957f18db2dea4bdbf68641509709d316b691a4cf3d147bb8ff9b0a9052cca0f0",
+      "bytes": 2255297
+    },
+    {
+      "template_id": "pig-bandori-chisato-lady",
+      "source_path": "猪猪素材库/紫色品质/淑女猪.png",
+      "media_path": "media/猪猪素材库/紫色品质/淑女猪.png",
+      "sha256": "f1fb07af4f53c4ee0809a96588bbcf2292e2d225511d80911d899114c1e11f60",
+      "bytes": 2303237
+    },
+    {
+      "template_id": "pig-bandori-maya-equipment",
+      "source_path": "猪猪素材库/紫色品质/器材猪.png",
+      "media_path": "media/猪猪素材库/紫色品质/器材猪.png",
+      "sha256": "b1461e2a1f93eb24c1dea9b2776ae1b595425ccea3f134f03014913a3354edea",
+      "bytes": 2004931
+    },
+    {
+      "template_id": "pig-bandori-eve-bushido",
+      "source_path": "猪猪素材库/金色品质/武士道猪.png",
+      "media_path": "media/猪猪素材库/金色品质/武士道猪.png",
+      "sha256": "f39c180201a1aa5c996dca95f1334f6097382a51aed4bb29ac87b16a8a4c38cf",
+      "bytes": 1652568
+    },
+    {
+      "template_id": "pig-g1092931381-aya-repair",
+      "source_path": "定制猪群友库/1092931381/彩彩修车猪.png",
+      "media_path": "media/定制猪群友库/1092931381/彩彩修车猪.png",
+      "sha256": "2c65eb4c58f9c9e7e6b3a4a4b473d159ed221866cce24a869aef99d8e9a63677",
+      "bytes": 2078825
+    },
+    {
+      "template_id": "food-g1092931381-aya-repair-mousse",
+      "source_path": "定制美食库/1092931381/彩彩修车猪慕斯.png",
+      "media_path": "media/定制美食库/1092931381/彩彩修车猪慕斯.png",
+      "sha256": "4b58cf4f7510398ccd89c21541f27c4391c8d5e4031f8e02514a95b91e780db2",
+      "bytes": 2401052
+    },
+    {
+      "template_id": "pig-g237716658-aya-repair",
+      "source_path": "定制猪群友库/237716658/彩彩修车猪.png",
+      "media_path": "media/定制猪群友库/237716658/彩彩修车猪.png",
+      "sha256": "2c65eb4c58f9c9e7e6b3a4a4b473d159ed221866cce24a869aef99d8e9a63677",
+      "bytes": 2078825
+    },
+    {
+      "template_id": "food-g237716658-aya-repair-mousse",
+      "source_path": "定制美食库/237716658/彩彩修车猪慕斯.png",
+      "media_path": "media/定制美食库/237716658/彩彩修车猪慕斯.png",
+      "sha256": "4b58cf4f7510398ccd89c21541f27c4391c8d5e4031f8e02514a95b91e780db2",
+      "bytes": 2401052
+    },
+    {
+      "template_id": "pig-bandori-hhw-happy",
+      "source_path": "猪猪素材库/金色品质/HAPPY猪.png",
+      "media_path": "media/猪猪素材库/金色品质/HAPPY猪.png",
+      "sha256": "4b5f8dba5d55405c1d9de9bc09c3c92c3588cb332f6db977cd08236ffb01b86e",
+      "bytes": 2073011
+    },
+    {
+      "template_id": "pig-bandori-hhw-opera",
+      "source_path": "猪猪素材库/金色品质/歌剧猪.png",
+      "media_path": "media/猪猪素材库/金色品质/歌剧猪.png",
+      "sha256": "4cd796157ffddcff9584d0060c74b848810668e4e79fddb15e8c232af77b22a3",
+      "bytes": 2882046
+    },
+    {
+      "template_id": "pig-bandori-hhw-lost",
+      "source_path": "猪猪素材库/金色品质/迷路猪.png",
+      "media_path": "media/猪猪素材库/金色品质/迷路猪.png",
+      "sha256": "912036183acd4e6a0bb5476c13fe80859815174711403bb792a316aa1c8a6952",
+      "bytes": 2232290
+    },
+    {
+      "template_id": "pig-bandori-hhw-misaki",
+      "source_path": "猪猪素材库/紫色品质/美咲猪.png",
+      "media_path": "media/猪猪素材库/紫色品质/美咲猪.png",
+      "sha256": "1ea80713e1353d3984e392270d8cebe6c649fcb24190536d7e36c7227f7b1b5d",
+      "bytes": 1964129
+    },
+    {
+      "template_id": "pig-bandori-hhw-korokke",
+      "source_path": "猪猪素材库/紫色品质/可乐饼猪.png",
+      "media_path": "media/猪猪素材库/紫色品质/可乐饼猪.png",
+      "sha256": "6bc8f060f87f0bdc2b59ff1dd9995eefbaccf76a9288a96f6da0c128da9bf908",
+      "bytes": 2070393
+    },
+    {
+      "template_id": "pig-bandori-hhw-michelle",
+      "source_path": "猪猪素材库/蓝色品质/米歇尔猪.png",
+      "media_path": "media/猪猪素材库/蓝色品质/米歇尔猪.png",
+      "sha256": "70b3080b5b97058290d163f4757290e0278a9c4132bc29b0518b9db4eeacbca8",
+      "bytes": 2202099
+    },
+    {
+      "template_id": "pig-g1092931381-baogian",
+      "source_path": "定制猪群友库/1092931381/保千猪.png",
+      "media_path": "media/定制猪群友库/1092931381/保千猪.png",
+      "sha256": "7cd503089ec7f0b5d593b86c68c0573a0582a0143e60fb13798517875d05505a",
+      "bytes": 2419454
+    },
+    {
+      "template_id": "pig-g237716658-baogian",
+      "source_path": "定制猪群友库/237716658/保千猪.png",
+      "media_path": "media/定制猪群友库/237716658/保千猪.png",
+      "sha256": "7cd503089ec7f0b5d593b86c68c0573a0582a0143e60fb13798517875d05505a",
+      "bytes": 2419454
+    },
+    {
+      "template_id": "food-g1092931381-baogian-pork-roulette",
+      "source_path": "定制美食库/1092931381/猪保千猪排轮盘.png",
+      "media_path": "media/定制美食库/1092931381/猪保千猪排轮盘.png",
+      "sha256": "8670bb5e9e5d10298f12fb85200668d11ac71059382e86c5eaccf815cc84815b",
+      "bytes": 2897399
+    },
+    {
+      "template_id": "food-g237716658-baogian-pork-roulette",
+      "source_path": "定制美食库/237716658/猪保千猪排轮盘.png",
+      "media_path": "media/定制美食库/237716658/猪保千猪排轮盘.png",
+      "sha256": "8670bb5e9e5d10298f12fb85200668d11ac71059382e86c5eaccf815cc84815b",
+      "bytes": 2897399
+    },
+    {
+      "template_id": "pig-bandori-roselia-yukina",
+      "source_path": "猪猪素材库/金色品质/歌姬猪.png",
+      "media_path": "media/猪猪素材库/金色品质/歌姬猪.png",
+      "sha256": "2478c381a642878e6699f7766742661901ec1aea7e92e5f71cc75863b3577a04",
+      "bytes": 1925543
+    },
+    {
+      "template_id": "pig-bandori-roselia-lisa",
+      "source_path": "猪猪素材库/金色品质/妈妈猪.png",
+      "media_path": "media/猪猪素材库/金色品质/妈妈猪.png",
+      "sha256": "8e426c0c208e6bdf88048e8674ab7df6143101e8f163efe1b0f89625a74e0a15",
+      "bytes": 1881397
+    },
+    {
+      "template_id": "pig-bandori-roselia-sayo",
+      "source_path": "猪猪素材库/紫色品质/薯条猪.png",
+      "media_path": "media/猪猪素材库/紫色品质/薯条猪.png",
+      "sha256": "289187488b583eecaaf65f856735cfdfcbc9ebc6e6264b5ce0046648384038e0",
+      "bytes": 1961016
+    },
+    {
+      "template_id": "pig-bandori-roselia-ako",
+      "source_path": "猪猪素材库/金色品质/魔王猪.png",
+      "media_path": "media/猪猪素材库/金色品质/魔王猪.png",
+      "sha256": "b2fcbefd90b8815ebd047bcbfb288d97e54595a315348babf494556625db8dd3",
+      "bytes": 2595516
+    },
+    {
+      "template_id": "pig-bandori-roselia-rinko",
+      "source_path": "猪猪素材库/紫色品质/宅宅猪.png",
+      "media_path": "media/猪猪素材库/紫色品质/宅宅猪.png",
+      "sha256": "1f7946b84a2a56546d680225bb126c3ddf67beea30a5459a41fe4a9e7986e354",
+      "bytes": 2049498
+    },
+    {
+      "template_id": "pig-g1092931381-ob-yichuan",
+      "source_path": "定制猪群友库/1092931381/ob一串猪.png",
+      "media_path": "media/定制猪群友库/1092931381/ob一串猪.png",
+      "sha256": "949cfa0af2698d5690fb57c1068f0d7b699973823c98178a25b073036b617750",
+      "bytes": 2072621
+    },
+    {
+      "template_id": "pig-g237716658-ob-yichuan",
+      "source_path": "定制猪群友库/237716658/ob一串猪.png",
+      "media_path": "media/定制猪群友库/237716658/ob一串猪.png",
+      "sha256": "949cfa0af2698d5690fb57c1068f0d7b699973823c98178a25b073036b617750",
+      "bytes": 2072621
+    },
+    {
+      "template_id": "food-g1092931381-tangcu-paigu",
+      "source_path": "定制美食库/1092931381/糖醋排骨.png",
+      "media_path": "media/定制美食库/1092931381/糖醋排骨.png",
+      "sha256": "bc75916164002597fcbb95daaec3e9e1d06743969c4e925ac4862cb397f229ac",
+      "bytes": 2313297
+    },
+    {
+      "template_id": "food-g237716658-tangcu-paigu",
+      "source_path": "定制美食库/237716658/糖醋排骨.png",
+      "media_path": "media/定制美食库/237716658/糖醋排骨.png",
+      "sha256": "bc75916164002597fcbb95daaec3e9e1d06743969c4e925ac4862cb397f229ac",
+      "bytes": 2313297
+    },
+    {
+      "template_id": "pig-qo5e5854406d0297d6feae696a13e3a339-ob-yichuan",
+      "source_path": "定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/ob一串猪.png",
+      "media_path": "media/定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/ob一串猪.png",
+      "sha256": "949cfa0af2698d5690fb57c1068f0d7b699973823c98178a25b073036b617750",
+      "bytes": 2072621
+    },
+    {
+      "template_id": "food-qo5e5854406d0297d6feae696a13e3a339-tangcu-paigu",
+      "source_path": "定制美食库/5E5854406D0297D6FEAE696A13E3A339/糖醋排骨.png",
+      "media_path": "media/定制美食库/5E5854406D0297D6FEAE696A13E3A339/糖醋排骨.png",
+      "sha256": "bc75916164002597fcbb95daaec3e9e1d06743969c4e925ac4862cb397f229ac",
+      "bytes": 2313297
+    },
+    {
+      "template_id": "pig-qo9ea2810f378fbd7dc3219c56ceab3520-ob-yichuan",
+      "source_path": "定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/ob一串猪.png",
+      "media_path": "media/定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/ob一串猪.png",
+      "sha256": "949cfa0af2698d5690fb57c1068f0d7b699973823c98178a25b073036b617750",
+      "bytes": 2072621
+    },
+    {
+      "template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-tangcu-paigu",
+      "source_path": "定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/糖醋排骨.png",
+      "media_path": "media/定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/糖醋排骨.png",
+      "sha256": "bc75916164002597fcbb95daaec3e9e1d06743969c4e925ac4862cb397f229ac",
+      "bytes": 2313297
+    },
+    {
+      "template_id": "pig-qo5e5854406d0297d6feae696a13e3a339-juejue",
+      "source_path": "定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/撅撅猪.jpg",
+      "media_path": "media/定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/撅撅猪.jpg",
+      "sha256": "1922d2c243075c2aea59bd6cc96fbba84a1caeffdc75a9c3036f7577aa28b1d8",
+      "bytes": 383056
+    },
+    {
+      "template_id": "pig-qo5e5854406d0297d6feae696a13e3a339-1004",
+      "source_path": "定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/1004猪鼻哥.jpg",
+      "media_path": "media/定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/1004猪鼻哥.jpg",
+      "sha256": "f34d4535a397f9593b663cc7c6ec93ef116ff5751a86567daa126afab6a90969",
+      "bytes": 101617
+    },
+    {
+      "template_id": "pig-qo5e5854406d0297d6feae696a13e3a339-xiaoma",
+      "source_path": "定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/小马猪.png",
+      "media_path": "media/定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/小马猪.png",
+      "sha256": "3b9c1accb43c3fd8beab9c082c0afd66f597923258023a09c7afd74e12f39ddf",
+      "bytes": 2091983
+    },
+    {
+      "template_id": "pig-qo5e5854406d0297d6feae696a13e3a339-soft-sakiko",
+      "source_path": "定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/软糯丰川祥猪.png",
+      "media_path": "media/定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/软糯丰川祥猪.png",
+      "sha256": "89e1ade4f49695f9e5001fe41951572f0216d00b6cff630b1c0da163f58d04ac",
+      "bytes": 2353668
+    },
+    {
+      "template_id": "pig-qo5e5854406d0297d6feae696a13e3a339-xiangni-daozao",
+      "source_path": "定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/向你道早猪.gif",
+      "media_path": "media/定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/向你道早猪.gif",
+      "sha256": "b4f3ea67e20d3da33a3109310036dec4e64b7193e982cb2b5e9e4754e69d824d",
+      "bytes": 5032736
+    },
+    {
+      "template_id": "pig-qo5e5854406d0297d6feae696a13e3a339-aya-repair",
+      "source_path": "定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/彩彩修车猪.png",
+      "media_path": "media/定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/彩彩修车猪.png",
+      "sha256": "2c65eb4c58f9c9e7e6b3a4a4b473d159ed221866cce24a869aef99d8e9a63677",
+      "bytes": 2078825
+    },
+    {
+      "template_id": "pig-qo5e5854406d0297d6feae696a13e3a339-baogian",
+      "source_path": "定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/保千猪.png",
+      "media_path": "media/定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/保千猪.png",
+      "sha256": "7cd503089ec7f0b5d593b86c68c0573a0582a0143e60fb13798517875d05505a",
+      "bytes": 2419454
+    },
+    {
+      "template_id": "food-qo5e5854406d0297d6feae696a13e3a339-juejue-pie",
+      "source_path": "定制美食库/5E5854406D0297D6FEAE696A13E3A339/撅撅猪派.png",
+      "media_path": "media/定制美食库/5E5854406D0297D6FEAE696A13E3A339/撅撅猪派.png",
+      "sha256": "de87f3e62b5f7f26b781ac7e1a0575b7e0fbb1ac3da117790dc61ec232d0a774",
+      "bytes": 1382254
+    },
+    {
+      "template_id": "food-qo5e5854406d0297d6feae696a13e3a339-1004-omelette",
+      "source_path": "定制美食库/5E5854406D0297D6FEAE696A13E3A339/猪鼻蛋包饭.png",
+      "media_path": "media/定制美食库/5E5854406D0297D6FEAE696A13E3A339/猪鼻蛋包饭.png",
+      "sha256": "fe34d59f684016c5f0e792b7ac3c69d0b1b7a8d8b011c52f56eed4c7ae3c48f2",
+      "bytes": 2501516
+    },
+    {
+      "template_id": "food-qo5e5854406d0297d6feae696a13e3a339-xiaoma-mont-blanc",
+      "source_path": "定制美食库/5E5854406D0297D6FEAE696A13E3A339/小马猪蒙布朗.png",
+      "media_path": "media/定制美食库/5E5854406D0297D6FEAE696A13E3A339/小马猪蒙布朗.png",
+      "sha256": "6a532a674fbbb623e01517c66ef6fb4567c6415d5a7b4696d6132806fdda7aaa",
+      "bytes": 2482282
+    },
+    {
+      "template_id": "food-qo5e5854406d0297d6feae696a13e3a339-mist-blue-keyboard-daifuku",
+      "source_path": "定制美食库/5E5854406D0297D6FEAE696A13E3A339/雾蓝键盘大福.png",
+      "media_path": "media/定制美食库/5E5854406D0297D6FEAE696A13E3A339/雾蓝键盘大福.png",
+      "sha256": "85b44a9ccec2cd003f6ee2bffb13d9cd612ac21a6d9670f9deb9ddf3ddf25485",
+      "bytes": 2517621
+    },
+    {
+      "template_id": "food-qo5e5854406d0297d6feae696a13e3a339-xiangni-daozao-chocolate-cornet",
+      "source_path": "定制美食库/5E5854406D0297D6FEAE696A13E3A339/向你道早猪猪巧克力螺.png",
+      "media_path": "media/定制美食库/5E5854406D0297D6FEAE696A13E3A339/向你道早猪猪巧克力螺.png",
+      "sha256": "1fbbad9cf0947e986ac78e2a2af4061e47159753d9c1e5a3b18b7fc9f83e7560",
+      "bytes": 2763070
+    },
+    {
+      "template_id": "food-qo5e5854406d0297d6feae696a13e3a339-aya-repair-mousse",
+      "source_path": "定制美食库/5E5854406D0297D6FEAE696A13E3A339/彩彩修车猪慕斯.png",
+      "media_path": "media/定制美食库/5E5854406D0297D6FEAE696A13E3A339/彩彩修车猪慕斯.png",
+      "sha256": "4b58cf4f7510398ccd89c21541f27c4391c8d5e4031f8e02514a95b91e780db2",
+      "bytes": 2401052
+    },
+    {
+      "template_id": "food-qo5e5854406d0297d6feae696a13e3a339-baogian-pork-roulette",
+      "source_path": "定制美食库/5E5854406D0297D6FEAE696A13E3A339/猪保千猪排轮盘.png",
+      "media_path": "media/定制美食库/5E5854406D0297D6FEAE696A13E3A339/猪保千猪排轮盘.png",
+      "sha256": "8670bb5e9e5d10298f12fb85200668d11ac71059382e86c5eaccf815cc84815b",
+      "bytes": 2897399
+    },
+    {
+      "template_id": "pig-qo9ea2810f378fbd7dc3219c56ceab3520-juejue",
+      "source_path": "定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/撅撅猪.jpg",
+      "media_path": "media/定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/撅撅猪.jpg",
+      "sha256": "1922d2c243075c2aea59bd6cc96fbba84a1caeffdc75a9c3036f7577aa28b1d8",
+      "bytes": 383056
+    },
+    {
+      "template_id": "pig-qo9ea2810f378fbd7dc3219c56ceab3520-1004",
+      "source_path": "定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/1004猪鼻哥.jpg",
+      "media_path": "media/定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/1004猪鼻哥.jpg",
+      "sha256": "f34d4535a397f9593b663cc7c6ec93ef116ff5751a86567daa126afab6a90969",
+      "bytes": 101617
+    },
+    {
+      "template_id": "pig-qo9ea2810f378fbd7dc3219c56ceab3520-xiaoma",
+      "source_path": "定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/小马猪.png",
+      "media_path": "media/定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/小马猪.png",
+      "sha256": "3b9c1accb43c3fd8beab9c082c0afd66f597923258023a09c7afd74e12f39ddf",
+      "bytes": 2091983
+    },
+    {
+      "template_id": "pig-qo9ea2810f378fbd7dc3219c56ceab3520-soft-sakiko",
+      "source_path": "定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/软糯丰川祥猪.png",
+      "media_path": "media/定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/软糯丰川祥猪.png",
+      "sha256": "89e1ade4f49695f9e5001fe41951572f0216d00b6cff630b1c0da163f58d04ac",
+      "bytes": 2353668
+    },
+    {
+      "template_id": "pig-qo9ea2810f378fbd7dc3219c56ceab3520-xiangni-daozao",
+      "source_path": "定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/向你道早猪.gif",
+      "media_path": "media/定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/向你道早猪.gif",
+      "sha256": "b4f3ea67e20d3da33a3109310036dec4e64b7193e982cb2b5e9e4754e69d824d",
+      "bytes": 5032736
+    },
+    {
+      "template_id": "pig-qo9ea2810f378fbd7dc3219c56ceab3520-aya-repair",
+      "source_path": "定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/彩彩修车猪.png",
+      "media_path": "media/定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/彩彩修车猪.png",
+      "sha256": "2c65eb4c58f9c9e7e6b3a4a4b473d159ed221866cce24a869aef99d8e9a63677",
+      "bytes": 2078825
+    },
+    {
+      "template_id": "pig-qo9ea2810f378fbd7dc3219c56ceab3520-baogian",
+      "source_path": "定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/保千猪.png",
+      "media_path": "media/定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/保千猪.png",
+      "sha256": "7cd503089ec7f0b5d593b86c68c0573a0582a0143e60fb13798517875d05505a",
+      "bytes": 2419454
+    },
+    {
+      "template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-juejue-pie",
+      "source_path": "定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/撅撅猪派.png",
+      "media_path": "media/定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/撅撅猪派.png",
+      "sha256": "de87f3e62b5f7f26b781ac7e1a0575b7e0fbb1ac3da117790dc61ec232d0a774",
+      "bytes": 1382254
+    },
+    {
+      "template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-1004-omelette",
+      "source_path": "定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/猪鼻蛋包饭.png",
+      "media_path": "media/定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/猪鼻蛋包饭.png",
+      "sha256": "fe34d59f684016c5f0e792b7ac3c69d0b1b7a8d8b011c52f56eed4c7ae3c48f2",
+      "bytes": 2501516
+    },
+    {
+      "template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-xiaoma-mont-blanc",
+      "source_path": "定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/小马猪蒙布朗.png",
+      "media_path": "media/定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/小马猪蒙布朗.png",
+      "sha256": "6a532a674fbbb623e01517c66ef6fb4567c6415d5a7b4696d6132806fdda7aaa",
+      "bytes": 2482282
+    },
+    {
+      "template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-mist-blue-keyboard-daifuku",
+      "source_path": "定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/雾蓝键盘大福.png",
+      "media_path": "media/定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/雾蓝键盘大福.png",
+      "sha256": "85b44a9ccec2cd003f6ee2bffb13d9cd612ac21a6d9670f9deb9ddf3ddf25485",
+      "bytes": 2517621
+    },
+    {
+      "template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-xiangni-daozao-chocolate-cornet",
+      "source_path": "定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/向你道早猪猪巧克力螺.png",
+      "media_path": "media/定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/向你道早猪猪巧克力螺.png",
+      "sha256": "1fbbad9cf0947e986ac78e2a2af4061e47159753d9c1e5a3b18b7fc9f83e7560",
+      "bytes": 2763070
+    },
+    {
+      "template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-aya-repair-mousse",
+      "source_path": "定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/彩彩修车猪慕斯.png",
+      "media_path": "media/定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/彩彩修车猪慕斯.png",
+      "sha256": "4b58cf4f7510398ccd89c21541f27c4391c8d5e4031f8e02514a95b91e780db2",
+      "bytes": 2401052
+    },
+    {
+      "template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-baogian-pork-roulette",
+      "source_path": "定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/猪保千猪排轮盘.png",
+      "media_path": "media/定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/猪保千猪排轮盘.png",
+      "sha256": "8670bb5e9e5d10298f12fb85200668d11ac71059382e86c5eaccf815cc84815b",
+      "bytes": 2897399
+    },
+    {
+      "template_id": "pig-bandori-ras-layer",
+      "source_path": "猪猪素材库/紫色品质/LAYER猪.png",
+      "media_path": "media/猪猪素材库/紫色品质/LAYER猪.png",
+      "sha256": "69247e5e87c5919a44c1a1d9098774b514dd465f0f85dc6eae629bc400b9b492",
+      "bytes": 2063857
+    },
+    {
+      "template_id": "pig-bandori-ras-lock",
+      "source_path": "猪猪素材库/金色品质/LOCK猪.png",
+      "media_path": "media/猪猪素材库/金色品质/LOCK猪.png",
+      "sha256": "163b157d4704744af17747572fe72685c9c58e7867fef8d927e8aaa9bce07e42",
+      "bytes": 2117372
+    },
+    {
+      "template_id": "pig-bandori-ras-masking-motor",
+      "source_path": "猪猪素材库/紫色品质/摩托猪.png",
+      "media_path": "media/猪猪素材库/紫色品质/摩托猪.png",
+      "sha256": "ffe8b6cbfa7f8496f14bd8b006a809dc838e340035beb9aee026179ff3aea442",
+      "bytes": 1956933
+    },
+    {
+      "template_id": "pig-bandori-ras-pareo",
+      "source_path": "猪猪素材库/金色品质/PAREO猪.png",
+      "media_path": "media/猪猪素材库/金色品质/PAREO猪.png",
+      "sha256": "b21012ecb1c84310c887e8864973bc42b78066468639bd9785f051c2b4214564",
+      "bytes": 1709941
+    },
+    {
+      "template_id": "pig-bandori-ras-chu2",
+      "source_path": "猪猪素材库/金色品质/chuchu猪.png",
+      "media_path": "media/猪猪素材库/金色品质/chuchu猪.png",
+      "sha256": "87e16367c702f416504d0315f6c859e354a863b52fe4ec285952f27425a5ca2e",
+      "bytes": 2098370
+    }
+  ]
+}

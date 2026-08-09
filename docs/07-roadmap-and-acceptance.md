@@ -975,3 +975,24 @@
   8 猪 + 8 菜定义保持全字段一致，玩家资产、额度与效果队列仍按作用域隔离。
 - 离线验收：pytest `206 passed`；Ruff、Python `compileall`、`uv lock --check`、
   `git diff --check` 与 Asset Manifest 构建/隔离导入校验全部通过。
+
+## 41. v1.9.0 RAISE A SUILEN 联动与 Git LFS 全素材验收
+
+- 验收日期：`2026-08-09`。插件升级为 `local.pig-catcher v1.9.0`；Schema `14`、
+  Asset Manifest `4`、Ruleset `13` 均不变，本轮只增加公共联动模板与正式媒体。
+- 新增 RAISE A SUILEN 完整 `5/5` 收集组：LAYER猪与摩托猪（MASKING）为四星；
+  LOCK猪、PAREO猪与 chuchu猪（CHU²）为五星。正式源路径修正用户文件名中的
+  `LCOK → LOCK`，角色 ID、固定槽位和官方资料 URL 均通过目录回归。
+- 角色描述依据官方资料并结合原图中的乐器、服装、应援、蛋糕、DJ 台与肉干等元素撰写；
+  所有文案为预审静态文本，运行时不调用 LLM，也未下载或混入官方角色图片。
+- 正式目录为 215 项模板（152 猪 + 63 菜）、167 份唯一二进制、218 份隔离存储媒体、
+  64 项群专属和 43 只联动猪；目录哈希为
+  `9abe2e896b9bb42cd5bac1685b55115cd4767ddf2eac201f27134033d50b9b28`。
+- 两个数字 QQ 群和两个 QQ 官方群各自可见 128 只猪、39 道菜和 8+8 个保密群槽位；
+  四份完整图鉴均无裁切、越界或破图，五张新资产卡为 1128×820 且描述完整。
+- `asset_library/current/` 的完整正式包按维护者要求纳入 Git LFS，历史归档与临时素材
+  仍被忽略；构建报告改用仓库相对路径，并以 `ASSET_NOTICE.md` 说明代码与媒体权利边界。
+- 更新公告按既有运营模板写入 `docs/10-update-announcement-2026-08-09.md`，逐项介绍
+  五只联动猪、15 种商城道具、15 道公共四/五星菜、叠加规则与六星独占层。
+- 离线验收：pytest `206 passed`；Ruff、Python `compileall`、`uv lock --check`、
+  Manifest 构建/隔离导入、215 张资产卡、16 组动画代表帧与四作用域完整图鉴均通过。

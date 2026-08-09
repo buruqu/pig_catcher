@@ -25,11 +25,11 @@ def _entries() -> list[dict[str, object]]:
     return list(payload["entries"])
 
 
-def test_formal_catalog_has_all_210_named_assets_and_stable_ids() -> None:
+def test_formal_catalog_has_all_215_named_assets_and_stable_ids() -> None:
     entries = _entries()
-    assert len(entries) == 210
-    assert len({entry["template_id"] for entry in entries}) == 210
-    assert len({entry["source_path"] for entry in entries}) == 210
+    assert len(entries) == 215
+    assert len({entry["template_id"] for entry in entries}) == 215
+    assert len({entry["source_path"] for entry in entries}) == 215
     assert all(str(entry["description"]).strip() for entry in entries)
     pig_counts = Counter(
         int(entry["rarity"])
@@ -41,7 +41,7 @@ def test_formal_catalog_has_all_210_named_assets_and_stable_ids() -> None:
         for entry in entries
         if entry["kind"] == "food"
     )
-    assert pig_counts == {1: 20, 2: 20, 3: 21, 4: 26, 5: 28, 6: 32}
+    assert pig_counts == {1: 20, 2: 20, 3: 21, 4: 28, 5: 31, 6: 32}
     assert food_counts == {1: 3, 2: 6, 3: 7, 4: 8, 5: 7, 6: 32}
 
 
@@ -291,6 +291,11 @@ def test_bandori_collaboration_mappings_use_official_profiles_and_five_slots() -
         "薯条猪": ("冰川纱夜", "Roselia"),
         "魔王猪": ("宇田川亚子", "Roselia"),
         "宅宅猪": ("白金燐子", "Roselia"),
+        "LAYER猪": ("LAYER", "RAISE A SUILEN"),
+        "LOCK猪": ("LOCK", "RAISE A SUILEN"),
+        "摩托猪": ("MASKING", "RAISE A SUILEN"),
+        "PAREO猪": ("PAREO", "RAISE A SUILEN"),
+        "chuchu猪": ("CHU²", "RAISE A SUILEN"),
     }
     assert all(
         value["total"] == (
@@ -303,6 +308,7 @@ def test_bandori_collaboration_mappings_use_official_profiles_and_five_slots() -
         str(value["official_profile_url"]).startswith((
             "https://bang-dream.com/",
             "https://anime.bang-dream.com/",
+            "https://bang-dream-gbp-en.bushiroad.com/",
         ))
         for value in collabs.values()
     )
@@ -350,6 +356,17 @@ def test_bandori_collaboration_mappings_use_official_profiles_and_five_slots() -
         if value["collection_name"] == "Roselia"
     }
     assert roselia_slots == {1, 2, 3, 4, 5}
+    raise_a_suilen_slots = {
+        int(value["slot"])
+        for value in collabs.values()
+        if value["collection_name"] == "RAISE A SUILEN"
+    }
+    assert raise_a_suilen_slots == {1, 2, 3, 4, 5}
+    assert collabs["LAYER猪"]["character_id"] == "layer"
+    assert collabs["LOCK猪"]["character_id"] == "lock"
+    assert collabs["摩托猪"]["character_id"] == "masking"
+    assert collabs["PAREO猪"]["character_id"] == "pareo"
+    assert collabs["chuchu猪"]["character_id"] == "chu2"
     assert collabs["歌姬猪"]["character_id"] == "yukina"
     assert collabs["妈妈猪"]["character_id"] == "lisa"
     assert collabs["薯条猪"]["character_id"] == "sayo"
@@ -425,6 +442,32 @@ def test_new_pigs_keep_reviewed_descriptions_and_rarities() -> None:
         "编着若宫伊芙的银白双辫，背起紫色键盘，把“武士道”当成每次登台的信念；"
         "性格坦率又一心一意，哪怕方向跑偏，也会用热情把大家重新带回节拍。"
     )
+    assert pigs["LAYER猪"]["rarity"] == 4
+    assert pigs["LAYER猪"]["description"] == (
+        "抱着琥珀色贝斯守在麦克风前，借来LAYER成熟冷静的舞台气场；"
+        "平日和群猪保持恰到好处的距离，一开口却能像专业歌姬般驾驭各种曲风，沉稳低音下也藏着炽热。"
+    )
+    assert pigs["LOCK猪"]["rarity"] == 5
+    assert pigs["LOCK猪"]["description"] == (
+        "扎起LOCK的雾紫双辫，扶好蓝色吉他和滑落的圆框眼镜；"
+        "平时是有点不走运却凡事拼尽全力的苦劳猪，一踏上舞台便被吉他点亮，对Poppin'Party的热爱也从不藏着。"
+    )
+    assert pigs["摩托猪"]["rarity"] == 4
+    assert pigs["摩托猪"]["description"] == (
+        "把红黑头盔扣在MASKING式的金发上，看着像要骑摩托冲出后台，真正发动的却是“狂犬”鼓点；"
+        "外表有点凶，心里重情又热血，敲完鼓还会悄悄端出一只精致小蛋糕。"
+    )
+    assert pigs["PAREO猪"]["rarity"] == 5
+    assert pigs["PAREO猪"]["description"] == (
+        "梳着PAREO的蓝粉双马尾，键盘、星星应援棒和“可爱”缺一不可；"
+        "它是Pastel＊Palettes的忠实偶像猪，也把发掘自己的CHU²当成最重要的主人，热情上来时谁都拦不住。"
+    )
+    assert pigs["chuchu猪"]["rarity"] == 5
+    assert pigs["chuchu猪"]["description"] == (
+        "戴上CHU²的猫耳耳机站到DJ台前，作词、作曲和制作全都要由自己掌控；"
+        "这只年少却专业的制作人猪想用最强音乐改变世界，态度再强势也守礼，手边永远少不了肉干。"
+    )
+    assert pigs["LOCK猪"]["source_path"].endswith("LOCK猪.png")
     assert pigs["彩彩修车猪"]["paired_food_template_id"].endswith(
         "aya-repair-mousse"
     )

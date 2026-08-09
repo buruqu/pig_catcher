@@ -14,7 +14,6 @@ runtime/
 data/
 artifacts/
 config_back/
-asset_library/current/
 asset_library/current-v*/
 asset_library/archive/
 asset_library/*.rar

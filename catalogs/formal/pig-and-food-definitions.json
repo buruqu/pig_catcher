@@ -3595,6 +3595,131 @@
       "effect_params": {
         "uses": 5
       }
+    },
+    {
+      "template_id": "pig-bandori-ras-layer",
+      "source_path": "猪猪素材库/紫色品质/LAYER猪.png",
+      "kind": "pig",
+      "display_name": "LAYER猪",
+      "rarity": 4,
+      "description": "抱着琥珀色贝斯守在麦克风前，借来LAYER成熟冷静的舞台气场；平日和群猪保持恰到好处的距离，一开口却能像专业歌姬般驾驭各种曲风，沉稳低音下也藏着炽热。",
+      "fat_profile": "balanced",
+      "recipe_tags": [
+        "BanG Dream!",
+        "RAISE A SUILEN",
+        "主唱",
+        "贝斯"
+      ],
+      "collection": {
+        "collaboration_name": "BanG Dream!",
+        "collection_id": "bandori-raise-a-suilen",
+        "collection_name": "RAISE A SUILEN",
+        "slot": 1,
+        "total": 5,
+        "character_id": "layer",
+        "character_name": "LAYER",
+        "official_profile_url": "https://bang-dream-gbp-en.bushiroad.com/character/raise-a-suilen/layer/"
+      }
+    },
+    {
+      "template_id": "pig-bandori-ras-lock",
+      "source_path": "猪猪素材库/金色品质/LOCK猪.png",
+      "kind": "pig",
+      "display_name": "LOCK猪",
+      "rarity": 5,
+      "description": "扎起LOCK的雾紫双辫，扶好蓝色吉他和滑落的圆框眼镜；平时是有点不走运却凡事拼尽全力的苦劳猪，一踏上舞台便被吉他点亮，对Poppin'Party的热爱也从不藏着。",
+      "fat_profile": "lean",
+      "recipe_tags": [
+        "BanG Dream!",
+        "RAISE A SUILEN",
+        "吉他",
+        "努力"
+      ],
+      "collection": {
+        "collaboration_name": "BanG Dream!",
+        "collection_id": "bandori-raise-a-suilen",
+        "collection_name": "RAISE A SUILEN",
+        "slot": 2,
+        "total": 5,
+        "character_id": "lock",
+        "character_name": "LOCK",
+        "official_profile_url": "https://bang-dream-gbp-en.bushiroad.com/character/raise-a-suilen/lock/"
+      }
+    },
+    {
+      "template_id": "pig-bandori-ras-masking-motor",
+      "source_path": "猪猪素材库/紫色品质/摩托猪.png",
+      "kind": "pig",
+      "display_name": "摩托猪",
+      "rarity": 4,
+      "description": "把红黑头盔扣在MASKING式的金发上，看着像要骑摩托冲出后台，真正发动的却是“狂犬”鼓点；外表有点凶，心里重情又热血，敲完鼓还会悄悄端出一只精致小蛋糕。",
+      "fat_profile": "balanced",
+      "recipe_tags": [
+        "BanG Dream!",
+        "RAISE A SUILEN",
+        "鼓手",
+        "摩托"
+      ],
+      "collection": {
+        "collaboration_name": "BanG Dream!",
+        "collection_id": "bandori-raise-a-suilen",
+        "collection_name": "RAISE A SUILEN",
+        "slot": 3,
+        "total": 5,
+        "character_id": "masking",
+        "character_name": "MASKING",
+        "official_profile_url": "https://bang-dream-gbp-en.bushiroad.com/character/raise-a-suilen/masking/"
+      }
+    },
+    {
+      "template_id": "pig-bandori-ras-pareo",
+      "source_path": "猪猪素材库/金色品质/PAREO猪.png",
+      "kind": "pig",
+      "display_name": "PAREO猪",
+      "rarity": 5,
+      "description": "梳着PAREO的蓝粉双马尾，键盘、星星应援棒和“可爱”缺一不可；它是Pastel＊Palettes的忠实偶像猪，也把发掘自己的CHU²当成最重要的主人，热情上来时谁都拦不住。",
+      "fat_profile": "lean",
+      "recipe_tags": [
+        "BanG Dream!",
+        "RAISE A SUILEN",
+        "键盘",
+        "偶像应援"
+      ],
+      "collection": {
+        "collaboration_name": "BanG Dream!",
+        "collection_id": "bandori-raise-a-suilen",
+        "collection_name": "RAISE A SUILEN",
+        "slot": 4,
+        "total": 5,
+        "character_id": "pareo",
+        "character_name": "PAREO",
+        "official_profile_url": "https://bang-dream-gbp-en.bushiroad.com/character/raise-a-suilen/pareo/"
+      }
+    },
+    {
+      "template_id": "pig-bandori-ras-chu2",
+      "source_path": "猪猪素材库/金色品质/chuchu猪.png",
+      "kind": "pig",
+      "display_name": "chuchu猪",
+      "rarity": 5,
+      "description": "戴上CHU²的猫耳耳机站到DJ台前，作词、作曲和制作全都要由自己掌控；这只年少却专业的制作人猪想用最强音乐改变世界，态度再强势也守礼，手边永远少不了肉干。",
+      "fat_profile": "balanced",
+      "recipe_tags": [
+        "BanG Dream!",
+        "RAISE A SUILEN",
+        "DJ",
+        "制作人"
+      ],
+      "collection": {
+        "collaboration_name": "BanG Dream!",
+        "collection_id": "bandori-raise-a-suilen",
+        "collection_name": "RAISE A SUILEN",
+        "slot": 5,
+        "total": 5,
+        "character_id": "chu2",
+        "character_name": "CHU²",
+        "official_profile_url": "https://bang-dream-gbp-en.bushiroad.com/character/raise-a-suilen/chu2/"
+      }
     }
   ]
 }

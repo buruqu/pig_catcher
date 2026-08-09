@@ -216,8 +216,8 @@
 catalogs/formal/
   pig-and-food-definitions.json  # 可审计元数据，进入 Git
 asset_library/
-  README.md                      # 素材位置和维护说明，进入 Git
-  current/                       # 本机当前导入包，Git 忽略
+  README.md / ASSET_NOTICE.md    # 素材位置、维护和权利说明，进入 Git
+  current/                       # 当前正式导入包，图片/动画由 Git LFS 管理
     media/定制猪群友库/<群号>/    # 每个群独立保存六星猪原件
     media/定制美食库/<群号>/      # 每个群独立保存六星菜原件
   archive/v*/                   # 本机历史回滚包，Git 忽略
@@ -227,9 +227,9 @@ ctx.paths.data_dir/
 
 2A 的隐私/缺图占位位于 HTML/CSS 模板，不出现在 `assets.json`、猪模板表或美食模板表中。
 
-6 星群素材不默认提交到公共 Git 历史。它们通过管理面板导入 `ctx.paths.data_dir` 下的
-范围目录，并用数据库映射到 `scope_id`。不同群即使暂时使用相同图片，也必须拥有
-独立群号目录、独立模板 ID 和独立运行媒体路径，不允许跨群二进制去重。
+本次发布按维护者明确要求把完整 `current/`（含群作用域素材）通过 Git LFS 提交；代码的
+MIT License 不自动再许可第三方媒体，边界见 `ASSET_NOTICE.md`。不同群即使暂时使用相同
+图片，也必须拥有独立群号目录、独立模板 ID 和独立运行媒体路径，不允许跨群二进制去重。
 
 ## 9. 素材验收
 
@@ -245,8 +245,8 @@ ctx.paths.data_dir/
 8. 所有素材在正式卡片与群聊缩略尺寸完成视觉抽检，动画同时检查代表帧。
 9. 不将参考图中的水母素材、布局截图或其衍生裁切当作项目资产。
 
-当前正式目录已接入 210 项模板，其中 147 只猪、63 道美食、12 项动画和 64 项群专属
-模板；四个已授权作用域各可见 123 只猪和 39 道美食。目录包含 162 份唯一源二进制、
-213 份按作用域隔离的存储媒体和 2 张备用图。联动猪共 38 只：Poppin'Party、
-Afterglow、Pastel＊Palettes、MyGO!!!!!、Morfonica 与 Roselia 均为 `5/5`，
+当前正式目录已接入 215 项模板，其中 152 只猪、63 道美食、16 项动画和 64 项群专属
+模板；四个已授权作用域各可见 128 只猪和 39 道美食。目录包含 167 份唯一源二进制、
+218 份按作用域隔离的存储媒体和 2 张备用图。联动猪共 43 只：Poppin'Party、
+Afterglow、Pastel＊Palettes、MyGO!!!!!、Morfonica、Roselia 与 RAISE A SUILEN 均为 `5/5`，
 Hello, Happy World! 含米歇尔猪为 `6/6`，梦限大动画薇欧拉为单槽特别联动。

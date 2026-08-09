@@ -4,9 +4,9 @@
 显示名、品质、描述、素材相对路径、体型规则、美食效果、六星猪对应菜、
 BanG Dream 联动信息和群作用域。
 
-图片原件不提交到这里；本机当前素材包位于 `asset_library/current/`，MaiBot 运行副本
-位于插件数据目录。修改清单后必须运行 `tests/test_catalog_definitions.py` 和素材构建、
-导入校验，避免定义与二进制文件失配。
+图片原件不放在 `catalogs/`；当前正式素材包位于 `asset_library/current/` 并通过 Git LFS
+发布，MaiBot 运行副本位于插件数据目录。修改清单后必须运行
+`tests/test_catalog_definitions.py` 和素材构建、导入校验，避免定义与二进制文件失配。
 
 当前群专属内容同时维护四个作用域：`qq:1092931381` 与
 `qq-official:5E5854406D0297D6FEAE696A13E3A339` 为一组，`qq:237716658` 与

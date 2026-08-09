@@ -21,6 +21,15 @@ PIG_RANGES = {
 }
 
 
+def portable_report_path(path: Path) -> str:
+    """Keep repository-owned build metadata portable and free of user paths."""
+    resolved = path.resolve()
+    try:
+        return resolved.relative_to(PROJECT_ROOT).as_posix()
+    except ValueError:
+        return str(resolved)
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--source", type=Path, required=True)
@@ -201,8 +210,8 @@ def build_package(
         encoding="utf-8",
     )
     report = {
-        "source_root": str(source_root),
-        "definitions": str(definitions_path.resolve()),
+        "source_root": portable_report_path(source_root),
+        "definitions": portable_report_path(definitions_path),
         "entry_count": len(entries),
         "unique_binary_count": len(unique_hashes),
         "stored_binary_count": len(hash_to_media_path),

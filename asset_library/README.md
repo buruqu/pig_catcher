@@ -1,15 +1,14 @@
 # 本机素材库
 
-`current/` 保存当前正式素材导入包；`archive/` 保存按版本命名的本机回滚包。两者都被 Git 忽略，整理目录时不得删除。
-当前正式媒体字节仍来自 `v1.6.7`（六星定制内容已在四个群全量开放，修复官方群跨群授权）。
-插件 `v1.8.0` 不替换图片/GIF，但修改了公共四星、五星菜的效果元数据，因此必须使用
-Ruleset 13 正式定义重建 `current/assets.json` 与 `current/build-report.json`；不得继续导入
-旧的效果快照。
+`current/` 保存 `v1.9.0` 当前正式素材导入包，并按本次发布要求通过 Git LFS 提交完整
+图片与动画；`archive/` 继续保存本机历史回滚包并被 Git 忽略，整理目录时不得删除。
+本版在 Ruleset 13 商城与四/五星菜平衡包上新增 RAISE A SUILEN 五只公共联动猪，
+`current/assets.json` 与 `current/build-report.json` 已按正式定义重建。
 
 | 位置 | 内容 |
 | --- | --- |
 | `current/assets.json` | 可供导入工具读取的 Asset Manifest 4 |
-| `current/build-report.json` | 210 项模板、162 份唯一内容、213 份隔离存储媒体的 SHA-256 校验报告 |
+| `current/build-report.json` | 215 项模板、167 份唯一内容、218 份隔离存储媒体的 SHA-256 校验报告 |
 | `current/media/猪猪素材库/` | 一至五星公共猪猪素材 |
 | `current/media/美食素材库/` | 公共美食素材 |
 | `current/media/定制猪群友库/` | 按 QQ 群号隔离的六星定制猪 |
@@ -17,7 +16,8 @@ Ruleset 13 正式定义重建 `current/assets.json` 与 `current/build-report.js
 | `archive/v*/` | 历史版本素材包，仅用于本机核验和回滚 |
 
 该目录中的图片和 GIF 保留原始字节，不做重编码；动画列表页只提取确定性预览帧，
-单项详情仍使用原动画。正式包被 Git 忽略，以免群专属图片进入公共仓库。
+单项详情仍使用原动画。`current/` 通过 Git LFS 发布，素材权利边界见
+`asset_library/ASSET_NOTICE.md`；历史 `archive/` 与临时来源仍不进入 Git。
 
 正式名称、描述、品质、概率属性和授权范围维护在
 `catalogs/formal/pig-and-food-definitions.json`。新增或替换素材后，应使用
