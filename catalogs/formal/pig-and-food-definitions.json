@@ -1545,7 +1545,7 @@
       "effect_id": "next-pig-rarity",
       "effect_params": {
         "rarity": 4,
-        "multiplier": 1.6
+        "multiplier": 2.4
       }
     },
     {
@@ -1560,9 +1560,9 @@
         "酥脆",
         "整盒"
       ],
-      "effect_id": "extra-catches",
+      "effect_id": "current-window-catches",
       "effect_params": {
-        "count": 1
+        "count": 2
       }
     },
     {
@@ -1639,7 +1639,7 @@
       "effect_id": "next-food-rarity",
       "effect_params": {
         "rarity": 4,
-        "multiplier": 1.6
+        "multiplier": 2.4
       }
     },
     {
@@ -1656,7 +1656,8 @@
       ],
       "effect_id": "next-catch-quality",
       "effect_params": {
-        "multiplier": 1.35
+        "multiplier": 1.5,
+        "uses": 1
       }
     },
     {
@@ -1673,7 +1674,8 @@
       ],
       "effect_id": "next-cook-quality",
       "effect_params": {
-        "shift_percent": 8
+        "shift_percent": 10,
+        "uses": 1
       }
     },
     {
@@ -1720,7 +1722,8 @@
       ],
       "effect_id": "next-cook-quality",
       "effect_params": {
-        "shift_percent": 14
+        "shift_percent": 24,
+        "uses": 1
       }
     },
     {
@@ -1735,7 +1738,7 @@
         "海味",
         "拼盘"
       ],
-      "effect_id": "extra-catches",
+      "effect_id": "today-window-catches",
       "effect_params": {
         "count": 2
       }
@@ -1752,9 +1755,9 @@
         "拼盘",
         "六吃"
       ],
-      "effect_id": "next-six-star-cook",
+      "effect_id": "next-six-star-cook-bonus",
       "effect_params": {
-        "six_star_percent": 20
+        "bonus_percent": 22
       }
     },
     {
@@ -2180,7 +2183,7 @@
       "effect_id": "next-pig-stature",
       "effect_params": {
         "mode": "mini",
-        "strength": 0.18
+        "strength": 0.22
       }
     },
     {
@@ -2197,7 +2200,7 @@
       "effect_id": "next-food-rarity",
       "effect_params": {
         "rarity": 3,
-        "multiplier": 3.0
+        "multiplier": 4.0
       }
     },
     {
@@ -2212,9 +2215,10 @@
         "珍珠",
         "饮品"
       ],
-      "effect_id": "next-catch-quality",
+      "effect_id": "next-pig-rarity",
       "effect_params": {
-        "multiplier": 2.0
+        "rarity": 5,
+        "multiplier": 2.5
       }
     },
     {
@@ -2231,7 +2235,8 @@
       ],
       "effect_id": "next-cook-quality",
       "effect_params": {
-        "shift_percent": 20
+        "shift_percent": 18,
+        "uses": 2
       }
     },
     {
@@ -2245,9 +2250,10 @@
         "果冻",
         "甜点"
       ],
-      "effect_id": "extra-catches",
+      "effect_id": "next-catch-quality",
       "effect_params": {
-        "count": 3
+        "multiplier": 2.2,
+        "uses": 2
       }
     },
     {
@@ -2265,7 +2271,7 @@
       "effect_id": "next-pig-rarity",
       "effect_params": {
         "rarity": 5,
-        "multiplier": 5.0
+        "multiplier": 6.0
       }
     },
     {

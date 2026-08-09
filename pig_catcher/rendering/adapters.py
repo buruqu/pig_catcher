@@ -105,11 +105,7 @@ def _collection_view(collection: object) -> CollectionProgressViewModel:
 def _probability_line(weights: Sequence[float]) -> str:
     """Format final rarity weights as a compact probability line."""
 
-    return " ".join(
-        f"{index + 1}★{value:.1f}%"
-        for index, value in enumerate(weights)
-        if value > 0
-    )
+    return " ".join(f"{index + 1}★{value:.1f}%" for index, value in enumerate(weights) if value > 0)
 
 
 def _probability_sources(
@@ -119,9 +115,12 @@ def _probability_sources(
     cookware_level: int | None,
     item_name: str,
     effect_count: int,
+    exclusive_effect_active: bool = False,
 ) -> str:
     """Summarize every factor that shaped the final probability."""
 
+    if exclusive_effect_active:
+        return "六星菜独占规则（等级、升级、道具与其他菜品均未参与）"
     parts: list[str] = []
     if player_level:
         parts.append(f"等级 Lv.{player_level}")
@@ -144,9 +143,7 @@ def pig_card_view(
 ) -> PigCardViewModel:
     """Build one catch or detail card view."""
 
-    progress = (
-        level_progress(catch.total_experience) if catch is not None else None
-    )
+    progress = level_progress(catch.total_experience) if catch is not None else None
     return PigCardViewModel(
         mode_label=mode_label,
         display_name=pig.display_name,
@@ -175,12 +172,8 @@ def pig_card_view(
         total_experience=catch.total_experience if catch is not None else None,
         player_level=progress.level if progress is not None else None,
         level_title=progress.title if progress is not None else "",
-        next_level_experience=(
-            progress.next_threshold if progress is not None else None
-        ),
-        level_progress_percent=(
-            progress.progress_percent if progress is not None else 0.0
-        ),
+        next_level_experience=(progress.next_threshold if progress is not None else None),
+        level_progress_percent=(progress.progress_percent if progress is not None else 0.0),
         daily_count=catch.daily_count if catch is not None else None,
         daily_limit=catch.daily_limit if catch is not None else None,
         item_name=catch.item_name if catch is not None else "",
@@ -190,35 +183,15 @@ def pig_card_view(
         body_label=pig.body_label,
         body_description=pig.body_description,
         giant_score=pig.giant_score,
-        global_size_record=(
-            catch.global_size_record
-            if catch is not None
-            else pig.is_global_size_record
-        ),
-        global_weight_record=(
-            catch.global_weight_record
-            if catch is not None
-            else pig.is_global_weight_record
-        ),
-        giant_sighting=(
-            catch.giant_sighting if catch is not None else pig.is_giant_sighting
-        ),
+        global_size_record=(catch.global_size_record if catch is not None else pig.is_global_size_record),
+        global_weight_record=(catch.global_weight_record if catch is not None else pig.is_global_weight_record),
+        giant_sighting=(catch.giant_sighting if catch is not None else pig.is_giant_sighting),
         size_label=size_label(pig.size_percentile),
         weight_label=weight_label(pig.weight_percentile),
-        effect_summaries=(
-            catch.effect_summaries if catch is not None else ()
-        ),
-        excluded_summaries=(
-            catch.excluded_summaries if catch is not None else ()
-        ),
-        tutorial_text=(
-            "输入 /切换 猪保千 可在猪猪立绘与表情包之间切换"
-            if pig.alternate_image_relpath
-            else ""
-        ),
-        probability_line=(
-            _probability_line(catch.weights) if catch is not None else ""
-        ),
+        effect_summaries=(catch.effect_summaries if catch is not None else ()),
+        excluded_summaries=(catch.excluded_summaries if catch is not None else ()),
+        tutorial_text=("输入 /切换 猪保千 可在猪猪立绘与表情包之间切换" if pig.alternate_image_relpath else ""),
+        probability_line=(_probability_line(catch.weights) if catch is not None else ""),
         probability_sources=(
             _probability_sources(
                 player_level=progress.level if progress is not None else None,
@@ -226,6 +199,7 @@ def pig_card_view(
                 cookware_level=None,
                 item_name=catch.item_name,
                 effect_count=len(catch.effect_summaries),
+                exclusive_effect_active=catch.exclusive_effect_active,
             )
             if catch is not None
             else ""
@@ -253,9 +227,7 @@ def profile_view(profile: PlayerProfile) -> ProfileViewModel:
         daily_limit=profile.daily_limit,
         cooldown_remaining_seconds=profile.cooldown_remaining_seconds,
         feed_level=profile.feed_level,
-        armed_item_name=(
-            profile.armed_item.display_name if profile.armed_item is not None else ""
-        ),
+        armed_item_name=(profile.armed_item.display_name if profile.armed_item is not None else ""),
         armed_item_quantity=profile.armed_item_quantity,
         cookware_level=profile.cookware_level,
         total_cooks=profile.total_cooks,
@@ -263,18 +235,14 @@ def profile_view(profile: PlayerProfile) -> ProfileViewModel:
         food_catalog_count=profile.food_catalog_count,
         visible_food_catalog_total=profile.visible_food_catalog_total,
         armed_cooking_item_name=(
-            profile.armed_cooking_item.display_name
-            if profile.armed_cooking_item is not None
-            else ""
+            profile.armed_cooking_item.display_name if profile.armed_cooking_item is not None else ""
         ),
         armed_cooking_item_quantity=profile.armed_cooking_item_quantity,
         collections=tuple(_collection_view(item) for item in profile.collections),
         showcase_pig=profile.showcase_pig,
         showcase_food=profile.showcase_food,
         level_catch_base_high_percent=profile.level_catch_base_high_percent,
-        level_catch_adjusted_high_percent=(
-            profile.level_catch_adjusted_high_percent
-        ),
+        level_catch_adjusted_high_percent=(profile.level_catch_adjusted_high_percent),
         level_cooking_bonus_percent=profile.level_cooking_bonus_percent,
         level_bonus_cap_level=profile.level_bonus_cap_level,
     )
@@ -421,11 +389,7 @@ def food_card_view(
     bonus_selector = ""
     if cooking is not None and cooking.bonus_serving and len(cooking.foods) > 1:
         bonus_selector = cooking.foods[1].selector
-    progress = (
-        level_progress(cooking.total_experience)
-        if cooking is not None
-        else None
-    )
+    progress = level_progress(cooking.total_experience) if cooking is not None else None
     return FoodCardViewModel(
         mode_label=mode_label,
         display_name=food.display_name,
@@ -445,54 +409,29 @@ def food_card_view(
         is_animated=food.is_animated,
         media_format=food.media_format,
         coin_reward=cooking.coin_reward if cooking is not None else None,
-        experience_reward=(
-            cooking.experience_reward if cooking is not None else None
-        ),
+        experience_reward=(cooking.experience_reward if cooking is not None else None),
         coin_balance=cooking.coin_balance if cooking is not None else None,
-        total_experience=(
-            cooking.total_experience if cooking is not None else None
-        ),
+        total_experience=(cooking.total_experience if cooking is not None else None),
         player_level=progress.level if progress is not None else None,
         level_title=progress.title if progress is not None else "",
-        next_level_experience=(
-            progress.next_threshold if progress is not None else None
-        ),
-        level_progress_percent=(
-            progress.progress_percent if progress is not None else 0.0
-        ),
-        cookware_level=(
-            cooking.cookware_level if cooking is not None else None
-        ),
+        next_level_experience=(progress.next_threshold if progress is not None else None),
+        level_progress_percent=(progress.progress_percent if progress is not None else 0.0),
+        cookware_level=(cooking.cookware_level if cooking is not None else None),
         item_name=cooking.item_name if cooking is not None else "",
-        catalog_new_count=(
-            cooking.catalog_new_count if cooking is not None else 0
-        ),
+        catalog_new_count=(cooking.catalog_new_count if cooking is not None else 0),
         bonus_selector=bonus_selector,
-        probability_summary=(
-            cooking.probability_summary if cooking is not None else ""
-        ),
-        effect_summaries=(
-            cooking.effect_summaries if cooking is not None else ()
-        ),
-        excluded_summaries=(
-            cooking.excluded_summaries if cooking is not None else ()
-        ),
-        probability_line=(
-            _probability_line(cooking.weights) if cooking is not None else ""
-        ),
+        probability_summary=(cooking.probability_summary if cooking is not None else ""),
+        effect_summaries=(cooking.effect_summaries if cooking is not None else ()),
+        excluded_summaries=(cooking.excluded_summaries if cooking is not None else ()),
+        probability_line=(_probability_line(cooking.weights) if cooking is not None else ""),
         probability_sources=(
             _probability_sources(
                 player_level=progress.level if progress is not None else None,
                 feed_level=None,
-                cookware_level=(
-                    cooking.cookware_level if cooking is not None else None
-                ),
+                cookware_level=(cooking.cookware_level if cooking is not None else None),
                 item_name=cooking.item_name if cooking is not None else "",
-                effect_count=(
-                    len(cooking.effect_summaries)
-                    if cooking is not None
-                    else 0
-                ),
+                effect_count=(len(cooking.effect_summaries) if cooking is not None else 0),
+                exclusive_effect_active=(cooking.exclusive_effect_active if cooking is not None else False),
             )
             if cooking is not None
             else ""
@@ -550,9 +489,7 @@ def food_catalog_view(page: FoodCatalogPage) -> FoodCatalogViewModel:
                 is_animated=entry.is_animated,
                 image_fit=entry.image_fit,
                 effect_summary=(
-                    effect_summary(entry.effect_id, entry.effect_params)
-                    if entry.discovered and entry.effect_id
-                    else ""
+                    effect_summary(entry.effect_id, entry.effect_params) if entry.discovered and entry.effect_id else ""
                 ),
             )
             for entry in page.entries
@@ -563,31 +500,21 @@ def food_catalog_view(page: FoodCatalogPage) -> FoodCatalogViewModel:
 def store_view(page: StorePage) -> StoreViewModel:
     """Build one store rendering view."""
 
-    base_high_probability = sum(
-        catch_weights(page.catch_base_weights, feed_level=0)[3:]
-    )
+    base_high_probability = sum(catch_weights(page.catch_base_weights, feed_level=0)[3:])
     feed_probability_rows = tuple(
         StoreProbabilityRowViewModel(
             level=level,
             value=f"{high_probability:.2f}%",
-            delta=(
-                "基准"
-                if level == 0
-                else f"+{high_probability - base_high_probability:.2f} 点"
-            ),
+            delta=("基准" if level == 0 else f"+{high_probability - base_high_probability:.2f} 点"),
             current=level == page.feed_level,
         )
         for level in range(6)
-        for high_probability in (
-            sum(catch_weights(page.catch_base_weights, feed_level=level)[3:]),
-        )
+        for high_probability in (sum(catch_weights(page.catch_base_weights, feed_level=level)[3:]),)
     )
     cookware_probability_rows = tuple(
         StoreProbabilityRowViewModel(
             level=level,
-            value=(
-                f"+{(cookware_higher_rarity_multiplier(level) - 1.0) * 100.0:.0f}%"
-            ),
+            value=(f"+{(cookware_higher_rarity_multiplier(level) - 1.0) * 100.0:.0f}%"),
             delta="相对权重",
             current=level == page.cookware_level,
         )
@@ -608,6 +535,40 @@ def store_view(page: StorePage) -> StoreViewModel:
             strict=True,
         )
     )
+    super_lucky_after = catch_weights(
+        page.catch_base_weights,
+        item_id="super-lucky-whistle",
+    )
+    super_lucky_whistle_rows = tuple(
+        StoreConsumableProbabilityRowViewModel(
+            label=f"{rarity} 星",
+            before=f"{before:.2f}%",
+            after=f"{after:.2f}%",
+        )
+        for rarity, before, after in zip(
+            range(1, 7),
+            lucky_before,
+            super_lucky_after,
+            strict=True,
+        )
+    )
+    star_radar_after = catch_weights(
+        page.catch_base_weights,
+        item_id="star-pig-radar",
+    )
+    star_pig_radar_rows = tuple(
+        StoreConsumableProbabilityRowViewModel(
+            label=f"{rarity} 星",
+            before=f"{before:.2f}%",
+            after=f"{after:.2f}%",
+        )
+        for rarity, before, after in zip(
+            range(1, 7),
+            lucky_before,
+            star_radar_after,
+            strict=True,
+        )
+    )
     chef_spice_rows = tuple(
         StoreConsumableProbabilityRowViewModel(
             label=f"{rarity} 星猪",
@@ -625,6 +586,23 @@ def store_view(page: StorePage) -> StoreViewModel:
         )
         for rarity in range(1, 6)
     )
+    super_chef_spice_rows = (
+        StoreConsumableProbabilityRowViewModel(
+            label="6 星猪",
+            before=_probability_distribution(cooking_weights(6)),
+            after=_probability_distribution(
+                adjusted_cooking_weights(
+                    6,
+                    size_percentile=0.0,
+                    weight_percentile=0.0,
+                    cookware_level=0,
+                    player_level=1,
+                    chef_spice=False,
+                    item_id="super-chef-spice",
+                )
+            ),
+        ),
+    )
     return StoreViewModel(
         display_name=page.display_name,
         coin_balance=page.coin_balance,
@@ -637,7 +615,10 @@ def store_view(page: StorePage) -> StoreViewModel:
         feed_probability_rows=feed_probability_rows,
         cookware_probability_rows=cookware_probability_rows,
         lucky_whistle_rows=lucky_whistle_rows,
+        super_lucky_whistle_rows=super_lucky_whistle_rows,
+        star_pig_radar_rows=star_pig_radar_rows,
         chef_spice_rows=chef_spice_rows,
+        super_chef_spice_rows=super_chef_spice_rows,
         products=tuple(
             StoreProductViewModel(
                 display_name=product.display_name,
@@ -660,11 +641,7 @@ def store_view(page: StorePage) -> StoreViewModel:
 def _probability_distribution(weights: tuple[float, ...]) -> str:
     """Compactly format only reachable rarity outcomes."""
 
-    return " · ".join(
-        f"{rarity}★ {value:.0f}%"
-        for rarity, value in enumerate(weights, start=1)
-        if value > 0
-    )
+    return " · ".join(f"{rarity}★ {value:.0f}%" for rarity, value in enumerate(weights, start=1) if value > 0)
 
 
 def purchase_receipt_view(result: PurchaseResult) -> EconomyReceiptViewModel:
@@ -694,11 +671,7 @@ def batch_sale_receipt_view(result: BatchSaleResult) -> EconomyReceiptViewModel:
     """Build one low-rarity batch-sale receipt."""
 
     kind = "猪猪" if result.asset_kind == "pig" else "美食"
-    scope = (
-        f"{result.rarity} 星{kind}"
-        if result.rarity is not None
-        else f"1 至 {result.max_rarity} 星{kind}"
-    )
+    scope = f"{result.rarity} 星{kind}" if result.rarity is not None else f"1 至 {result.max_rarity} 星{kind}"
     return EconomyReceiptViewModel(
         eyebrow="官方回收 · 原子批量结算",
         title="批量售卖成功",
@@ -733,9 +706,7 @@ def batch_cook_view(result: BatchCookingResult) -> BatchCookingViewModel:
         for food in sorted(result.foods, key=lambda item: (-item.rarity, item.acquired_at))
     )
     return BatchCookingViewModel(
-        display_name=result.source_pigs[0].owner_display_name
-        if result.source_pigs
-        else "",
+        display_name=result.source_pigs[0].owner_display_name if result.source_pigs else "",
         pig_count=result.pig_count,
         food_count=result.food_count,
         coin_reward=result.coin_reward,
@@ -755,9 +726,7 @@ def eat_receipt_view(result: EatResult) -> EconomyReceiptViewModel:
         EconomyReceiptRowViewModel("累计经验", str(result.total_experience)),
     ]
     if result.effect.coin_bonus:
-        rows.append(
-            EconomyReceiptRowViewModel("额外猪币", f"+{result.effect.coin_bonus}")
-        )
+        rows.append(EconomyReceiptRowViewModel("额外猪币", f"+{result.effect.coin_bonus}"))
     return EconomyReceiptViewModel(
         eyebrow="美食品鉴 · 成功后消耗一份",
         title="开饭啦",
@@ -819,10 +788,7 @@ def gift_receipt_view(result: GiftResult) -> EconomyReceiptViewModel:
         title="赠送完成",
         badge_label=result.asset.kind_label,
         badge_value="★" * result.asset.rarity,
-        summary=(
-            f"{result.sender_display_name} 将 {result.asset.selector} "
-            f"赠送给 {result.recipient_display_name}"
-        ),
+        summary=(f"{result.sender_display_name} 将 {result.asset.selector} 赠送给 {result.recipient_display_name}"),
         rows=(
             EconomyReceiptRowViewModel("接收方", result.recipient_display_name),
             EconomyReceiptRowViewModel("资产属性", result.asset.detail_text),
@@ -865,8 +831,7 @@ def trade_receipt_view(result: TradeActionResult) -> EconomyReceiptViewModel:
         summary=f"{'★' * result.trade.asset.rarity} {result.trade.asset.selector}",
         rows=tuple(rows),
         note=(
-            "接收方使用 /接受交易 交易号 完成付款；"
-            "未完成报价会在五分钟后自动解锁。"
+            "接收方使用 /接受交易 交易号 完成付款；未完成报价会在五分钟后自动解锁。"
             if result.operation == "created"
             else "交易状态已原子写入，重复命令不会再次转移资产或猪币。"
         ),
@@ -910,9 +875,7 @@ def trade_list_view(page: TradePage) -> TradeListViewModel:
         page=page.page,
         page_count=page.page_count,
         total_count=page.total_count,
-        status_label=(
-            TRADE_STATUS_LABELS[page.status] if page.status is not None else "全部"
-        ),
+        status_label=(TRADE_STATUS_LABELS[page.status] if page.status is not None else "全部"),
         items=tuple(
             TradeListItemViewModel(
                 trade_id=entry.trade_id,
@@ -988,12 +951,7 @@ def media_path(data_dir: Path, relative_path: str) -> Path:
     root = Path(data_dir).resolve()
     normalized = Path(str(relative_path or ""))
     candidate = (root / normalized).resolve()
-    if (
-        not relative_path
-        or normalized.is_absolute()
-        or candidate == root
-        or not candidate.is_relative_to(root)
-    ):
+    if not relative_path or normalized.is_absolute() or candidate == root or not candidate.is_relative_to(root):
         raise RenderError("素材路径不在插件数据目录内。")
     return candidate
 
@@ -1017,21 +975,13 @@ def food_media_path(data_dir: Path, food: FoodView) -> Path | None:
 def inventory_media_paths(data_dir: Path, page: InventoryPage) -> dict[str, Path]:
     """Resolve visible inventory media; GIFs are previewed by the renderer."""
 
-    return {
-        pig.pig_instance_id: media_path(data_dir, pig.image_relpath)
-        for pig in page.pigs
-        if pig.media_visible
-    }
+    return {pig.pig_instance_id: media_path(data_dir, pig.image_relpath) for pig in page.pigs if pig.media_visible}
 
 
 def catalog_media_paths(data_dir: Path, page: CatalogPage) -> dict[str, Path]:
     """Resolve discovered catalog media, including animated sources."""
 
-    return {
-        entry.template_id: media_path(data_dir, entry.image_relpath)
-        for entry in page.entries
-        if entry.discovered
-    }
+    return {entry.template_id: media_path(data_dir, entry.image_relpath) for entry in page.entries if entry.discovered}
 
 
 def food_inventory_media_paths(
@@ -1041,9 +991,7 @@ def food_inventory_media_paths(
     """Resolve visible food inventory media, including animated sources."""
 
     return {
-        food.food_instance_id: media_path(data_dir, food.image_relpath)
-        for food in page.foods
-        if food.media_visible
+        food.food_instance_id: media_path(data_dir, food.image_relpath) for food in page.foods if food.media_visible
     }
 
 
@@ -1053,11 +1001,7 @@ def food_catalog_media_paths(
 ) -> dict[str, Path]:
     """Resolve discovered food catalog media, including animated sources."""
 
-    return {
-        entry.template_id: media_path(data_dir, entry.image_relpath)
-        for entry in page.entries
-        if entry.discovered
-    }
+    return {entry.template_id: media_path(data_dir, entry.image_relpath) for entry in page.entries if entry.discovered}
 
 
 def ranking_media_paths(
@@ -1069,10 +1013,7 @@ def ranking_media_paths(
     result: dict[str, Path] = {}
     for entry in page.entries:
         showcase = _ranking_showcase(entry, page.ranking_type)
-        if (
-            showcase is None
-            or not showcase.media_visible
-        ):
+        if showcase is None or not showcase.media_visible:
             continue
         result[entry.player_id] = media_path(data_dir, showcase.image_relpath)
     return result

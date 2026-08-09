@@ -87,6 +87,23 @@ class FoodAttributes:
     recipe_factor: float
 
 
+def scale_food_attributes(
+    attributes: FoodAttributes,
+    *,
+    multiplier: float,
+) -> FoodAttributes:
+    """Scale a one-shot item's serving quantity and audited official value."""
+
+    factor = float(multiplier)
+    if not 1.0 <= factor <= 2.0:
+        raise DomainValidationError("道具成品倍率必须位于 1 至 2。")
+    return FoodAttributes(
+        portion_weight=round(attributes.portion_weight * factor, 2),
+        official_value=max(1, round(attributes.official_value * factor)),
+        recipe_factor=attributes.recipe_factor,
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class StoreProduct:
     """商城中的一次性道具或当前可购买升级。"""
@@ -120,9 +137,7 @@ def cookware_higher_rarity_multiplier(cookware_level: int) -> float:
 def level_cooking_higher_rarity_multiplier(player_level: int) -> float:
     """返回数值等级对普通做菜高档结果的封顶相对权重乘数。"""
 
-    return 1.0 + LEVEL_COOKING_HIGHER_RARITY_STEP * level_catch_bonus_scale(
-        player_level
-    )
+    return 1.0 + LEVEL_COOKING_HIGHER_RARITY_STEP * level_catch_bonus_scale(player_level)
 
 
 def adjusted_cooking_weights(
@@ -134,6 +149,7 @@ def adjusted_cooking_weights(
     player_level: int = 1,
     chef_spice: bool,
     super_chef_spice: bool = False,
+    item_id: str = "",
 ) -> tuple[float, ...]:
     """应用属性、等级、厨具与互斥香料。"""
 
@@ -145,15 +161,21 @@ def adjusted_cooking_weights(
     weight = float(weight_percentile)
     if not 0.0 <= size <= 1.0 or not 0.0 <= weight <= 1.0:
         raise DomainValidationError("原料猪属性百分位必须位于 0 至 1。")
-    if chef_spice and super_chef_spice:
-        raise DomainValidationError("主厨香料与超级主厨香料不能叠加。")
+    selected_item = str(item_id or "").strip()
+    legacy_items = int(chef_spice) + int(super_chef_spice)
+    if legacy_items > 1 or (selected_item and legacy_items):
+        raise DomainValidationError("一次做菜只能应用一个品质概率道具。")
+    if chef_spice:
+        selected_item = "chef-spice"
+    elif super_chef_spice:
+        selected_item = "super-chef-spice"
     cookware_multiplier = cookware_higher_rarity_multiplier(cookware_level)
     level_multiplier = level_cooking_higher_rarity_multiplier(player_level)
     if rarity is Rarity.SIX:
         weights = list(cooking_weights(rarity))
-        if super_chef_spice:
-            weights[4] -= 5.0
-            weights[5] += 5.0
+        if selected_item == "super-chef-spice":
+            weights[4] -= 12.0
+            weights[5] += 12.0
         return normalize_weights(weights)
 
     weights = list(cooking_weights(rarity))
@@ -162,8 +184,8 @@ def adjusted_cooking_weights(
     attribute_shift = min(weights[lowest_index], 8.0 * ((size + weight) / 2.0))
     weights[lowest_index] -= attribute_shift
     weights[target_index] += attribute_shift
-    if chef_spice:
-        spice_shift = min(weights[lowest_index], 15.0)
+    if selected_item == "chef-spice":
+        spice_shift = min(weights[lowest_index], 18.0)
         weights[lowest_index] -= spice_shift
         weights[target_index] += spice_shift
 
@@ -171,6 +193,14 @@ def adjusted_cooking_weights(
     source_index = int(rarity) - 1
     for index in range(source_index + 1, len(weights)):
         weights[index] *= higher_multiplier
+    if selected_item == "no-downgrade-lid":
+        lower_weight = sum(weights[:source_index])
+        for index in range(source_index):
+            weights[index] = 0.0
+        weights[source_index] += lower_weight
+    elif selected_item == "ascension-stove-core":
+        for index in range(source_index + 1, len(weights)):
+            weights[index] *= 2.5
     weights[5] = 0.0
     return normalize_weights(weights)
 
@@ -179,10 +209,7 @@ def recipe_affinity(recipe_tags: tuple[str, ...] | list[str]) -> str:
     """从审核过的静态标签确定偏瘦、均衡或偏肥食谱倾向。"""
 
     normalized = {str(tag).strip() for tag in recipe_tags if str(tag).strip()}
-    scores = {
-        affinity: len(normalized.intersection(keywords))
-        for affinity, keywords in _RECIPE_KEYWORDS.items()
-    }
+    scores = {affinity: len(normalized.intersection(keywords)) for affinity, keywords in _RECIPE_KEYWORDS.items()}
     best = max(scores, key=scores.__getitem__)
     return best if scores[best] > 0 else "balanced"
 
@@ -221,9 +248,7 @@ def generate_food_attributes(
     portion_weight = source_weight_value * (0.35 + 0.15 * roll)
     recipe_factor = stable_recipe_factor(template_id)
     portion_factor = 0.85 + 0.30 * source_percentile
-    official_value = round(
-        FOOD_BASE_VALUES[resolved_rarity] * portion_factor * recipe_factor
-    )
+    official_value = round(FOOD_BASE_VALUES[resolved_rarity] * portion_factor * recipe_factor)
     return FoodAttributes(
         portion_weight=round(portion_weight, 6),
         official_value=official_value,

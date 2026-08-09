@@ -8,15 +8,16 @@ from .enums import Rarity
 from .errors import DomainValidationError
 
 BASE_CATCH_WEIGHTS: tuple[float, ...] = (40.0, 30.0, 17.0, 8.0, 4.0, 1.0)
-LUCKY_WHISTLE_BASE_WEIGHTS: tuple[float, ...] = (36.0, 28.0, 16.0, 11.0, 6.0, 3.0)
-LUCKY_WHISTLE_RARITY_MULTIPLIERS: tuple[float, ...] = tuple(
-    adjusted / baseline
-    for adjusted, baseline in zip(
-        LUCKY_WHISTLE_BASE_WEIGHTS,
-        BASE_CATCH_WEIGHTS,
-        strict=True,
-    )
+LUCKY_WHISTLE_BASE_WEIGHTS: tuple[float, ...] = (34.0, 27.0, 16.0, 12.0, 7.0, 4.0)
+SUPER_LUCKY_WHISTLE_BASE_WEIGHTS: tuple[float, ...] = (
+    27.0,
+    23.0,
+    15.0,
+    15.0,
+    12.0,
+    8.0,
 )
+STAR_PIG_RADAR_BASE_WEIGHTS: tuple[float, ...] = (0.0, 0.0, 45.0, 30.0, 18.0, 7.0)
 FEED_RARITY_MULTIPLIER_STEPS: tuple[float, ...] = (
     0.0,
     0.01,
@@ -27,9 +28,7 @@ FEED_RARITY_MULTIPLIER_STEPS: tuple[float, ...] = (
 )
 LEVEL_CATCH_BONUS_INTERVAL = 4
 LEVEL_CATCH_BONUS_MAX_SCALE = 5.0
-LEVEL_CATCH_BONUS_CAP_LEVEL = (
-    int(LEVEL_CATCH_BONUS_MAX_SCALE) * LEVEL_CATCH_BONUS_INTERVAL + 1
-)
+LEVEL_CATCH_BONUS_CAP_LEVEL = int(LEVEL_CATCH_BONUS_MAX_SCALE) * LEVEL_CATCH_BONUS_INTERVAL + 1
 
 BASE_COOKING_WEIGHTS: dict[Rarity, tuple[float, ...]] = {
     Rarity.ONE: (75.0, 22.0, 3.0, 0.0, 0.0, 0.0),
@@ -61,10 +60,7 @@ def feed_rarity_multipliers(feed_level: int) -> tuple[float, ...]:
     normalized_level = int(feed_level)
     if not 0 <= normalized_level <= 5:
         raise DomainValidationError("猪饲料等级必须位于 0 至 5。")
-    return tuple(
-        1.0 + step * normalized_level
-        for step in FEED_RARITY_MULTIPLIER_STEPS
-    )
+    return tuple(1.0 + step * normalized_level for step in FEED_RARITY_MULTIPLIER_STEPS)
 
 
 def level_catch_bonus_scale(player_level: int) -> float:
@@ -92,12 +88,19 @@ def catch_weights(
     player_level: int = 1,
     lucky_whistle: bool = False,
     super_lucky_whistle: bool = False,
+    item_id: str = "",
     six_star_available: bool = True,
 ) -> tuple[float, ...]:
     """计算等级、饲料、互斥消耗品和六星资格修正后的抓取权重。"""
 
-    if lucky_whistle and super_lucky_whistle:
-        raise DomainValidationError("幸运猪哨与超级幸运猪哨不能叠加。")
+    selected_item = str(item_id or "").strip()
+    legacy_items = int(lucky_whistle) + int(super_lucky_whistle)
+    if legacy_items > 1 or (selected_item and legacy_items):
+        raise DomainValidationError("一次抓猪只能应用一个品质概率道具。")
+    if lucky_whistle:
+        selected_item = "lucky-whistle"
+    elif super_lucky_whistle:
+        selected_item = "super-lucky-whistle"
 
     weights = list(normalize_weights(base_weights))
     feed_multipliers = feed_rarity_multipliers(feed_level)
@@ -111,31 +114,22 @@ def catch_weights(
             strict=True,
         )
     ]
-    if lucky_whistle:
+    item_distributions = {
+        "lucky-whistle": LUCKY_WHISTLE_BASE_WEIGHTS,
+        "super-lucky-whistle": SUPER_LUCKY_WHISTLE_BASE_WEIGHTS,
+        "star-pig-radar": STAR_PIG_RADAR_BASE_WEIGHTS,
+    }
+    target_distribution = item_distributions.get(selected_item)
+    if target_distribution is not None:
         weights = [
-            value * multiplier
-            for value, multiplier in zip(
+            value * (target / baseline if baseline > 0 else 0.0)
+            for value, target, baseline in zip(
                 weights,
-                LUCKY_WHISTLE_RARITY_MULTIPLIERS,
+                target_distribution,
+                BASE_CATCH_WEIGHTS,
                 strict=True,
             )
         ]
-    if super_lucky_whistle:
-        normalized = list(normalize_weights(weights))
-        boosted_five = normalized[4] * 5.0
-        boosted_six = normalized[5] * 5.0
-        boosted_total = boosted_five + boosted_six
-        lower_total = sum(normalized[:4])
-        if boosted_total >= 100.0 or lower_total <= 0.0:
-            high_scale = 100.0 / boosted_total
-            weights = [0.0, 0.0, 0.0, 0.0, boosted_five * high_scale, boosted_six * high_scale]
-        else:
-            lower_scale = (100.0 - boosted_total) / lower_total
-            weights = [
-                *(value * lower_scale for value in normalized[:4]),
-                boosted_five,
-                boosted_six,
-            ]
     if not six_star_available:
         weights[4] += weights[5]
         weights[5] = 0.0

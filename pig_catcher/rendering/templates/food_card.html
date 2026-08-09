@@ -59,8 +59,7 @@
       <p class="pig-card__description" style="font-size: {% if view.description|length > 350 %}13{% elif view.description|length > 250 %}14{% elif view.description|length > 160 %}15{% elif view.description|length > 115 %}16{% elif view.description|length > 80 %}17{% else %}19{% endif %}px;line-height:{% if view.description|length > 160 %}1.45{% else %}1.55{% endif %}">{{ view.description }}</p>
       <p class="pig-card__subline">
         效果：{{ view.effect_summary }} · 获得于 {{ view.acquired_at }}
-        {% if view.probability_summary %}<br>最终品质概率：{{ view.probability_summary }}{% endif %}
-        {% if view.probability_line %}<br>本次最终概率：{{ view.probability_line }}{% endif %}
+        {% if view.probability_line %}<br>本次最终概率：{{ view.probability_line }}{% elif view.probability_summary %}<br>最终品质概率：{{ view.probability_summary }}{% endif %}
         {% if view.probability_sources %}<br>概率来源：{{ view.probability_sources }}{% endif %}
         {% if view.effect_summaries %}<br>本次美食加成：{{ view.effect_summaries | join("；") }}{% endif %}
         {% if view.excluded_summaries %}<br>互斥未叠加：{{ view.excluded_summaries | join("；") }}{% endif %}

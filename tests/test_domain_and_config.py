@@ -26,11 +26,18 @@ from pig_catcher.domain.errors import (
 )
 from pig_catcher.domain.food_effects import (
     ActiveFoodEffect,
+    active_quota_effect_bonuses,
     apply_catch_effects,
     apply_cooking_effects,
     resolve_food_effect,
 )
-from pig_catcher.domain.gameplay import level_progress, size_label, weight_label
+from pig_catcher.domain.gameplay import (
+    ITEM_DEFINITIONS,
+    generate_pig_attributes,
+    level_progress,
+    size_label,
+    weight_label,
+)
 from pig_catcher.domain.models import CommandIdentity, ScopeKey
 from pig_catcher.domain.ports import MessageKeyFactory
 from pig_catcher.domain.quota import catch_quota_window, effective_catch_limit
@@ -124,19 +131,69 @@ def test_feed_and_lucky_item_improve_high_rarity_share() -> None:
     baseline = catch_weights(feed_level=0, lucky_whistle=False)
     lucky_only = catch_weights(feed_level=0, lucky_whistle=True)
     boosted = catch_weights(feed_level=5, lucky_whistle=True)
-    assert lucky_only == pytest.approx((36.0, 28.0, 16.0, 11.0, 6.0, 3.0))
+    assert lucky_only == pytest.approx((34.0, 27.0, 16.0, 12.0, 7.0, 4.0))
     assert sum(boosted[2:]) > sum(baseline[2:])
 
     super_lucky = catch_weights(super_lucky_whistle=True)
-    assert super_lucky[4] == pytest.approx(baseline[4] * 5.0)
-    assert super_lucky[5] == pytest.approx(baseline[5] * 5.0)
-    assert super_lucky[:4] == pytest.approx(
-        tuple(value * (75.0 / 95.0) for value in baseline[:4])
-    )
+    assert super_lucky == pytest.approx((27.0, 23.0, 15.0, 15.0, 12.0, 8.0))
     assert sum(super_lucky) == pytest.approx(100.0)
     assert sum(super_lucky[4:]) > sum(lucky_only[4:])
-    with pytest.raises(DomainValidationError, match="不能叠加"):
+    radar = catch_weights(item_id="star-pig-radar")
+    assert radar == pytest.approx((0.0, 0.0, 45.0, 30.0, 18.0, 7.0))
+    with pytest.raises(DomainValidationError, match="一个"):
         catch_weights(lucky_whistle=True, super_lucky_whistle=True)
+
+
+def test_rebalanced_item_catalog_is_unique_and_priced_by_strength() -> None:
+    expected_prices = {
+        "幸运猪哨": 480,
+        "超级幸运猪哨": 1320,
+        "星辉探猪镜": 1680,
+        "巨物玉米": 240,
+        "增膘豆饼": 200,
+        "精瘦青饲料": 200,
+        "猪币悬赏牌": 620,
+        "主厨香料": 480,
+        "超级主厨香料": 1180,
+        "精准刀工券": 220,
+        "慢炖调料包": 260,
+        "大份餐盒": 520,
+        "稳火保底锅盖": 780,
+        "升星炉芯": 1080,
+        "丰收围裙": 460,
+    }
+    assert len(ITEM_DEFINITIONS) == 15
+    assert {item.display_name: item.price for item in ITEM_DEFINITIONS} == expected_prices
+    assert len({item.item_id for item in ITEM_DEFINITIONS}) == 15
+    assert len({item.effect_summary for item in ITEM_DEFINITIONS}) == 15
+    assert all(item.action_type in {"catching", "cooking"} for item in ITEM_DEFINITIONS)
+    assert expected_prices["超级幸运猪哨"] < 2000
+    assert expected_prices["超级主厨香料"] < 2000
+
+
+def test_catch_attribute_items_have_distinct_bounded_profiles() -> None:
+    common = {
+        "rarity": Rarity.THREE,
+        "length_min": 20.0,
+        "length_max": 100.0,
+        "weight_min": 10.0,
+        "weight_max": 210.0,
+        "fat_profile": "balanced",
+        "random_values": (0.5, 0.5, 0.5, 0.5, 0.5),
+    }
+    baseline = generate_pig_attributes(**common)
+    giant = generate_pig_attributes(**common, item_id="giant-corn")
+    fattened = generate_pig_attributes(**common, item_id="fattening-bean-cake")
+    lean = generate_pig_attributes(**common, item_id="lean-green-feed")
+
+    assert giant.size_percentile == pytest.approx(baseline.size_percentile + 0.22)
+    assert giant.weight_percentile == pytest.approx(baseline.weight_percentile + 0.14)
+    assert fattened.fat_ratio == pytest.approx(baseline.fat_ratio + 22)
+    assert fattened.weight_percentile == pytest.approx(baseline.weight_percentile + 0.12)
+    assert lean.fat_ratio == pytest.approx(baseline.fat_ratio - 22)
+    assert lean.size_percentile == pytest.approx(baseline.size_percentile + 0.10)
+    assert lean.weight_percentile == pytest.approx(baseline.weight_percentile + 0.05)
+    assert len({giant.official_value, fattened.official_value, lean.official_value}) == 3
 
 
 def test_numeric_level_improves_catch_probability_with_a_hard_cap() -> None:
@@ -315,7 +372,7 @@ def _active_effect(
 
 
 def test_same_family_catch_effects_do_not_stack_and_report_skipped() -> None:
-    # 同属“抓猪概率组”的三个效果：只应生效最早的一个，其余被互斥跳过
+    # 六星菜独占效果始终优先于普通概率菜，普通效果保留且不消耗。
     quality = _active_effect(
         "quality",
         "next-catch-quality",
@@ -335,10 +392,10 @@ def test_same_family_catch_effects_do_not_stack_and_report_skipped() -> None:
         created_at="2026-08-07T00:00:02.000Z",
     )
     application = apply_catch_effects(BASE_CATCH_WEIGHTS, [quality, exact_six, rarity])
-    assert application.consumed_entry_ids == ("quality",)
+    assert application.consumed_entry_ids == ("exact-six",)
     assert len(application.summaries) == 1
     assert len(application.skipped_summaries) == 2
-    assert all("未叠加" in text for text in application.skipped_summaries)
+    assert all("独占" in text for text in application.skipped_summaries)
     # 体型组与概率组正交，可同时生效
     stature = _active_effect(
         "stature",
@@ -436,6 +493,62 @@ def test_quota_reset_chance_resolves_to_one_use_grant() -> None:
     grant = resolve_food_effect("quota-reset", {"count": 1})
     assert grant.granted_uses == 1
     assert "/重置额度" in grant.summary
+
+
+def test_balanced_four_and_five_star_effects_support_multi_use_and_quota_layers() -> None:
+    four_star = resolve_food_effect(
+        "next-catch-quality",
+        {"multiplier": 1.5, "uses": 1},
+    )
+    five_star = resolve_food_effect(
+        "next-catch-quality",
+        {"multiplier": 2.2, "uses": 2},
+    )
+    six_cook_bonus = resolve_food_effect(
+        "next-six-star-cook-bonus",
+        {"bonus_percent": 22},
+    )
+    assert four_star.granted_uses == 1
+    assert five_star.granted_uses == 2
+    assert five_star.params["multiplier"] > four_star.params["multiplier"]
+    assert six_cook_bonus.params == {"bonus_percent": 22.0}
+
+    current = _active_effect(
+        "current-window",
+        "current-window-catches",
+        {"count": 2},
+        created_at="2026-08-09T00:00:00.000Z",
+    )
+    today = _active_effect(
+        "today-window",
+        "today-window-catches",
+        {"count": 2},
+        created_at="2026-08-09T00:00:01.000Z",
+    )
+    assert active_quota_effect_bonuses([current, today]) == (2, 2)
+
+
+def test_ordinary_six_star_cook_bonus_stacks_then_caps_at_fifty_percent() -> None:
+    bonus = _active_effect(
+        "six-cook-bonus",
+        "next-six-star-cook-bonus",
+        {"bonus_percent": 22},
+        created_at="2026-08-09T00:00:00.000Z",
+    )
+    item_adjusted = (0.0, 0.0, 0.0, 0.0, 78.0, 22.0)
+    application = apply_cooking_effects(
+        item_adjusted,
+        [bonus],
+        source_rarity=6,
+    )
+    assert application.weights == pytest.approx((0, 0, 0, 0, 56, 44))
+
+    near_cap = apply_cooking_effects(
+        (0, 0, 0, 0, 55, 45),
+        [bonus],
+        source_rarity=6,
+    )
+    assert near_cap.weights == pytest.approx((0, 0, 0, 0, 50, 50))
 
 
 def test_numeric_level_and_honor_title_remain_separate_progress_tracks() -> None:

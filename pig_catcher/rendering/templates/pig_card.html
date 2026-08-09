@@ -9,7 +9,7 @@
   </style>
 </head>
 <body>
-  <main class="game-sheet pig-card rarity-{{ view.rarity }}{% if view.description|length > 160 %} pig-card--long{% endif %}" data-pig-catcher-root data-render-ready="true">
+  <main class="game-sheet pig-card rarity-{{ view.rarity }}{% if view.description|length > 160 %} pig-card--long{% endif %}{% if view.probability_line %} pig-card--probability{% endif %}" data-pig-catcher-root data-render-ready="true">
     <header class="game-header pig-card__header">
       <div class="game-header__copy">
         <p class="game-header__eyebrow">{{ view.mode_label }} · {{ view.owner_display_name }}</p>

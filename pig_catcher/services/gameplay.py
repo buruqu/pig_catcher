@@ -25,9 +25,10 @@ from ..domain.errors import (
     ReceiptConflictError,
 )
 from ..domain.food_effects import (
-    EXCLUSIVE_CATCH_EFFECTS,
     active_effect_from_row,
+    active_quota_effect_bonuses,
     apply_catch_effects,
+    has_compatible_exclusive_catch_effect,
 )
 from ..domain.gameplay import (
     CATCH_COIN_REWARDS,
@@ -176,6 +177,7 @@ class CatchResult:
     weights: tuple[float, ...]
     effect_summaries: tuple[str, ...] = ()
     excluded_summaries: tuple[str, ...] = ()
+    exclusive_effect_active: bool = False
     global_size_record: bool = False
     global_weight_record: bool = False
     giant_sighting: bool = False
@@ -368,9 +370,7 @@ def pig_view_from_row(
     giant_size_threshold_cm: float = 120.0,
     giant_weight_threshold_kg: float = 350.0,
 ) -> PigView:
-    stature_profile = str(
-        row.get("stature_profile") or StatureProfile.STANDARD.value
-    )
+    stature_profile = str(row.get("stature_profile") or StatureProfile.STANDARD.value)
     body = describe_body_scale(
         stature_profile=stature_profile,
         size_value=float(row["size_value"]),
@@ -486,25 +486,22 @@ def format_catch_summary(result: CatchResult) -> str:
     record_text = "、".join(records) if records else "未刷新群纪录"
     item_text = result.item_name or "无"
     new_text = "NEW｜首次收入图鉴\n" if result.catalog_new else ""
-    body_text = (
-        f"体格：{result.pig.body_label}｜{result.pig.body_description}\n"
-        if result.pig.body_label
-        else ""
-    )
-    effect_text = (
-        f"\n美食加成：{'；'.join(result.effect_summaries)}"
-        if result.effect_summaries
-        else ""
-    )
-    excluded_text = (
-        f"\n互斥未叠加：{'；'.join(result.excluded_summaries)}"
-        if result.excluded_summaries
-        else ""
-    )
-    probability_line = " ".join(
-        f"{index + 1}★{value:.1f}%"
-        for index, value in enumerate(result.weights)
-        if value > 0
+    body_text = f"体格：{result.pig.body_label}｜{result.pig.body_description}\n" if result.pig.body_label else ""
+    effect_text = f"\n美食加成：{'；'.join(result.effect_summaries)}" if result.effect_summaries else ""
+    excluded_text = f"\n互斥未叠加：{'；'.join(result.excluded_summaries)}" if result.excluded_summaries else ""
+    probability_line = " ".join(f"{index + 1}★{value:.1f}%" for index, value in enumerate(result.weights) if value > 0)
+    probability_source_parts = [
+        f"等级 Lv.{progress.level}",
+        f"饲料 Lv.{result.feed_level}",
+    ]
+    if result.item_name:
+        probability_source_parts.append(f"道具·{result.item_name}")
+    if result.effect_summaries:
+        probability_source_parts.append(f"美食加成 ×{len(result.effect_summaries)}")
+    probability_sources = (
+        "六星菜独占规则（等级、升级、道具与其他菜品均未参与）"
+        if result.exclusive_effect_active
+        else "、".join(probability_source_parts)
     )
     return (
         "【抓猪成功】\n"
@@ -524,6 +521,7 @@ def format_catch_summary(result: CatchResult) -> str:
         f"本时段抓猪：{result.daily_count}/{result.daily_limit}\n"
         f"本次道具：{item_text}\n"
         f"本次最终概率：{probability_line}\n"
+        f"概率来源：{probability_sources}\n"
         f"群纪录：{record_text}{effect_text}{excluded_text}"
     )
 
@@ -578,8 +576,7 @@ def format_pig_detail_summary(pig: PigView) -> str:
     if pig.is_giant_sighting:
         records.append("巨物目击留档")
     body = (
-        f"体格：{pig.body_label}（巨物分 {pig.giant_score:.1f}）\n"
-        f"体格评价：{pig.body_description}\n"
+        f"体格：{pig.body_label}（巨物分 {pig.giant_score:.1f}）\n体格评价：{pig.body_description}\n"
         if pig.body_label
         else ""
     )
@@ -612,8 +609,7 @@ def format_inventory_summary(result: InventoryPage) -> str:
         lines.append("当前没有符合条件的猪猪。")
     for pig in result.pigs:
         lines.append(
-            f"{pig.stars} {pig.selector}｜{pig.size_value:.1f}cm｜"
-            f"{pig.weight_value:.2f}kg｜{pig.official_value}猪币"
+            f"{pig.stars} {pig.selector}｜{pig.size_value:.1f}cm｜{pig.weight_value:.2f}kg｜{pig.official_value}猪币"
         )
     return "\n".join(lines)
 
@@ -695,11 +691,7 @@ def format_item_action_summary(result: ItemActionResult) -> str:
             f"当前库存：{result.quantity}\n"
             f"效果：{result.item.effect_summary}"
         )
-    return (
-        "【道具已取消】\n"
-        f"已取消装备 {result.item.display_name}，道具未被消耗。\n"
-        f"当前库存：{result.quantity}"
-    )
+    return f"【道具已取消】\n已取消装备 {result.item.display_name}，道具未被消耗。\n当前库存：{result.quantity}"
 
 
 class GameplayService:
@@ -776,6 +768,17 @@ class GameplayService:
                 window_start=window_start,
                 window_end=window_end,
             )
+            active_effects = tuple(
+                active_effect_from_row(row)
+                for row in await self.economy_repository.list_active_food_effects(
+                    session,
+                    player_id=identity.player_id,
+                    now=now,
+                )
+            )
+            current_window_bonus, today_window_bonus = active_quota_effect_bonuses(
+                active_effects
+            )
             extra_granted, extra_consumed = (
                 await self.economy_repository.extra_catch_grants(
                     session,
@@ -810,6 +813,8 @@ class GameplayService:
                     self.catching.daily_limit
                     + permanent_bonus
                     + weekly_bonus
+                    + current_window_bonus
+                    + today_window_bonus
                 )
             normal_daily_limit = effective_catch_limit(
                 base_limit=base_window_limit,
@@ -833,14 +838,9 @@ class GameplayService:
                     f"本时段已经抓了 {daily_count}/{daily_limit} 次，"
                     f"下次刷新：北京时间 {quota_window.next_refresh_label}。"
                 )
-            using_extra_catch = (
-                catch_restriction is None and daily_count >= base_window_limit
-            )
+            using_extra_catch = catch_restriction is None and daily_count >= base_window_limit
             if using_extra_catch and extra_consumed >= extra_granted:
-                raise DailyCatchLimitError(
-                    f"本时段已经抓了 {daily_count}/{daily_limit} 次，"
-                    "额外抓猪机会已用完。"
-                )
+                raise DailyCatchLimitError(f"本时段已经抓了 {daily_count}/{daily_limit} 次，额外抓猪机会已用完。")
             remaining = _cooldown_remaining(
                 now=now_datetime,
                 last_acquired_at=last_acquired_at,
@@ -871,32 +871,18 @@ class GameplayService:
                 action_type="catching",
             )
             armed_item, armed_quantity = self._armed_item(armed_row, "catching")
-            active_effects = tuple(
-                active_effect_from_row(row)
-                for row in await self.economy_repository.list_active_food_effects(
-                    session,
-                    player_id=identity.player_id,
-                    now=now,
-                )
-            )
-            # 六星菜独占效果：本次抓猪忽略装备道具（道具保留、不消耗、不参与权重）
-            exclusive_effect_active = any(
-                effect.effect_id in EXCLUSIVE_CATCH_EFFECTS
-                for effect in active_effects
+            # 六星菜独占效果：回到未受等级、饲料、道具和普通菜影响的基础层。
+            exclusive_effect_active = has_compatible_exclusive_catch_effect(
+                active_effects,
+                six_star_available=bool(buckets[Rarity.SIX]),
             )
             if exclusive_effect_active:
                 armed_item = None
             weights = self._available_weights(
                 buckets=buckets,
-                feed_level=feed_level,
-                player_level=probability_level,
-                lucky_whistle=(
-                    armed_item is not None and armed_item.item_id == "lucky-whistle"
-                ),
-                super_lucky_whistle=(
-                    armed_item is not None
-                    and armed_item.item_id == "super-lucky-whistle"
-                ),
+                feed_level=0 if exclusive_effect_active else feed_level,
+                player_level=1 if exclusive_effect_active else probability_level,
+                item_id=armed_item.item_id if armed_item is not None else "",
             )
             effect_application = apply_catch_effects(weights, active_effects)
             weights = effect_application.weights
@@ -929,30 +915,23 @@ class GameplayService:
                 "rarity_roll": rarity_roll,
                 "template_roll": template_roll,
                 "attribute_rolls": list(attribute_rolls),
-                "food_effect_entry_ids": list(
-                    effect_application.consumed_entry_ids
-                ),
+                "food_effect_entry_ids": list(effect_application.consumed_entry_ids),
                 "food_effect_summaries": list(effect_application.summaries),
                 "stature_bias": effect_application.stature_bias,
                 "extra_catch_granted": extra_granted,
                 "extra_catch_used": using_extra_catch,
                 "permanent_window_bonus": permanent_bonus,
                 "weekly_window_bonus": weekly_bonus,
+                "current_window_bonus": current_window_bonus,
+                "today_window_bonus": today_window_bonus,
+                "exclusive_effect_active": exclusive_effect_active,
                 "catch_window_limit_restriction_id": (
-                    str(catch_restriction["restriction_id"])
-                    if catch_restriction is not None
-                    else ""
+                    str(catch_restriction["restriction_id"]) if catch_restriction is not None else ""
                 ),
                 "catch_window_limit_restriction_expires_at": (
-                    str(catch_restriction.get("expires_at") or "")
-                    if catch_restriction is not None
-                    else ""
+                    str(catch_restriction.get("expires_at") or "") if catch_restriction is not None else ""
                 ),
-                "quota_window_boost_limit": (
-                    int(window_boost["limit_value"])
-                    if window_boost is not None
-                    else 0
-                ),
+                "quota_window_boost_limit": (int(window_boost["limit_value"]) if window_boost is not None else 0),
             }
             await self.repository.insert_pig_instance(
                 session,
@@ -972,15 +951,16 @@ class GameplayService:
                     "fat_ratio": attributes.fat_ratio,
                     "official_value": attributes.official_value,
                     "ruleset_version": RULESET_VERSION,
-                    "random_snapshot_json": self.repository.random_snapshot_json(
-                        random_snapshot
-                    ),
+                    "random_snapshot_json": self.repository.random_snapshot_json(random_snapshot),
                     "acquired_at": now,
                     "updated_at": now,
                 },
             )
             coin_reward = CATCH_COIN_REWARDS[rarity]
             experience_reward = CATCH_EXPERIENCE_REWARDS[rarity]
+            if armed_item is not None and armed_item.item_id == "coin-bounty-tag":
+                coin_reward *= 2
+                experience_reward = (experience_reward * 3 + 1) // 2
             coin_balance, total_experience = await self.repository.apply_catch_rewards(
                 session,
                 player_id=identity.player_id,
@@ -1021,10 +1001,7 @@ class GameplayService:
                 now=now,
             )
             body = describe_body_scale(
-                stature_profile=str(
-                    template.get("stature_profile")
-                    or StatureProfile.STANDARD.value
-                ),
+                stature_profile=str(template.get("stature_profile") or StatureProfile.STANDARD.value),
                 size_value=attributes.size_value,
                 size_percentile=attributes.size_percentile,
                 weight_value=attributes.weight_value,
@@ -1074,9 +1051,7 @@ class GameplayService:
                     now=now,
                 )
                 if not consumed:
-                    raise ItemInventoryError(
-                        f"已装备的“{armed_item.display_name}”库存不足，本次抓猪未结算。"
-                    )
+                    raise ItemInventoryError(f"已装备的“{armed_item.display_name}”库存不足，本次抓猪未结算。")
             if effect_application.consumed_entry_ids:
                 await self.economy_repository.consume_food_effects(
                     session,
@@ -1118,6 +1093,7 @@ class GameplayService:
                 "weights": [round(value, 8) for value in weights],
                 "effect_summaries": list(effect_application.summaries),
                 "excluded_summaries": list(effect_application.skipped_summaries),
+                "exclusive_effect_active": exclusive_effect_active,
             }
             provisional_receipt = CommandReceipt(
                 receipt_id="",
@@ -1153,6 +1129,7 @@ class GameplayService:
                 weights=weights,
                 effect_summaries=effect_application.summaries,
                 excluded_summaries=effect_application.skipped_summaries,
+                exclusive_effect_active=exclusive_effect_active,
                 global_size_record=global_size_record,
                 global_weight_record=global_weight_record,
                 giant_sighting=giant_sighting,
@@ -1195,6 +1172,7 @@ class GameplayService:
                 weights=weights,
                 effect_summaries=effect_application.summaries,
                 excluded_summaries=effect_application.skipped_summaries,
+                exclusive_effect_active=exclusive_effect_active,
                 global_size_record=global_size_record,
                 global_weight_record=global_weight_record,
                 giant_sighting=giant_sighting,
@@ -1230,28 +1208,14 @@ class GameplayService:
         target: dict[str, object] | None = None
         if short_code:
             normalized = str(short_code).strip().upper()
-            matches = [
-                instance
-                for instance in instances
-                if str(instance["short_code"]).upper() == normalized
-            ]
+            matches = [instance for instance in instances if str(instance["short_code"]).upper() == normalized]
             if not matches:
-                codes = "、".join(
-                    str(instance["short_code"]) for instance in instances
-                )
-                return 0, "", (
-                    f"背包中没有编号 {short_code} 的保千猪；"
-                    f"你当前持有的保千猪编号：{codes}"
-                )
+                codes = "、".join(str(instance["short_code"]) for instance in instances)
+                return 0, "", (f"背包中没有编号 {short_code} 的保千猪；你当前持有的保千猪编号：{codes}")
             target = matches[0]
         elif len(instances) > 1:
-            codes = "、".join(
-                str(instance["short_code"]) for instance in instances
-            )
-            return 0, "", (
-                f"你有 {len(instances)} 只保千猪，请指定编号切换："
-                f"/切换 猪保千 {codes}"
-            )
+            codes = "、".join(str(instance["short_code"]) for instance in instances)
+            return 0, "", (f"你有 {len(instances)} 只保千猪，请指定编号切换：/切换 猪保千 {codes}")
         else:
             target = instances[0]
         async with self.database.transaction() as session:
@@ -1262,9 +1226,7 @@ class GameplayService:
                 now=now,
             )
         label = "表情包" if new_variant == "sticker" else "猪猪立绘"
-        return count, new_variant, (
-            f"已将保千猪 {target['short_code']} 切换为 {label}。"
-        )
+        return count, new_variant, (f"已将保千猪 {target['short_code']} 切换为 {label}。")
 
     async def profile(self, identity: CommandIdentity) -> PlayerProfile:
         """Read the current-group player profile."""
@@ -1295,6 +1257,17 @@ class GameplayService:
                 player_id=identity.player_id,
                 window_start=window_start,
                 window_end=window_end,
+            )
+            active_effects = tuple(
+                active_effect_from_row(row)
+                for row in await self.economy_repository.list_active_food_effects(
+                    session,
+                    player_id=identity.player_id,
+                    now=now,
+                )
+            )
+            current_window_bonus, today_window_bonus = active_quota_effect_bonuses(
+                active_effects
             )
             extra_granted, extra_consumed = await self.economy_repository.extra_catch_grants(
                 session,
@@ -1327,6 +1300,8 @@ class GameplayService:
                     self.catching.daily_limit
                     + permanent_bonus
                     + weekly_bonus
+                    + current_window_bonus
+                    + today_window_bonus
                 )
             feed_level = await self.repository.get_feed_level(
                 session,
@@ -1421,25 +1396,18 @@ class GameplayService:
             armed_cooking_item_quantity=cooking_item_quantity,
             collections=_format_collection_rows(collection_rows),
             showcase_pig=(
-                f"{showcase_row.get('pig_display_name')}#"
-                f"{showcase_row.get('pig_short_code')}"
-                if showcase_row.get("pig_display_name")
-                and showcase_row.get("pig_short_code")
+                f"{showcase_row.get('pig_display_name')}#{showcase_row.get('pig_short_code')}"
+                if showcase_row.get("pig_display_name") and showcase_row.get("pig_short_code")
                 else ""
             ),
             showcase_food=(
-                f"{showcase_row.get('food_display_name')}#"
-                f"{showcase_row.get('food_short_code')}"
-                if showcase_row.get("food_display_name")
-                and showcase_row.get("food_short_code")
+                f"{showcase_row.get('food_display_name')}#{showcase_row.get('food_short_code')}"
+                if showcase_row.get("food_display_name") and showcase_row.get("food_short_code")
                 else ""
             ),
             level_catch_base_high_percent=sum(base_weights[3:]),
             level_catch_adjusted_high_percent=sum(level_weights[3:]),
-            level_cooking_bonus_percent=(
-                level_cooking_higher_rarity_multiplier(progress.level) - 1.0
-            )
-            * 100.0,
+            level_cooking_bonus_percent=(level_cooking_higher_rarity_multiplier(progress.level) - 1.0) * 100.0,
         )
 
     async def pig_detail(self, identity: CommandIdentity, selector_text: str) -> PigView:
@@ -1461,12 +1429,8 @@ class GameplayService:
         if not rows:
             raise PigNotFoundError(f"你的猪猪背包中找不到“{selector_text.strip()}”。")
         if len(rows) > 1:
-            candidates = "、".join(
-                f"{row['display_name_snapshot']}#{row['short_code']}" for row in rows[:8]
-            )
-            raise AmbiguousPigSelectorError(
-                f"“{selector.name}”有多只，请带短编号重试：{candidates}"
-            )
+            candidates = "、".join(f"{row['display_name_snapshot']}#{row['short_code']}" for row in rows[:8])
+            raise AmbiguousPigSelectorError(f"“{selector.name}”有多只，请带短编号重试：{candidates}")
         return self._pig_view(rows[0])
 
     async def inventory(
@@ -1855,16 +1819,11 @@ class GameplayService:
             item_id=str(payload.get("item_id") or ""),
             item_name=str(payload.get("item_name") or ""),
             weights=tuple(float(value) for value in weights_raw),
-            effect_summaries=tuple(
-                str(value)
-                for value in payload.get("effect_summaries", [])
-                if str(value).strip()
-            ),
+            effect_summaries=tuple(str(value) for value in payload.get("effect_summaries", []) if str(value).strip()),
             excluded_summaries=tuple(
-                str(value)
-                for value in payload.get("excluded_summaries", [])
-                if str(value).strip()
+                str(value) for value in payload.get("excluded_summaries", []) if str(value).strip()
             ),
+            exclusive_effect_active=bool(payload.get("exclusive_effect_active") or False),
             global_size_record=bool(payload.get("global_size_record") or False),
             global_weight_record=bool(payload.get("global_weight_record") or False),
             giant_sighting=bool(payload.get("giant_sighting") or False),
@@ -1896,21 +1855,16 @@ class GameplayService:
         buckets: Mapping[Rarity, Sequence[Mapping[str, object]]],
         feed_level: int,
         player_level: int,
-        lucky_whistle: bool,
-        super_lucky_whistle: bool,
+        item_id: str,
     ) -> tuple[float, ...]:
         weights = catch_weights(
             self.catching.weights(),
             feed_level=feed_level,
             player_level=player_level,
-            lucky_whistle=lucky_whistle,
-            super_lucky_whistle=super_lucky_whistle,
+            item_id=item_id,
             six_star_available=bool(buckets[Rarity.SIX]),
         )
-        available = tuple(
-            weight if buckets[rarity] else 0.0
-            for rarity, weight in zip(Rarity, weights, strict=True)
-        )
+        available = tuple(weight if buckets[rarity] else 0.0 for rarity, weight in zip(Rarity, weights, strict=True))
         if not any(available):
             raise NoDrawableTemplateError("当前群没有可用猪猪素材。")
         return normalize_weights(available)
@@ -1927,9 +1881,7 @@ class GameplayService:
             raise ItemInventoryError("已装备道具与当前动作不兼容，请先取消道具。")
         quantity = int(row["quantity"] or 0)
         if quantity <= 0:
-            raise ItemInventoryError(
-                f"已装备的“{item.display_name}”库存不足，请先取消道具。"
-            )
+            raise ItemInventoryError(f"已装备的“{item.display_name}”库存不足，请先取消道具。")
         return item, quantity
 
     @staticmethod
@@ -1950,9 +1902,7 @@ class GameplayService:
             parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
         except ValueError:
             return value
-        return parsed.astimezone(timezone(timedelta(hours=8))).strftime(
-            "北京时间 %Y-%m-%d %H:%M:%S"
-        )
+        return parsed.astimezone(timezone(timedelta(hours=8))).strftime("北京时间 %Y-%m-%d %H:%M:%S")
 
     def _new_identifier(self) -> str:
         candidate = str(self.id_factory() or "").strip()

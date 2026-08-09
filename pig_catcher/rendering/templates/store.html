@@ -84,7 +84,7 @@
         <div class="store-probability__heading">
           <div>
             <span>一次性道具概率</span>
-            <h2>幸运猪哨</h2>
+            <h2>猪哨与探猪镜</h2>
           </div>
           <p>基础抓猪权重；逐星展示使用前 → 使用后</p>
         </div>
@@ -96,7 +96,25 @@
           </div>
           {% endfor %}
         </div>
-        <p class="store-probability__note">规则：幸运猪哨把基础六档调整为 36% / 28% / 16% / 11% / 6% / 3%；超级幸运猪哨把 5、6 星实际概率同时精确提升至 5 倍，并等比例压缩 1 至 4 星，同类道具不可叠加。</p>
+        <p class="store-probability__note"><strong>超级幸运猪哨</strong>：逐星使用前 → 使用后</p>
+        <div class="store-consumable-grid store-consumable-grid--six">
+          {% for row in view.super_lucky_whistle_rows %}
+          <div class="store-consumable-row">
+            <strong>{{ row.label }}</strong>
+            <span>{{ row.before }} → {{ row.after }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        <p class="store-probability__note"><strong>星辉探猪镜</strong>：逐星使用前 → 使用后</p>
+        <div class="store-consumable-grid store-consumable-grid--six">
+          {% for row in view.star_pig_radar_rows %}
+          <div class="store-consumable-row">
+            <strong>{{ row.label }}</strong>
+            <span>{{ row.before }} → {{ row.after }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        <p class="store-probability__note">一次只能装备一个抓猪道具；普通 4/5 星菜可再叠加一个抓猪概率效果，六星菜独占效果触发时道具保留且不参与。</p>
       </div>
 
       <div class="store-probability__group">
@@ -116,7 +134,17 @@
           </div>
           {% endfor %}
         </div>
-        <p class="store-probability__note">主厨香料从最低可出品质向高一档转移最多 15 个百分点；超级主厨香料仅用于六星猪，把六星菜概率额外提高 5 个百分点，且不与六星菜概率美食效果叠加。</p>
+        <p class="store-probability__note"><strong>超级主厨香料</strong>：六星猪使用前 → 使用后</p>
+        <div class="store-consumable-grid">
+          {% for row in view.super_chef_spice_rows %}
+          <div class="store-consumable-row store-consumable-row--wide">
+            <strong>{{ row.label }}</strong>
+            <span>{{ row.before }}</span>
+            <small>→ {{ row.after }}</small>
+          </div>
+          {% endfor %}
+        </div>
+        <p class="store-probability__note">主厨香料向高一档转移最多 18 个百分点；超级主厨香料把六星菜概率从 10% 提至 22%。普通五星菜“一猪六吃”可继续叠加，六星菜独占效果触发时香料保留且不参与。</p>
       </div>
     </section>
 

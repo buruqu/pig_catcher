@@ -17,6 +17,9 @@ from playwright.async_api import async_playwright
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from pig_catcher.config.model import EconomySection  # noqa: E402
+from pig_catcher.domain.economy import build_store_products  # noqa: E402
+from pig_catcher.domain.rules import BASE_CATCH_WEIGHTS  # noqa: E402
 from pig_catcher.rendering import (  # noqa: E402
     EconomyReceiptRowViewModel,
     EconomyReceiptViewModel,
@@ -30,11 +33,10 @@ from pig_catcher.rendering import (  # noqa: E402
     PigCatcherRenderer,
     ProfileViewModel,
     RenderedImage,
-    StoreConsumableProbabilityRowViewModel,
-    StoreProbabilityRowViewModel,
-    StoreProductViewModel,
     StoreViewModel,
 )
+from pig_catcher.rendering import store_view as build_store_view  # noqa: E402
+from pig_catcher.services import StorePage  # noqa: E402
 from tools.accept_catching_and_collection_views import (  # noqa: E402
     PlaywrightRenderCapability,
     render_options,
@@ -107,11 +109,8 @@ def food_card(
         item_name="主厨香料" if cooking else "",
         catalog_new_count=1 if cooking else 0,
         bonus_selector="命令测试菜#B19F2C3D" if cooking else "",
-        probability_summary=(
-            "1★ 14.0% · 2★ 58.0% · 3★ 24.0% · 4★ 4.0%"
-            if cooking
-            else ""
-        ),
+        probability_line=("1★ 14.0% · 2★ 58.0% · 3★ 24.0% · 4★ 4.0%" if cooking else ""),
+        probability_sources=("等级 Lv.5、厨具 Lv.3、道具·主厨香料" if cooking else ""),
     )
 
 
@@ -167,131 +166,29 @@ def catalog_view(rows: Sequence[Mapping[str, object]]) -> FoodCatalogViewModel:
 
 
 def store_view() -> StoreViewModel:
-    definitions = (
-        (
-            "幸运猪哨",
-            "抓猪道具",
-            680,
-            "下一次抓猪：基础六档概率调整为 36% / 28% / 16% / 11% / 6% / 3%",
-            "/购买 幸运猪哨",
-        ),
-        (
-            "超级幸运猪哨",
-            "抓猪道具",
-            2600,
-            "下一次抓猪：5 星与 6 星概率同时精确提升至 5 倍；同类道具不可叠加",
-            "/购买 超级幸运猪哨",
-        ),
-        ("巨物玉米", "抓猪道具", 140, "下一次抓猪更容易遇到大体型猪猪", "/购买 巨物玉米"),
-        ("增膘豆饼", "抓猪道具", 100, "下一次抓猪的猪猪更肥、更重", "/购买 增膘豆饼"),
-        ("精瘦青饲料", "抓猪道具", 100, "下一次抓猪的猪猪更精瘦、体型略大", "/购买 精瘦青饲料"),
-        (
-            "主厨香料",
-            "做菜道具",
-            680,
-            "下一次用 1-5 星猪做菜：从最低可出档向高一档转移最多 15 个百分点",
-            "/购买 主厨香料",
-        ),
-        (
-            "超级主厨香料",
-            "做菜道具",
-            2200,
-            "下一次用 6 星猪做菜：6 星菜概率额外增加 5 个百分点；不叠加",
-            "/购买 超级主厨香料",
-        ),
-        ("精准刀工券", "做菜道具", 120, "下一次做菜优先偏瘦食谱", "/购买 精准刀工券"),
-        ("慢炖调料包", "做菜道具", 120, "下一次做菜优先偏肥食谱", "/购买 慢炖调料包"),
-        ("大份餐盒", "做菜道具", 240, "符合条件时有机会额外出餐", "/购买 大份餐盒"),
-        ("猪饲料升级", "永久升级", 260, "Lv.2 → Lv.3，永久改善高星抓猪权重", "/升级 猪饲料"),
-        ("厨具升级", "永久升级", 520, "Lv.3 → Lv.4，永久改善做菜品质", "/升级 厨具"),
-    )
-    return StoreViewModel(
-        display_name="第四轮商城验收成员",
-        coin_balance=16888,
-        page=1,
-        page_count=1,
-        total_count=12,
-        category="全部",
+    """Build the acceptance card from production domain rules, not fixtures."""
+
+    economy = EconomySection()
+    products = build_store_products(
         feed_level=2,
         cookware_level=3,
-        feed_probability_rows=tuple(
-            StoreProbabilityRowViewModel(
-                level=level,
-                value=value,
-                delta="基准" if level == 0 else delta,
-                current=level == 2,
-            )
-            for level, value, delta in (
-                (0, "13.00%", "基准"),
-                (1, "13.27%", "+0.27 点"),
-                (2, "13.54%", "+0.54 点"),
-                (3, "13.80%", "+0.80 点"),
-                (4, "14.05%", "+1.05 点"),
-                (5, "14.30%", "+1.30 点"),
-            )
-        ),
-        cookware_probability_rows=tuple(
-            StoreProbabilityRowViewModel(
-                level=level,
-                value=f"+{level * 2}%",
-                delta="相对权重",
-                current=level == 3,
-            )
-            for level in range(6)
-        ),
-        lucky_whistle_rows=tuple(
-            StoreConsumableProbabilityRowViewModel(
-                label=f"{rarity} 星",
-                before=before,
-                after=after,
-            )
-            for rarity, before, after in (
-                (1, "40.00%", "36.00%"),
-                (2, "30.00%", "28.00%"),
-                (3, "17.00%", "16.00%"),
-                (4, "8.00%", "11.00%"),
-                (5, "4.00%", "6.00%"),
-                (6, "1.00%", "3.00%"),
-            )
-        ),
-        chef_spice_rows=tuple(
-            StoreConsumableProbabilityRowViewModel(
-                label=label,
-                before=before,
-                after=after,
-            )
-            for label, before, after in (
-                ("1 星猪", "1★ 75% · 2★ 22% · 3★ 3%", "1★ 60% · 2★ 37% · 3★ 3%"),
-                (
-                    "2 星猪",
-                    "1★ 15% · 2★ 65% · 3★ 18% · 4★ 2%",
-                    "2★ 80% · 3★ 18% · 4★ 2%",
-                ),
-                (
-                    "3 星猪",
-                    "2★ 20% · 3★ 60% · 4★ 18% · 5★ 2%",
-                    "2★ 5% · 3★ 75% · 4★ 18% · 5★ 2%",
-                ),
-                (
-                    "4 星猪",
-                    "2★ 5% · 3★ 25% · 4★ 60% · 5★ 10%",
-                    "3★ 30% · 4★ 60% · 5★ 10%",
-                ),
-                ("5 星猪", "3★ 5% · 4★ 25% · 5★ 70%", "4★ 30% · 5★ 70%"),
-            )
-        ),
-        products=tuple(
-            StoreProductViewModel(
-                display_name=name,
-                category=category,
-                unit_price=price,
-                effect_summary=effect,
-                current_level=0,
-                target_level=0,
-                command=command,
-            )
-            for name, category, price, effect, command in definitions
-        ),
+        feed_prices=economy.feed_upgrade_prices,
+        cookware_prices=economy.cookware_upgrade_prices,
+    )
+    return build_store_view(
+        StorePage(
+            display_name="Ruleset 13 商城验收成员",
+            coin_balance=16888,
+            page=1,
+            page_count=1,
+            total_count=len(products),
+            page_size=len(products),
+            category="全部",
+            feed_level=2,
+            cookware_level=3,
+            products=products,
+            catch_base_weights=BASE_CATCH_WEIGHTS,
+        )
     )
 
 
@@ -301,11 +198,11 @@ def receipt_view(kind: str) -> EconomyReceiptViewModel:
             eyebrow="猪猪商城 · 原子扣款与发货",
             title="购买成功",
             badge_label="剩余猪币",
-            badge_value="16208",
+            badge_value="16408",
             summary="幸运猪哨 ×1",
             rows=(
-                EconomyReceiptRowViewModel("单价", "680 猪币"),
-                EconomyReceiptRowViewModel("本次支付", "680 猪币"),
+                EconomyReceiptRowViewModel("单价", "480 猪币"),
+                EconomyReceiptRowViewModel("本次支付", "480 猪币"),
                 EconomyReceiptRowViewModel("当前库存", "3"),
             ),
             note="同一消息重复投递不会再次扣款或发货。",

@@ -54,11 +54,24 @@ def test_high_rarity_food_effects_cover_new_gameplay_families() -> None:
     assert foods["猪咪虾寿司"]["effect_id"] == "next-catch-quality"
     assert foods["猪猪玉子烧"]["effect_id"] == "next-cook-quality"
     assert foods["猪寿司拼盘"]["effect_params"] == {"count": 2}
-    assert foods["一猪六吃"]["effect_params"] == {"six_star_percent": 20}
-    assert foods["一盒油炸猪"]["effect_params"] == {"count": 1}
-    assert foods["猪猪白菜炖粉条"]["effect_params"] == {"shift_percent": 14}
-    assert foods["猪咪莓蛋糕"]["effect_params"] == {"shift_percent": 20}
-    assert foods["猪皮奶"]["effect_params"] == {"rarity": 5, "multiplier": 5.0}
+    assert foods["猪寿司拼盘"]["effect_id"] == "today-window-catches"
+    assert foods["一猪六吃"]["effect_id"] == "next-six-star-cook-bonus"
+    assert foods["一猪六吃"]["effect_params"] == {"bonus_percent": 22}
+    assert foods["一盒油炸猪"]["effect_id"] == "current-window-catches"
+    assert foods["一盒油炸猪"]["effect_params"] == {"count": 2}
+    assert foods["猪猪白菜炖粉条"]["effect_params"] == {
+        "shift_percent": 24,
+        "uses": 1,
+    }
+    assert foods["猪咪莓蛋糕"]["effect_params"] == {
+        "shift_percent": 18,
+        "uses": 2,
+    }
+    assert foods["猪果冻"]["effect_params"] == {
+        "multiplier": 2.2,
+        "uses": 2,
+    }
+    assert foods["猪皮奶"]["effect_params"] == {"rarity": 5, "multiplier": 6.0}
     assert foods["小马猪蒙布朗"]["effect_params"] == {"six_star_percent": 60}
     assert foods["雾蓝键盘大福"]["effect_params"] == {
         "uses": 5,
@@ -76,7 +89,6 @@ def test_high_rarity_food_effects_cover_new_gameplay_families() -> None:
     assert foods["猪鼻蛋包饭"]["effect_params"] == {"six_star_percent": 60}
     assert foods["撅撅猪派"]["effect_params"] == {"count": 1, "max_bonus": 5}
     assert foods["向你道早猪猪巧克力螺"]["effect_params"] == {"count": 5}
-    assert foods["猪果冻"]["effect_params"] == {"count": 3}
     # 每道不同名菜的效果签名必须唯一（群专属双群复制品除外）
     signatures: dict[tuple[str, str], list[str]] = {}
     for entry in _entries():
@@ -90,6 +102,35 @@ def test_high_rarity_food_effects_cover_new_gameplay_families() -> None:
     for names in signatures.values():
         # 同一道菜在多个群的作用域复制允许相同签名
         assert len(set(names)) == 1, f"不同菜品效果重复：{set(names)}"
+
+
+def test_five_star_food_routes_are_stronger_than_four_star_counterparts() -> None:
+    foods = {
+        entry["display_name"]: entry
+        for entry in _entries()
+        if entry["kind"] == "food"
+    }
+
+    four_catch = foods["猪咪虾寿司"]["effect_params"]
+    five_catch = foods["猪果冻"]["effect_params"]
+    assert five_catch["multiplier"] > four_catch["multiplier"]
+    assert five_catch["uses"] > four_catch["uses"]
+
+    four_cook = foods["猪猪玉子烧"]["effect_params"]
+    five_cook_once = foods["猪猪白菜炖粉条"]["effect_params"]
+    five_cook_twice = foods["猪咪莓蛋糕"]["effect_params"]
+    assert five_cook_once["shift_percent"] > four_cook["shift_percent"]
+    assert five_cook_twice["shift_percent"] > four_cook["shift_percent"]
+    assert five_cook_twice["uses"] > four_cook["uses"]
+
+    four_five_star_target = foods["珍猪奶茶"]["effect_params"]
+    five_five_star_target = foods["猪皮奶"]["effect_params"]
+    assert five_five_star_target["rarity"] == four_five_star_target["rarity"] == 5
+    assert five_five_star_target["multiplier"] > four_five_star_target["multiplier"]
+
+    assert foods["一盒油炸猪"]["effect_id"] == "current-window-catches"
+    assert foods["猪寿司拼盘"]["effect_id"] == "today-window-catches"
+    assert foods["猪寿司拼盘"]["rarity"] > foods["一盒油炸猪"]["rarity"]
 
 
 def test_semantic_body_ranges_match_visual_scale_without_changing_normal_pigs() -> None:

@@ -252,6 +252,16 @@ def pig_card(
         catalog_new=True,
         size_record=True,
         weight_record=mode_label == "抓猪成功",
+        probability_line=(
+            "1★ 34.0% · 2★ 27.0% · 3★ 16.0% · 4★ 12.0% · 5★ 7.0% · 6★ 4.0%"
+            if mode_label == "抓猪成功"
+            else ""
+        ),
+        probability_sources=(
+            "等级 Lv.4、饲料 Lv.2、道具·巨物玉米"
+            if mode_label == "抓猪成功"
+            else ""
+        ),
     )
 
 

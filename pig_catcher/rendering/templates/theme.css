@@ -541,6 +541,14 @@ footer strong {
   height: 1080px;
 }
 
+.pig-card--probability {
+  height: 950px;
+}
+
+.pig-card--long.pig-card--probability {
+  height: 1170px;
+}
+
 .pig-card__header {
   height: 126px;
 }

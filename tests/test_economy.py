@@ -31,6 +31,7 @@ from pig_catcher.domain.errors import (
     CookCooldownError,
     CookingTemplateError,
     DailyCatchLimitError,
+    DomainValidationError,
     FoodEffectError,
     InsufficientBalanceError,
 )
@@ -44,6 +45,7 @@ from pig_catcher.services import (
     EconomyService,
     GameplayService,
     SocialService,
+    format_cooking_summary,
     format_store_summary,
 )
 from pig_catcher.services.command_state import iso_timestamp
@@ -296,7 +298,45 @@ def test_cooking_weight_hard_boundaries() -> None:
         cookware_level=5,
         chef_spice=False,
         super_chef_spice=True,
-    ) == (0.0, 0.0, 0.0, 0.0, 85.0, 15.0)
+    ) == (0.0, 0.0, 0.0, 0.0, 78.0, 22.0)
+
+
+def test_new_cooking_items_have_distinct_non_stackable_probability_profiles() -> None:
+    baseline = adjusted_cooking_weights(
+        4,
+        size_percentile=0.0,
+        weight_percentile=0.0,
+        cookware_level=0,
+        chef_spice=False,
+    )
+    protected = adjusted_cooking_weights(
+        4,
+        size_percentile=0.0,
+        weight_percentile=0.0,
+        cookware_level=0,
+        chef_spice=False,
+        item_id="no-downgrade-lid",
+    )
+    ascended = adjusted_cooking_weights(
+        4,
+        size_percentile=0.0,
+        weight_percentile=0.0,
+        cookware_level=0,
+        chef_spice=False,
+        item_id="ascension-stove-core",
+    )
+    assert protected[:3] == (0.0, 0.0, 0.0)
+    assert protected[3] > baseline[3]
+    assert ascended[4] > baseline[4]
+    with pytest.raises(DomainValidationError, match="一个"):
+        adjusted_cooking_weights(
+            4,
+            size_percentile=0.0,
+            weight_percentile=0.0,
+            cookware_level=0,
+            chef_spice=True,
+            item_id="no-downgrade-lid",
+        )
 
 
 def test_level_and_cookware_probability_bonuses_are_exact_and_bounded() -> None:
@@ -362,6 +402,8 @@ async def test_cooking_commits_once_and_rehydrates_after_restart(
     assert card.level_title == "被猪拱"
     assert card.next_level_experience == 50
     assert card.level_progress_percent == pytest.approx(18.0)
+    assert "1★" in card.probability_line
+    assert "厨具 Lv.0" in card.probability_sources
 
     duplicate = await first_service.cook(identity, caught.pig.selector)
     assert duplicate.receipt_created is False
@@ -518,6 +560,10 @@ async def test_large_lunch_box_produces_two_foods_and_consumes_once(
     ]
     assert result.foods[0].rarity == result.foods[1].rarity
     assert result.coin_reward == 3
+    summary = format_cooking_summary(result)
+    assert summary.count("本次最终概率：") == 1
+    assert "最终品质概率" not in summary
+    assert "概率来源：等级 Lv.1、厨具 Lv.0、道具·大份餐盒" in summary
     item = await database.fetch_one(
         "SELECT quantity FROM item_inventory WHERE player_id = ? AND item_id = 'large-lunch-box'",
         (identity.player_id,),
@@ -527,7 +573,7 @@ async def test_large_lunch_box_produces_two_foods_and_consumes_once(
 
 
 @pytest.mark.asyncio
-async def test_super_chef_spice_turns_six_star_cook_to_15_percent_and_consumes_once(
+async def test_super_chef_spice_turns_six_star_cook_to_22_percent_and_consumes_once(
     tmp_path: Path,
 ) -> None:
     database = await _database_with_catalog(
@@ -572,7 +618,7 @@ async def test_super_chef_spice_turns_six_star_cook_to_15_percent_and_consumes_o
     result = await economy.cook(identity, source.pig.selector)
 
     assert result.foods[0].rarity == 6
-    assert result.weights == (0.0, 0.0, 0.0, 0.0, 85.0, 15.0)
+    assert result.weights == (0.0, 0.0, 0.0, 0.0, 78.0, 22.0)
     assert result.item_name == "超级主厨香料"
     item = await database.fetch_one(
         "SELECT quantity FROM item_inventory WHERE player_id = ? AND item_id = 'super-chef-spice'",
@@ -1130,10 +1176,10 @@ async def test_store_purchase_upgrade_insufficient_balance_and_ledger(
     )
     store = await service.store(seed_identity, page=1, category="全部")
     assert store.coin_balance == 2000
-    assert len(store.products) == 12
+    assert len(store.products) == 17
     products = {product.display_name: product for product in store.products}
-    assert products["超级幸运猪哨"].unit_price == 2600
-    assert products["超级主厨香料"].unit_price == 2200
+    assert products["超级幸运猪哨"].unit_price == 1320
+    assert products["超级主厨香料"].unit_price == 1180
     store_card = store_view(store)
     assert tuple(row.value for row in store_card.feed_probability_rows) == (
         "13.00%",
@@ -1157,39 +1203,42 @@ async def test_store_purchase_upgrade_insufficient_balance_and_ledger(
         (row.before, row.after)
         for row in store_card.lucky_whistle_rows
     ) == (
-        ("40.00%", "36.00%"),
-        ("30.00%", "28.00%"),
+        ("40.00%", "34.00%"),
+        ("30.00%", "27.00%"),
         ("17.00%", "16.00%"),
-        ("8.00%", "11.00%"),
-        ("4.00%", "6.00%"),
-        ("1.00%", "3.00%"),
+        ("8.00%", "12.00%"),
+        ("4.00%", "7.00%"),
+        ("1.00%", "4.00%"),
     )
     assert tuple(row.after for row in store_card.chef_spice_rows) == (
-        "1★ 60% · 2★ 37% · 3★ 3%",
+        "1★ 57% · 2★ 40% · 3★ 3%",
         "2★ 80% · 3★ 18% · 4★ 2%",
-        "2★ 5% · 3★ 75% · 4★ 18% · 5★ 2%",
+        "2★ 2% · 3★ 78% · 4★ 18% · 5★ 2%",
         "3★ 30% · 4★ 60% · 5★ 10%",
         "4★ 30% · 5★ 70%",
     )
+    assert store_card.super_chef_spice_rows[0].after == "5★ 78% · 6★ 22%"
     store_text = format_store_summary(store)
     assert "猪饲料 Lv.0-5 的 4-6 星合计概率" in store_text
     assert "厨具 Lv.0-5 的高档菜相对权重增幅" in store_text
     assert "幸运猪哨（基础权重，使用前→使用后）" in store_text
+    assert "超级幸运猪哨（基础权重，使用前→使用后）" in store_text
+    assert "星辉探猪镜（基础权重，使用前→使用后）" in store_text
     assert "主厨香料（基础分布、Lv.0，使用前→使用后）" in store_text
-    assert "1★猪 1★ 75%、2★ 22%、3★ 3%→1★ 60%、2★ 37%、3★ 3%" in store_text
+    assert "1★猪 1★ 75%、2★ 22%、3★ 3%→1★ 57%、2★ 40%、3★ 3%" in store_text
 
     item_identity = _identity(message_id="buy-item")
-    item = await service.purchase(item_identity, "幸运猪哨", quantity=2)
-    assert item.balance_after == 640
-    assert item.inventory_quantity == 2
-    assert (await service.purchase(item_identity, "幸运猪哨", quantity=2)).receipt_created is False
+    item = await service.purchase(item_identity, "幸运猪哨", quantity=3)
+    assert item.balance_after == 560
+    assert item.inventory_quantity == 3
+    assert (await service.purchase(item_identity, "幸运猪哨", quantity=3)).receipt_created is False
 
     upgrade = await service.upgrade(
         _identity(message_id="buy-upgrade"),
         "厨具",
     )
     assert upgrade.upgrade_level == 1
-    assert upgrade.balance_after == 140
+    assert upgrade.balance_after == 60
     with pytest.raises(InsufficientBalanceError):
         await service.upgrade(
             _identity(message_id="buy-too-expensive"),
@@ -1199,9 +1248,9 @@ async def test_store_purchase_upgrade_insufficient_balance_and_ledger(
         "SELECT quantity FROM item_inventory WHERE player_id = ? AND item_id = 'lucky-whistle'",
         (seed_identity.player_id,),
     )
-    assert inventory is not None and inventory["quantity"] == 2
+    assert inventory is not None and inventory["quantity"] == 3
     ledger = await service.ledger(seed_identity, page=1)
-    assert ledger.coin_balance == ledger.ledger_total == 140
+    assert ledger.coin_balance == ledger.ledger_total == 60
     assert ledger.total_count == 3
     await database.close()
 
@@ -2224,4 +2273,70 @@ async def test_batch_cook_defaults_to_low_rarity_and_keeps_highest(
         ("pig-collab-a", 150),
         ("pig-collab-b", 250),
     ]
+    await database.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("effect_id", "advance", "expected_after_advance"),
+    [
+        ("current-window-catches", timedelta(hours=7), 1),
+        ("today-window-catches", timedelta(hours=7), 3),
+    ],
+)
+async def test_balanced_quota_foods_separate_current_window_from_all_today_windows(
+    tmp_path: Path,
+    effect_id: str,
+    advance: timedelta,
+    expected_after_advance: int,
+) -> None:
+    case_root = tmp_path / effect_id
+    case_root.mkdir()
+    database = await _database_with_catalog(
+        case_root,
+        pig_rarities=(4,),
+        food_rarities=(4,),
+        effect_ids={4: effect_id},
+        effect_params={4: {"count": 2}},
+    )
+    clock = FixedClock()
+    catching = GameplayService(
+        database,
+        CatchingSection(daily_limit=1, cooldown_seconds=0),
+        random_source=SequenceRandom(0.0, 0.0, 0.5, 0.5, 0.5, 0.5, 0.5),
+        clock=clock,
+        id_factory=iter((f"{effect_id}-pig", f"{effect_id}-catch-ledger")).__next__,
+        short_code_factory=lambda: "A19F2C3D",
+    )
+    source = await catching.catch(_identity(message_id=f"{effect_id}-source"))
+    economy = EconomyService(
+        database,
+        CookingSection(cook_cooldown_seconds=0),
+        EconomySection(),
+        random_source=SequenceRandom(0.5, 0.0, 0.5),
+        clock=clock,
+        id_factory=iter(
+            (f"{effect_id}-food", f"{effect_id}-cook-ledger", f"{effect_id}-effect")
+        ).__next__,
+        short_code_factory=lambda: "A29F2C3D",
+        quota_refresh_hours=(0, 9, 12, 19),
+    )
+    cooked = await economy.cook(
+        _identity(message_id=f"{effect_id}-cook"),
+        source.pig.selector,
+    )
+    eaten = await economy.eat(
+        _identity(message_id=f"{effect_id}-eat"),
+        cooked.foods[0].selector,
+    )
+    assert eaten.effect.queued_effect_id == effect_id
+    active = await catching.profile(_identity(message_id=f"{effect_id}-active"))
+    assert (active.daily_count, active.daily_limit) == (1, 3)
+
+    clock.value += advance
+    next_window = await catching.profile(_identity(message_id=f"{effect_id}-next"))
+    assert (next_window.daily_count, next_window.daily_limit) == (
+        0,
+        expected_after_advance,
+    )
     await database.close()

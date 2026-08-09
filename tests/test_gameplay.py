@@ -25,6 +25,7 @@ from pig_catcher.services import (
     AssetCatalogService,
     FrameworkService,
     GameplayService,
+    format_catch_summary,
     format_profile_summary,
 )
 
@@ -183,6 +184,8 @@ async def test_catch_commits_all_effects_once_and_survives_restart(
     assert card.level_title == "被猪拱"
     assert card.next_level_experience == 50
     assert card.level_progress_percent == pytest.approx(10.0)
+    assert "1★100.0%" in card.probability_line
+    assert "等级 Lv.1" in card.probability_sources
 
     duplicate = await first_service.catch(identity)
     assert duplicate.receipt_created is False
@@ -583,7 +586,14 @@ async def test_armed_item_is_idempotent_and_consumed_only_by_successful_catch(
 
     caught = await service.catch(_identity(message_id="catch"))
     assert caught.item_name == "巨物玉米"
-    assert caught.pig.size_percentile == pytest.approx(0.62)
+    assert caught.pig.size_percentile == pytest.approx(0.72)
+    card = pig_card_view(caught.pig, mode_label="抓猪成功", catch=caught)
+    assert "本次" not in card.probability_line
+    assert "1★" in card.probability_line
+    assert "道具·巨物玉米" in card.probability_sources
+    summary = format_catch_summary(caught)
+    assert summary.count("本次最终概率：") == 1
+    assert "概率来源：等级 Lv.1、饲料 Lv.0、道具·巨物玉米" in summary
     inventory = await database.fetch_one(
         "SELECT quantity FROM item_inventory WHERE player_id = ? AND item_id = 'giant-corn'",
         (identity.player_id,),
@@ -596,6 +606,41 @@ async def test_armed_item_is_idempotent_and_consumed_only_by_successful_catch(
         )
         is None
     )
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_coin_bounty_tag_doubles_coins_and_increases_experience_once(
+    tmp_path: Path,
+) -> None:
+    database = await _database_with_catalog(
+        tmp_path,
+        [_pig_entry("one-pig", rarity=1)],
+    )
+    identity = _identity(message_id="bounty-arm")
+    await FrameworkService(database).touch_identity(identity)
+    async with database.transaction() as session:
+        await session.execute(
+            """
+            INSERT INTO item_inventory(player_id, item_id, quantity, updated_at)
+            VALUES (?, 'coin-bounty-tag', 1, '2026-07-28T00:00:00.000Z')
+            """,
+            (identity.player_id,),
+        )
+    service = GameplayService(
+        database,
+        CatchingSection(cooldown_seconds=0),
+        random_source=SequenceRandom(*_catch_rolls()),
+    )
+    await service.arm_item(identity, "猪币悬赏牌")
+    result = await service.catch(_identity(message_id="bounty-catch"))
+    assert (result.coin_reward, result.experience_reward) == (4, 8)
+    assert result.item_name == "猪币悬赏牌"
+    row = await database.fetch_one(
+        "SELECT quantity FROM item_inventory WHERE player_id = ? AND item_id = 'coin-bounty-tag'",
+        (identity.player_id,),
+    )
+    assert row is not None and row["quantity"] == 0
     await database.close()
 
 

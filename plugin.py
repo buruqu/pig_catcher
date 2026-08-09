@@ -314,6 +314,8 @@ class PigCatcherPlugin(MaiBotPlugin):
                 settings.cooking,
                 settings.economy,
                 catch_base_weights=settings.catching.weights(),
+                quota_refresh_hours=settings.catching.quota_refresh_hours,
+                quota_timezone_name=settings.catching.daily_reset_timezone,
             )
             self._social_service = SocialService(
                 database,

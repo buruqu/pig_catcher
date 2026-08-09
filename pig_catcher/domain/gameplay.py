@@ -72,36 +72,107 @@ ITEM_DEFINITIONS: tuple[ItemDefinition, ...] = (
         "lucky-whistle",
         "幸运猪哨",
         "catching",
-        680,
-        "下一次抓猪：基础六档概率调整为 36% / 28% / 16% / 11% / 6% / 3%",
+        480,
+        "下一次抓猪：在保留等级与饲料加成的基础上，将基准六档调整为 34% / 27% / 16% / 12% / 7% / 4%",
     ),
     ItemDefinition(
         "super-lucky-whistle",
         "超级幸运猪哨",
         "catching",
-        2600,
-        "下一次抓猪：5 星与 6 星概率同时精确提升至 5 倍；同类道具不可叠加",
+        1320,
+        "下一次抓猪：在保留等级与饲料加成的基础上，将基准六档调整为 27% / 23% / 15% / 15% / 12% / 8%",
     ),
-    ItemDefinition("giant-corn", "巨物玉米", "catching", 140, "下一次抓猪更容易遇到大体型猪猪"),
-    ItemDefinition("fattening-bean-cake", "增膘豆饼", "catching", 100, "下一次抓猪的猪猪更肥、更重"),
-    ItemDefinition("lean-green-feed", "精瘦青饲料", "catching", 100, "下一次抓猪的猪猪更精瘦、体型略大"),
+    ItemDefinition(
+        "star-pig-radar",
+        "星辉探猪镜",
+        "catching",
+        1680,
+        "下一次抓猪必为 3 至 6 星，最终基准概率为 45% / 30% / 18% / 7%（3 至 6 星）",
+    ),
+    ItemDefinition(
+        "giant-corn",
+        "巨物玉米",
+        "catching",
+        240,
+        "下一次抓猪体型百分位 +22%、重量百分位 +14%",
+    ),
+    ItemDefinition(
+        "fattening-bean-cake",
+        "增膘豆饼",
+        "catching",
+        200,
+        "下一次抓猪肥瘦率 +22 点、重量百分位 +12%",
+    ),
+    ItemDefinition(
+        "lean-green-feed",
+        "精瘦青饲料",
+        "catching",
+        200,
+        "下一次抓猪肥瘦率 -22 点、体型百分位 +10%、重量百分位 +5%",
+    ),
+    ItemDefinition(
+        "coin-bounty-tag",
+        "猪币悬赏牌",
+        "catching",
+        620,
+        "下一次抓猪的猪币奖励 ×2、经验奖励 ×1.5；不改变品质概率",
+    ),
     ItemDefinition(
         "chef-spice",
         "主厨香料",
         "cooking",
-        680,
-        "下一次用 1-5 星猪做菜：从最低可出档向高一档转移最多 15 个百分点",
+        480,
+        "下一次用 1 至 5 星猪做菜：从最低可出档向高一档转移最多 18 个百分点",
     ),
     ItemDefinition(
         "super-chef-spice",
         "超级主厨香料",
         "cooking",
-        2200,
-        "下一次用 6 星猪做菜：6 星菜概率额外增加 5 个百分点；不与六星菜概率效果叠加",
+        1180,
+        "下一次用 6 星猪做菜：6 星菜概率额外 +12 个百分点；遇六星菜独占效果时保留不消耗",
     ),
-    ItemDefinition("precision-knife", "精准刀工券", "cooking", 120, "优先偏瘦食谱"),
-    ItemDefinition("slow-cook-seasoning", "慢炖调料包", "cooking", 120, "优先偏肥食谱"),
-    ItemDefinition("large-lunch-box", "大份餐盒", "cooking", 240, "符合条件时可能额外出餐"),
+    ItemDefinition(
+        "precision-knife",
+        "精准刀工券",
+        "cooking",
+        220,
+        "下一次普通做菜优先偏瘦食谱，成品份量与价值额外 +12%",
+    ),
+    ItemDefinition(
+        "slow-cook-seasoning",
+        "慢炖调料包",
+        "cooking",
+        260,
+        "下一次普通做菜优先偏肥食谱，成品份量与价值额外 +18%",
+    ),
+    ItemDefinition(
+        "large-lunch-box",
+        "大份餐盒",
+        "cooking",
+        520,
+        "下一次普通做菜有 45% 概率额外获得同款成品一份",
+    ),
+    ItemDefinition(
+        "no-downgrade-lid",
+        "稳火保底锅盖",
+        "cooking",
+        780,
+        "下一次用 1 至 5 星猪做菜不会产出低于原料品质的美食",
+    ),
+    ItemDefinition(
+        "ascension-stove-core",
+        "升星炉芯",
+        "cooking",
+        1080,
+        "下一次用 1 至 4 星猪做菜，高于原料品质的相对权重提升至 ×2.5",
+    ),
+    ItemDefinition(
+        "harvest-apron",
+        "丰收围裙",
+        "cooking",
+        460,
+        "下一次普通做菜的所有成品份量与价值额外 +25%",
+    ),
 )
 
 ITEMS_BY_ID = {item.item_id: item for item in ITEM_DEFINITIONS}
@@ -203,8 +274,7 @@ def generate_pig_attributes(
     if weight_min <= 0 or weight_max < weight_min:
         raise DomainValidationError("猪模板重量范围无效。")
     first, second, third, fourth, fifth = (
-        _unit(value, name=f"属性随机值 {index}")
-        for index, value in enumerate(random_values, start=1)
+        _unit(value, name=f"属性随机值 {index}") for index, value in enumerate(random_values, start=1)
     )
     size_percentile = (first + second) / 2.0
     condition_noise = (third + fourth) / 2.0
@@ -226,13 +296,15 @@ def generate_pig_attributes(
         if item.action_type != "catching":
             raise DomainValidationError("做菜道具不能用于抓猪。")
         if item.item_id == "giant-corn":
-            size_percentile = _clamp(size_percentile + 0.12, 0.0, 1.0)
+            size_percentile = _clamp(size_percentile + 0.22, 0.0, 1.0)
+            weight_percentile = _clamp(weight_percentile + 0.14, 0.0, 1.0)
         elif item.item_id == "fattening-bean-cake":
-            fat_ratio = _clamp(fat_ratio + 15.0, 0.0, 100.0)
-            weight_percentile = _clamp(weight_percentile + 0.05, 0.0, 1.0)
+            fat_ratio = _clamp(fat_ratio + 22.0, 0.0, 100.0)
+            weight_percentile = _clamp(weight_percentile + 0.12, 0.0, 1.0)
         elif item.item_id == "lean-green-feed":
-            fat_ratio = _clamp(fat_ratio - 15.0, 0.0, 100.0)
-            size_percentile = _clamp(size_percentile + 0.03, 0.0, 1.0)
+            fat_ratio = _clamp(fat_ratio - 22.0, 0.0, 100.0)
+            size_percentile = _clamp(size_percentile + 0.10, 0.0, 1.0)
+            weight_percentile = _clamp(weight_percentile + 0.05, 0.0, 1.0)
 
     size_value = length_min + (length_max - length_min) * size_percentile
     weight_value = weight_min + (weight_max - weight_min) * weight_percentile

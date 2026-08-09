@@ -478,7 +478,10 @@ class StoreViewModel:
     feed_probability_rows: tuple[StoreProbabilityRowViewModel, ...] = ()
     cookware_probability_rows: tuple[StoreProbabilityRowViewModel, ...] = ()
     lucky_whistle_rows: tuple[StoreConsumableProbabilityRowViewModel, ...] = ()
+    super_lucky_whistle_rows: tuple[StoreConsumableProbabilityRowViewModel, ...] = ()
+    star_pig_radar_rows: tuple[StoreConsumableProbabilityRowViewModel, ...] = ()
     chef_spice_rows: tuple[StoreConsumableProbabilityRowViewModel, ...] = ()
+    super_chef_spice_rows: tuple[StoreConsumableProbabilityRowViewModel, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
