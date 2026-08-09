@@ -7,9 +7,9 @@ from dataclasses import dataclass
 
 from .enums import ReceiptSendStatus
 from .errors import ScopeValidationError, SelectorValidationError
+from .short_codes import normalize_short_code
 
 _PLATFORM_PATTERN = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
-_SHORT_CODE_PATTERN = re.compile(r"^[A-F0-9]{8}$")
 
 
 def _validate_identifier(value: str, *, field_name: str, max_length: int = 256) -> str:
@@ -97,10 +97,7 @@ class AssetSelector:
         object.__setattr__(self, "name", name)
         if self.short_code is None:
             return
-        normalized_code = str(self.short_code).strip().upper()
-        if not _SHORT_CODE_PATTERN.fullmatch(normalized_code):
-            raise SelectorValidationError("资产短编号必须是 8 位十六进制字符。")
-        object.__setattr__(self, "short_code", normalized_code)
+        object.__setattr__(self, "short_code", normalize_short_code(self.short_code))
 
 
 @dataclass(frozen=True, slots=True)

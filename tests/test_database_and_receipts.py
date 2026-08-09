@@ -51,6 +51,20 @@ async def test_empty_database_migrates_and_passes_integrity_check(tmp_path: Path
     } <= names
     pig_columns = await database.fetch_all("PRAGMA table_info(pig_templates)")
     assert "paired_food_template_id" in {str(row["name"]) for row in pig_columns}
+    instance_tables = await database.fetch_all(
+        """
+        SELECT name, sql
+        FROM sqlite_master
+        WHERE type = 'table' AND name IN ('pig_instances', 'food_instances')
+        ORDER BY name
+        """
+    )
+    assert len(instance_tables) == 2
+    for row in instance_tables:
+        table_sql = str(row["sql"])
+        assert "short_code TEXT NOT NULL COLLATE NOCASE UNIQUE" in table_sql
+        assert "length(short_code) BETWEEN 4 AND 16" in table_sql
+        assert "short_code NOT GLOB '*[^0-9A-Za-z]*'" in table_sql
     await database.close()
 
 

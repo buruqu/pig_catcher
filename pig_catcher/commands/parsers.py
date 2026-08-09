@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 
 from ..domain.enums import AssetKind, TradeStatus
 from ..domain.errors import DomainValidationError
+from ..domain.short_codes import is_valid_short_code, normalize_short_code
 from ..domain.social import (
     normalize_ranking_type,
     normalize_trade_id,
@@ -132,9 +132,6 @@ class AdminBlacklistQuery:
     reason: str
 
 
-_ADMIN_SHORT_CODE_PATTERN = re.compile(r"^[A-Fa-f0-9]{8}$")
-
-
 def _validate_admin_user_id(value: str) -> str:
     normalized = str(value or "").strip()
     if (
@@ -191,40 +188,44 @@ def parse_admin_coin_amount(value: str) -> int:
 
 
 def parse_admin_asset_grant(value: str) -> AdminAssetGrantQuery:
-    """Parse ``<模板名称或ID> [8位短编号]`` and ``名称#短编号``."""
+    """Parse ``<模板名称或ID> [字母数字编号]`` and ``名称#短编号``."""
 
     normalized = str(value or "").strip()
     if not normalized:
         raise DomainValidationError("请填写要发放的猪猪或美食名称。")
     name, separator, possible_code = normalized.rpartition("#")
     if separator:
-        if not name.strip() or not _ADMIN_SHORT_CODE_PATTERN.fullmatch(possible_code.strip()):
-            raise DomainValidationError("手动编号必须使用 8 位十六进制字符。")
+        if not name.strip() or not is_valid_short_code(possible_code):
+            raise DomainValidationError(
+                "手动编号必须由 4 至 16 位英文字母或数字组成，不区分大小写。"
+            )
         return AdminAssetGrantQuery(
             template_selector=name.strip(),
-            short_code=possible_code.strip().upper(),
+            short_code=normalize_short_code(possible_code),
         )
     tokens = normalized.split()
-    if len(tokens) >= 2 and _ADMIN_SHORT_CODE_PATTERN.fullmatch(tokens[-1]):
+    if len(tokens) >= 2 and is_valid_short_code(tokens[-1]):
         return AdminAssetGrantQuery(
             template_selector=" ".join(tokens[:-1]).strip(),
-            short_code=tokens[-1].upper(),
+            short_code=normalize_short_code(tokens[-1]),
         )
     return AdminAssetGrantQuery(template_selector=normalized)
 
 
 def parse_admin_asset_selector(value: str) -> str:
-    """Require an exact ``名称#8位短编号`` for destructive removal."""
+    """Require an exact ``名称#字母数字编号`` for destructive removal."""
 
     normalized = str(value or "").strip()
     name, separator, short_code = normalized.rpartition("#")
     if (
         not separator
         or not name.strip()
-        or not _ADMIN_SHORT_CODE_PATTERN.fullmatch(short_code.strip())
+        or not is_valid_short_code(short_code)
     ):
-        raise DomainValidationError("删除资产必须填写“名称#8位短编号”，避免误删同名资产。")
-    return f"{name.strip()}#{short_code.strip().upper()}"
+        raise DomainValidationError(
+            "删除资产必须填写“名称#4至16位字母数字编号”，避免误删同名资产。"
+        )
+    return f"{name.strip()}#{normalize_short_code(short_code)}"
 
 
 def parse_admin_blacklist_query(

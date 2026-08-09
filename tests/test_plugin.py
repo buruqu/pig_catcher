@@ -359,7 +359,7 @@ def test_admin_command_patterns_claim_only_the_documented_syntax() -> None:
         "pig_catcher_admin_deduct_coins_all": ("/猪管全员扣币 100",),
         "pig_catcher_admin_grant_asset": (
             "/猪管发猪 @玩家 地球猪",
-            "/猪管发菜 official-openid 彩彩修车饭 A1B2C3D4",
+            "/猪管发菜 official-openid 彩彩修车饭 Pig9Fun",
         ),
         "pig_catcher_admin_remove_asset": (
             "/猪管删猪 @玩家 地球猪#A1B2C3D4",
@@ -380,6 +380,11 @@ def test_admin_command_patterns_claim_only_the_documented_syntax() -> None:
         "command_pattern"
     ]
     assert re.search(asset_pattern, "/猪管发币 @玩家 100") is None
+
+    toggle_pattern = components["pig_catcher_toggle_baogian"]["metadata"][
+        "command_pattern"
+    ]
+    assert re.search(toggle_pattern, "/切换 猪保千 pig9fun")
 
 
 def test_plugin_exposes_fully_chinese_webui_schema() -> None:
@@ -1853,7 +1858,7 @@ async def test_toggle_baogian_works_across_groups_and_requires_code_when_multipl
     )
     await _insert_baogian(
         plugin, scope_id=official_scope, player_id=player_id,
-        short_code="BA0A0002", instance_id="baogian-2",
+        short_code="Pig9Fun", instance_id="baogian-2",
     )
 
     # 多只且未给编号：提示需要编号
@@ -1872,7 +1877,7 @@ async def test_toggle_baogian_works_across_groups_and_requires_code_when_multipl
     )
     assert ok is False
     assert "请指定编号" in message
-    assert "BA0A0001" in message and "BA0A0002" in message
+    assert "BA0A0001" in message and "Pig9Fun" in message
 
     # 指定编号：只切换那一只
     ok, message, _ = await plugin.handle_toggle_baogian(
@@ -1885,11 +1890,11 @@ async def test_toggle_baogian_works_across_groups_and_requires_code_when_multipl
                 display_name="官方成员",
                 message_id="baogian-toggle-2",
             ),
-            arguments="BA0A0002",
+            arguments="pig9fun",
         ),
     )
     assert ok is True
-    assert "BA0A0002" in message
+    assert "Pig9Fun" in message
     assert "表情包" in message
     row = await plugin.database.fetch_one(
         "SELECT display_variant FROM pig_instances WHERE pig_instance_id = 'baogian-2'"

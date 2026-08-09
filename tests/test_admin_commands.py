@@ -217,10 +217,20 @@ async def test_admin_asset_grant_manual_or_generated_code_and_history_preserving
         **_command_kwargs(
             _admin_message(message_id="admin-pig-grant", target_user_id="target"),
             kind="猪",
-            arguments="@目标玩家 命令测试猪 A1B2C3D4",
+            arguments="@目标玩家 命令测试猪 Pig9Fun",
         ),
     )
     assert pig_grant[0] is True
+    duplicate_cross_kind = await plugin.handle_admin_grant_asset(
+        stream_id="stream-10001",
+        **_command_kwargs(
+            _admin_message(message_id="admin-code-conflict", target_user_id="target"),
+            kind="菜",
+            arguments="@目标玩家 命令测试菜1 pig9fun",
+        ),
+    )
+    assert duplicate_cross_kind[0] is False
+    assert "已被其他资产占用" in duplicate_cross_kind[1]
     food_grant = await plugin.handle_admin_grant_asset(
         stream_id="stream-10001",
         **_command_kwargs(
@@ -245,7 +255,7 @@ async def test_admin_asset_grant_manual_or_generated_code_and_history_preserving
         WHERE owner_player_id = 'qq:10001:target'
         """
     )
-    assert pig is not None and tuple(pig)[1:3] == ("A1B2C3D4", "active")
+    assert pig is not None and tuple(pig)[1:3] == ("PIG9FUN", "active")
     assert '"source":"admin-grant"' in str(pig["random_snapshot_json"])
     assert food is not None
     assert len(str(food["short_code"])) == 8
@@ -260,7 +270,7 @@ async def test_admin_asset_grant_manual_or_generated_code_and_history_preserving
         **_command_kwargs(
             _admin_message(message_id="admin-pig-remove", target_user_id="target"),
             kind="猪",
-            arguments="@目标玩家 命令测试猪#A1B2C3D4",
+            arguments="@目标玩家 命令测试猪#pig9fun",
         ),
     )
     assert removed[0] is True

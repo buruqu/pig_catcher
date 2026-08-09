@@ -107,7 +107,7 @@ class AdministrationRepository:
             WHERE instance.scope_id = ?
               AND instance.owner_player_id = ?
               AND instance.display_name_snapshot = ?
-              AND instance.short_code = ?
+              AND instance.short_code COLLATE NOCASE = ?
               AND instance.state IN ('active', 'locked-for-trade')
             """,
             (scope_id, owner_player_id, display_name, short_code),

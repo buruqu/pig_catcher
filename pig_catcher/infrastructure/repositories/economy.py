@@ -339,7 +339,7 @@ class EconomyRepository:
         parameters: list[object] = [player_id, selector.name, compact_name]
         short_code_clause = ""
         if selector.short_code is not None:
-            short_code_clause = "AND instance.short_code = ?"
+            short_code_clause = "AND instance.short_code COLLATE NOCASE = ?"
             parameters.append(selector.short_code)
         rows = await session.fetch_all(
             f"""

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import re
 from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -70,7 +69,8 @@ from ..domain.rules import (
     cooking_weights,
     normalize_weights,
 )
-from ..domain.selectors import new_short_code, parse_asset_selector
+from ..domain.selectors import parse_asset_selector
+from ..domain.short_codes import is_valid_short_code, new_short_code
 from ..infrastructure.database import DatabaseSession, PigCatcherDatabase
 from ..infrastructure.repositories import (
     EconomyRepository,
@@ -98,7 +98,6 @@ _SELL_PIG_COMMAND = "pig-catcher.sell-pig"
 _SELL_FOOD_COMMAND = "pig-catcher.sell-food"
 _BATCH_SELL_PIG_COMMAND = "pig-catcher.batch-sell-pig"
 _BATCH_SELL_FOOD_COMMAND = "pig-catcher.batch-sell-food"
-_SHORT_CODE_PATTERN = re.compile(r"^[A-F0-9]{8}$")
 _FAT_LABELS = {
     "lean": "偏瘦",
     "balanced": "均衡",
@@ -2763,7 +2762,7 @@ class EconomyService:
     ) -> str:
         for _ in range(32):
             candidate = str(self.short_code_factory() or "").strip().upper()
-            if not _SHORT_CODE_PATTERN.fullmatch(candidate):
+            if not is_valid_short_code(candidate):
                 continue
             if candidate in reserved:
                 continue

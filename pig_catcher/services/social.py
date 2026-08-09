@@ -29,7 +29,7 @@ from ..domain.errors import (
 )
 from ..domain.models import CommandIdentity, CommandReceipt
 from ..domain.ports import Clock, MessageKeyFactory, SystemClock
-from ..domain.selectors import new_short_code, parse_asset_selector
+from ..domain.selectors import parse_asset_selector
 from ..domain.social import (
     TRADE_STATUS_LABELS,
     giant_score,
@@ -395,7 +395,7 @@ class SocialService:
         self.restriction_repository = restriction_repository or RestrictionRepository()
         self.clock = clock or SystemClock()
         self.id_factory = id_factory or (lambda: uuid4().hex)
-        self.trade_id_factory = trade_id_factory or new_short_code
+        self.trade_id_factory = trade_id_factory or (lambda: uuid4().hex[:8].upper())
 
     async def expire_stale_offers(self) -> int:
         now = iso_timestamp(self.clock.now())

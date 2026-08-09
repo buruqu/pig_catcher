@@ -10,6 +10,8 @@ from pydantic import ValidationError
 
 from pig_catcher.commands.help import format_help
 from pig_catcher.commands.parsers import (
+    parse_admin_asset_grant,
+    parse_admin_asset_selector,
     parse_batch_sale_query,
     parse_catalog_query,
     parse_store_query,
@@ -52,6 +54,11 @@ from pig_catcher.domain.rules import (
     normalize_weights,
 )
 from pig_catcher.domain.selectors import parse_asset_selector
+from pig_catcher.domain.short_codes import (
+    GENERATED_SHORT_CODE_LENGTH,
+    SHORT_CODE_ALPHABET,
+    new_short_code,
+)
 
 
 def test_scope_key_is_stable_and_group_scoped() -> None:
@@ -71,6 +78,21 @@ def test_asset_selector_supports_optional_short_code() -> None:
     selector = parse_asset_selector("粉红小香猪#A19F2C3D")
     assert selector.name == "粉红小香猪"
     assert selector.short_code == "A19F2C3D"
+    friendly = parse_asset_selector("粉红小香猪#pig9Fun")
+    assert friendly.short_code == "PIG9FUN"
+
+
+def test_asset_codes_use_full_alphanumeric_case_insensitive_policy() -> None:
+    assert SHORT_CODE_ALPHABET == "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    generated = new_short_code()
+    assert len(generated) == GENERATED_SHORT_CODE_LENGTH
+    assert set(generated) <= set(SHORT_CODE_ALPHABET)
+    assert parse_asset_selector("猪#Abc1").short_code == "ABC1"
+    assert parse_asset_selector("猪#abcdefghijklmnop").short_code == "ABCDEFGHIJKLMNOP"
+    query = parse_admin_asset_grant("地球猪 Pig9Fun")
+    assert query.template_selector == "地球猪"
+    assert query.short_code == "PIG9FUN"
+    assert parse_admin_asset_selector("地球猪#pIg9fUn") == "地球猪#PIG9FUN"
 
 
 def test_catalog_query_has_filters_but_no_page_number() -> None:
@@ -92,7 +114,10 @@ def test_store_upgrade_and_batch_sale_parsers_match_new_commands() -> None:
     assert parse_batch_sale_query("美食").asset_kind.value == "food"
 
 
-@pytest.mark.parametrize("value", ["#A19F2C3D", "猪#BAD", "猪#A19F2C3G"])
+@pytest.mark.parametrize(
+    "value",
+    ["#A19F2C3D", "猪#BAD", "猪#BAD-1", "猪#ABCDEFGHIJKLMNOPQ"],
+)
 def test_asset_selector_rejects_ambiguous_syntax(value: str) -> None:
     with pytest.raises(SelectorValidationError):
         parse_asset_selector(value)

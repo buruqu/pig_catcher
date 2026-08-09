@@ -21,7 +21,8 @@ from ..domain.ports import (
     SystemRandomSource,
 )
 from ..domain.quota import catch_quota_window
-from ..domain.selectors import new_short_code, parse_asset_selector
+from ..domain.selectors import parse_asset_selector
+from ..domain.short_codes import new_short_code, normalize_short_code
 from ..infrastructure.database import DatabaseSession, PigCatcherDatabase
 from ..infrastructure.repositories import (
     AdministrationRepository,
@@ -450,7 +451,7 @@ class AdministrationService:
         normalized_target = self._normalize_target_user_id(identity, target_user_id)
         selector = parse_asset_selector(selector_text)
         if selector.short_code is None:
-            raise DomainValidationError("管理员删除资产必须提供 8 位短编号。")
+            raise DomainValidationError("管理员删除资产必须提供精确的资产短编号。")
         request_payload = {
             "command_version": 1,
             "target_user_id": normalized_target,
@@ -940,16 +941,13 @@ class AdministrationService:
             candidate = new_short_code()
             if not await self.gameplay_repository.short_code_exists(session, candidate):
                 return candidate
-        raise RuntimeError("无法生成全库唯一的 8 位资产编号。")
+        raise RuntimeError("无法生成全库唯一的 8 位字母数字资产编号。")
 
     @staticmethod
     def _normalize_optional_short_code(value: str | None) -> str | None:
         if value is None or not str(value).strip():
             return None
-        normalized = str(value).strip().upper()
-        if len(normalized) != 8 or any(character not in "0123456789ABCDEF" for character in normalized):
-            raise DomainValidationError("手动资产编号必须是 8 位十六进制字符。")
-        return normalized
+        return normalize_short_code(value)
 
     @staticmethod
     def _normalize_target_user_id(identity: CommandIdentity, value: str) -> str:

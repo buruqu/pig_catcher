@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import math
-import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta, timezone
@@ -52,7 +51,8 @@ from ..domain.rules import (
     choose_rarity,
     normalize_weights,
 )
-from ..domain.selectors import new_short_code, parse_asset_selector
+from ..domain.selectors import parse_asset_selector
+from ..domain.short_codes import is_valid_short_code, new_short_code
 from ..domain.social import describe_body_scale
 from ..infrastructure.database import DatabaseSession, PigCatcherDatabase
 from ..infrastructure.repositories import (
@@ -79,7 +79,6 @@ from .receipts import request_fingerprint
 _CATCH_COMMAND = "pig-catcher.catch"
 _ARM_ITEM_COMMAND = "pig-catcher.arm-item"
 _CANCEL_ITEM_COMMAND = "pig-catcher.cancel-item"
-_SHORT_CODE_PATTERN = re.compile(r"^[A-F0-9]{8}$")
 _FAT_LABELS = {
     "lean": "偏瘦",
     "balanced": "均衡",
@@ -1913,7 +1912,7 @@ class GameplayService:
     async def _new_unique_short_code(self, session: DatabaseSession) -> str:
         for _ in range(32):
             candidate = str(self.short_code_factory() or "").strip().upper()
-            if not _SHORT_CODE_PATTERN.fullmatch(candidate):
+            if not is_valid_short_code(candidate):
                 continue
             if not await self.repository.short_code_exists(session, candidate):
                 return candidate
