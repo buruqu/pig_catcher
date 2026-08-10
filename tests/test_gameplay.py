@@ -99,6 +99,31 @@ def _pig_entry(
     }
 
 
+def _food_entry(
+    template_id: str,
+    *,
+    effect_id: str,
+    effect_params: dict[str, object],
+) -> dict[str, object]:
+    return {
+        "template_id": template_id,
+        "kind": "food",
+        "display_name": "专属次数测试菜",
+        "rarity": 6,
+        "scope": "group",
+        "group_scope_id": "qq:100",
+        "description": "用于验证六星菜专属抓猪次数。",
+        "image": f"{template_id}.png",
+        "fit": "contain",
+        "source": "pytest synthetic asset",
+        "license": "test-only",
+        "consent_status": "granted",
+        "recipe_tags": ["测试"],
+        "effect_id": effect_id,
+        "effect_params": effect_params,
+    }
+
+
 async def _database_with_catalog(
     tmp_path: Path,
     entries: list[dict[str, object]],
@@ -342,6 +367,113 @@ async def test_default_frequency_is_five_per_window_with_twenty_second_cooldown(
     clock.value = datetime(2026, 7, 28, 11, 0, tzinfo=UTC)
     refreshed = await service.catch(_identity(message_id="after-19-refresh"))
     assert refreshed.daily_count == 1
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_six_star_dish_dedicated_catches_do_not_consume_normal_quota(
+    tmp_path: Path,
+) -> None:
+    database = await _database_with_catalog(
+        tmp_path,
+        [
+            _pig_entry("six-star-pig", rarity=6, group_id="100"),
+            _food_entry(
+                "dedicated-catch-food",
+                effect_id="next-six-star-catch",
+                effect_params={"six_star_percent": 60, "uses": 5},
+            ),
+        ],
+    )
+    clock = MutableClock(datetime(2026, 7, 28, 4, 0, tzinfo=UTC))
+    instance_ids = iter(
+        value
+        for index in range(1, 7)
+        for value in (f"dedicated-pig-{index}", f"dedicated-ledger-{index}")
+    )
+    short_codes = iter(f"D{index:07d}" for index in range(1, 7))
+    service = GameplayService(
+        database,
+        CatchingSection(cooldown_seconds=0, daily_limit=1),
+        random_source=SequenceRandom(
+            *(roll for _ in range(6) for roll in _catch_rolls())
+        ),
+        clock=clock,
+        id_factory=instance_ids.__next__,
+        short_code_factory=short_codes.__next__,
+    )
+    identity = _identity(message_id="normal-quota-catch")
+    normal = await service.catch(identity)
+    assert (normal.daily_count, normal.daily_limit) == (1, 1)
+
+    now = "2026-07-28T04:00:00.000Z"
+    async with database.transaction() as session:
+        await session.execute(
+            """
+            INSERT INTO food_instances(
+                food_instance_id, short_code, scope_id, owner_player_id,
+                template_id, template_version, rarity, display_name_snapshot,
+                portion_weight, fat_category, official_value, effect_id,
+                effect_params_json, ruleset_version, random_snapshot_json,
+                state, acquired_at, disposed_at, updated_at
+            )
+            VALUES (
+                'dedicated-source-food', 'Food0001', ?, ?,
+                'dedicated-catch-food', 1, 6, '专属次数测试菜',
+                1.0, 'balanced', 25000, 'next-six-star-catch',
+                '{"six_star_percent":60,"uses":5}', 16, '{}',
+                'consumed', ?, ?, ?
+            )
+            """,
+            (identity.scope.value, identity.player_id, now, now, now),
+        )
+        await session.execute(
+            """
+            INSERT INTO player_food_effects(
+                effect_entry_id, player_id, source_food_instance_id,
+                effect_id, params_json, granted_uses, consumed_uses,
+                expires_at, created_at, updated_at
+            ) VALUES (
+                'dedicated-effect', ?, 'dedicated-source-food',
+                'next-six-star-catch', '{"six_star_percent":60,"uses":5}',
+                5, 0, NULL, ?, ?
+            )
+            """,
+            (identity.player_id, now, now),
+        )
+
+    dedicated_results = []
+    for index in range(1, 6):
+        result = await service.catch(
+            _identity(message_id=f"dedicated-catch-{index}")
+        )
+        dedicated_results.append(result)
+        assert result.quota_exempt_catch is True
+        assert (result.daily_count, result.daily_limit) == (1, 1)
+        assert pig_card_view(
+            result.pig,
+            mode_label="抓猪成功",
+            catch=result,
+        ).quota_exempt_catch is True
+
+    with pytest.raises(DailyCatchLimitError, match="1/1"):
+        await service.catch(_identity(message_id="dedicated-exhausted"))
+
+    quota = await database.fetch_one(
+        """
+        SELECT COUNT(*) AS total, SUM(catch_quota_cost) AS quota_cost
+        FROM command_receipts
+        WHERE player_id = ? AND command_name = 'pig-catcher.catch'
+        """,
+        (identity.player_id,),
+    )
+    effect = await database.fetch_one(
+        "SELECT granted_uses, consumed_uses FROM player_food_effects WHERE effect_entry_id = 'dedicated-effect'"
+    )
+    assert quota is not None and tuple(quota) == (6, 1)
+    assert effect is not None and tuple(effect) == (5, 5)
+    profile = await service.profile(_identity(message_id="dedicated-profile"))
+    assert (profile.daily_count, profile.daily_limit) == (1, 1)
     await database.close()
 
 

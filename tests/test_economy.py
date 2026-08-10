@@ -298,7 +298,7 @@ def test_cooking_weight_hard_boundaries() -> None:
         cookware_level=5,
         chef_spice=False,
         super_chef_spice=True,
-    ) == (0.0, 0.0, 0.0, 0.0, 78.0, 22.0)
+    ) == (0.0, 0.0, 0.0, 0.0, 80.0, 20.0)
 
 
 def test_new_cooking_items_have_distinct_non_stackable_probability_profiles() -> None:
@@ -613,7 +613,7 @@ async def test_large_lunch_box_produces_two_foods_and_consumes_once(
 
 
 @pytest.mark.asyncio
-async def test_super_chef_spice_turns_six_star_cook_to_22_percent_and_consumes_once(
+async def test_super_chef_spice_turns_six_star_cook_to_20_percent_and_consumes_once(
     tmp_path: Path,
 ) -> None:
     database = await _database_with_catalog(
@@ -658,7 +658,7 @@ async def test_super_chef_spice_turns_six_star_cook_to_22_percent_and_consumes_o
     result = await economy.cook(identity, source.pig.selector)
 
     assert result.foods[0].rarity == 6
-    assert result.weights == (0.0, 0.0, 0.0, 0.0, 78.0, 22.0)
+    assert result.weights == (0.0, 0.0, 0.0, 0.0, 80.0, 20.0)
     assert result.item_name == "超级主厨香料"
     item = await database.fetch_one(
         "SELECT quantity FROM item_inventory WHERE player_id = ? AND item_id = 'super-chef-spice'",
@@ -979,7 +979,7 @@ async def test_extra_catch_food_extends_today_limit_and_consumes_only_bonus_uses
 
 
 @pytest.mark.asyncio
-async def test_weekly_window_food_adds_five_to_every_window_without_stacking(
+async def test_rolling_seven_day_food_adds_five_to_every_window_without_stacking(
     tmp_path: Path,
 ) -> None:
     database = await _database_with_catalog(
@@ -1031,6 +1031,9 @@ async def test_weekly_window_food_adds_five_to_every_window_without_stacking(
     assert granted_again is False
 
     clock.value += timedelta(days=7)
+    anniversary = await catching.profile(_identity(message_id="weekly-anniversary-profile"))
+    assert anniversary.daily_limit == 6
+    clock.value += timedelta(hours=7)
     expired = await catching.profile(_identity(message_id="weekly-expired-profile"))
     assert expired.daily_limit == 1
     await database.close()
@@ -1257,7 +1260,7 @@ async def test_store_purchase_upgrade_insufficient_balance_and_ledger(
         "3★ 30% · 4★ 60% · 5★ 10%",
         "4★ 30% · 5★ 70%",
     )
-    assert store_card.super_chef_spice_rows[0].after == "5★ 78% · 6★ 22%"
+    assert store_card.super_chef_spice_rows[0].after == "5★ 80% · 6★ 20%"
     store_text = format_store_summary(store)
     assert "猪饲料 Lv.0-5 的 4-6 星合计概率" in store_text
     assert "厨具 Lv.0-5 的高档菜相对权重增幅" in store_text

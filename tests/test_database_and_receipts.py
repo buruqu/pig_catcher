@@ -19,6 +19,7 @@ from pig_catcher.domain.errors import (
 )
 from pig_catcher.domain.models import CommandIdentity, ScopeKey
 from pig_catcher.infrastructure import PigCatcherDatabase, safe_database_path
+from pig_catcher.infrastructure.migrations import MIGRATIONS
 from pig_catcher.infrastructure.migrations.v0001_initial import MIGRATION_0001
 from pig_catcher.services import (
     FrameworkService,
@@ -70,6 +71,240 @@ async def test_empty_database_migrates_and_passes_integrity_check(tmp_path: Path
         assert "short_code TEXT NOT NULL COLLATE NOCASE UNIQUE" in table_sql
         assert "length(short_code) BETWEEN 4 AND 16" in table_sql
         assert "short_code NOT GLOB '*[^0-9A-Za-z]*'" in table_sql
+    receipt_columns = await database.fetch_all("PRAGMA table_info(command_receipts)")
+    receipt_column_map = {str(row["name"]): row for row in receipt_columns}
+    assert int(receipt_column_map["catch_quota_cost"]["notnull"]) == 1
+    assert str(receipt_column_map["catch_quota_cost"]["dflt_value"]) == "1"
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_v18_migrates_active_food_effects_and_rolling_expiry(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "v17-food-effects.sqlite3"
+    connection = sqlite3.connect(path)
+    connection.execute("PRAGMA foreign_keys = OFF")
+    connection.execute(
+        """
+        CREATE TABLE schema_migrations (
+            version INTEGER PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE,
+            applied_at TEXT NOT NULL
+        )
+        """
+    )
+    for migration in MIGRATIONS[:-1]:
+        for statement in migration.statements:
+            connection.execute(statement)
+        connection.execute(
+            "INSERT INTO schema_migrations(version, name, applied_at) VALUES (?, ?, 'now')",
+            (migration.version, migration.name),
+        )
+        connection.execute(f"PRAGMA user_version = {migration.version}")
+
+    now = "2026-08-10T07:29:16.657Z"
+    connection.execute(
+        """
+        INSERT INTO scopes(
+            scope_id, platform, group_id, group_name, stream_id,
+            created_at, updated_at
+        ) VALUES ('qq:100', 'qq', '100', '测试群', 'stream-100', ?, ?)
+        """,
+        (now, now),
+    )
+    connection.execute(
+        """
+        INSERT INTO players(
+            player_id, scope_id, platform_user_id, display_name,
+            created_at, updated_at
+        ) VALUES ('qq:100:200', 'qq:100', '200', '测试成员', ?, ?)
+        """,
+        (now, now),
+    )
+    connection.execute(
+        """
+        INSERT INTO asset_manifest_imports(
+            catalog_hash, catalog_id, manifest_version, source_label,
+            storage_relpath, entry_count, status, created_at
+        ) VALUES ('catalog', 'pytest', 4, 'pytest', 'pytest', 8, 'active', ?)
+        """,
+        (now,),
+    )
+    old_effects = {
+        "糖醋排骨": ("exclusive-catch-quality", '{"multiplier":3.0}', 1),
+        "猪鼻蛋包饭": ("next-six-star-cook", '{"six_star_percent":60}', 1),
+        "小马猪蒙布朗": ("next-six-star-catch", '{"six_star_percent":60}', 1),
+        "雾蓝键盘大福": (
+            "next-high-star-catch",
+            '{"five_star_percent":30,"four_star_percent":60,"six_star_percent":10,"uses":5}',
+            5,
+        ),
+        "彩彩修车猪慕斯": ("next-five-star-cook", '{"uses":5}', 5),
+        "猪保千猪排轮盘": ("even-catch-distribution", '{"uses":5}', 5),
+        "一猪六吃": ("next-six-star-cook-bonus", '{"bonus_percent":22}', 1),
+    }
+    for index, (name, (effect_id, params, granted_uses)) in enumerate(
+        old_effects.items(),
+        start=1,
+    ):
+        template_id = f"food-template-{index}"
+        instance_id = f"food-instance-{index}"
+        connection.execute(
+            """
+            INSERT INTO food_templates(
+                template_id, catalog_hash, display_name, rarity, scope_type,
+                description, image_relpath, image_sha256, image_fit,
+                effect_id, effect_params_json, source_label, license,
+                consent_status, created_at, updated_at
+            ) VALUES (?, 'catalog', ?, 6, 'group', '测试', ?, 'hash',
+                      'contain', ?, ?, 'pytest', 'test-only', 'granted', ?, ?)
+            """,
+            (template_id, name, f"{name}.png", effect_id, params, now, now),
+        )
+        connection.execute(
+            """
+            INSERT INTO food_instances(
+                food_instance_id, short_code, scope_id, owner_player_id,
+                template_id, template_version, rarity, display_name_snapshot,
+                portion_weight, fat_category, official_value, effect_id,
+                effect_params_json, ruleset_version, random_snapshot_json,
+                state, acquired_at, updated_at
+            ) VALUES (?, ?, 'qq:100', 'qq:100:200', ?, 1, 6, ?, 1.0,
+                      'balanced', 25000, ?, ?, 15, '{}', 'active', ?, ?)
+            """,
+            (instance_id, f"F{index:07d}", template_id, name, effect_id, params, now, now),
+        )
+        connection.execute(
+            """
+            INSERT INTO player_food_effects(
+                effect_entry_id, player_id, source_food_instance_id,
+                effect_id, params_json, granted_uses, consumed_uses,
+                created_at, updated_at
+            ) VALUES (?, 'qq:100:200', ?, ?, ?, ?, 0, ?, ?)
+            """,
+            (
+                f"effect-{index}",
+                instance_id,
+                effect_id,
+                params,
+                granted_uses,
+                now,
+                now,
+            ),
+        )
+    chocolate_consumed_at = "2026-08-10T00:25:16.908Z"
+    connection.execute(
+        """
+        INSERT INTO food_templates(
+            template_id, catalog_hash, display_name, rarity, scope_type,
+            description, image_relpath, image_sha256, image_fit,
+            effect_id, effect_params_json, source_label, license,
+            consent_status, created_at, updated_at
+        ) VALUES (
+            'chocolate-template', 'catalog', '向你道早猪猪巧克力螺', 6,
+            'group', '测试', '巧克力螺.png', 'hash', 'contain',
+            'weekly-window-catches', '{"count":5}', 'pytest', 'test-only',
+            'granted', ?, ?
+        )
+        """,
+        (now, now),
+    )
+    connection.execute(
+        """
+        INSERT INTO food_instances(
+            food_instance_id, short_code, scope_id, owner_player_id,
+            template_id, template_version, rarity, display_name_snapshot,
+            portion_weight, fat_category, official_value, effect_id,
+            effect_params_json, ruleset_version, random_snapshot_json,
+            state, acquired_at, disposed_at, updated_at
+        ) VALUES (
+            'chocolate-cornet-source', 'CHOC0001', 'qq:100', 'qq:100:200',
+            'chocolate-template', 1, 6, '向你道早猪猪巧克力螺', 1.0,
+            'balanced', 25000, 'weekly-window-catches', '{"count":5}',
+            15, '{}', 'consumed', ?, ?, ?
+        )
+        """,
+        (chocolate_consumed_at, chocolate_consumed_at, now),
+    )
+    connection.execute(
+        """
+        INSERT INTO player_catch_quota_bonuses(
+            player_id, weekly_bonus, weekly_expires_at,
+            weekly_source_food_instance_id, created_at, updated_at
+        ) VALUES (
+            'qq:100:200', 5, '2026-08-16T16:00:00.000Z',
+            'chocolate-cornet-source', ?, ?
+        )
+        """,
+        (now, now),
+    )
+    connection.execute(
+        """
+        INSERT INTO command_receipts(
+            receipt_id, idempotency_key, scope_id, player_id, command_name,
+            request_fingerprint, result_type, text_summary, created_at, updated_at
+        ) VALUES (
+            'old-receipt', 'old-idempotency', 'qq:100', 'qq:100:200',
+            'pig-catcher.catch', 'fingerprint', 'pig', '旧抓猪收据', ?, ?
+        )
+        """,
+        (now, now),
+    )
+    connection.commit()
+    connection.close()
+
+    database = PigCatcherDatabase(path)
+    await database.open()
+    assert await database.schema_version() == 18
+    templates = await database.fetch_all(
+        "SELECT display_name, effect_id, effect_params_json FROM food_templates ORDER BY display_name"
+    )
+    migrated = {
+        str(row["display_name"]): (
+            str(row["effect_id"]),
+            str(row["effect_params_json"]),
+        )
+        for row in templates
+    }
+    assert migrated["糖醋排骨"] == ("quota-reset", '{"count":1}')
+    assert migrated["一猪六吃"] == (
+        "next-six-star-cook-bonus",
+        '{"bonus_percent":15}',
+    )
+    effects = await database.fetch_all(
+        """
+        SELECT instance.display_name_snapshot, effect.effect_id,
+               effect.params_json, effect.granted_uses
+        FROM player_food_effects AS effect
+        JOIN food_instances AS instance
+          ON instance.food_instance_id = effect.source_food_instance_id
+        ORDER BY instance.display_name_snapshot
+        """
+    )
+    active = {
+        str(row["display_name_snapshot"]): (
+            str(row["effect_id"]),
+            str(row["params_json"]),
+            int(row["granted_uses"]),
+        )
+        for row in effects
+    }
+    assert active["糖醋排骨"] == ("quota-reset", '{"count":1}', 1)
+    assert active["猪鼻蛋包饭"][2] == 2
+    assert active["小马猪蒙布朗"][2] == 5
+    assert active["雾蓝键盘大福"][2] == 10
+    assert active["彩彩修车猪慕斯"][2] == 10
+    assert active["猪保千猪排轮盘"][2] == 10
+    quota = await database.fetch_one(
+        "SELECT weekly_expires_at FROM player_catch_quota_bonuses WHERE player_id = 'qq:100:200'"
+    )
+    receipt = await database.fetch_one(
+        "SELECT catch_quota_cost FROM command_receipts WHERE receipt_id = 'old-receipt'"
+    )
+    assert quota is not None and quota["weekly_expires_at"] == "2026-08-17T01:00:00.000Z"
+    assert receipt is not None and receipt["catch_quota_cost"] == 1
+    assert await database.integrity_check() == ("ok",)
     await database.close()
 
 
@@ -276,6 +511,47 @@ async def test_legacy_v9_social_ban_splits_into_two_permanent_blacklists(
             source_object_id TEXT NOT NULL DEFAULT '',
             idempotency_key TEXT UNIQUE,
             created_at TEXT NOT NULL
+        );
+        CREATE TABLE command_receipts (
+            receipt_id TEXT PRIMARY KEY,
+            idempotency_key TEXT NOT NULL UNIQUE,
+            scope_id TEXT NOT NULL,
+            player_id TEXT,
+            command_name TEXT NOT NULL,
+            request_fingerprint TEXT NOT NULL,
+            result_type TEXT NOT NULL,
+            result_object_id TEXT NOT NULL DEFAULT '',
+            result_json TEXT NOT NULL DEFAULT '{}',
+            text_summary TEXT NOT NULL,
+            business_status TEXT NOT NULL DEFAULT 'committed',
+            send_status TEXT NOT NULL DEFAULT 'pending',
+            send_error TEXT NOT NULL DEFAULT '',
+            claimed_at TEXT,
+            sent_at TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE TABLE player_food_effects (
+            effect_entry_id TEXT PRIMARY KEY,
+            player_id TEXT NOT NULL,
+            source_food_instance_id TEXT NOT NULL UNIQUE,
+            effect_id TEXT NOT NULL,
+            params_json TEXT NOT NULL DEFAULT '{}',
+            granted_uses INTEGER NOT NULL,
+            consumed_uses INTEGER NOT NULL DEFAULT 0,
+            expires_at TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE TABLE player_catch_quota_bonuses (
+            player_id TEXT PRIMARY KEY,
+            permanent_bonus INTEGER NOT NULL DEFAULT 0,
+            weekly_bonus INTEGER NOT NULL DEFAULT 0,
+            weekly_expires_at TEXT,
+            weekly_source_food_instance_id TEXT,
+            permanent_source_food_instance_id TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
         );
         INSERT INTO scopes(
             scope_id, platform, group_id, created_at, updated_at

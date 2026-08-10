@@ -47,16 +47,19 @@ class ReceiptRepository:
         result_json: str,
         text_summary: str,
         now: str,
+        catch_quota_cost: int = 1,
     ) -> ReceiptReservation:
+        if catch_quota_cost not in {0, 1}:
+            raise ReceiptConflictError("抓猪额度成本必须是 0 或 1。")
         receipt_id = uuid4().hex
         cursor = await session.execute(
             """
             INSERT INTO command_receipts(
                 receipt_id, idempotency_key, scope_id, player_id, command_name,
                 request_fingerprint, result_type, result_object_id, result_json,
-                text_summary, send_status, created_at, updated_at
+                text_summary, catch_quota_cost, send_status, created_at, updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
             ON CONFLICT(idempotency_key) DO NOTHING
             """,
             (
@@ -70,6 +73,7 @@ class ReceiptRepository:
                 result_object_id,
                 result_json,
                 text_summary,
+                catch_quota_cost,
                 now,
                 now,
             ),

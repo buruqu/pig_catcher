@@ -674,7 +674,7 @@ def format_store_summary(result: StorePage) -> str:
         f"超级幸运猪哨（基础权重，使用前→使用后）：{catch_item_summary('super-lucky-whistle')}",
         f"星辉探猪镜（基础权重，使用前→使用后）：{catch_item_summary('star-pig-radar')}",
         f"主厨香料（基础分布、Lv.0，使用前→使用后）：{chef_summary}",
-        "超级主厨香料：六星猪做菜由 90% 五星 / 10% 六星调整为 78% / 22%。",
+        "超级主厨香料：六星猪做菜由 90% 五星 / 10% 六星调整为 80% / 20%。",
         "六星菜独占效果触发时，等级、升级、道具与其他菜品均不参与；道具和其他菜品保留不消耗。",
     ]
     if not result.products:
@@ -1534,7 +1534,7 @@ class EconomyService:
                 else:
                     effect_expires_at = self._daily_effect_expiry(now_datetime)
             elif effect.queued_effect_id == WEEKLY_WINDOW_CATCHES:
-                effect_expires_at = self._weekly_effect_expiry(now_datetime)
+                effect_expires_at = self._rolling_seven_day_effect_expiry(now_datetime)
                 granted = await self.repository.grant_weekly_catch_bonus(
                     session,
                     player_id=identity.player_id,
@@ -1544,7 +1544,7 @@ class EconomyService:
                     now=now,
                 )
                 if not granted:
-                    raise FoodEffectError("本周的全时段抓猪额度加成已经生效，不能重复叠加；美食未消耗。")
+                    raise FoodEffectError("滚动 7 天全时段抓猪额度加成已经生效，不能重复叠加；美食未消耗。")
             elif effect.queued_effect_id == PERMANENT_WINDOW_CATCH:
                 permanent_total = await self.repository.increment_permanent_catch_bonus(
                     session,
@@ -2733,18 +2733,13 @@ class EconomyService:
         )
         return iso_timestamp(expiry)
 
-    @staticmethod
-    def _weekly_effect_expiry(now: datetime) -> str:
-        beijing_timezone = timezone(timedelta(hours=8), "Asia/Shanghai")
-        local = now.astimezone(beijing_timezone)
-        days_until_monday = 7 - local.weekday()
-        next_monday = (local + timedelta(days=days_until_monday)).date()
-        expiry = datetime.combine(
-            next_monday,
-            datetime.min.time(),
-            tzinfo=beijing_timezone,
+    def _rolling_seven_day_effect_expiry(self, now: datetime) -> str:
+        anniversary_window = catch_quota_window(
+            now + timedelta(days=7),
+            refresh_hours=self.quota_refresh_hours,
+            timezone_name=self.quota_timezone_name,
         )
-        return iso_timestamp(expiry)
+        return iso_timestamp(anniversary_window.end)
 
     async def _expire_stale_offers(self) -> int:
         now = iso_timestamp(self.clock.now())

@@ -31,7 +31,7 @@ QUOTA_RESET_CHANCE = "quota-reset"
 CURRENT_WINDOW_CATCHES = "current-window-catches"
 TODAY_WINDOW_CATCHES = "today-window-catches"
 NEXT_SIX_STAR_COOK_BONUS = "next-six-star-cook-bonus"
-# 糖醋排骨专用独占加权（与普通菜的 next-catch-quality 区分来源）
+# Schema 18 前糖醋排骨使用的历史独占加权；保留解析能力以兼容旧审计快照。
 EXCLUSIVE_CATCH_QUALITY = "exclusive-catch-quality"
 
 # 独占效果：六星菜效果独立作用，不与任何其他菜品效果或道具叠加。
@@ -45,6 +45,15 @@ EXCLUSIVE_CATCH_EFFECTS = frozenset(
     }
 )
 EXCLUSIVE_COOK_EFFECTS = frozenset({NEXT_SIX_STAR_COOK, NEXT_FIVE_STAR_COOK})
+
+# 这三种六星菜自带独立抓猪次数。成功结算时消耗效果次数，但不消耗正常时段额度。
+QUOTA_EXEMPT_CATCH_EFFECTS = frozenset(
+    {
+        NEXT_SIX_STAR_CATCH,
+        NEXT_HIGH_STAR_CATCH,
+        EVEN_CATCH_DISTRIBUTION,
+    }
+)
 
 CATCH_EFFECT_IDS = frozenset(
     {
@@ -245,19 +254,29 @@ def resolve_food_effect(
         )
     if normalized_id == NEXT_SIX_STAR_COOK:
         percent = _number(raw, "six_star_percent", lower=11.0, upper=60.0)
+        uses = _integer(raw, "uses", lower=1, upper=10) if "uses" in raw else 1
         return FoodEffectGrant(
             normalized_id,
-            {"six_star_percent": percent},
-            1,
-            f"下一次用 6 星猪做菜时，6 星定制菜概率提升至 {percent:g}%。",
+            {"six_star_percent": percent, "uses": uses},
+            uses,
+            (
+                f"接下来 {uses} 次用 6 星猪做菜时，6 星定制菜概率提升至 {percent:g}%。"
+                if uses > 1
+                else f"下一次用 6 星猪做菜时，6 星定制菜概率提升至 {percent:g}%。"
+            ),
         )
     if normalized_id == NEXT_SIX_STAR_CATCH:
         percent = _number(raw, "six_star_percent", lower=11.0, upper=60.0)
+        uses = _integer(raw, "uses", lower=1, upper=10) if "uses" in raw else 1
         return FoodEffectGrant(
             normalized_id,
-            {"six_star_percent": percent},
-            1,
-            f"下一次抓猪时，6 星猪概率提升至 {percent:g}%。",
+            {"six_star_percent": percent, "uses": uses},
+            uses,
+            (
+                f"接下来 {uses} 次专属抓猪，6 星猪概率提升至 {percent:g}%；不消耗正常时段额度。"
+                if uses > 1
+                else f"下一次专属抓猪，6 星猪概率提升至 {percent:g}%；不消耗正常时段额度。"
+            ),
         )
     if normalized_id == EXTRA_CATCHES:
         count = _integer(raw, "count", lower=1, upper=10)
@@ -289,7 +308,10 @@ def resolve_food_effect(
             normalized_id,
             {"count": count},
             1,
-            f"本周所有抓猪时段的基础额度额外 +{count} 次；不可重复叠加。",
+            (
+                f"从食用起滚动 7 天内，每个抓猪时段基础额度额外 +{count} 次；"
+                "第 7 天对应时段仍生效，有效期内不可重复叠加。"
+            ),
         )
     if normalized_id == PERMANENT_WINDOW_CATCH:
         count = _integer(raw, "count", lower=1, upper=1)
@@ -348,7 +370,10 @@ def resolve_food_effect(
                 "six_star_percent": round(six, 4),
             },
             uses,
-            f"接下来 {uses} 次抓猪必定获得高星猪：4 星 {four:g}%、5 星 {five:g}%、6 星 {six:g}%。",
+            (
+                f"接下来 {uses} 次专属抓猪必定获得高星猪：4 星 {four:g}%、"
+                f"5 星 {five:g}%、6 星 {six:g}%；不消耗正常时段额度。"
+            ),
         )
     if normalized_id == NEXT_FIVE_STAR_COOK:
         uses = _integer(raw, "uses", lower=1, upper=10)
@@ -364,7 +389,7 @@ def resolve_food_effect(
             normalized_id,
             {"uses": uses},
             uses,
-            f"接下来 {uses} 次抓猪，所有品质的获取概率完全相同。",
+            f"接下来 {uses} 次专属抓猪，所有品质概率完全相同；不消耗正常时段额度。",
         )
     if normalized_id == QUOTA_RESET_CHANCE:
         count = _integer(raw, "count", lower=1, upper=3)
@@ -502,8 +527,9 @@ def apply_catch_effects(
         if exclusive.effect_id == NEXT_SIX_STAR_CATCH:
             target = float(grant.params["six_star_percent"])
             lower_total = sum(adjusted[:5])
-            scale = (100.0 - target) / lower_total
-            adjusted = [value * scale for value in adjusted[:5]] + [target]
+            if lower_total > 0:
+                scale = (100.0 - target) / lower_total
+                adjusted = [value * scale for value in adjusted[:5]] + [target]
         elif exclusive.effect_id == NEXT_HIGH_STAR_CATCH:
             four = float(grant.params["four_star_percent"])
             five = float(grant.params["five_star_percent"])

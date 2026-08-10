@@ -18,6 +18,7 @@ from .v0014_batch_keep_highest import MIGRATION_0014
 from .v0015_admin_commands import MIGRATION_0015
 from .v0016_alphanumeric_short_codes import MIGRATION_0016
 from .v0017_automatic_regulation import MIGRATION_0017
+from .v0018_food_effect_rebalance import MIGRATION_0018
 
 MIGRATIONS: tuple[Migration, ...] = (
     MIGRATION_0001,
@@ -37,6 +38,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     MIGRATION_0015,
     MIGRATION_0016,
     MIGRATION_0017,
+    MIGRATION_0018,
 )
 
 __all__ = ["MIGRATIONS", "Migration"]

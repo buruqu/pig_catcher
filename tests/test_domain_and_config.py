@@ -27,6 +27,7 @@ from pig_catcher.domain.errors import (
     SelectorValidationError,
 )
 from pig_catcher.domain.food_effects import (
+    QUOTA_EXEMPT_CATCH_EFFECTS,
     ActiveFoodEffect,
     active_quota_effect_bonuses,
     apply_catch_effects,
@@ -551,11 +552,16 @@ def test_same_family_cooking_effects_do_not_stack_and_report_skipped() -> None:
 
 
 def test_six_star_exclusive_effects_override_weights_with_multi_uses() -> None:
-    # 雾蓝键盘大福：固定高星分布 4/5/6 = 60/30/10，uses=5
+    assert QUOTA_EXEMPT_CATCH_EFFECTS == {
+        "next-six-star-catch",
+        "next-high-star-catch",
+        "even-catch-distribution",
+    }
+    # 雾蓝键盘大福：固定高星分布 4/5/6 = 60/30/10，uses=10
     high_star = _active_effect(
         "high-star",
         "next-high-star-catch",
-        {"uses": 5, "four_star_percent": 60, "five_star_percent": 30, "six_star_percent": 10},
+        {"uses": 10, "four_star_percent": 60, "five_star_percent": 30, "six_star_percent": 10},
         created_at="2026-08-07T00:00:00.000Z",
     )
     application = apply_catch_effects(BASE_CATCH_WEIGHTS, [high_star])
@@ -565,7 +571,7 @@ def test_six_star_exclusive_effects_override_weights_with_multi_uses() -> None:
     five_cook = _active_effect(
         "five-cook",
         "next-five-star-cook",
-        {"uses": 5},
+        {"uses": 10},
         created_at="2026-08-07T00:00:00.000Z",
     )
     cook_application = apply_cooking_effects(
@@ -578,7 +584,7 @@ def test_six_star_exclusive_effects_override_weights_with_multi_uses() -> None:
     even = _active_effect(
         "even",
         "even-catch-distribution",
-        {"uses": 5},
+        {"uses": 10},
         created_at="2026-08-07T00:00:00.000Z",
     )
     even_application = apply_catch_effects(BASE_CATCH_WEIGHTS, [even])
@@ -624,12 +630,12 @@ def test_balanced_four_and_five_star_effects_support_multi_use_and_quota_layers(
     )
     six_cook_bonus = resolve_food_effect(
         "next-six-star-cook-bonus",
-        {"bonus_percent": 22},
+        {"bonus_percent": 15},
     )
     assert four_star.granted_uses == 1
     assert five_star.granted_uses == 2
     assert five_star.params["multiplier"] > four_star.params["multiplier"]
-    assert six_cook_bonus.params == {"bonus_percent": 22.0}
+    assert six_cook_bonus.params == {"bonus_percent": 15.0}
 
     current = _active_effect(
         "current-window",
@@ -650,16 +656,16 @@ def test_ordinary_six_star_cook_bonus_stacks_then_caps_at_fifty_percent() -> Non
     bonus = _active_effect(
         "six-cook-bonus",
         "next-six-star-cook-bonus",
-        {"bonus_percent": 22},
+        {"bonus_percent": 15},
         created_at="2026-08-09T00:00:00.000Z",
     )
-    item_adjusted = (0.0, 0.0, 0.0, 0.0, 78.0, 22.0)
+    item_adjusted = (0.0, 0.0, 0.0, 0.0, 80.0, 20.0)
     application = apply_cooking_effects(
         item_adjusted,
         [bonus],
         source_rarity=6,
     )
-    assert application.weights == pytest.approx((0, 0, 0, 0, 56, 44))
+    assert application.weights == pytest.approx((0, 0, 0, 0, 65, 35))
 
     near_cap = apply_cooking_effects(
         (0, 0, 0, 0, 55, 45),

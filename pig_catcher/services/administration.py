@@ -745,7 +745,7 @@ class AdministrationService:
                 identity=identity,
                 platform_user_id=normalized_target,
             )
-            cleared_catches, _ = await self.gameplay_repository.catch_usage(
+            cleared_catches, _, _ = await self.gameplay_repository.catch_usage(
                 session,
                 player_id=str(target["player_id"]),
                 window_start=window_start,

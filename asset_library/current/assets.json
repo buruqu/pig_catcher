@@ -3401,7 +3401,7 @@
       ],
       "effect_id": "next-six-star-cook-bonus",
       "effect_params": {
-        "bonus_percent": 22
+        "bonus_percent": 15
       },
       "paired_food_template_id": "",
       "collection": null
@@ -3453,7 +3453,8 @@
       ],
       "effect_id": "next-six-star-cook",
       "effect_params": {
-        "six_star_percent": 60
+        "six_star_percent": 60,
+        "uses": 2
       },
       "paired_food_template_id": "",
       "collection": null
@@ -3480,7 +3481,8 @@
       ],
       "effect_id": "next-six-star-catch",
       "effect_params": {
-        "six_star_percent": 60
+        "six_star_percent": 60,
+        "uses": 5
       },
       "paired_food_template_id": "",
       "collection": null
@@ -3532,7 +3534,8 @@
       ],
       "effect_id": "next-six-star-cook",
       "effect_params": {
-        "six_star_percent": 60
+        "six_star_percent": 60,
+        "uses": 2
       },
       "paired_food_template_id": "",
       "collection": null
@@ -3559,7 +3562,8 @@
       ],
       "effect_id": "next-six-star-catch",
       "effect_params": {
-        "six_star_percent": 60
+        "six_star_percent": 60,
+        "uses": 5
       },
       "paired_food_template_id": "",
       "collection": null
@@ -4312,7 +4316,7 @@
       ],
       "effect_id": "next-high-star-catch",
       "effect_params": {
-        "uses": 5,
+        "uses": 10,
         "four_star_percent": 60,
         "five_star_percent": 30,
         "six_star_percent": 10
@@ -4427,7 +4431,7 @@
       ],
       "effect_id": "next-high-star-catch",
       "effect_params": {
-        "uses": 5,
+        "uses": 10,
         "four_star_percent": 60,
         "five_star_percent": 30,
         "six_star_percent": 10
@@ -4688,7 +4692,7 @@
       ],
       "effect_id": "next-five-star-cook",
       "effect_params": {
-        "uses": 5
+        "uses": 10
       },
       "paired_food_template_id": "",
       "collection": null
@@ -4746,7 +4750,7 @@
       ],
       "effect_id": "next-five-star-cook",
       "effect_params": {
-        "uses": 5
+        "uses": 10
       },
       "paired_food_template_id": "",
       "collection": null
@@ -5073,7 +5077,7 @@
       ],
       "effect_id": "even-catch-distribution",
       "effect_params": {
-        "uses": 5
+        "uses": 10
       },
       "paired_food_template_id": "",
       "collection": null
@@ -5100,7 +5104,7 @@
       ],
       "effect_id": "even-catch-distribution",
       "effect_params": {
-        "uses": 5
+        "uses": 10
       },
       "paired_food_template_id": "",
       "collection": null
@@ -5384,9 +5388,9 @@
         "糖醋排骨",
         "297期"
       ],
-      "effect_id": "exclusive-catch-quality",
+      "effect_id": "quota-reset",
       "effect_params": {
-        "multiplier": 3.0
+        "count": 1
       },
       "paired_food_template_id": "",
       "collection": null
@@ -5410,9 +5414,9 @@
         "糖醋排骨",
         "297期"
       ],
-      "effect_id": "exclusive-catch-quality",
+      "effect_id": "quota-reset",
       "effect_params": {
-        "multiplier": 3.0
+        "count": 1
       },
       "paired_food_template_id": "",
       "collection": null
@@ -5466,9 +5470,9 @@
         "糖醋排骨",
         "297期"
       ],
-      "effect_id": "exclusive-catch-quality",
+      "effect_id": "quota-reset",
       "effect_params": {
-        "multiplier": 3.0
+        "count": 1
       },
       "paired_food_template_id": "",
       "collection": null
@@ -5522,9 +5526,9 @@
         "糖醋排骨",
         "297期"
       ],
-      "effect_id": "exclusive-catch-quality",
+      "effect_id": "quota-reset",
       "effect_params": {
-        "multiplier": 3.0
+        "count": 1
       },
       "paired_food_template_id": "",
       "collection": null
@@ -5786,7 +5790,8 @@
       ],
       "effect_id": "next-six-star-cook",
       "effect_params": {
-        "six_star_percent": 60
+        "six_star_percent": 60,
+        "uses": 2
       },
       "paired_food_template_id": "",
       "collection": null
@@ -5813,7 +5818,8 @@
       ],
       "effect_id": "next-six-star-catch",
       "effect_params": {
-        "six_star_percent": 60
+        "six_star_percent": 60,
+        "uses": 5
       },
       "paired_food_template_id": "",
       "collection": null
@@ -5839,7 +5845,7 @@
       ],
       "effect_id": "next-high-star-catch",
       "effect_params": {
-        "uses": 5,
+        "uses": 10,
         "four_star_percent": 60,
         "five_star_percent": 30,
         "six_star_percent": 10
@@ -5895,7 +5901,7 @@
       ],
       "effect_id": "next-five-star-cook",
       "effect_params": {
-        "uses": 5
+        "uses": 10
       },
       "paired_food_template_id": "",
       "collection": null
@@ -5922,7 +5928,7 @@
       ],
       "effect_id": "even-catch-distribution",
       "effect_params": {
-        "uses": 5
+        "uses": 10
       },
       "paired_food_template_id": "",
       "collection": null
@@ -6184,7 +6190,8 @@
       ],
       "effect_id": "next-six-star-cook",
       "effect_params": {
-        "six_star_percent": 60
+        "six_star_percent": 60,
+        "uses": 2
       },
       "paired_food_template_id": "",
       "collection": null
@@ -6211,7 +6218,8 @@
       ],
       "effect_id": "next-six-star-catch",
       "effect_params": {
-        "six_star_percent": 60
+        "six_star_percent": 60,
+        "uses": 5
       },
       "paired_food_template_id": "",
       "collection": null
@@ -6237,7 +6245,7 @@
       ],
       "effect_id": "next-high-star-catch",
       "effect_params": {
-        "uses": 5,
+        "uses": 10,
         "four_star_percent": 60,
         "five_star_percent": 30,
         "six_star_percent": 10
@@ -6293,7 +6301,7 @@
       ],
       "effect_id": "next-five-star-cook",
       "effect_params": {
-        "uses": 5
+        "uses": 10
       },
       "paired_food_template_id": "",
       "collection": null
@@ -6320,7 +6328,7 @@
       ],
       "effect_id": "even-catch-distribution",
       "effect_params": {
-        "uses": 5
+        "uses": 10
       },
       "paired_food_template_id": "",
       "collection": null

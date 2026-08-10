@@ -584,6 +584,7 @@ async def test_third_round_templates_render_all_business_views(
         level_progress_percent=42.86,
         daily_count=2,
         daily_limit=30,
+        quota_exempt_catch=True,
         catalog_new=True,
         size_record=True,
     )
@@ -596,6 +597,7 @@ async def test_third_round_templates_render_all_business_views(
     assert "Lv.4 · 抓猪老手" in pig_html
     assert "+45 EXP · 600/800" in pig_html
     assert 'width: 42.86%' in pig_html
+    assert "六星菜专属次数 · 本次未扣正常额度" in pig_html
     await renderer.render_static_pig_card(replace(pig, coin_reward=None), None)
     missing_pig_html, _ = capability.calls[-1]
     assert "素材文件暂时不可用" in missing_pig_html

@@ -24,6 +24,7 @@ from ..domain.errors import (
     ReceiptConflictError,
 )
 from ..domain.food_effects import (
+    QUOTA_EXEMPT_CATCH_EFFECTS,
     active_effect_from_row,
     active_quota_effect_bonuses,
     apply_catch_effects,
@@ -177,6 +178,7 @@ class CatchResult:
     effect_summaries: tuple[str, ...] = ()
     excluded_summaries: tuple[str, ...] = ()
     exclusive_effect_active: bool = False
+    quota_exempt_catch: bool = False
     global_size_record: bool = False
     global_weight_record: bool = False
     giant_sighting: bool = False
@@ -488,6 +490,7 @@ def format_catch_summary(result: CatchResult) -> str:
     body_text = f"体格：{result.pig.body_label}｜{result.pig.body_description}\n" if result.pig.body_label else ""
     effect_text = f"\n美食加成：{'；'.join(result.effect_summaries)}" if result.effect_summaries else ""
     excluded_text = f"\n互斥未叠加：{'；'.join(result.excluded_summaries)}" if result.excluded_summaries else ""
+    quota_text = "\n专属次数：本次未消耗正常抓猪额度" if result.quota_exempt_catch else ""
     probability_line = " ".join(f"{index + 1}★{value:.1f}%" for index, value in enumerate(result.weights) if value > 0)
     probability_source_parts = [
         f"等级 Lv.{progress.level}",
@@ -521,7 +524,7 @@ def format_catch_summary(result: CatchResult) -> str:
         f"本次道具：{item_text}\n"
         f"本次最终概率：{probability_line}\n"
         f"概率来源：{probability_sources}\n"
-        f"群纪录：{record_text}{effect_text}{excluded_text}"
+        f"群纪录：{record_text}{effect_text}{excluded_text}{quota_text}"
     )
 
 
@@ -761,7 +764,7 @@ class GameplayService:
                 identity=identity,
                 now=now,
             )
-            daily_count, last_acquired_at = await self.repository.catch_usage(
+            daily_count, total_catch_count, last_acquired_at = await self.repository.catch_usage(
                 session,
                 player_id=identity.player_id,
                 window_start=window_start,
@@ -825,29 +828,6 @@ class GameplayService:
                 normal_limit=normal_daily_limit,
                 restriction=catch_restriction,
             )
-            if daily_count >= daily_limit:
-                if catch_restriction is not None:
-                    expiry = str(catch_restriction.get("expires_at") or "")
-                    raise DailyCatchLimitError(
-                        "账号处于违规处理期，"
-                        f"本时段额度限制为 {daily_limit} 次；限制截止："
-                        f"{self._restriction_expiry_label(expiry)}。"
-                    )
-                raise DailyCatchLimitError(
-                    f"本时段已经抓了 {daily_count}/{daily_limit} 次，"
-                    f"下次刷新：北京时间 {quota_window.next_refresh_label}。"
-                )
-            using_extra_catch = catch_restriction is None and daily_count >= base_window_limit
-            if using_extra_catch and extra_consumed >= extra_granted:
-                raise DailyCatchLimitError(f"本时段已经抓了 {daily_count}/{daily_limit} 次，额外抓猪机会已用完。")
-            remaining = _cooldown_remaining(
-                now=now_datetime,
-                last_acquired_at=last_acquired_at,
-                cooldown_seconds=self.catching.cooldown_seconds,
-            )
-            if remaining:
-                raise CatchCooldownError(remaining)
-
             templates = await self.repository.list_drawable_pig_templates(
                 session,
                 scope_id=identity.scope.value,
@@ -885,6 +865,42 @@ class GameplayService:
             )
             effect_application = apply_catch_effects(weights, active_effects)
             weights = effect_application.weights
+            consumed_effect_ids = {
+                effect.effect_entry_id: effect.effect_id for effect in active_effects
+            }
+            quota_exempt_catch = any(
+                consumed_effect_ids.get(entry_id) in QUOTA_EXEMPT_CATCH_EFFECTS
+                for entry_id in effect_application.consumed_entry_ids
+            )
+            if catch_restriction is not None and total_catch_count >= daily_limit:
+                expiry = str(catch_restriction.get("expires_at") or "")
+                raise DailyCatchLimitError(
+                    "账号处于违规处理期，"
+                    f"本时段额度限制为 {daily_limit} 次；限制截止："
+                    f"{self._restriction_expiry_label(expiry)}。"
+                )
+            if not quota_exempt_catch and daily_count >= daily_limit:
+                raise DailyCatchLimitError(
+                    f"本时段已经抓了 {daily_count}/{daily_limit} 次，"
+                    f"下次刷新：北京时间 {quota_window.next_refresh_label}。"
+                )
+            using_extra_catch = (
+                not quota_exempt_catch
+                and catch_restriction is None
+                and daily_count >= base_window_limit
+            )
+            if using_extra_catch and extra_consumed >= extra_granted:
+                raise DailyCatchLimitError(
+                    f"本时段已经抓了 {daily_count}/{daily_limit} 次，额外抓猪机会已用完。"
+                )
+            remaining = _cooldown_remaining(
+                now=now_datetime,
+                last_acquired_at=last_acquired_at,
+                cooldown_seconds=self.catching.cooldown_seconds,
+            )
+            if remaining:
+                raise CatchCooldownError(remaining)
+            settled_daily_count = daily_count + (0 if quota_exempt_catch else 1)
             rarity_roll = self.random_source.random()
             rarity = choose_rarity(weights, rarity_roll)
             candidates = buckets[rarity]
@@ -924,6 +940,7 @@ class GameplayService:
                 "current_window_bonus": current_window_bonus,
                 "today_window_bonus": today_window_bonus,
                 "exclusive_effect_active": exclusive_effect_active,
+                "quota_exempt_catch": quota_exempt_catch,
                 "catch_window_limit_restriction_id": (
                     str(catch_restriction["restriction_id"]) if catch_restriction is not None else ""
                 ),
@@ -1072,7 +1089,7 @@ class GameplayService:
                 raise RuntimeError("抓猪实例提交前无法读取。")
             pig = self._pig_view(pig_row)
             payload: dict[str, Any] = {
-                "daily_count": daily_count + 1,
+                "daily_count": settled_daily_count,
                 "daily_limit": daily_limit,
                 "quota_window": quota_window.label,
                 "next_quota_refresh": quota_window.next_refresh_label,
@@ -1093,6 +1110,7 @@ class GameplayService:
                 "effect_summaries": list(effect_application.summaries),
                 "excluded_summaries": list(effect_application.skipped_summaries),
                 "exclusive_effect_active": exclusive_effect_active,
+                "quota_exempt_catch": quota_exempt_catch,
             }
             provisional_receipt = CommandReceipt(
                 receipt_id="",
@@ -1113,7 +1131,7 @@ class GameplayService:
                 pig=pig,
                 receipt=provisional_receipt,
                 receipt_created=True,
-                daily_count=daily_count + 1,
+                daily_count=settled_daily_count,
                 daily_limit=daily_limit,
                 coin_reward=coin_reward,
                 experience_reward=experience_reward,
@@ -1129,6 +1147,7 @@ class GameplayService:
                 effect_summaries=effect_application.summaries,
                 excluded_summaries=effect_application.skipped_summaries,
                 exclusive_effect_active=exclusive_effect_active,
+                quota_exempt_catch=quota_exempt_catch,
                 global_size_record=global_size_record,
                 global_weight_record=global_weight_record,
                 giant_sighting=giant_sighting,
@@ -1151,12 +1170,13 @@ class GameplayService:
                 ),
                 text_summary=summary,
                 now=now,
+                catch_quota_cost=0 if quota_exempt_catch else 1,
             )
             return CatchResult(
                 pig=pig,
                 receipt=reservation.receipt,
                 receipt_created=reservation.created,
-                daily_count=daily_count + 1,
+                daily_count=settled_daily_count,
                 daily_limit=daily_limit,
                 coin_reward=coin_reward,
                 experience_reward=experience_reward,
@@ -1172,6 +1192,7 @@ class GameplayService:
                 effect_summaries=effect_application.summaries,
                 excluded_summaries=effect_application.skipped_summaries,
                 exclusive_effect_active=exclusive_effect_active,
+                quota_exempt_catch=quota_exempt_catch,
                 global_size_record=global_size_record,
                 global_weight_record=global_weight_record,
                 giant_sighting=giant_sighting,
@@ -1251,7 +1272,7 @@ class GameplayService:
             )
             if row is None:
                 raise RuntimeError("玩家档案初始化后无法读取。")
-            daily_count, last_acquired_at = await self.repository.catch_usage(
+            daily_count, _, last_acquired_at = await self.repository.catch_usage(
                 session,
                 player_id=identity.player_id,
                 window_start=window_start,
@@ -1823,6 +1844,7 @@ class GameplayService:
                 str(value) for value in payload.get("excluded_summaries", []) if str(value).strip()
             ),
             exclusive_effect_active=bool(payload.get("exclusive_effect_active") or False),
+            quota_exempt_catch=bool(payload.get("quota_exempt_catch") or False),
             global_size_record=bool(payload.get("global_size_record") or False),
             global_weight_record=bool(payload.get("global_weight_record") or False),
             giant_sighting=bool(payload.get("giant_sighting") or False),

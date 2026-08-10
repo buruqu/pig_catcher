@@ -131,7 +131,7 @@ ITEM_DEFINITIONS: tuple[ItemDefinition, ...] = (
         "超级主厨香料",
         "cooking",
         1180,
-        "下一次用 6 星猪做菜：6 星菜概率额外 +12 个百分点；遇六星菜独占效果时保留不消耗",
+        "下一次用 6 星猪做菜：6 星菜概率额外 +10 个百分点；遇六星菜独占效果时保留不消耗",
     ),
     ItemDefinition(
         "precision-knife",

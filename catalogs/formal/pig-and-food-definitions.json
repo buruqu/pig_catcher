@@ -1757,7 +1757,7 @@
       ],
       "effect_id": "next-six-star-cook-bonus",
       "effect_params": {
-        "bonus_percent": 22
+        "bonus_percent": 15
       }
     },
     {
@@ -1793,7 +1793,8 @@
       "group_scope_id": "qq:1092931381",
       "effect_id": "next-six-star-cook",
       "effect_params": {
-        "six_star_percent": 60
+        "six_star_percent": 60,
+        "uses": 2
       }
     },
     {
@@ -1812,7 +1813,8 @@
       "group_scope_id": "qq:1092931381",
       "effect_id": "next-six-star-catch",
       "effect_params": {
-        "six_star_percent": 60
+        "six_star_percent": 60,
+        "uses": 5
       }
     },
     {
@@ -1848,7 +1850,8 @@
       "group_scope_id": "qq:237716658",
       "effect_id": "next-six-star-cook",
       "effect_params": {
-        "six_star_percent": 60
+        "six_star_percent": 60,
+        "uses": 2
       }
     },
     {
@@ -1867,7 +1870,8 @@
       "group_scope_id": "qq:237716658",
       "effect_id": "next-six-star-catch",
       "effect_params": {
-        "six_star_percent": 60
+        "six_star_percent": 60,
+        "uses": 5
       }
     },
     {
@@ -2339,7 +2343,7 @@
       "group_scope_id": "qq:1092931381",
       "effect_id": "next-high-star-catch",
       "effect_params": {
-        "uses": 5,
+        "uses": 10,
         "four_star_percent": 60,
         "five_star_percent": 30,
         "six_star_percent": 10
@@ -2410,7 +2414,7 @@
       "group_scope_id": "qq:237716658",
       "effect_id": "next-high-star-catch",
       "effect_params": {
-        "uses": 5,
+        "uses": 10,
         "four_star_percent": 60,
         "five_star_percent": 30,
         "six_star_percent": 10
@@ -2574,7 +2578,7 @@
       "group_scope_id": "qq:1092931381",
       "effect_id": "next-five-star-cook",
       "effect_params": {
-        "uses": 5
+        "uses": 10
       }
     },
     {
@@ -2610,7 +2614,7 @@
       "group_scope_id": "qq:237716658",
       "effect_id": "next-five-star-cook",
       "effect_params": {
-        "uses": 5
+        "uses": 10
       }
     },
     {
@@ -2813,7 +2817,7 @@
       "group_scope_id": "qq:1092931381",
       "effect_id": "even-catch-distribution",
       "effect_params": {
-        "uses": 5
+        "uses": 10
       }
     },
     {
@@ -2832,7 +2836,7 @@
       "group_scope_id": "qq:237716658",
       "effect_id": "even-catch-distribution",
       "effect_params": {
-        "uses": 5
+        "uses": 10
       }
     },
     {
@@ -3005,9 +3009,9 @@
         "297期"
       ],
       "group_scope_id": "qq:1092931381",
-      "effect_id": "exclusive-catch-quality",
+      "effect_id": "quota-reset",
       "effect_params": {
-        "multiplier": 3.0
+        "count": 1
       }
     },
     {
@@ -3023,9 +3027,9 @@
         "297期"
       ],
       "group_scope_id": "qq:237716658",
-      "effect_id": "exclusive-catch-quality",
+      "effect_id": "quota-reset",
       "effect_params": {
-        "multiplier": 3.0
+        "count": 1
       }
     },
     {
@@ -3057,9 +3061,9 @@
         "297期"
       ],
       "group_scope_id": "qq-official:5E5854406D0297D6FEAE696A13E3A339",
-      "effect_id": "exclusive-catch-quality",
+      "effect_id": "quota-reset",
       "effect_params": {
-        "multiplier": 3.0
+        "count": 1
       }
     },
     {
@@ -3091,9 +3095,9 @@
         "297期"
       ],
       "group_scope_id": "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
-      "effect_id": "exclusive-catch-quality",
+      "effect_id": "quota-reset",
       "effect_params": {
-        "multiplier": 3.0
+        "count": 1
       }
     },
     {
@@ -3247,7 +3251,8 @@
       "group_scope_id": "qq-official:5E5854406D0297D6FEAE696A13E3A339",
       "effect_id": "next-six-star-cook",
       "effect_params": {
-        "six_star_percent": 60
+        "six_star_percent": 60,
+        "uses": 2
       }
     },
     {
@@ -3266,7 +3271,8 @@
       "group_scope_id": "qq-official:5E5854406D0297D6FEAE696A13E3A339",
       "effect_id": "next-six-star-catch",
       "effect_params": {
-        "six_star_percent": 60
+        "six_star_percent": 60,
+        "uses": 5
       }
     },
     {
@@ -3284,7 +3290,7 @@
       "group_scope_id": "qq-official:5E5854406D0297D6FEAE696A13E3A339",
       "effect_id": "next-high-star-catch",
       "effect_params": {
-        "uses": 5,
+        "uses": 10,
         "four_star_percent": 60,
         "five_star_percent": 30,
         "six_star_percent": 10
@@ -3324,7 +3330,7 @@
       "group_scope_id": "qq-official:5E5854406D0297D6FEAE696A13E3A339",
       "effect_id": "next-five-star-cook",
       "effect_params": {
-        "uses": 5
+        "uses": 10
       }
     },
     {
@@ -3343,7 +3349,7 @@
       "group_scope_id": "qq-official:5E5854406D0297D6FEAE696A13E3A339",
       "effect_id": "even-catch-distribution",
       "effect_params": {
-        "uses": 5
+        "uses": 10
       }
     },
     {
@@ -3497,7 +3503,8 @@
       "group_scope_id": "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
       "effect_id": "next-six-star-cook",
       "effect_params": {
-        "six_star_percent": 60
+        "six_star_percent": 60,
+        "uses": 2
       }
     },
     {
@@ -3516,7 +3523,8 @@
       "group_scope_id": "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
       "effect_id": "next-six-star-catch",
       "effect_params": {
-        "six_star_percent": 60
+        "six_star_percent": 60,
+        "uses": 5
       }
     },
     {
@@ -3534,7 +3542,7 @@
       "group_scope_id": "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
       "effect_id": "next-high-star-catch",
       "effect_params": {
-        "uses": 5,
+        "uses": 10,
         "four_star_percent": 60,
         "five_star_percent": 30,
         "six_star_percent": 10
@@ -3574,7 +3582,7 @@
       "group_scope_id": "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
       "effect_id": "next-five-star-cook",
       "effect_params": {
-        "uses": 5
+        "uses": 10
       }
     },
     {
@@ -3593,7 +3601,7 @@
       "group_scope_id": "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
       "effect_id": "even-catch-distribution",
       "effect_params": {
-        "uses": 5
+        "uses": 10
       }
     },
     {

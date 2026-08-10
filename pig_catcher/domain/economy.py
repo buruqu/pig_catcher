@@ -174,8 +174,8 @@ def adjusted_cooking_weights(
     if rarity is Rarity.SIX:
         weights = list(cooking_weights(rarity))
         if selected_item == "super-chef-spice":
-            weights[4] -= 12.0
-            weights[5] += 12.0
+            weights[4] -= 10.0
+            weights[5] += 10.0
         return normalize_weights(weights)
 
     weights = list(cooking_weights(rarity))

@@ -61,7 +61,7 @@ class GameplayRepository:
         player_id: str,
         window_start: str,
         window_end: str,
-    ) -> tuple[int, str | None]:
+    ) -> tuple[int, int, str | None]:
         row = await session.fetch_one(
             """
             WITH player_scope AS (
@@ -96,7 +96,8 @@ class GameplayRepository:
                 )
             )
             SELECT
-                COUNT(*) AS daily_count,
+                COALESCE(SUM(receipt.catch_quota_cost), 0) AS daily_count,
+                COUNT(*) AS total_count,
                 MAX(receipt.created_at) AS last_acquired_at
             FROM command_receipts AS receipt
             CROSS JOIN effective_window
@@ -118,9 +119,13 @@ class GameplayRepository:
             ),
         )
         if row is None:
-            return 0, None
+            return 0, 0, None
         last = row["last_acquired_at"]
-        return int(row["daily_count"]), str(last) if last is not None else None
+        return (
+            int(row["daily_count"]),
+            int(row["total_count"]),
+            str(last) if last is not None else None,
+        )
 
     async def get_feed_level(self, session: DatabaseSession, *, player_id: str) -> int:
         row = await session.fetch_one(

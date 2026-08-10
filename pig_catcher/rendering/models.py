@@ -117,6 +117,7 @@ class PigCardViewModel:
     level_progress_percent: float = 0.0
     daily_count: int | None = None
     daily_limit: int | None = None
+    quota_exempt_catch: bool = False
     item_name: str = ""
     catalog_new: bool = False
     size_record: bool = False

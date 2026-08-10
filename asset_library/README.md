@@ -1,8 +1,8 @@
 # 本机素材库
 
-`current/` 保存 `v1.9.0` 当前正式素材导入包，并按本次发布要求通过 Git LFS 提交完整
-图片与动画；`archive/` 继续保存本机历史回滚包并被 Git 忽略，整理目录时不得删除。
-本版在 Ruleset 13 商城与四/五星菜平衡包上新增 RAISE A SUILEN 五只公共联动猪，
+`current/` 保存 `v1.13.0` 当前正式素材导入包，并通过 Git LFS 提交完整图片与动画；
+`archive/` 继续保存本机历史回滚包并被 Git 忽略，整理目录时不得删除。本版不改变媒体
+二进制，在 Ruleset 16 中同步重置机会、滚动七天额度和多次六星菜效果参数；
 `current/assets.json` 与 `current/build-report.json` 已按正式定义重建。
 
 | 位置 | 内容 |

@@ -56,7 +56,7 @@ def test_high_rarity_food_effects_cover_new_gameplay_families() -> None:
     assert foods["猪寿司拼盘"]["effect_params"] == {"count": 2}
     assert foods["猪寿司拼盘"]["effect_id"] == "today-window-catches"
     assert foods["一猪六吃"]["effect_id"] == "next-six-star-cook-bonus"
-    assert foods["一猪六吃"]["effect_params"] == {"bonus_percent": 22}
+    assert foods["一猪六吃"]["effect_params"] == {"bonus_percent": 15}
     assert foods["一盒油炸猪"]["effect_id"] == "current-window-catches"
     assert foods["一盒油炸猪"]["effect_params"] == {"count": 2}
     assert foods["猪猪白菜炖粉条"]["effect_params"] == {
@@ -72,21 +72,27 @@ def test_high_rarity_food_effects_cover_new_gameplay_families() -> None:
         "uses": 2,
     }
     assert foods["猪皮奶"]["effect_params"] == {"rarity": 5, "multiplier": 6.0}
-    assert foods["小马猪蒙布朗"]["effect_params"] == {"six_star_percent": 60}
-    assert foods["雾蓝键盘大福"]["effect_params"] == {
+    assert foods["小马猪蒙布朗"]["effect_params"] == {
+        "six_star_percent": 60,
         "uses": 5,
+    }
+    assert foods["雾蓝键盘大福"]["effect_params"] == {
+        "uses": 10,
         "four_star_percent": 60,
         "five_star_percent": 30,
         "six_star_percent": 10,
     }
     assert foods["雾蓝键盘大福"]["effect_id"] == "next-high-star-catch"
     assert foods["彩彩修车猪慕斯"]["effect_id"] == "next-five-star-cook"
-    assert foods["彩彩修车猪慕斯"]["effect_params"] == {"uses": 5}
+    assert foods["彩彩修车猪慕斯"]["effect_params"] == {"uses": 10}
     assert foods["猪保千猪排轮盘"]["effect_id"] == "even-catch-distribution"
-    assert foods["猪保千猪排轮盘"]["effect_params"] == {"uses": 5}
-    assert foods["糖醋排骨"]["effect_id"] == "exclusive-catch-quality"
-    assert foods["糖醋排骨"]["effect_params"] == {"multiplier": 3.0}
-    assert foods["猪鼻蛋包饭"]["effect_params"] == {"six_star_percent": 60}
+    assert foods["猪保千猪排轮盘"]["effect_params"] == {"uses": 10}
+    assert foods["糖醋排骨"]["effect_id"] == "quota-reset"
+    assert foods["糖醋排骨"]["effect_params"] == {"count": 1}
+    assert foods["猪鼻蛋包饭"]["effect_params"] == {
+        "six_star_percent": 60,
+        "uses": 2,
+    }
     assert foods["撅撅猪派"]["effect_params"] == {"count": 1, "max_bonus": 5}
     assert foods["向你道早猪猪巧克力螺"]["effect_params"] == {"count": 5}
     # 每道不同名菜的效果签名必须唯一（群专属双群复制品除外）

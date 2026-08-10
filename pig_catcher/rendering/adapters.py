@@ -176,6 +176,7 @@ def pig_card_view(
         level_progress_percent=(progress.progress_percent if progress is not None else 0.0),
         daily_count=catch.daily_count if catch is not None else None,
         daily_limit=catch.daily_limit if catch is not None else None,
+        quota_exempt_catch=catch.quota_exempt_catch if catch is not None else False,
         item_name=catch.item_name if catch is not None else "",
         catalog_new=catch.catalog_new if catch is not None else False,
         size_record=catch.size_record if catch is not None else pig.is_size_record,

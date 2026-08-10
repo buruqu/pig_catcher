@@ -105,6 +105,7 @@
       <div class="pig-card__receipt-item">
         <span>本时段 / 道具</span>
         <strong>{{ view.daily_count }}/{{ view.daily_limit }} · {{ view.item_name or "无" }}</strong>
+        {% if view.quota_exempt_catch %}<small>六星菜专属次数 · 本次未扣正常额度</small>{% endif %}
       </div>
       {% if view.probability_line %}
       <div class="pig-card__receipt-item" style="grid-column: 1 / -1;flex-direction:column;gap:2px">
