@@ -59,6 +59,7 @@ from .command_state import (
 from .economy import FoodView, food_view_from_row
 from .gameplay import PigView, pig_view_from_row
 from .receipts import request_fingerprint
+from .regulation import RegulationOutcome, RegulationService
 
 _GIFT_COMMAND = "pig-catcher.gift"
 _TRADE_OFFER_COMMAND = "pig-catcher.trade-offer"
@@ -98,6 +99,7 @@ class GiftResult:
     sender_display_name: str
     recipient_display_name: str
     asset: SocialAsset
+    regulation: RegulationOutcome | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -131,6 +133,7 @@ class TradeActionResult:
     trade: TradeView
     buyer_balance: int | None = None
     seller_balance: int | None = None
+    regulation: RegulationOutcome | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -288,6 +291,8 @@ def _showcase_food(food: FoodView) -> ShowcaseAsset:
 
 
 def format_gift_summary(result: GiftResult) -> str:
+    if result.regulation is not None and result.regulation.blocked:
+        return f"【赠送未执行】\n{result.regulation.public_message}"
     return (
         "【赠送成功】\n"
         f"{result.sender_display_name} 将 {result.asset.kind_label}"
@@ -300,6 +305,13 @@ def format_gift_summary(result: GiftResult) -> str:
 
 def format_trade_summary(result: TradeActionResult) -> str:
     trade = result.trade
+    if result.regulation is not None and result.regulation.blocked:
+        return (
+            "【交易未执行】\n"
+            f"交易号：{trade.trade_id}\n"
+            f"物品：{'★' * trade.asset.rarity} {trade.asset.selector}\n"
+            f"{result.regulation.public_message}"
+        )
     balance = ""
     if result.buyer_balance is not None and result.seller_balance is not None:
         balance = (
@@ -380,6 +392,7 @@ class SocialService:
         framework_repository: FrameworkRepository | None = None,
         receipt_repository: ReceiptRepository | None = None,
         restriction_repository: RestrictionRepository | None = None,
+        regulation_service: RegulationService | None = None,
         clock: Clock | None = None,
         id_factory: Callable[[], str] | None = None,
         trade_id_factory: Callable[[], str] | None = None,
@@ -393,6 +406,7 @@ class SocialService:
         self.framework_repository = framework_repository or FrameworkRepository()
         self.receipt_repository = receipt_repository or ReceiptRepository()
         self.restriction_repository = restriction_repository or RestrictionRepository()
+        self.regulation_service = regulation_service
         self.clock = clock or SystemClock()
         self.id_factory = id_factory or (lambda: uuid4().hex)
         self.trade_id_factory = trade_id_factory or (lambda: uuid4().hex[:8].upper())
@@ -437,6 +451,7 @@ class SocialService:
                 return self._gift_from_receipt(existing, receipt_created=False)
             await self._ensure_social_transfer_allowed(
                 session,
+                scope_id=identity.scope.value,
                 player_ids=(identity.player_id, recipient.player_id),
                 restriction_type=GIFT_TRANSFER_BAN,
                 now=now,
@@ -457,6 +472,62 @@ class SocialService:
                 asset_kind=asset_kind,
                 selector_text=selector_text,
             )
+            transfer_event_id = self.id_factory()
+            regulation = None
+            if self.regulation_service is not None:
+                regulation = await self.regulation_service.evaluate_transfer(
+                    session,
+                    scope_id=identity.scope.value,
+                    source_operation_key=idempotency_key,
+                    transfer_event_id=transfer_event_id,
+                    from_player_id=identity.player_id,
+                    to_player_id=recipient.player_id,
+                    asset_kind=asset_kind.value,
+                    asset_instance_id=asset.instance_id,
+                    rarity=asset.rarity,
+                    official_value=asset.official_value,
+                    transfer_type="gift",
+                    price=None,
+                    active_player_ids=(identity.player_id,),
+                    now=now,
+                )
+            if regulation is not None and regulation.blocked:
+                payload = {
+                    "sender_display_name": identity.display_name,
+                    "recipient_display_name": recipient.display_name,
+                    "asset": _asset_payload(asset),
+                    "regulation": regulation.to_payload(),
+                }
+                provisional = GiftResult(
+                    receipt=self._provisional_receipt(
+                        identity=identity,
+                        idempotency_key=idempotency_key,
+                        command_name=_GIFT_COMMAND,
+                        request_payload=request_payload,
+                        result_type="gift-regulation-blocked",
+                        result_object_id=asset.instance_id,
+                        result_payload=payload,
+                        now=now,
+                    ),
+                    receipt_created=True,
+                    sender_display_name=identity.display_name,
+                    recipient_display_name=recipient.display_name,
+                    asset=asset,
+                    regulation=regulation,
+                )
+                receipt = await self._reserve_receipt(
+                    session,
+                    provisional.receipt,
+                    text_summary=format_gift_summary(provisional),
+                )
+                return GiftResult(
+                    receipt=receipt,
+                    receipt_created=True,
+                    sender_display_name=identity.display_name,
+                    recipient_display_name=recipient.display_name,
+                    asset=asset,
+                    regulation=regulation,
+                )
             transferred = await self.repository.transfer_active_asset(
                 session,
                 asset_kind=asset_kind,
@@ -484,7 +555,7 @@ class SocialService:
             )
             await self.repository.insert_transfer_event(
                 session,
-                transfer_event_id=self.id_factory(),
+                transfer_event_id=transfer_event_id,
                 scope_id=identity.scope.value,
                 asset_kind=asset_kind,
                 asset_instance_id=asset.instance_id,
@@ -510,6 +581,7 @@ class SocialService:
                 "sender_display_name": identity.display_name,
                 "recipient_display_name": recipient.display_name,
                 "asset": _asset_payload(asset),
+                "regulation": regulation.to_payload() if regulation is not None else None,
             }
             provisional = GiftResult(
                 receipt=self._provisional_receipt(
@@ -526,6 +598,7 @@ class SocialService:
                 sender_display_name=identity.display_name,
                 recipient_display_name=recipient.display_name,
                 asset=asset,
+                regulation=regulation,
             )
             receipt = await self._reserve_receipt(
                 session,
@@ -538,6 +611,7 @@ class SocialService:
                 sender_display_name=identity.display_name,
                 recipient_display_name=recipient.display_name,
                 asset=asset,
+                regulation=regulation,
             )
 
     async def create_trade(
@@ -588,6 +662,7 @@ class SocialService:
                 )
             await self._ensure_social_transfer_allowed(
                 session,
+                scope_id=identity.scope.value,
                 player_ids=(identity.player_id, recipient.player_id),
                 restriction_type=TRADE_BAN,
                 now=now,
@@ -712,6 +787,7 @@ class SocialService:
             trade = self._trade_from_row(row)
             await self._ensure_social_transfer_allowed(
                 session,
+                scope_id=identity.scope.value,
                 player_ids=(
                     trade.sender_player_id,
                     trade.recipient_player_id,
@@ -719,6 +795,89 @@ class SocialService:
                 restriction_type=TRADE_BAN,
                 now=now,
             )
+            transfer_event_id = self.id_factory()
+            regulation = None
+            if self.regulation_service is not None:
+                regulation = await self.regulation_service.evaluate_transfer(
+                    session,
+                    scope_id=identity.scope.value,
+                    source_operation_key=idempotency_key,
+                    transfer_event_id=transfer_event_id,
+                    from_player_id=trade.sender_player_id,
+                    to_player_id=trade.recipient_player_id,
+                    asset_kind=trade.asset.asset_kind.value,
+                    asset_instance_id=trade.asset.instance_id,
+                    rarity=trade.asset.rarity,
+                    official_value=trade.asset.official_value,
+                    transfer_type="trade",
+                    price=trade.price,
+                    active_player_ids=(
+                        trade.sender_player_id,
+                        trade.recipient_player_id,
+                    ),
+                    now=now,
+                )
+            if regulation is not None and regulation.blocked:
+                await self.repository.resolve_trade(
+                    session,
+                    trade_id=trade.trade_id,
+                    expected_status=TradeStatus.PENDING,
+                    new_status=TradeStatus.CANCELLED,
+                    now=now,
+                )
+                await self.repository.unlock_trade_asset(
+                    session,
+                    asset_kind=trade.asset.asset_kind,
+                    asset_instance_id=trade.asset.instance_id,
+                    trade_id=trade.trade_id,
+                    now=now,
+                )
+                cancelled = TradeView(
+                    trade_id=trade.trade_id,
+                    sender_player_id=trade.sender_player_id,
+                    sender_display_name=trade.sender_display_name,
+                    recipient_player_id=trade.recipient_player_id,
+                    recipient_display_name=trade.recipient_display_name,
+                    asset=trade.asset,
+                    price=trade.price,
+                    status=TradeStatus.CANCELLED,
+                    created_at=trade.created_at,
+                    expires_at=trade.expires_at,
+                    resolved_at=now,
+                )
+                payload = self._trade_payload(
+                    cancelled,
+                    operation="regulation-blocked",
+                    regulation=regulation,
+                )
+                provisional = TradeActionResult(
+                    receipt=self._provisional_receipt(
+                        identity=identity,
+                        idempotency_key=idempotency_key,
+                        command_name=_TRADE_ACCEPT_COMMAND,
+                        request_payload=request_payload,
+                        result_type="trade-regulation-blocked",
+                        result_object_id=trade.trade_id,
+                        result_payload=payload,
+                        now=now,
+                    ),
+                    receipt_created=True,
+                    operation="regulation-blocked",
+                    trade=cancelled,
+                    regulation=regulation,
+                )
+                receipt = await self._reserve_receipt(
+                    session,
+                    provisional.receipt,
+                    text_summary=format_trade_summary(provisional),
+                )
+                return TradeActionResult(
+                    receipt=receipt,
+                    receipt_created=True,
+                    operation="regulation-blocked",
+                    trade=cancelled,
+                    regulation=regulation,
+                )
             buyer_balance = await self.economy_repository.apply_currency_change(
                 session,
                 player_id=trade.recipient_player_id,
@@ -793,7 +952,7 @@ class SocialService:
             )
             await self.repository.insert_transfer_event(
                 session,
-                transfer_event_id=self.id_factory(),
+                transfer_event_id=transfer_event_id,
                 scope_id=identity.scope.value,
                 asset_kind=trade.asset.asset_kind,
                 asset_instance_id=trade.asset.instance_id,
@@ -831,6 +990,7 @@ class SocialService:
                 operation="accepted",
                 buyer_balance=buyer_balance,
                 seller_balance=seller_balance,
+                regulation=regulation,
             )
             provisional = TradeActionResult(
                 receipt=self._provisional_receipt(
@@ -848,6 +1008,7 @@ class SocialService:
                 trade=accepted,
                 buyer_balance=buyer_balance,
                 seller_balance=seller_balance,
+                regulation=regulation,
             )
             receipt = await self._reserve_receipt(
                 session,
@@ -861,6 +1022,7 @@ class SocialService:
                 trade=accepted,
                 buyer_balance=buyer_balance,
                 seller_balance=seller_balance,
+                regulation=regulation,
             )
 
     async def reject_trade(
@@ -1480,6 +1642,7 @@ class SocialService:
         self,
         session: DatabaseSession,
         *,
+        scope_id: str,
         player_ids: tuple[str, ...],
         restriction_type: str,
         now: str,
@@ -1502,7 +1665,18 @@ class SocialService:
             now=now,
         )
         if not restrictions:
-            return
+            if self.regulation_service is None:
+                return
+            hold = await self.regulation_service.current_hold(
+                session,
+                scope_id=scope_id,
+                player_ids=player_ids,
+                hold_types=("social", "plugin"),
+                now=now,
+            )
+            if hold is None:
+                return
+            raise SocialTransferRestrictedError(hold.public_message)
         if restriction_type == GIFT_TRANSFER_BAN:
             operation = "赠送或收赠任何猪猪和美食"
         else:
@@ -1558,6 +1732,7 @@ class SocialService:
         operation: str,
         buyer_balance: int | None = None,
         seller_balance: int | None = None,
+        regulation: RegulationOutcome | None = None,
     ) -> dict[str, object]:
         return {
             "operation": operation,
@@ -1576,6 +1751,7 @@ class SocialService:
             },
             "buyer_balance": buyer_balance,
             "seller_balance": seller_balance,
+            "regulation": regulation.to_payload() if regulation is not None else None,
         }
 
     @staticmethod
@@ -1613,6 +1789,7 @@ class SocialService:
             trade=trade,
             buyer_balance=int(buyer) if buyer is not None else None,
             seller_balance=int(seller) if seller is not None else None,
+            regulation=RegulationOutcome.from_payload(payload.get("regulation")),
         )
 
     @staticmethod
@@ -1631,6 +1808,7 @@ class SocialService:
             sender_display_name=str(payload["sender_display_name"]),
             recipient_display_name=str(payload["recipient_display_name"]),
             asset=_asset_from_payload(asset_payload),
+            regulation=RegulationOutcome.from_payload(payload.get("regulation")),
         )
 
     @staticmethod

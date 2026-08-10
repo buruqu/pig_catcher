@@ -17,6 +17,7 @@ from .v0013_quota_window_boosts import MIGRATION_0013
 from .v0014_batch_keep_highest import MIGRATION_0014
 from .v0015_admin_commands import MIGRATION_0015
 from .v0016_alphanumeric_short_codes import MIGRATION_0016
+from .v0017_automatic_regulation import MIGRATION_0017
 
 MIGRATIONS: tuple[Migration, ...] = (
     MIGRATION_0001,
@@ -35,6 +36,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     MIGRATION_0014,
     MIGRATION_0015,
     MIGRATION_0016,
+    MIGRATION_0017,
 )
 
 __all__ = ["MIGRATIONS", "Migration"]

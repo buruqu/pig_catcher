@@ -1,6 +1,6 @@
 [plugin]
 enabled = true
-config_version = "1.11.0"
+config_version = "1.12.0"
 framework_phase = "6"
 
 [features]
@@ -110,6 +110,20 @@ trade_enabled = true
 max_trade_price = 1000000
 offer_expiry_minutes = 5
 trade_page_size = 8
+
+[regulation]
+mode = "自动执行"
+enabled_scope_ids = [
+    "qq:237716658",
+    "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
+]
+lookback_days = 7
+warning_score = 40
+notice_cooldown_minutes = 10
+social_hold_hours = 24
+plugin_hold_hours = 72
+repeat_ban_days = 7
+severe_repeat_ban_days = 30
 
 [ranking]
 ranking_page_size = 10

@@ -54,6 +54,25 @@ def _validate_user_ids(values: list[str]) -> list[str]:
     return normalized
 
 
+def _validate_scope_ids(values: list[str]) -> list[str]:
+    normalized: list[str] = []
+    for raw_value in values:
+        value = str(raw_value or "").strip()
+        platform, separator, group_id = value.partition(":")
+        if (
+            not separator
+            or not platform
+            or not group_id
+            or ":" in group_id
+            or _validate_platform(platform) != platform
+            or _validate_group_id(group_id) != group_id
+        ):
+            raise ValueError("自动监管作用域必须使用 platform:group_id，例如 qq:237716658")
+        if value not in normalized:
+            normalized.append(value)
+    return normalized
+
+
 class PluginSection(PluginConfigBase):
     """插件启停与版本。"""
 
@@ -635,6 +654,92 @@ class TradingSection(PluginConfigBase):
     )
 
 
+class RegulationSection(PluginConfigBase):
+    """赠送与成交交易共用的群级自动监管策略。"""
+
+    __ui_label__ = "自动监管"
+    __ui_icon__ = "shield-alert"
+    __ui_order__ = 82
+
+    mode: Literal["关闭", "仅提醒", "自动执行"] = Field(
+        default="自动执行",
+        description="自动监管运行模式",
+        json_schema_extra=_ui(
+            "监管模式",
+            "群内只发送行为提醒，不公开风险分、阈值或证据；仅提醒模式不会自动限制",
+        ),
+    )
+    enabled_scope_ids: list[str] = Field(
+        default_factory=lambda: [
+            "qq:237716658",
+            "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
+        ],
+        max_length=20,
+        description="启用自动监管的精确平台群作用域",
+        json_schema_extra=_ui(
+            "启用作用域",
+            "每行一个 platform:group_id；不同平台与群完全独立计算",
+        ),
+    )
+    lookback_days: int = Field(
+        default=7,
+        ge=1,
+        le=30,
+        description="分析赠送与成交资产流向的滚动天数",
+        json_schema_extra=_ui("分析窗口", "默认回看 7 天；只处理启用作用域中的流转"),
+    )
+    warning_score: int = Field(
+        default=40,
+        ge=1,
+        le=200,
+        description="创建内部监管案件并提醒的最低分",
+        json_schema_extra=_ui(
+            "内部提醒阈值",
+            "仅管理员可见；群内消息不会显示分数、阈值或计算方式",
+        ),
+    )
+    notice_cooldown_minutes: int = Field(
+        default=10,
+        ge=1,
+        le=1440,
+        description="限制期间重复尝试的提醒与升级最短间隔",
+        json_schema_extra=_ui("重复提醒间隔", "防止连点命令造成刷屏或瞬间多级升级"),
+    )
+    social_hold_hours: int = Field(
+        default=24,
+        ge=1,
+        le=168,
+        description="多次提醒后赠送与交易功能限制时长",
+        json_schema_extra=_ui("社交限制时长", "默认 24 小时，到期自动恢复"),
+    )
+    plugin_hold_hours: int = Field(
+        default=72,
+        ge=1,
+        le=720,
+        description="首次插件临时封禁时长",
+        json_schema_extra=_ui("首次插件封禁", "默认 72 小时；配置管理员不自动封禁"),
+    )
+    repeat_ban_days: int = Field(
+        default=7,
+        ge=1,
+        le=90,
+        description="三十天内再次进入插件封禁时长",
+        json_schema_extra=_ui("再次封禁", "默认 7 天；历史处罚与新证据均保留审计"),
+    )
+    severe_repeat_ban_days: int = Field(
+        default=30,
+        ge=1,
+        le=365,
+        description="九十天内第三次进入插件封禁时长",
+        json_schema_extra=_ui("严重重复封禁", "默认 30 天；永久封禁仍只能人工确认"),
+    )
+
+    @field_validator("enabled_scope_ids")
+    @classmethod
+    def validate_enabled_scope_ids(cls, value: list[str]) -> list[str]:
+        return _validate_scope_ids(value)
+
+
 class RankingSection(PluginConfigBase):
     """群纪录、体格标签和排行榜规则。"""
 
@@ -1012,6 +1117,7 @@ class PigCatcherConfig(PluginConfigBase):
     cooking: CookingSection = Field(default_factory=CookingSection)
     economy: EconomySection = Field(default_factory=EconomySection)
     trading: TradingSection = Field(default_factory=TradingSection)
+    regulation: RegulationSection = Field(default_factory=RegulationSection)
     ranking: RankingSection = Field(default_factory=RankingSection)
     rendering: RenderingSection = Field(default_factory=RenderingSection)
     quota_administration: QuotaAdministrationSection = Field(

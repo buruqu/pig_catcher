@@ -778,6 +778,11 @@ def test_default_config_exposes_fixed_rules_and_chinese_schema() -> None:
     assert config.features.ledger_enabled is True
     assert config.trading.gift_enabled is True
     assert config.trading.trade_enabled is True
+    assert config.regulation.mode == "自动执行"
+    assert config.regulation.enabled_scope_ids == [
+        "qq:237716658",
+        "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
+    ]
     assert config.ranking.giant_size_threshold_cm == 120.0
     assert config.ranking.giant_weight_threshold_kg == 350.0
     schema = PigCatcherConfig.model_json_schema()
@@ -788,6 +793,7 @@ def test_default_config_exposes_fixed_rules_and_chinese_schema() -> None:
     assert "重置当前时段" in serialized
     assert "赠送/收赠黑名单" in serialized
     assert "公告正文" in serialized
+    assert "自动监管" in serialized
     assert config.blacklist_administration.__ui_label__ == "社交黑名单"
     assert config.announcement_administration.__ui_label__ == "群公告发送"
 

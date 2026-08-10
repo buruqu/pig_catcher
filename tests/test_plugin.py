@@ -236,7 +236,7 @@ async def test_group_reset_command_rejects_unconfigured_user_before_backup(
 def test_plugin_registers_only_explicit_production_commands() -> None:
     plugin = create_plugin()
     components = plugin.get_components()
-    assert len(components) == 45
+    assert len(components) == 47
     commands = {
         component["name"]
         for component in components
@@ -254,6 +254,8 @@ def test_plugin_registers_only_explicit_production_commands() -> None:
         "pig_catcher_admin_grant_asset",
         "pig_catcher_admin_remove_asset",
         "pig_catcher_admin_blacklist",
+        "pig_catcher_admin_regulation",
+        "pig_catcher_admin_regulation_release",
         "pig_catcher_admin_reset_player_quota",
         "pig_catcher_catch",
         "pig_catcher_profile",
@@ -296,6 +298,7 @@ def test_plugin_registers_only_explicit_production_commands() -> None:
     assert home_card["name"] == "pig_catcher_quota_control"
     assert "打开运营控制" in str(home_card)
     assert "社交黑名单" in str(home_card)
+    assert "自动监管" in str(home_card)
     assert "群公告" in str(home_card)
     assert "/plugin-config?plugin=local.pig-catcher" in str(home_card)
     serialized = str(components)
@@ -368,6 +371,13 @@ def test_admin_command_patterns_claim_only_the_documented_syntax() -> None:
         "pig_catcher_admin_blacklist": (
             "/猪管黑名单",
             "/猪管黑名单 加入 交易 @玩家 复核原因",
+        ),
+        "pig_catcher_admin_regulation": (
+            "/猪管监管",
+            "/猪管监管 ABCD1234",
+        ),
+        "pig_catcher_admin_regulation_release": (
+            "/猪管监管解除 ABCD1234 人工复核通过",
         ),
         "pig_catcher_admin_reset_player_quota": ("/猪管重置玩家 @玩家",),
     }

@@ -49,6 +49,7 @@ from .quota import (
     effective_catch_limit,
     normalize_quota_refresh_hours,
 )
+from .regulation import RegulationAnalysis, TransferSignal, analyze_transfer_graph
 from .social import (
     RANKING_TYPES,
     BodyScale,
@@ -85,12 +86,15 @@ __all__ = [
     "Rarity",
     "RANKING_TYPES",
     "ReceiptSendStatus",
+    "RegulationAnalysis",
     "ScopeKey",
     "StoreProduct",
     "StatureProfile",
     "TemplateScope",
+    "TransferSignal",
     "UPGRADE_DISPLAY_NAMES",
     "adjusted_cooking_weights",
+    "analyze_transfer_graph",
     "build_store_products",
     "generate_food_attributes",
     "generate_pig_attributes",

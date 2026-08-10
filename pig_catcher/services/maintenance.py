@@ -11,7 +11,11 @@ from pathlib import Path
 from ..assets import AssetCatalogStorage
 from ..domain.ports import Clock, SystemClock
 from ..infrastructure.database import PigCatcherDatabase
-from ..infrastructure.repositories import OperationsRepository, SocialRepository
+from ..infrastructure.repositories import (
+    OperationsRepository,
+    RegulationRepository,
+    SocialRepository,
+)
 from .command_state import iso_timestamp
 
 
@@ -36,6 +40,7 @@ class MaintenanceReport:
     removed_backups: int
     removed_staging_directories: int
     expired_trade_offers: int
+    expired_regulation_holds: int
     ledger_mismatch_count: int
     active_asset_file_count: int
     missing_asset_file_count: int
@@ -55,6 +60,7 @@ class MaintenanceRunner:
         clock: Clock | None = None,
         social_repository: SocialRepository | None = None,
         operations_repository: OperationsRepository | None = None,
+        regulation_repository: RegulationRepository | None = None,
     ) -> None:
         self.database = database
         self.storage = storage
@@ -64,6 +70,7 @@ class MaintenanceRunner:
         self.clock = clock or SystemClock()
         self.social_repository = social_repository or SocialRepository()
         self.operations_repository = operations_repository or OperationsRepository()
+        self.regulation_repository = regulation_repository or RegulationRepository()
         self.backups_dir = self.data_dir / "backups"
         self._stop_event = asyncio.Event()
         self._task: asyncio.Task[None] | None = None
@@ -105,12 +112,13 @@ class MaintenanceRunner:
                     )
                 self.logger.info(
                     "抓猪生产巡检完成：完整性=%s，账本异常=%s，素材缺失=%s/%s，"
-                    "过期报价=%s，备份=%s",
+                    "过期报价=%s，过期监管限制=%s，备份=%s",
                     ",".join(report.integrity_results) or "未检查",
                     report.ledger_mismatch_count,
                     report.missing_asset_file_count,
                     report.active_asset_file_count,
                     report.expired_trade_offers,
+                    report.expired_regulation_holds,
                     report.backup_path.name if report.backup_path is not None else "未到周期",
                 )
             except Exception:
@@ -125,9 +133,14 @@ class MaintenanceRunner:
 
     async def run_once(self) -> MaintenanceReport:
         async with self.database.transaction() as session:
+            now = iso_timestamp(self.clock.now())
             expired_trade_offers = await self.social_repository.expire_stale_offers(
                 session,
-                now=iso_timestamp(self.clock.now()),
+                now=now,
+            )
+            expired_regulation_holds = await self.regulation_repository.expire_holds(
+                session,
+                now=now,
             )
             ledger_mismatch_count = await self.operations_repository.balance_mismatch_count(
                 session
@@ -154,6 +167,7 @@ class MaintenanceRunner:
             removed_backups=removed_backups,
             removed_staging_directories=removed_staging,
             expired_trade_offers=expired_trade_offers,
+            expired_regulation_holds=expired_regulation_holds,
             ledger_mismatch_count=ledger_mismatch_count,
             active_asset_file_count=len(active_asset_paths),
             missing_asset_file_count=missing_asset_file_count,

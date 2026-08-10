@@ -109,6 +109,7 @@ from .pig_catcher.services import (
     MaintenanceRunner,
     PigView,
     ReceiptService,
+    RegulationService,
     RestrictionAdminService,
     SocialService,
     format_batch_sale_summary,
@@ -168,6 +169,7 @@ class PigCatcherPlugin(MaiBotPlugin):
         self._economy_service: EconomyService | None = None
         self._social_service: SocialService | None = None
         self._receipt_service: ReceiptService | None = None
+        self._regulation_service: RegulationService | None = None
         self._quota_reset_service: CatchQuotaResetService | None = None
         self._administration_service: AdministrationService | None = None
         self._restriction_admin_service: RestrictionAdminService | None = None
@@ -324,10 +326,17 @@ class PigCatcherPlugin(MaiBotPlugin):
                 quota_refresh_hours=settings.catching.quota_refresh_hours,
                 quota_timezone_name=settings.catching.daily_reset_timezone,
             )
+            regulation_service = RegulationService(
+                database,
+                settings.regulation,
+                admin_user_ids=settings.access.admin_user_ids,
+            )
+            self._regulation_service = regulation_service
             self._social_service = SocialService(
                 database,
                 settings.trading,
                 settings.ranking,
+                regulation_service=regulation_service,
             )
             self._receipt_service = ReceiptService(database)
             self._quota_reset_service = CatchQuotaResetService(
@@ -377,6 +386,7 @@ class PigCatcherPlugin(MaiBotPlugin):
         self._restriction_admin_service = None
         self._announcement_admin_service = None
         self._receipt_service = None
+        self._regulation_service = None
         self._economy_service = None
         self._social_service = None
         self._gameplay_service = None
@@ -582,13 +592,14 @@ class PigCatcherPlugin(MaiBotPlugin):
     @HomeCard(
         "pig_catcher_quota_control",
         title="抓猪运营管理",
-        description="集中管理额度重置、社交黑名单和群公告发送。",
+        description="集中管理额度、社交黑名单、群公告与自动监管。",
         content=[
             {
                 "type": "key_value",
                 "entries": {
                     "每日刷新": "00:00 / 09:00 / 12:00 / 19:00",
                     "黑名单": "赠送/收赠与交易分别管理",
+                    "自动监管": "237716658 / 官方群 CEAB3520",
                     "群公告": "使用目标群最近活跃线路",
                 },
             },
@@ -596,7 +607,8 @@ class PigCatcherPlugin(MaiBotPlugin):
                 "type": "markdown",
                 "content": (
                     "点击下方按钮进入插件配置。所有写操作均为一次性开关；"
-                    "黑名单变更会先在线备份，公告失败不会自动重发。"
+                    "黑名单变更会先在线备份，公告失败不会自动重发；"
+                    "监管案件可用 /猪管监管 查看并人工解除。"
                 ),
             },
             {
@@ -790,6 +802,18 @@ class PigCatcherPlugin(MaiBotPlugin):
                 )
                 return None, rejected
             return None, (False, "", 0)
+        regulation = self._regulation_service
+        if regulation is not None:
+            hold = await regulation.active_plugin_hold(identity)
+            if hold is not None:
+                if self.settings.access.notify_denied:
+                    rejected = await self._reply_text(
+                        identity.stream_id,
+                        hold.public_message,
+                        success=False,
+                    )
+                    return None, rejected
+                return None, (False, "", 0)
         if not feature_enabled:
             rejected = await self._reply_text(
                 identity.stream_id,
@@ -891,6 +915,41 @@ class PigCatcherPlugin(MaiBotPlugin):
             return True, receipt.text_summary, 2
         await receipts.mark_failed(receipt.receipt_id, "纯文字发送未成功")
         return False, receipt.text_summary, 1
+
+    async def _deliver_regulation_notices(
+        self,
+        *,
+        stream_id: str,
+        notice_ids: tuple[str, ...],
+    ) -> None:
+        """逐条投递中性提醒；只有真实发送成功才启动后续升级计数。"""
+
+        service = self._regulation_service
+        if service is None:
+            return
+        for notice_id in dict.fromkeys(notice_ids):
+            notice = await service.claim_notice(notice_id)
+            if notice is None:
+                continue
+            try:
+                sent = bool(await self.ctx.send.text(notice.message_text, stream_id))
+            except Exception as exc:
+                await service.mark_notice_failed(notice.notice_id, str(exc))
+                self.ctx.logger.exception(
+                    "自动监管提醒发送失败：case=%s，notice=%s",
+                    notice.case_id,
+                    notice.notice_id,
+                )
+                continue
+            if sent:
+                if not await service.mark_notice_sent(notice.notice_id):
+                    self.ctx.logger.error(
+                        "自动监管提醒已发送但无法标记完成：case=%s，notice=%s",
+                        notice.case_id,
+                        notice.notice_id,
+                    )
+            else:
+                await service.mark_notice_failed(notice.notice_id, "纯文字发送未成功")
 
     async def _render_pig_card(
         self,
@@ -1139,6 +1198,8 @@ class PigCatcherPlugin(MaiBotPlugin):
                 "/猪管删菜 <@玩家|用户ID> <美食名#编号>",
                 "/猪管黑名单",
                 "/猪管黑名单 <加入|移除> <插件|赠送|交易> <@玩家|用户ID> [原因]",
+                "/猪管监管 [案件号]",
+                "/猪管监管解除 <案件号> [原因]",
                 "/猪管重置玩家 <@玩家|用户ID>",
                 "",
                 "所有操作只作用于当前群；全员指当前群已登记玩家。",
@@ -1146,6 +1207,142 @@ class PigCatcherPlugin(MaiBotPlugin):
             )
         )
         return await self._reply_text(identity.stream_id, text, success=True)
+
+    @Command(
+        "pig_catcher_admin_regulation",
+        description="插件管理员查看当前群自动监管案件",
+        pattern=r"^/猪管监管(?:\s+(?P<case_id>\S+))?\s*$",
+    )
+    async def handle_admin_regulation(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_admin_command(stream_id, kwargs)
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        service = self._regulation_service
+        if service is None:
+            return await self._reply_text(
+                identity.stream_id,
+                "自动监管服务尚未就绪，请稍后再试。",
+                success=False,
+            )
+        try:
+            status_labels = {
+                "watching": "已提醒观察",
+                "supervised": "监管中",
+                "social-restricted": "社交功能临时限制",
+                "plugin-restricted": "插件临时限制",
+                "closed": "已关闭",
+                "dismissed": "已人工解除",
+            }
+            case_id = matched_group(kwargs, "case_id").strip()
+            enabled_text = (
+                "已启用"
+                if service.scope_enabled(identity.scope.value)
+                else "未启用（不会新建案件或自动限制）"
+            )
+            if not case_id:
+                cases = await service.list_cases(scope_id=identity.scope.value)
+                lines = [
+                    "【猪管·自动监管】",
+                    f"当前群：{identity.scope.value}",
+                    f"状态：{enabled_text}",
+                ]
+                if not cases:
+                    lines.append("当前没有监管案件。")
+                for item in cases:
+                    lines.append(
+                        f"{item.case_id[:8]}｜{status_labels.get(item.status, item.status)}｜"
+                        f"相关账号 {item.member_count}｜生效限制 {item.active_hold_count}｜"
+                        f"更新 {item.updated_at}"
+                    )
+                lines.append("查看：/猪管监管 <案件号前缀>")
+                return await self._reply_text(
+                    identity.stream_id,
+                    "\n".join(lines),
+                    success=True,
+                )
+            detail = await service.case_detail(
+                scope_id=identity.scope.value,
+                case_id_prefix=case_id,
+            )
+            summary = detail.summary
+            lines = [
+                "【猪管·监管案件】",
+                f"案件号：{summary.case_id[:12]}",
+                f"状态：{status_labels.get(summary.status, summary.status)}",
+                f"最近更新：{summary.updated_at}",
+                "相关账号：",
+            ]
+            lines.extend(
+                f"- {row['display_name']}（{row['platform_user_id']}）"
+                for row in detail.members
+            )
+            active_holds = [row for row in detail.holds if row["status"] == "active"]
+            if active_holds:
+                lines.append("当前临时限制：")
+                lines.extend(
+                    f"- {row['display_name']}｜"
+                    f"{'插件' if row['hold_type'] == 'plugin' else '赠送与交易'}｜"
+                    f"至 {row['expires_at']}"
+                    for row in active_holds
+                )
+            lines.append("人工解除：/猪管监管解除 <案件号> [原因]")
+            return await self._reply_text(
+                identity.stream_id,
+                "\n".join(lines),
+                success=True,
+            )
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation="查看自动监管案件",
+                error=exc,
+            )
+
+    @Command(
+        "pig_catcher_admin_regulation_release",
+        description="插件管理员人工解除当前群监管案件和临时限制",
+        pattern=(
+            r"^/猪管监管解除\s+(?P<case_id>\S+)"
+            r"(?:\s+(?P<reason>.*?))?\s*$"
+        ),
+    )
+    async def handle_admin_regulation_release(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_admin_command(stream_id, kwargs)
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        service = self._regulation_service
+        if service is None:
+            return await self._reply_text(
+                identity.stream_id,
+                "自动监管服务尚未就绪，请稍后再试。",
+                success=False,
+            )
+        try:
+            case_id = matched_group(kwargs, "case_id").strip()
+            reason = matched_group(kwargs, "reason").strip() or "管理员人工复核解除"
+            result = await service.release_case(
+                identity=identity,
+                case_id_prefix=case_id,
+                reason=reason,
+            )
+            return await self._deliver_text_receipt(
+                stream_id=identity.stream_id,
+                receipt=result.receipt,
+            )
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation="解除自动监管案件",
+                error=exc,
+            )
 
     @Command(
         "pig_catcher_admin_grant_coins",
@@ -2548,14 +2745,26 @@ class PigCatcherPlugin(MaiBotPlugin):
             )
             renderer = cast(PigCatcherRenderer, self._renderer)
             fallback = result.receipt.text_summary or format_gift_summary(result)
-            return await self._deliver_receipt(
-                stream_id=identity.stream_id,
-                receipt=result.receipt,
-                render=lambda: renderer.render_economy_receipt(
-                    gift_receipt_view(result)
-                ),
-                fallback_text=fallback,
-            )
+            if result.regulation is not None and result.regulation.blocked:
+                delivered = await self._deliver_text_receipt(
+                    stream_id=identity.stream_id,
+                    receipt=result.receipt,
+                )
+            else:
+                delivered = await self._deliver_receipt(
+                    stream_id=identity.stream_id,
+                    receipt=result.receipt,
+                    render=lambda: renderer.render_economy_receipt(
+                        gift_receipt_view(result)
+                    ),
+                    fallback_text=fallback,
+                )
+            if result.regulation is not None:
+                await self._deliver_regulation_notices(
+                    stream_id=identity.stream_id,
+                    notice_ids=result.regulation.notice_ids,
+                )
+            return delivered
         except Exception as exc:
             return await self._command_error(
                 stream_id=identity.stream_id,
@@ -2709,14 +2918,26 @@ class PigCatcherPlugin(MaiBotPlugin):
             )
             renderer = cast(PigCatcherRenderer, self._renderer)
             fallback = result.receipt.text_summary or format_trade_summary(result)
-            return await self._deliver_receipt(
-                stream_id=identity.stream_id,
-                receipt=result.receipt,
-                render=lambda: renderer.render_economy_receipt(
-                    trade_receipt_view(result)
-                ),
-                fallback_text=fallback,
-            )
+            if result.regulation is not None and result.regulation.blocked:
+                delivered = await self._deliver_text_receipt(
+                    stream_id=identity.stream_id,
+                    receipt=result.receipt,
+                )
+            else:
+                delivered = await self._deliver_receipt(
+                    stream_id=identity.stream_id,
+                    receipt=result.receipt,
+                    render=lambda: renderer.render_economy_receipt(
+                        trade_receipt_view(result)
+                    ),
+                    fallback_text=fallback,
+                )
+            if result.regulation is not None:
+                await self._deliver_regulation_notices(
+                    stream_id=identity.stream_id,
+                    notice_ids=result.regulation.notice_ids,
+                )
+            return delivered
         except Exception as exc:
             return await self._command_error(
                 stream_id=identity.stream_id,

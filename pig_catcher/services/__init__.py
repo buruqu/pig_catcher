@@ -61,6 +61,15 @@ from .quota import (
     QuotaWindowBoostResult,
 )
 from .receipts import ReceiptService
+from .regulation import (
+    RegulationCaseDetail,
+    RegulationCaseSummary,
+    RegulationHold,
+    RegulationNotice,
+    RegulationOutcome,
+    RegulationReleaseResult,
+    RegulationService,
+)
 from .restrictions import (
     AnnouncementAdminService,
     AnnouncementClaim,
@@ -128,6 +137,13 @@ __all__ = [
     "RecordsPage",
     "PurchaseResult",
     "ReceiptService",
+    "RegulationCaseDetail",
+    "RegulationCaseSummary",
+    "RegulationHold",
+    "RegulationNotice",
+    "RegulationOutcome",
+    "RegulationReleaseResult",
+    "RegulationService",
     "RestrictionAdminService",
     "RestrictionBatchResult",
     "SocialBlacklistUpdateResult",
