@@ -79,7 +79,7 @@ async def test_empty_database_migrates_and_passes_integrity_check(tmp_path: Path
 
 
 @pytest.mark.asyncio
-async def test_v18_migrates_active_food_effects_and_rolling_expiry(
+async def test_v19_repairs_legacy_six_ways_effect_and_preserves_v18_rebalance(
     tmp_path: Path,
 ) -> None:
     path = tmp_path / "v17-food-effects.sqlite3"
@@ -94,7 +94,7 @@ async def test_v18_migrates_active_food_effects_and_rolling_expiry(
         )
         """
     )
-    for migration in MIGRATIONS[:-1]:
+    for migration in MIGRATIONS[:-2]:
         for statement in migration.statements:
             connection.execute(statement)
         connection.execute(
@@ -142,7 +142,7 @@ async def test_v18_migrates_active_food_effects_and_rolling_expiry(
         ),
         "彩彩修车猪慕斯": ("next-five-star-cook", '{"uses":5}', 5),
         "猪保千猪排轮盘": ("even-catch-distribution", '{"uses":5}', 5),
-        "一猪六吃": ("next-six-star-cook-bonus", '{"bonus_percent":22}', 1),
+        "一猪六吃": ("next-six-star-cook", '{"six_star_percent":50}', 1),
     }
     for index, (name, (effect_id, params, granted_uses)) in enumerate(
         old_effects.items(),
@@ -256,7 +256,7 @@ async def test_v18_migrates_active_food_effects_and_rolling_expiry(
 
     database = PigCatcherDatabase(path)
     await database.open()
-    assert await database.schema_version() == 18
+    assert await database.schema_version() == 19
     templates = await database.fetch_all(
         "SELECT display_name, effect_id, effect_params_json FROM food_templates ORDER BY display_name"
     )
@@ -296,6 +296,11 @@ async def test_v18_migrates_active_food_effects_and_rolling_expiry(
     assert active["雾蓝键盘大福"][2] == 10
     assert active["彩彩修车猪慕斯"][2] == 10
     assert active["猪保千猪排轮盘"][2] == 10
+    assert active["一猪六吃"] == (
+        "next-six-star-cook-bonus",
+        '{"bonus_percent":15}',
+        1,
+    )
     quota = await database.fetch_one(
         "SELECT weekly_expires_at FROM player_catch_quota_bonuses WHERE player_id = 'qq:100:200'"
     )

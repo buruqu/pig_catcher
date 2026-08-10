@@ -1111,3 +1111,25 @@
 - 最终门禁：pytest `239 passed`；Ruff、Python `compileall`、`uv lock --check` 与
   `git diff --check` 全部通过。专项回归覆盖普通额度 `1/1` 后连续完成 5 次专属抓猪、效果
   逐次消费、普通额度保持不变、第 6 次回到额度拒绝，以及迁移、滚动边界和结果图标识。
+
+## 47. v1.13.1 存量“一猪六吃”效果类型修复验收
+
+- 验收日期：`2026-08-10`。截图与运行日志确认 `/抓猪` 返回“美食效果参数
+  six_star_percent 必须是数字”。根因是 Schema 18 已把存量“一猪六吃”的参数改成
+  `{"bonus_percent":15}`，但未把旧效果类型 `next-six-star-cook` 同步为
+  `next-six-star-cook-bonus`；抓猪读取全体待处理效果时因此在动作筛选前校验失败。
+- 数据保护：修复前在线备份为
+  `data/plugins/local.pig-catcher/backups/pig_catcher-pre-v1.13.1-six-ways-repair-20260810-204055-519746.sqlite3`，
+  Schema 18、`quick_check=ok`、外键异常 0，并确认生产库共有 5 条未消费记录受影响。
+- Schema 19 原位修复“一猪六吃”的模板、背包内可用实例和未消费效果队列。生产迁移后
+  5 条记录全部为 `next-six-star-cook-bonus + {"bonus_percent":15}`，消耗次数仍为 0；
+  全库 31 条未消费效果逐条解析均成功，错误记录为 0。
+- 运行验收：MaiBot 热加载日志确认 `local.pig-catcher v1.13.1` 注册成功，生产巡检为
+  完整性 `ok`、账本异常 0、素材缺失 `0/215`、过期报价 0、过期监管限制 0。专项服务回归
+  验证“一猪六吃”等待六星猪做菜时不会阻断 `/抓猪`，抓猪成功后该做菜效果仍保持未消费。
+- 修复后在线备份为
+  `data/plugins/local.pig-catcher/backups/pig_catcher-post-v1.13.1-six-ways-repair-20260810-204553-402640.sqlite3`，
+  Schema 19、`quick_check=ok`、外键异常 0，5 条修复效果均保留。
+- 最终门禁：pytest `240 passed`；Ruff、Python `compileall`、`uv lock --check` 与
+  `git diff --check` 全部通过。未代替玩家在真实群发送测试命令，避免消耗其抓猪次数；可由
+  玩家直接重试原 `/抓猪` 消息完成真实群观察。

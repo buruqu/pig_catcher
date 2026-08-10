@@ -104,20 +104,24 @@ def _food_entry(
     *,
     effect_id: str,
     effect_params: dict[str, object],
+    display_name: str = "专属次数测试菜",
+    rarity: int = 6,
+    group_id: str | None = "100",
 ) -> dict[str, object]:
+    group_only = group_id is not None
     return {
         "template_id": template_id,
         "kind": "food",
-        "display_name": "专属次数测试菜",
-        "rarity": 6,
-        "scope": "group",
-        "group_scope_id": "qq:100",
+        "display_name": display_name,
+        "rarity": rarity,
+        "scope": "group" if group_only else "common",
+        "group_scope_id": f"qq:{group_id}" if group_only else None,
         "description": "用于验证六星菜专属抓猪次数。",
         "image": f"{template_id}.png",
         "fit": "contain",
         "source": "pytest synthetic asset",
         "license": "test-only",
-        "consent_status": "granted",
+        "consent_status": "granted" if group_only else "not-required",
         "recipe_tags": ["测试"],
         "effect_id": effect_id,
         "effect_params": effect_params,
@@ -367,6 +371,77 @@ async def test_default_frequency_is_five_per_window_with_twenty_second_cooldown(
     clock.value = datetime(2026, 7, 28, 11, 0, tzinfo=UTC)
     refreshed = await service.catch(_identity(message_id="after-19-refresh"))
     assert refreshed.daily_count == 1
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_six_ways_cooking_bonus_waits_without_blocking_catching(
+    tmp_path: Path,
+) -> None:
+    database = await _database_with_catalog(
+        tmp_path,
+        [
+            _pig_entry("one-pig", rarity=1),
+            _food_entry(
+                "six-ways-food",
+                effect_id="next-six-star-cook-bonus",
+                effect_params={"bonus_percent": 15},
+                display_name="一猪六吃",
+                rarity=5,
+                group_id=None,
+            ),
+        ],
+    )
+    clock = MutableClock(datetime(2026, 7, 28, 4, 0, tzinfo=UTC))
+    service = GameplayService(
+        database,
+        CatchingSection(cooldown_seconds=0),
+        random_source=SequenceRandom(*_catch_rolls()),
+        clock=clock,
+    )
+    identity = _identity(message_id="catch-with-six-ways")
+    await service.profile(_identity(message_id="initialize-six-ways-player"))
+    now = "2026-07-28T04:00:00.000Z"
+    async with database.transaction() as session:
+        await session.execute(
+            """
+            INSERT INTO food_instances(
+                food_instance_id, short_code, scope_id, owner_player_id,
+                template_id, template_version, rarity, display_name_snapshot,
+                portion_weight, fat_category, official_value, effect_id,
+                effect_params_json, ruleset_version, random_snapshot_json,
+                state, acquired_at, disposed_at, updated_at
+            )
+            VALUES (
+                'six-ways-source', 'WAYS0001', ?, ?, 'six-ways-food', 1, 5,
+                '一猪六吃', 1.0, 'balanced', 1000,
+                'next-six-star-cook-bonus', '{"bonus_percent":15}', 16, '{}',
+                'consumed', ?, ?, ?
+            )
+            """,
+            (identity.scope.value, identity.player_id, now, now, now),
+        )
+        await session.execute(
+            """
+            INSERT INTO player_food_effects(
+                effect_entry_id, player_id, source_food_instance_id,
+                effect_id, params_json, granted_uses, consumed_uses,
+                expires_at, created_at, updated_at
+            ) VALUES (
+                'six-ways-effect', ?, 'six-ways-source',
+                'next-six-star-cook-bonus', '{"bonus_percent":15}',
+                1, 0, NULL, ?, ?
+            )
+            """,
+            (identity.player_id, now, now),
+        )
+
+    result = await service.catch(identity)
+    assert result.pig.rarity == 1
+    effect = await database.fetch_one(
+        "SELECT consumed_uses FROM player_food_effects WHERE effect_entry_id = 'six-ways-effect'"
+    )
+    assert effect is not None and effect["consumed_uses"] == 0
     await database.close()
 
 
