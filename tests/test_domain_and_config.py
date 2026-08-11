@@ -46,7 +46,11 @@ from pig_catcher.domain.gameplay import (
 )
 from pig_catcher.domain.models import CommandIdentity, ScopeKey
 from pig_catcher.domain.ports import MessageKeyFactory
-from pig_catcher.domain.quota import catch_quota_window, effective_catch_limit
+from pig_catcher.domain.quota import (
+    catch_quota_window,
+    effective_catch_limit,
+    stack_catch_quota_layers,
+)
 from pig_catcher.domain.rules import (
     BASE_CATCH_WEIGHTS,
     LEVEL_CATCH_BONUS_CAP_LEVEL,
@@ -994,6 +998,21 @@ def test_effective_catch_limit_drops_consumed_old_window_extras_from_display() -
     ) == 5
 
 
+def test_all_normal_quota_food_layers_stack_without_touching_dedicated_uses() -> None:
+    layers = stack_catch_quota_layers(
+        configured_base=5,
+        permanent_bonus=1,
+        weekly_bonus=5,
+        current_window_bonus=2,
+        today_window_bonus=2,
+        extra_granted=3,
+        extra_consumed=1,
+    )
+    assert layers.base_window_limit == 15
+    assert layers.effective_limit(used_count=4) == 17
+    assert layers.effective_limit(used_count=16) == 18
+
+
 def test_default_config_exposes_fixed_rules_and_chinese_schema() -> None:
     config = PigCatcherConfig()
     assert config.plugin.framework_phase == "6"
@@ -1091,6 +1110,7 @@ def test_help_is_copyable_concise_text() -> None:
     full = format_help()
     assert "/抓猪档案" not in full
     assert "/抓猪详情" not in full
+    assert "/猪猪详情 <猪名#短编号>" in full
     assert "/抓猪档案" not in format_help("抓猪")
     assert "/抓猪详情" not in format_help("抓猪")
     assert "<img" not in text

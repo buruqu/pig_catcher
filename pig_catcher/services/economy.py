@@ -2020,7 +2020,7 @@ class EconomyService:
         """Sell every unlocked low-rarity pig or food in one transaction.
 
         ``rarity`` 指定时只处理该品质；不指定时处理 ``1..max_rarity``。
-        联动猪（有收藏图鉴条目）始终不会参与猪猪批量售卖。
+        联动猪（有收藏图鉴条目）按模板保留价值最高的一只，其余重复实例可批量售卖。
         """
 
         if asset_kind not in {"pig", "food"}:
@@ -2611,8 +2611,8 @@ class EconomyService:
     ) -> tuple[bool, str]:
         """开启或关闭玩家的“批量保留”偏好。
 
-        开启后，批量售卖与批量做菜会按模板各保留一只价值最高的普通猪猪或
-        美食；所有联动猪始终默认保护，不受开关影响。
+        联动猪始终按模板保留一只价值最高的实例。开启后，批量售卖与批量做菜
+        还会按模板各保留一只价值最高的普通猪猪或美食。
         """
 
         now = iso_timestamp(self.clock.now())
@@ -2631,9 +2631,12 @@ class EconomyService:
         if enabled:
             return True, (
                 "已开启批量保留：批量售卖与批量做菜时，每个普通猪猪品种和每道"
-                "美食品种都会保留一只价值最高的实例；所有联动猪始终全部保护。"
+                "美食品种都会保留一只价值最高的实例；每种联动猪也会保留价值最高的一只。"
             )
-        return True, ("已关闭批量保留：批量操作不再额外保留普通猪猪和美食；所有联动猪仍始终全部保护。")
+        return True, (
+            "已关闭批量保留：批量操作不再额外保留普通猪猪和美食；"
+            "每种联动猪仍会保留价值最高的一只。"
+        )
 
     @staticmethod
     def _batch_sale_from_receipt(

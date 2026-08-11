@@ -25,7 +25,7 @@
       <p>消耗 {{ view.pig_count }} 只原料猪 · 按品质从高到低排列</p>
       <div class="pill-row">
         <span class="pill">{{ view.rarity ~ " 星" if view.rarity is not none else "全部 1-5 星" }}</span>
-        <span class="pill pill--strong">联动猪与六星猪不参与</span>
+        <span class="pill pill--strong">每种联动猪留一只 · 六星猪不参与</span>
       </div>
     </section>
 
@@ -65,7 +65,7 @@
     {% endif %}
 
     <footer class="game-footer">
-      <span>做菜冷却 10 秒；联动猪和六星定制猪始终受保护</span>
+      <span>做菜冷却 10 秒；每种联动猪保留价值最高的一只，六星定制猪不参与</span>
       <strong>{{ view.food_count }}/{{ view.food_count }}</strong>
     </footer>
   </main>

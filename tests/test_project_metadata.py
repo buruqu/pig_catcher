@@ -32,6 +32,7 @@ def test_manifest_versions_dependencies_and_capabilities_are_narrow() -> None:
     assert manifest["host_application"]["min_version"] == "1.0.12"
     assert manifest["sdk"]["min_version"] == "2.7.0"
     assert manifest["capabilities"] == [
+        "message.get_by_time_in_chat",
         "render.html2png",
         "send.image",
         "send.text",

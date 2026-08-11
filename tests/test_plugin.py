@@ -349,6 +349,19 @@ def test_store_command_patterns_do_not_claim_livehouse_commands() -> None:
     assert re.search(upgrade_pattern, "/升级 户山香澄") is None
 
 
+def test_pig_detail_command_supports_new_and_legacy_names() -> None:
+    components = {
+        component["name"]: component
+        for component in create_plugin().get_components()
+    }
+    pattern = components["pig_catcher_pig_detail"]["metadata"][
+        "command_pattern"
+    ]
+    assert re.search(pattern, "/猪猪详情 地球猪#Pig9Fun")
+    assert re.search(pattern, "/抓猪详情 地球猪#pig9fun")
+    assert re.search(pattern, "/猪详情 地球猪#pig9fun") is None
+
+
 def test_admin_command_patterns_claim_only_the_documented_syntax() -> None:
     components = {
         component["name"]: component
@@ -423,6 +436,7 @@ async def test_help_command_sends_copyable_text_without_rendering(tmp_path: Path
     assert "已开放抓猪" not in text
     assert "/抓猪档案" not in text
     assert "/抓猪详情" not in text
+    assert "/猪猪详情 <猪名#短编号>" in text
     assert context.send.texts == [("stream-10001", text)]
     assert context.send.images == []
     assert context.render.calls == []
@@ -1725,7 +1739,7 @@ async def test_batch_keep_commands_toggle_player_preference(
     assert enabled is True
     assert "已开启批量保留" in message
     assert "每个普通猪猪品种" in message
-    assert "所有联动猪始终全部保护" in message
+    assert "每种联动猪也会保留价值最高的一只" in message
     row = await plugin.database.fetch_one(
         "SELECT batch_keep_highest FROM players WHERE player_id = ?",
         (player_id,),
@@ -1743,7 +1757,7 @@ async def test_batch_keep_commands_toggle_player_preference(
     )
     assert disabled is True
     assert "已关闭批量保留" in message
-    assert "所有联动猪仍始终全部保护" in message
+    assert "每种联动猪仍会保留价值最高的一只" in message
     row = await plugin.database.fetch_one(
         "SELECT batch_keep_highest FROM players WHERE player_id = ?",
         (player_id,),

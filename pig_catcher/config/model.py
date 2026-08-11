@@ -124,7 +124,7 @@ class FeaturesSection(PluginConfigBase):
     inventory_enabled: bool = Field(
         default=True,
         description="是否允许查看猪猪背包和详情",
-        json_schema_extra=_ui("允许背包与详情", "对应 /猪猪背包 和 /抓猪详情"),
+        json_schema_extra=_ui("允许背包与详情", "对应 /猪猪背包 和 /猪猪详情（兼容 /抓猪详情）"),
     )
     catalog_enabled: bool = Field(
         default=True,
@@ -698,6 +698,77 @@ class RegulationSection(PluginConfigBase):
             "仅管理员可见；群内消息不会显示分数、阈值或计算方式",
         ),
     )
+    chat_activity_lookback_days: int = Field(
+        default=30,
+        ge=7,
+        le=90,
+        description="判断账号群聊活跃度时回看的滚动天数",
+        json_schema_extra=_ui(
+            "账号活跃窗口",
+            "只使用消息数和活跃日期，不分析或保存聊天正文",
+        ),
+    )
+    chat_activity_message_limit: int = Field(
+        default=5000,
+        ge=100,
+        le=20000,
+        description="一次账号活跃度快照最多读取的群消息条数",
+        json_schema_extra=_ui(
+            "活跃消息上限",
+            "取窗口内最近消息；超大群可适度提高，但会增加一次查询开销",
+        ),
+    )
+    established_min_messages: int = Field(
+        default=30,
+        ge=1,
+        le=1000,
+        description="认定群聊正常活跃账号所需的最低非命令消息数",
+        json_schema_extra=_ui(
+            "正常账号消息数",
+            "还必须同时达到活跃天数；仅用于放宽双方互赠，不豁免异常交易",
+        ),
+    )
+    established_min_active_days: int = Field(
+        default=7,
+        ge=1,
+        le=90,
+        description="认定群聊正常活跃账号所需的最低活跃天数",
+        json_schema_extra=_ui(
+            "正常账号活跃天数",
+            "与消息数同时满足才会放宽双方历史互赠",
+        ),
+    )
+    likely_alt_max_messages: int = Field(
+        default=5,
+        ge=0,
+        le=100,
+        description="疑似小号允许的群聊消息数上限",
+        json_schema_extra=_ui(
+            "小号消息上限",
+            "还需同时满足低活跃天数、短插件账号年龄和低游戏操作数",
+        ),
+    )
+    likely_alt_max_active_days: int = Field(
+        default=2,
+        ge=0,
+        le=30,
+        description="疑似小号允许的群聊活跃天数上限",
+        json_schema_extra=_ui("小号活跃天数", "四项低活跃条件必须全部满足才会严查"),
+    )
+    likely_alt_max_plugin_age_days: int = Field(
+        default=7,
+        ge=0,
+        le=90,
+        description="疑似小号允许的抓猪插件账号年龄上限",
+        json_schema_extra=_ui("小号插件年龄", "账号更老时不会仅因少发言被归为疑似小号"),
+    )
+    likely_alt_max_game_actions: int = Field(
+        default=10,
+        ge=0,
+        le=1000,
+        description="疑似小号允许的累计抓猪加做菜次数上限",
+        json_schema_extra=_ui("小号游戏操作数", "与群聊活跃度及账号年龄联合判断"),
+    )
     notice_cooldown_minutes: int = Field(
         default=10,
         ge=1,
@@ -738,6 +809,18 @@ class RegulationSection(PluginConfigBase):
     @classmethod
     def validate_enabled_scope_ids(cls, value: list[str]) -> list[str]:
         return _validate_scope_ids(value)
+
+    @model_validator(mode="after")
+    def validate_account_activity_thresholds(self) -> RegulationSection:
+        if self.established_min_active_days > self.chat_activity_lookback_days:
+            raise ValueError("正常账号活跃天数不能大于账号活跃窗口")
+        if self.likely_alt_max_active_days > self.chat_activity_lookback_days:
+            raise ValueError("小号活跃天数不能大于账号活跃窗口")
+        if self.likely_alt_max_messages >= self.established_min_messages:
+            raise ValueError("小号消息上限必须小于正常账号最低消息数")
+        if self.likely_alt_max_active_days >= self.established_min_active_days:
+            raise ValueError("小号活跃天数必须小于正常账号最低活跃天数")
+        return self
 
 
 class RankingSection(PluginConfigBase):

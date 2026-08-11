@@ -436,6 +436,15 @@ class SocialService:
         }
         idempotency_key = MessageKeyFactory.build(identity, _GIFT_COMMAND)
         now = iso_timestamp(self.clock.now())
+        activity_snapshot = (
+            await self.regulation_service.chat_activity_snapshot(
+                stream_id=identity.stream_id,
+                scope_id=identity.scope.value,
+                now=now,
+            )
+            if self.regulation_service is not None
+            else None
+        )
         async with self.database.transaction() as session:
             existing = await self.receipt_repository.get_by_key(
                 session,
@@ -490,6 +499,7 @@ class SocialService:
                     price=None,
                     active_player_ids=(identity.player_id,),
                     now=now,
+                    activity_snapshot=activity_snapshot,
                 )
             if regulation is not None and regulation.blocked:
                 payload = {
@@ -757,6 +767,15 @@ class SocialService:
         request_payload = {"command_version": 1, "trade_id": trade_id}
         idempotency_key = MessageKeyFactory.build(identity, _TRADE_ACCEPT_COMMAND)
         now = iso_timestamp(self.clock.now())
+        activity_snapshot = (
+            await self.regulation_service.chat_activity_snapshot(
+                stream_id=identity.stream_id,
+                scope_id=identity.scope.value,
+                now=now,
+            )
+            if self.regulation_service is not None
+            else None
+        )
         async with self.database.transaction() as session:
             existing = await self.receipt_repository.get_by_key(
                 session,
@@ -816,6 +835,7 @@ class SocialService:
                         trade.recipient_player_id,
                     ),
                     now=now,
+                    activity_snapshot=activity_snapshot,
                 )
             if regulation is not None and regulation.blocked:
                 await self.repository.resolve_trade(

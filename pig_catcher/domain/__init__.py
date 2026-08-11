@@ -44,10 +44,12 @@ from .gameplay import (
 )
 from .models import AssetSelector, CommandIdentity, ScopeKey
 from .quota import (
+    CatchQuotaLayers,
     CatchQuotaWindow,
     catch_quota_window,
     effective_catch_limit,
     normalize_quota_refresh_hours,
+    stack_catch_quota_layers,
 )
 from .regulation import RegulationAnalysis, TransferSignal, analyze_transfer_graph
 from .social import (
@@ -68,6 +70,7 @@ __all__ = [
     "COOK_COIN_REWARDS",
     "COOK_EXPERIENCE_REWARDS",
     "CommandIdentity",
+    "CatchQuotaLayers",
     "CatchQuotaWindow",
     "ConsentStatus",
     "FatProfile",
@@ -108,6 +111,7 @@ __all__ = [
     "level_progress",
     "normalize_ranking_type",
     "normalize_quota_refresh_hours",
+    "stack_catch_quota_layers",
     "normalize_trade_id",
     "recipe_affinity",
     "stable_recipe_factor",

@@ -50,7 +50,7 @@ from ..domain.gameplay import (
 )
 from ..domain.models import CommandIdentity, CommandReceipt
 from ..domain.ports import Clock, MessageKeyFactory, RandomSource, SystemClock, SystemRandomSource
-from ..domain.quota import catch_quota_window, effective_catch_limit
+from ..domain.quota import catch_quota_window, stack_catch_quota_layers
 from ..domain.rules import (
     LEVEL_CATCH_BONUS_CAP_LEVEL,
     catch_weights,
@@ -603,10 +603,17 @@ def format_pig_detail_summary(pig: PigView) -> str:
         if pig.body_label
         else ""
     )
+    collection = (
+        f"联动：{pig.collection_name}"
+        f"{' · ' + pig.character_name if pig.character_name else ''}\n"
+        if pig.collection_name
+        else "联动：非联动猪\n"
+    )
     return (
         "【猪猪详情】\n"
         f"{pig.stars} {pig.display_name}（{pig.rarity_name}）\n"
         f"编号：{pig.selector}\n"
+        f"{collection}"
         f"体型：{pig.size_value:.1f} cm（{size_label(pig.size_percentile)}）\n"
         f"重量：{pig.weight_value:.2f} kg（{weight_label(pig.weight_percentile)}）\n"
         f"体态：{pig.fat_label}\n"
@@ -838,21 +845,25 @@ class GameplayService:
             )
             if window_boost is not None:
                 # 提额窗口：本时段额度按提升值计算，且无视玩家违规限制
-                base_window_limit = int(window_boost["limit_value"])
+                quota_layers = stack_catch_quota_layers(
+                    configured_base=int(window_boost["limit_value"]),
+                    extra_granted=extra_granted,
+                    extra_consumed=extra_consumed,
+                )
                 catch_restriction = None
             else:
-                base_window_limit = (
-                    self.catching.daily_limit
-                    + permanent_bonus
-                    + weekly_bonus
-                    + current_window_bonus
-                    + today_window_bonus
+                quota_layers = stack_catch_quota_layers(
+                    configured_base=self.catching.daily_limit,
+                    permanent_bonus=permanent_bonus,
+                    weekly_bonus=weekly_bonus,
+                    current_window_bonus=current_window_bonus,
+                    today_window_bonus=today_window_bonus,
+                    extra_granted=extra_granted,
+                    extra_consumed=extra_consumed,
                 )
-            normal_daily_limit = effective_catch_limit(
-                base_limit=base_window_limit,
-                used_count=daily_count,
-                extra_granted=extra_granted,
-                extra_consumed=extra_consumed,
+            base_window_limit = quota_layers.base_window_limit
+            normal_daily_limit = quota_layers.effective_limit(
+                used_count=daily_count
             )
             daily_limit = self._restricted_daily_limit(
                 normal_limit=normal_daily_limit,
@@ -1448,15 +1459,21 @@ class GameplayService:
                 window_start=window_start,
             )
             if window_boost is not None:
-                base_window_limit = int(window_boost["limit_value"])
+                quota_layers = stack_catch_quota_layers(
+                    configured_base=int(window_boost["limit_value"]),
+                    extra_granted=extra_granted,
+                    extra_consumed=extra_consumed,
+                )
                 catch_restriction = None
             else:
-                base_window_limit = (
-                    self.catching.daily_limit
-                    + permanent_bonus
-                    + weekly_bonus
-                    + current_window_bonus
-                    + today_window_bonus
+                quota_layers = stack_catch_quota_layers(
+                    configured_base=self.catching.daily_limit,
+                    permanent_bonus=permanent_bonus,
+                    weekly_bonus=weekly_bonus,
+                    current_window_bonus=current_window_bonus,
+                    today_window_bonus=today_window_bonus,
+                    extra_granted=extra_granted,
+                    extra_consumed=extra_consumed,
                 )
             feed_level = await self.repository.get_feed_level(
                 session,
@@ -1526,12 +1543,7 @@ class GameplayService:
             held_records=int(row["held_records"]),
             daily_count=daily_count,
             daily_limit=self._restricted_daily_limit(
-                normal_limit=effective_catch_limit(
-                    base_limit=base_window_limit,
-                    used_count=daily_count,
-                    extra_granted=extra_granted,
-                    extra_consumed=extra_consumed,
-                ),
+                normal_limit=quota_layers.effective_limit(used_count=daily_count),
                 restriction=catch_restriction,
             ),
             cooldown_remaining_seconds=_cooldown_remaining(

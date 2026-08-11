@@ -338,10 +338,19 @@ class RegulationRepository:
         placeholders = ",".join("?" for _ in players)
         rows = await session.fetch_all(
             f"""
-            SELECT player_id, platform_user_id, display_name, scope_id
-            FROM players
-            WHERE player_id IN ({placeholders})
-            ORDER BY player_id
+            SELECT
+                player.player_id,
+                player.platform_user_id,
+                player.display_name,
+                player.scope_id,
+                player.created_at,
+                COALESCE(statistic.total_catches, 0) AS total_catches,
+                COALESCE(statistic.total_cooks, 0) AS total_cooks
+            FROM players AS player
+            LEFT JOIN player_statistics AS statistic
+              ON statistic.player_id = player.player_id
+            WHERE player.player_id IN ({placeholders})
+            ORDER BY player.player_id
             """,
             players,
         )

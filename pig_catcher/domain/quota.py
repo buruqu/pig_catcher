@@ -20,6 +20,68 @@ class CatchQuotaWindow:
     next_refresh_label: str
 
 
+@dataclass(frozen=True, slots=True)
+class CatchQuotaLayers:
+    """Explicitly stack every normal catch-quota source.
+
+    Six-star dedicated catches are intentionally absent because they bypass the
+    normal quota instead of increasing it.
+    """
+
+    configured_base: int
+    permanent_bonus: int
+    weekly_bonus: int
+    current_window_bonus: int
+    today_window_bonus: int
+    extra_granted: int
+    extra_consumed: int
+
+    @property
+    def base_window_limit(self) -> int:
+        return sum(
+            (
+                self.configured_base,
+                self.permanent_bonus,
+                self.weekly_bonus,
+                self.current_window_bonus,
+                self.today_window_bonus,
+            )
+        )
+
+    def effective_limit(self, *, used_count: int) -> int:
+        return effective_catch_limit(
+            base_limit=self.base_window_limit,
+            used_count=used_count,
+            extra_granted=self.extra_granted,
+            extra_consumed=self.extra_consumed,
+        )
+
+
+def stack_catch_quota_layers(
+    *,
+    configured_base: int,
+    permanent_bonus: int = 0,
+    weekly_bonus: int = 0,
+    current_window_bonus: int = 0,
+    today_window_bonus: int = 0,
+    extra_granted: int = 0,
+    extra_consumed: int = 0,
+) -> CatchQuotaLayers:
+    """Build a non-negative, auditable normal-quota stack."""
+
+    values = {
+        "configured_base": configured_base,
+        "permanent_bonus": permanent_bonus,
+        "weekly_bonus": weekly_bonus,
+        "current_window_bonus": current_window_bonus,
+        "today_window_bonus": today_window_bonus,
+        "extra_granted": extra_granted,
+        "extra_consumed": extra_consumed,
+    }
+    normalized = {name: max(0, int(value)) for name, value in values.items()}
+    return CatchQuotaLayers(**normalized)
+
+
 def normalize_quota_refresh_hours(hours: list[int] | tuple[int, ...]) -> tuple[int, ...]:
     """校验并规范化每天的整点刷新时刻。"""
 

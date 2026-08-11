@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Iterable, Mapping, Sequence
+import logging
+from collections import defaultdict
+from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -14,7 +16,13 @@ from ..config.access import normalized_id_set
 from ..config.model import RegulationSection
 from ..domain.models import CommandIdentity, CommandReceipt
 from ..domain.ports import Clock, MessageKeyFactory, SystemClock
-from ..domain.regulation import TransferSignal, analyze_transfer_graph
+from ..domain.regulation import (
+    AccountActivityProfile,
+    TransferSignal,
+    analyze_transfer_graph,
+    classify_account_activity,
+    relax_established_mutual_gifts,
+)
 from ..infrastructure.database import DatabaseSession, PigCatcherDatabase
 from ..infrastructure.repositories import (
     FrameworkRepository,
@@ -39,6 +47,9 @@ _STATUS_RANK = {
     "dismissed": 4,
 }
 _REGULATION_RELEASE_COMMAND = "pig-catcher.admin-regulation-release"
+_CHAT_ACTIVITY_CACHE_MINUTES = 5
+_BEIJING_OFFSET = timedelta(hours=8)
+logger = logging.getLogger(__name__)
 
 
 def _parse_timestamp(value: object) -> datetime:
@@ -51,6 +62,25 @@ def _parse_timestamp(value: object) -> datetime:
 
 def _unique(values: Iterable[str]) -> tuple[str, ...]:
     return tuple(dict.fromkeys(str(value).strip() for value in values if str(value).strip()))
+
+
+ChatMessageProvider = Callable[
+    [str, float, float, int],
+    Awaitable[Sequence[Mapping[str, object]]],
+]
+
+
+@dataclass(frozen=True, slots=True)
+class ChatActivitySnapshot:
+    """Per-user message/day counts for one exact chat stream."""
+
+    available: bool
+    message_counts: Mapping[str, int]
+    active_day_counts: Mapping[str, int]
+
+    @classmethod
+    def unavailable(cls) -> ChatActivitySnapshot:
+        return cls(available=False, message_counts={}, active_day_counts={})
 
 
 @dataclass(frozen=True, slots=True)
@@ -157,6 +187,7 @@ class RegulationService:
         receipt_repository: ReceiptRepository | None = None,
         framework_repository: FrameworkRepository | None = None,
         clock: Clock | None = None,
+        chat_message_provider: ChatMessageProvider | None = None,
     ) -> None:
         self.database = database
         self.config = config
@@ -165,11 +196,146 @@ class RegulationService:
         self.receipt_repository = receipt_repository or ReceiptRepository()
         self.framework_repository = framework_repository or FrameworkRepository()
         self.clock = clock or SystemClock()
+        self.chat_message_provider = chat_message_provider
         self.admin_user_ids = normalized_id_set(admin_user_ids)
         self.enabled_scope_ids = frozenset(config.enabled_scope_ids)
+        self._chat_activity_cache: dict[
+            tuple[str, str],
+            tuple[datetime, ChatActivitySnapshot],
+        ] = {}
 
     def scope_enabled(self, scope_id: str) -> bool:
         return self.config.mode != "关闭" and scope_id in self.enabled_scope_ids
+
+    async def chat_activity_snapshot(
+        self,
+        *,
+        stream_id: str,
+        scope_id: str,
+        now: str,
+    ) -> ChatActivitySnapshot:
+        """Read bounded chat metadata and aggregate counts without message text."""
+
+        if not self.scope_enabled(scope_id) or self.chat_message_provider is None:
+            return ChatActivitySnapshot.unavailable()
+        now_datetime = _parse_timestamp(now)
+        cache_key = (scope_id, str(stream_id))
+        cached = self._chat_activity_cache.get(cache_key)
+        if cached is not None and cached[0] > now_datetime:
+            return cached[1]
+        starts_at = now_datetime - timedelta(
+            days=self.config.chat_activity_lookback_days
+        )
+        try:
+            messages = await self.chat_message_provider(
+                str(stream_id),
+                starts_at.timestamp(),
+                now_datetime.timestamp(),
+                self.config.chat_activity_message_limit,
+            )
+        except Exception:
+            logger.warning(
+                "读取群聊活跃度失败，自动监管本次不启用账号类型放宽或严查",
+                exc_info=True,
+            )
+            return ChatActivitySnapshot.unavailable()
+
+        platform, _, group_id = scope_id.partition(":")
+        counts: dict[str, int] = defaultdict(int)
+        days: dict[str, set[object]] = defaultdict(set)
+        for message in messages:
+            if not isinstance(message, Mapping):
+                continue
+            if bool(message.get("is_command")) or bool(message.get("is_notify")):
+                continue
+            message_platform = str(message.get("platform") or "").strip().lower()
+            if message_platform and message_platform != platform.lower():
+                continue
+            message_info = message.get("message_info")
+            if not isinstance(message_info, Mapping):
+                continue
+            group_info = message_info.get("group_info")
+            if isinstance(group_info, Mapping):
+                message_group_id = str(group_info.get("group_id") or "").strip()
+                if message_group_id and message_group_id != group_id:
+                    continue
+            user_info = message_info.get("user_info")
+            if not isinstance(user_info, Mapping):
+                continue
+            user_id = str(user_info.get("user_id") or "").strip()
+            if not user_id:
+                continue
+            try:
+                message_time = datetime.fromtimestamp(
+                    float(message.get("timestamp")),
+                    tz=UTC,
+                )
+            except (TypeError, ValueError, OSError):
+                continue
+            if message_time < starts_at or message_time > now_datetime:
+                continue
+            counts[user_id] += 1
+            days[user_id].add((message_time + _BEIJING_OFFSET).date())
+        snapshot = ChatActivitySnapshot(
+            available=True,
+            message_counts=dict(counts),
+            active_day_counts={user_id: len(values) for user_id, values in days.items()},
+        )
+        self._chat_activity_cache[cache_key] = (
+            now_datetime + timedelta(minutes=_CHAT_ACTIVITY_CACHE_MINUTES),
+            snapshot,
+        )
+        return snapshot
+
+    async def _account_activity_profiles(
+        self,
+        session: DatabaseSession,
+        *,
+        scope_id: str,
+        player_ids: Sequence[str],
+        snapshot: ChatActivitySnapshot | None,
+        now: datetime,
+    ) -> dict[str, AccountActivityProfile]:
+        normalized_ids = _unique(player_ids)
+        rows = await self.repository.player_rows(
+            session,
+            player_ids=normalized_ids,
+        )
+        row_by_player = {str(row["player_id"]): row for row in rows}
+        current_snapshot = snapshot or ChatActivitySnapshot.unavailable()
+        prefix = f"{scope_id}:"
+        profiles: dict[str, AccountActivityProfile] = {}
+        for player_id in normalized_ids:
+            row = row_by_player.get(player_id, {})
+            user_id = str(row.get("platform_user_id") or "").strip()
+            if not user_id and player_id.startswith(prefix):
+                user_id = player_id[len(prefix) :]
+            created_at = _parse_timestamp(row.get("created_at"))
+            plugin_age_days = (
+                max(0, (now - created_at).days)
+                if created_at != datetime.min.replace(tzinfo=UTC)
+                else 0
+            )
+            profiles[player_id] = classify_account_activity(
+                player_id=player_id,
+                chat_history_available=current_snapshot.available,
+                chat_message_count=int(current_snapshot.message_counts.get(user_id, 0)),
+                chat_active_day_count=int(current_snapshot.active_day_counts.get(user_id, 0)),
+                plugin_age_days=plugin_age_days,
+                game_action_count=(
+                    int(row.get("total_catches") or 0)
+                    + int(row.get("total_cooks") or 0)
+                ),
+                established_min_messages=self.config.established_min_messages,
+                established_min_active_days=self.config.established_min_active_days,
+                likely_alt_max_messages=self.config.likely_alt_max_messages,
+                likely_alt_max_active_days=self.config.likely_alt_max_active_days,
+                likely_alt_max_plugin_age_days=(
+                    self.config.likely_alt_max_plugin_age_days
+                ),
+                likely_alt_max_game_actions=self.config.likely_alt_max_game_actions,
+            )
+        return profiles
 
     def _is_protected_player(self, row: Mapping[str, object]) -> bool:
         user_id = str(row.get("platform_user_id") or "")
@@ -306,6 +472,7 @@ class RegulationService:
         price: int | None,
         active_player_ids: Sequence[str],
         now: str,
+        activity_snapshot: ChatActivitySnapshot | None = None,
     ) -> RegulationOutcome | None:
         if not self.scope_enabled(scope_id):
             return None
@@ -370,9 +537,38 @@ class RegulationService:
                 )
             )
             anchor_ids.add(coin_event_id)
+        graph_player_ids = _unique(
+            player_id
+            for signal in signals
+            for player_id in (signal.from_player_id, signal.to_player_id)
+        )
+        activity_profiles = await self._account_activity_profiles(
+            session,
+            scope_id=scope_id,
+            player_ids=graph_player_ids,
+            snapshot=activity_snapshot,
+            now=now_datetime,
+        )
+        established_ids = frozenset(
+            player_id
+            for player_id, profile in activity_profiles.items()
+            if profile.tier == "established"
+        )
+        strict_ids = frozenset(
+            player_id
+            for player_id, profile in activity_profiles.items()
+            if profile.tier == "likely-alt"
+        )
+        graph_signals, relaxed_mutual_gift_event_ids = (
+            relax_established_mutual_gifts(
+                tuple(signals),
+                established_player_ids=established_ids,
+            )
+        )
         analysis = analyze_transfer_graph(
-            tuple(signals),
+            graph_signals,
             anchor_event_ids=frozenset(anchor_ids),
+            strict_player_ids=strict_ids,
         )
         if analysis is None or analysis.score < self.config.warning_score:
             return None
@@ -393,6 +589,28 @@ class RegulationService:
             "high_rarity_asset_count": analysis.high_rarity_asset_count,
             "six_star_asset_count": analysis.six_star_asset_count,
             "price_anomaly_level": analysis.price_anomaly_level,
+            "strict_source_count": analysis.strict_source_count,
+            "account_activity": {
+                player_id: {
+                    "tier": activity_profiles[player_id].tier,
+                    "chat_history_available": activity_profiles[
+                        player_id
+                    ].chat_history_available,
+                    "chat_message_count": activity_profiles[
+                        player_id
+                    ].chat_message_count,
+                    "chat_active_day_count": activity_profiles[
+                        player_id
+                    ].chat_active_day_count,
+                    "plugin_age_days": activity_profiles[player_id].plugin_age_days,
+                    "game_action_count": activity_profiles[player_id].game_action_count,
+                }
+                for player_id in sorted(
+                    set(analysis.upstream_player_ids)
+                    | set(analysis.target_player_ids)
+                )
+            },
+            "relaxed_mutual_gift_event_ids": relaxed_mutual_gift_event_ids,
             "source_operation_key": source_operation_key,
             "transfer_type": transfer_type,
             "evaluated_at": now,

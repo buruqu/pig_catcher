@@ -1,6 +1,6 @@
 [plugin]
 enabled = true
-config_version = "1.15.0"
+config_version = "1.16.0"
 framework_phase = "6"
 
 [features]
@@ -119,6 +119,14 @@ enabled_scope_ids = [
 ]
 lookback_days = 7
 warning_score = 40
+chat_activity_lookback_days = 30
+chat_activity_message_limit = 5000
+established_min_messages = 30
+established_min_active_days = 7
+likely_alt_max_messages = 5
+likely_alt_max_active_days = 2
+likely_alt_max_plugin_age_days = 7
+likely_alt_max_game_actions = 10
 notice_cooldown_minutes = 10
 social_hold_hours = 24
 plugin_hold_hours = 72

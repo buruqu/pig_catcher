@@ -9,7 +9,7 @@ from ...domain.enums import RecordType
 from ...domain.models import AssetSelector
 from ..database import DatabaseSession
 from .batch_safety import (
-    collaboration_pig_exclusion_sql,
+    highest_collaboration_pig_ids_per_template,
     highest_instance_ids_per_template,
 )
 
@@ -509,8 +509,9 @@ class GameplayRepository:
     ) -> list[dict[str, object]]:
         """List active, unlocked pigs eligible for batch cooking.
 
-        默认只处理一至三星低星原料猪（``rarity`` 指定时按指定品质）；所有联动猪
-        始终排除。``keep_highest`` 开启时，普通猪按模板各保留一只价值最高实例。
+        默认只处理一至三星低星原料猪（``rarity`` 指定时按指定品质）；联动猪
+        始终按模板保留一只价值最高实例。``keep_highest`` 开启时，普通猪也按模板
+        各保留一只价值最高实例。
         """
 
         rarity_clause = (
@@ -529,7 +530,6 @@ class GameplayRepository:
         if keep_ids:
             placeholders = ",".join("?" for _ in keep_ids)
             keep_clause = f"AND instance.pig_instance_id NOT IN ({placeholders})"
-        collaboration_clause = collaboration_pig_exclusion_sql("instance")
         parameters: list[object] = [player_id, scope_id]
         if rarity is not None:
             parameters.append(rarity)
@@ -543,7 +543,6 @@ class GameplayRepository:
               AND instance.state = 'active'
               AND instance.locked_trade_id IS NULL
               {rarity_clause}
-              {collaboration_clause}
               {keep_clause}
             ORDER BY instance.rarity DESC, instance.acquired_at ASC
             """,
@@ -570,20 +569,29 @@ class GameplayRepository:
     ) -> list[str]:
         """Return pig instance ids kept from one batch cooking/selling operation.
 
-        联动猪由批量查询独立全部保护；开关开启时，在批量做菜品质区间内按模板
-        各保留一个最高价值的普通猪实例。
+        联动猪无论开关状态都按模板保留一个最高价值实例；开关开启时，
+        在批量做菜品质区间内再按模板各保留一个最高价值的普通猪实例。
         """
 
-        if not keep_highest:
-            return []
-        return await highest_instance_ids_per_template(
+        keep_ids = await highest_collaboration_pig_ids_per_template(
             session,
             player_id=player_id,
             scope_id=scope_id,
-            asset_kind="pig",
             max_rarity=3,
             rarity=rarity,
         )
+        if keep_highest:
+            keep_ids.extend(
+                await highest_instance_ids_per_template(
+                    session,
+                    player_id=player_id,
+                    scope_id=scope_id,
+                    asset_kind="pig",
+                    max_rarity=3,
+                    rarity=rarity,
+                )
+            )
+        return list(dict.fromkeys(keep_ids))
 
     async def profile_row(
         self,

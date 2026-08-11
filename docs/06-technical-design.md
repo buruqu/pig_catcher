@@ -10,8 +10,8 @@
 
 第五轮沿用已验证的 SDK 2.7.x 公共接口和宿主加载器；若后续版本变化，先更新兼容设计再写代码。
 
-当前正式插件为 `1.15.0`，标识为 `schema_version=22`、`asset_manifest_version=4` 和
-`ruleset_version=18`。三者独立递增，不能用插件版本代替数据、素材和数值规则版本。
+当前正式插件为 `1.16.0`，标识为 `schema_version=22`、`asset_manifest_version=4` 和
+`ruleset_version=19`。三者独立递增，不能用插件版本代替数据、素材和数值规则版本。
 Schema 18 为抓猪收据增加普通额度成本，Ruleset 16 增加六星菜专属抓猪、滚动七天到期、
 多次六星效果与普通六星做菜平衡；Schema 19 修复存量“一猪六吃”效果类型与新参数不匹配；
 Schema 20 与 Ruleset 17 同步 9 道公共四/五星菜的新效果、现有可用实例和未消费队列；
@@ -28,11 +28,13 @@ Schema 21 收敛热加载期间可能先落库的“猪利猪”早期参数；S
 | 首页管理入口 | `@HomeCard` 声明式按钮，跳转插件配置 |
 | 发文字与图片 | `self.ctx.send.text`、`self.ctx.send.image` |
 | HTML 转 PNG | `self.ctx.render.html2png` |
+| 当前群近期消息元数据 | `self.ctx.message.get_by_time_in_chat`，只计发送者、时间和命令过滤结果 |
 | 持久化目录 | `self.ctx.paths.data_dir` |
 | 临时渲染目录 | `self.ctx.paths.runtime_dir` |
 | 日志 | `self.ctx.logger` |
 
-首版不注册普通消息 `@EventHandler`、LLM `@Tool`、模型提供器或网关。联动猪如果未来需要插件间能力，再基于明确用例设计稳定 `@API`，不提前暴露宽泛写接口。
+插件不注册普通消息 `@EventHandler`、LLM `@Tool`、模型提供器或网关。监管只在赠送/接受交易
+命令执行时按需查询当前群近期消息，不监听、保存或分析聊天正文。
 
 ## 3. 当前项目结构
 
@@ -173,6 +175,12 @@ Schema 17 新增 `anti_abuse_cases`、`anti_abuse_case_members`、`anti_abuse_no
 锚点分析。资产信号沿猪实例及美食 `source_pig_instance_id` 归并血缘；已接受交易同时保留价格
 与官方价值，明显高价时建立买方到卖方的猪币收益方向。纯正常价格交易可以作为图谱上下文，
 但不能在没有赠送或价格偏离时单独触发处罚。
+
+事务开始前，`plugin.py` 通过公共 `message.get_by_time_in_chat` 能力最多读取当前精确聊天流
+最近 5,000 条、30 天内的非命令消息。服务只聚合每名发送者的消息数和活跃日期，并使用
+5 分钟内存缓存；正文、二进制内容和消息列表都不进入数据库。双方均达到 30 条/7 日且存在
+双向赠送时，相关赠送事件才从本轮图排除。消息不超过 5 条/2 日、插件账号不满 7 天且玩法
+动作不超过 10 次者进入疑似小号严格来源集合；查询失败时层级为 `unknown`，不做身份猜测。
 
 判定顺序固定为：人工永久限制检查 → 自动到期处理 → 当前临时限制检查 → 图谱分析 →
 案件与提醒/限制写入 → 允许时再扣款和转移。首次提醒生成 `PENDING` 通知，事务提交后由群消息
@@ -318,8 +326,8 @@ Asset Manifest v4 在 v3 的媒体、授权、`effect_id` 和 `effect_params` �
 | UAT | 先用正式素材隔离副本跑真实 Chromium 命令流，再验证运行中 MaiBot 加载；真实 QQ 人机回归按用户决定由上线使用完成 |
 
 批量资产安全规则集中在 `infrastructure/repositories/batch_safety.py`：普通资产使用
-`ROW_NUMBER() OVER (PARTITION BY template_id ...)` 稳定选出每模板最高价值实例；联动猪
-由售卖/做菜主查询中的相关 `NOT EXISTS` 直接排除，避免实例数量增长触发 SQLite 参数上限。
+`ROW_NUMBER() OVER (PARTITION BY template_id ...)` 稳定选出每模板最高价值实例；联动猪也
+按模板查询一个最高价值实例 ID 并加入保留集合，重复实例继续进入售卖/做菜候选。
 四群内容同步由正式目录测试比较用户可见语义，玩家资产与账本仍按四个 `scope_id` 隔离。
 
 Ruleset 13 把概率处理拆成普通叠加层与六星菜独占层。普通抓猪最多同时使用一个概率菜、
@@ -367,6 +375,11 @@ Ruleset 18 在个人效果队列之外增加群效果层。`group_food_effects` 
 Schema 22 创建上述两张表及作用域/玩家索引，并收敛糖醋排骨模板、可用/锁定实例和未消费
 重置机会。猪鼻蛋包饭只更新模板和仍可使用/锁定实例，不把旧的个人待用做菜效果改成群级
 发币，以免对已经食用并结算过的历史事件重新铸币。
+
+Ruleset 19 不迁移历史资产。`CatchQuotaLayers` 统一基础、永久、滚动七天、当前时段、今日时段
+和旧版共享池的正常额度计算；六星专属次数仍走 `catch_quota_cost=0`。批量安全由“全部联动
+实例排除”改为“每个联动模板保留最高价值一只”。自动监管增加可解释的 `established / likely-alt /
+unknown` 活跃层级和双向主账号赠送过滤，所有阈值均来自中文配置模型。
 
 滚动七天额度在吃菜时用 `now + 7 days` 所在抓猪窗口的结束时刻作为到期点；Schema 18
 迁移优先从来源美食 `disposed_at` 恢复实际食用时间，缺失时才回退额度行 `updated_at`。

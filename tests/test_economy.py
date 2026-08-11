@@ -1723,7 +1723,7 @@ async def test_batch_sell_keeps_collaboration_pigs_and_supports_rarity_filter(
         (identity.player_id,),
     )
     assert remaining is not None and remaining["count"] == 2  # 1 星普通 + 1 星联动
-    # 不指定品质（1-3 星）：1 星普通被卖，联动猪仍保护
+    # 不指定品质（1-3 星）：1 星普通被卖，每种联动猪仍保留最高价值实例。
     sold_all = await economy.batch_sell_low_rarity(
         _identity(message_id="batch-sell-2", user_id="200"),
         asset_kind="pig",
@@ -1738,7 +1738,7 @@ async def test_batch_sell_keeps_collaboration_pigs_and_supports_rarity_filter(
 
 
 @pytest.mark.asyncio
-async def test_batch_cook_skips_collaboration_pigs_and_sorts_by_rarity_desc(
+async def test_batch_cook_keeps_best_collaboration_duplicate_and_sorts_by_rarity_desc(
     tmp_path: Path,
 ) -> None:
     from pig_catcher.rendering import batch_cook_view
@@ -1760,6 +1760,8 @@ async def test_batch_cook_skips_collaboration_pigs_and_sorts_by_rarity_desc(
             0.0, 0.0, 0.5, 0.5, 0.5, 0.5, 0.5,
             # 1 星联动猪
             0.0, 0.9, 0.5, 0.5, 0.5, 0.5, 0.5,
+            # 同模板的另一只 1 星联动猪
+            0.0, 0.9, 0.5, 0.5, 0.5, 0.5, 0.5,
         ),
         clock=clock,
         id_factory=iter(
@@ -1767,33 +1769,52 @@ async def test_batch_cook_skips_collaboration_pigs_and_sorts_by_rarity_desc(
                 "pig-k1", "ledger-k1",
                 "pig-k2", "ledger-k2",
                 "pig-k3", "ledger-k3",
+                "pig-k4", "ledger-k4",
             )
         ).__next__,
-        short_code_factory=iter(("A1000001", "A1000002", "A1000003")).__next__,
+        short_code_factory=iter(
+            ("A1000001", "A1000002", "A1000003", "A1000004")
+        ).__next__,
     )
     identity = _identity(message_id="batch-cook")
-    for mid in ("cook-1", "cook-2", "cook-3"):
+    for mid in ("cook-1", "cook-2", "cook-3", "cook-4"):
         await service.catch(_identity(message_id=mid, user_id="200"))
+    async with database.transaction() as session:
+        await session.execute(
+            "UPDATE pig_instances SET official_value = 999 WHERE pig_instance_id = 'pig-k4'"
+        )
 
     economy = EconomyService(
         database,
         CookingSection(cook_cooldown_seconds=0),
         EconomySection(),
-        random_source=SequenceRandom(0.0, 0.0, 0.5, 0.0, 0.0, 0.5),
+        random_source=SequenceRandom(
+            0.0, 0.0, 0.5,
+            0.0, 0.0, 0.5,
+            0.0, 0.0, 0.5,
+        ),
         clock=clock,
-        id_factory=iter(("ck-food-1", "ck-ledger-1", "ck-food-2", "ck-ledger-2")).__next__,
+        id_factory=iter(
+            (
+                "ck-food-1", "ck-ledger-1",
+                "ck-food-2", "ck-ledger-2",
+                "ck-food-3", "ck-ledger-3",
+            )
+        ).__next__,
         short_code_factory=iter(("ABAD0001", "ABAD0002", "ABAD0003")).__next__,
     )
     result = await economy.batch_cook(identity, rarity=None)
-    assert result.pig_count == 2  # 联动猪被保护
-    assert result.food_count == 2
-    # 联动猪仍在背包
+    assert result.pig_count == 3  # 两只普通猪 + 一只低价值联动重复猪
+    assert result.food_count == 3
+    # 同一种联动猪只保留最高价值的一只
     collab_left = await database.fetch_one(
-        "SELECT COUNT(*) AS count FROM pig_instances WHERE state = 'active'"
+        "SELECT COUNT(*) AS count, MAX(official_value) AS value "
+        "FROM pig_instances WHERE state = 'active'"
     )
     assert collab_left is not None and collab_left["count"] == 1
+    assert collab_left["value"] == 999
     view = batch_cook_view(result)
-    assert view.food_count == 2
+    assert view.food_count == 3
     rarities = [item.rarity for item in view.items]
     assert rarities == sorted(rarities, reverse=True)
     await database.close()
@@ -2004,7 +2025,7 @@ async def _insert_food(
 async def test_batch_keep_default_and_switch_keep_highest_value_assets(
     tmp_path: Path,
 ) -> None:
-    """联动猪默认全保留；开启后普通猪按模板各保留最高价值实例。"""
+    """联动猪默认每模板留最高一只；开关再保护普通猪最高实例。"""
 
     database = await _database_with_catalog(
         tmp_path,
@@ -2053,7 +2074,7 @@ async def test_batch_keep_default_and_switch_keep_highest_value_assets(
         clock=clock,
         id_factory=iter(("ledger-1", "ledger-2", "ledger-3", "ledger-4")).__next__,
     )
-    # 默认：所有联动猪受保护，普通猪（含 seed）全部批量售卖。
+    # 默认：每种联动猪保留一只，普通猪（含 seed）全部批量售卖。
     sold = await economy.batch_sell_low_rarity(
         _identity(message_id="batch-keep-sell-1", user_id="200"),
         asset_kind="pig",
@@ -2073,7 +2094,7 @@ async def test_batch_keep_default_and_switch_keep_highest_value_assets(
         ("pig-collab-b", 250),
     ]
 
-    # 开启后：每个普通模板各保留一只最高价值实例，联动猪仍全部保护。
+    # 开启后：普通模板也各保留最高实例；联动重复实例只留最高的一只。
     enabled, _ = await economy.set_batch_keep_highest(
         _identity(message_id="batch-keep-enable", user_id="200"),
         enabled=True,
@@ -2097,15 +2118,15 @@ async def test_batch_keep_default_and_switch_keep_highest_value_assets(
                       short_code="A11E0023", instance_id="pig-keep-8")
     await _insert_pig(database, player_id=pid, scope_id=scope,
                       template_id="pig-collab-a", rarity=1,
-                      display_name="联动猪a", official_value=150,
+                      display_name="联动猪a", official_value=350,
                       short_code="A11E0024", instance_id="pig-keep-9")
     sold = await economy.batch_sell_low_rarity(
         _identity(message_id="batch-keep-sell-2", user_id="200"),
         asset_kind="pig",
         max_rarity=3,
     )
-    # 两个普通模板各卖出低价值实例；三个联动实例全部保留。
-    assert sold.asset_count == 2
+    # 两个普通模板低价值实例和联动 a 的低价值重复实例被处理。
+    assert sold.asset_count == 3
     rows = await database.fetch_all(
         """
         SELECT template_id, official_value FROM pig_instances
@@ -2117,8 +2138,7 @@ async def test_batch_keep_default_and_switch_keep_highest_value_assets(
     assert [(r["template_id"], r["official_value"]) for r in rows] == [
         ("pig-1-common", 300),
         ("pig-1-common-other", 220),
-        ("pig-collab-a", 150),
-        ("pig-collab-a", 150),
+        ("pig-collab-a", 350),
         ("pig-collab-b", 250),
     ]
     await database.close()
@@ -2201,7 +2221,7 @@ async def test_batch_sell_keeps_highest_value_food_when_enabled(
 async def test_batch_cook_defaults_to_low_rarity_and_keeps_highest(
     tmp_path: Path,
 ) -> None:
-    """批量做菜保护全部联动猪，开启后按普通模板各保留最高价值实例。"""
+    """批量做菜按联动模板留最高实例，开启后再按普通模板留最高实例。"""
 
     database = await _database_with_catalog(
         tmp_path,

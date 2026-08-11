@@ -11,7 +11,12 @@ import pytest
 
 from pig_catcher.config.model import RankingSection, RegulationSection, TradingSection
 from pig_catcher.domain.enums import AssetKind, TradeStatus
-from pig_catcher.domain.regulation import TransferSignal, analyze_transfer_graph
+from pig_catcher.domain.regulation import (
+    TransferSignal,
+    analyze_transfer_graph,
+    classify_account_activity,
+    relax_established_mutual_gifts,
+)
 from pig_catcher.infrastructure.repositories import FrameworkRepository
 from pig_catcher.services import RegulationService, SocialService
 from pig_catcher.services.command_state import iso_timestamp
@@ -85,6 +90,79 @@ def test_graph_exempts_one_feeder_but_detects_funnels_and_chains() -> None:
     assert chain.source_player_ids == ("small-a", "small-b")
     assert chain.relay_player_ids == ("relay",)
     assert chain.max_path_depth == 2
+
+
+def test_account_activity_classification_requires_complete_evidence() -> None:
+    common = {
+        "established_min_messages": 30,
+        "established_min_active_days": 7,
+        "likely_alt_max_messages": 5,
+        "likely_alt_max_active_days": 2,
+        "likely_alt_max_plugin_age_days": 7,
+        "likely_alt_max_game_actions": 10,
+    }
+    established = classify_account_activity(
+        player_id="main",
+        chat_history_available=True,
+        chat_message_count=30,
+        chat_active_day_count=7,
+        plugin_age_days=1,
+        game_action_count=0,
+        **common,
+    )
+    likely_alt = classify_account_activity(
+        player_id="alt",
+        chat_history_available=True,
+        chat_message_count=5,
+        chat_active_day_count=2,
+        plugin_age_days=7,
+        game_action_count=10,
+        **common,
+    )
+    unavailable = classify_account_activity(
+        player_id="unknown",
+        chat_history_available=False,
+        chat_message_count=0,
+        chat_active_day_count=0,
+        plugin_age_days=0,
+        game_action_count=0,
+        **common,
+    )
+    assert established.tier == "established"
+    assert likely_alt.tier == "likely-alt"
+    assert unavailable.tier == "unknown"
+
+
+def test_established_reciprocal_gifts_are_filtered_but_one_way_gifts_remain() -> None:
+    signals = (
+        _signal("a-to-b", "a", "b"),
+        _signal("b-to-a", "b", "a"),
+        _signal("c-to-b", "c", "b"),
+    )
+    remaining, relaxed_ids = relax_established_mutual_gifts(
+        signals,
+        established_player_ids=frozenset({"a", "b", "c"}),
+    )
+    assert relaxed_ids == ("a-to-b", "b-to-a")
+    assert tuple(signal.event_id for signal in remaining) == ("c-to-b",)
+
+
+def test_two_one_shot_sources_require_likely_alt_evidence() -> None:
+    signals = (
+        _signal("a-to-main", "small-a", "main"),
+        _signal("b-to-main", "small-b", "main"),
+    )
+    assert analyze_transfer_graph(
+        signals,
+        anchor_event_ids=frozenset({"b-to-main"}),
+    ) is None
+    strict = analyze_transfer_graph(
+        signals,
+        anchor_event_ids=frozenset({"b-to-main"}),
+        strict_player_ids=frozenset({"small-a", "small-b"}),
+    )
+    assert strict is not None
+    assert strict.strict_source_count == 2
 
 
 def test_graph_does_not_join_unrelated_assets_through_same_relay() -> None:
@@ -255,6 +333,137 @@ async def _mark_all_notices_sent(
         assert "风险分" not in notice.message_text
         assert "阈值" not in notice.message_text
         assert await regulation.mark_notice_sent(notice_id) is True
+
+
+def _active_chat_provider(clock: MutableClock, *user_ids: str):
+    messages: list[dict[str, object]] = []
+    for day_offset in range(7):
+        for user_id in user_ids:
+            for message_index in range(5):
+                timestamp = clock.now() - timedelta(
+                    days=day_offset,
+                    minutes=message_index + 1,
+                )
+                messages.append(
+                    {
+                        "message_id": f"{user_id}-{day_offset}-{message_index}",
+                        "timestamp": str(timestamp.timestamp()),
+                        "platform": "qq",
+                        "message_info": {
+                            "user_info": {"user_id": user_id},
+                            "group_info": {"group_id": "100"},
+                        },
+                        "is_command": False,
+                        "is_notify": False,
+                    }
+                )
+
+    async def provider(
+        chat_id: str,
+        start_time: float,
+        end_time: float,
+        limit: int,
+    ) -> tuple[dict[str, object], ...]:
+        assert chat_id == "stream-100"
+        assert start_time < end_time
+        return tuple(messages[-limit:])
+
+    return provider
+
+
+@pytest.mark.asyncio
+async def test_established_players_reciprocal_gifts_do_not_open_case(
+    tmp_path: Path,
+) -> None:
+    database, clock, assets = await _seed_two_source_assets(tmp_path)
+    regulation = RegulationService(
+        database,
+        RegulationSection(enabled_scope_ids=["qq:100"]),
+        clock=clock,
+        chat_message_provider=_active_chat_provider(
+            clock,
+            "source-a",
+            "source-b",
+            "main",
+        ),
+    )
+    social = SocialService(
+        database,
+        TradingSection(),
+        RankingSection(),
+        regulation_service=regulation,
+        clock=clock,
+    )
+    operations = (
+        ("source-a", "main", assets[0].pig.selector, "mutual-1"),
+        ("main", "source-a", assets[0].pig.selector, "mutual-2"),
+        ("source-b", "main", assets[4].pig.selector, "mutual-3"),
+        ("main", "source-b", assets[4].pig.selector, "mutual-4"),
+        ("source-a", "main", assets[0].pig.selector, "mutual-5"),
+        ("source-b", "main", assets[4].pig.selector, "mutual-6"),
+    )
+    for sender, recipient, selector, message_id in operations:
+        result = await social.gift(
+            _identity(user_id=sender, message_id=message_id),
+            _identity(user_id=recipient, message_id=f"target-{message_id}"),
+            asset_kind=AssetKind.PIG,
+            selector_text=selector,
+        )
+        assert result.regulation is None
+    count = await database.fetch_one("SELECT COUNT(*) AS count FROM anti_abuse_cases")
+    assert count is not None and int(count["count"]) == 0
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_two_low_activity_new_sources_are_checked_strictly(
+    tmp_path: Path,
+) -> None:
+    database, clock, assets = await _seed_two_source_assets(tmp_path)
+
+    async def empty_provider(
+        chat_id: str,
+        start_time: float,
+        end_time: float,
+        limit: int,
+    ) -> tuple[dict[str, object], ...]:
+        return ()
+
+    regulation = RegulationService(
+        database,
+        RegulationSection(enabled_scope_ids=["qq:100"]),
+        clock=clock,
+        chat_message_provider=empty_provider,
+    )
+    social = SocialService(
+        database,
+        TradingSection(),
+        RankingSection(),
+        regulation_service=regulation,
+        clock=clock,
+    )
+    first = await social.gift(
+        _identity(user_id="source-a", message_id="strict-a"),
+        _identity(user_id="main", message_id="strict-target-a"),
+        asset_kind=AssetKind.PIG,
+        selector_text=assets[0].pig.selector,
+    )
+    assert first.regulation is None
+    second = await social.gift(
+        _identity(user_id="source-b", message_id="strict-b"),
+        _identity(user_id="main", message_id="strict-target-b"),
+        asset_kind=AssetKind.PIG,
+        selector_text=assets[4].pig.selector,
+    )
+    assert second.regulation is not None
+    assert second.regulation.stage == "warning"
+    case = await database.fetch_one(
+        "SELECT evidence_json FROM anti_abuse_cases WHERE case_id = ?",
+        (second.regulation.case_id,),
+    )
+    assert case is not None
+    assert '"strict_source_count": 2' in str(case["evidence_json"])
+    await database.close()
 
 
 @pytest.mark.asyncio

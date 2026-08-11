@@ -5,6 +5,74 @@ from __future__ import annotations
 from collections import defaultdict, deque
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Literal
+
+AccountTrustTier = Literal["established", "regular", "likely-alt", "unknown"]
+
+
+@dataclass(frozen=True, slots=True)
+class AccountActivityProfile:
+    """Deterministic account-maturity snapshot without reading message content."""
+
+    player_id: str
+    tier: AccountTrustTier
+    chat_history_available: bool
+    chat_message_count: int
+    chat_active_day_count: int
+    plugin_age_days: int
+    game_action_count: int
+
+
+def classify_account_activity(
+    *,
+    player_id: str,
+    chat_history_available: bool,
+    chat_message_count: int,
+    chat_active_day_count: int,
+    plugin_age_days: int,
+    game_action_count: int,
+    established_min_messages: int,
+    established_min_active_days: int,
+    likely_alt_max_messages: int,
+    likely_alt_max_active_days: int,
+    likely_alt_max_plugin_age_days: int,
+    likely_alt_max_game_actions: int,
+) -> AccountActivityProfile:
+    """Classify one account using counts and dates only.
+
+    Missing chat history never makes an account a likely alt and never grants
+    the established-account mutual-gift relaxation.
+    """
+
+    messages = max(0, int(chat_message_count))
+    chat_days = max(0, int(chat_active_day_count))
+    plugin_days = max(0, int(plugin_age_days))
+    actions = max(0, int(game_action_count))
+    if not chat_history_available:
+        tier: AccountTrustTier = "unknown"
+    elif (
+        messages >= int(established_min_messages)
+        and chat_days >= int(established_min_active_days)
+    ):
+        tier = "established"
+    elif (
+        messages <= int(likely_alt_max_messages)
+        and chat_days <= int(likely_alt_max_active_days)
+        and plugin_days <= int(likely_alt_max_plugin_age_days)
+        and actions <= int(likely_alt_max_game_actions)
+    ):
+        tier = "likely-alt"
+    else:
+        tier = "regular"
+    return AccountActivityProfile(
+        player_id=str(player_id),
+        tier=tier,
+        chat_history_available=bool(chat_history_available),
+        chat_message_count=messages,
+        chat_active_day_count=chat_days,
+        plugin_age_days=plugin_days,
+        game_action_count=actions,
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,6 +108,42 @@ class RegulationAnalysis:
     high_rarity_asset_count: int
     six_star_asset_count: int
     price_anomaly_level: str
+    strict_source_count: int = 0
+
+
+def relax_established_mutual_gifts(
+    signals: tuple[TransferSignal, ...],
+    *,
+    established_player_ids: frozenset[str],
+) -> tuple[tuple[TransferSignal, ...], tuple[str, ...]]:
+    """Exclude reciprocal gifts between two established chat accounts.
+
+    Trades, one-way gifts, and any transfer involving a non-established account
+    remain visible to the graph. The returned event ids are retained as internal
+    audit evidence by the service layer.
+    """
+
+    directions = {
+        (signal.from_player_id, signal.to_player_id)
+        for signal in signals
+        if signal.channel == "asset"
+        and signal.transfer_type == "gift"
+        and signal.from_player_id in established_player_ids
+        and signal.to_player_id in established_player_ids
+    }
+    relaxed_ids = {
+        signal.event_id
+        for signal in signals
+        if signal.channel == "asset"
+        and signal.transfer_type == "gift"
+        and signal.from_player_id in established_player_ids
+        and signal.to_player_id in established_player_ids
+        and (signal.to_player_id, signal.from_player_id) in directions
+    }
+    return (
+        tuple(signal for signal in signals if signal.event_id not in relaxed_ids),
+        tuple(sorted(relaxed_ids)),
+    )
 
 
 def _weak_component(
@@ -170,6 +274,7 @@ def _analyze_targets(
     signals: tuple[TransferSignal, ...],
     targets: tuple[str, ...],
     anchor_event_ids: frozenset[str],
+    strict_player_ids: frozenset[str],
 ) -> RegulationAnalysis | None:
     path_signals = _trace_asset_paths(signals, targets)
     if not path_signals or not (
@@ -218,8 +323,14 @@ def _analyze_targets(
         dedicated_sources.add(player_id)
         if len(toward_targets) >= 2:
             repeated_sources.add(player_id)
-    # 两个来源需要都已经重复向同一汇聚路径流转；来源更多时，一次性分散小号也应被识别。
-    if len(repeated_sources) < 2 and len(dedicated_sources) < 3:
+    strict_sources = dedicated_sources & strict_player_ids
+    # 普通账号仍要求两个重复来源或三个集中来源；已被客观活跃度指标归为
+    # 疑似小号的来源，只要有两个集中流向即可进入后续可解释评分。
+    if (
+        len(repeated_sources) < 2
+        and len(dedicated_sources) < 3
+        and len(strict_sources) < 2
+    ):
         return None
 
     relevant_nodes = set(dedicated_sources)
@@ -309,6 +420,7 @@ def _analyze_targets(
         score += 15
     elif anomaly == 1:
         score += 8
+    score += min(30, 15 * len(strict_sources))
 
     return RegulationAnalysis(
         score=score,
@@ -324,6 +436,7 @@ def _analyze_targets(
         high_rarity_asset_count=high_rarity_count,
         six_star_asset_count=six_star_count,
         price_anomaly_level={0: "none", 1: "moderate", 2: "severe"}[anomaly],
+        strict_source_count=len(strict_sources),
     )
 
 
@@ -331,6 +444,7 @@ def analyze_transfer_graph(
     signals: tuple[TransferSignal, ...],
     *,
     anchor_event_ids: frozenset[str],
+    strict_player_ids: frozenset[str] = frozenset(),
 ) -> RegulationAnalysis | None:
     """返回包含本次操作且得分最高的单/双汇聚账号候选。"""
 
@@ -354,6 +468,7 @@ def analyze_transfer_graph(
             component_signals,
             (primary_target,),
             anchor_event_ids,
+            strict_player_ids,
         )
         if single is not None:
             candidates.append(single)
@@ -378,6 +493,7 @@ def analyze_transfer_graph(
                 component_signals,
                 tuple(sorted((primary_target, companion))),
                 anchor_event_ids,
+                strict_player_ids,
             )
             if paired is not None:
                 candidates.append(paired)
@@ -395,4 +511,12 @@ def analyze_transfer_graph(
     )
 
 
-__all__ = ["RegulationAnalysis", "TransferSignal", "analyze_transfer_graph"]
+__all__ = [
+    "AccountActivityProfile",
+    "AccountTrustTier",
+    "RegulationAnalysis",
+    "TransferSignal",
+    "analyze_transfer_graph",
+    "classify_account_activity",
+    "relax_established_mutual_gifts",
+]

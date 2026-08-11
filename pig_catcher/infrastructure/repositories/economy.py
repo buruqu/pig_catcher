@@ -7,7 +7,7 @@ from collections.abc import Mapping
 from ...domain.models import AssetSelector
 from ..database import DatabaseSession
 from .batch_safety import (
-    collaboration_pig_exclusion_sql,
+    highest_collaboration_pig_ids_per_template,
     highest_instance_ids_per_template,
 )
 
@@ -558,8 +558,8 @@ class EconomyRepository:
         """Sell all unlocked assets at or below one rarity and return count/value.
 
         ``rarity`` 指定时只处理该品质；不指定时处理 ``1..max_rarity``。
-        联动猪始终全部排除；``keep_highest`` 开启时，普通猪猪或美食按模板
-        各保留一只价值最高的实例（同价值取最小实例 id）。
+        联动猪始终按模板保留一只价值最高的实例；``keep_highest`` 开启时，
+        普通猪猪或美食也按模板各保留一只（同价值取最小实例 id）。
         """
 
         if asset_kind not in {"pig", "food"}:
@@ -570,11 +570,6 @@ class EconomyRepository:
             "AND rarity = ?" if rarity is not None else "AND rarity <= ?"
         )
         rarity_param: object = rarity if rarity is not None else max_rarity
-        collaboration_clause = (
-            collaboration_pig_exclusion_sql(table)
-            if asset_kind == "pig"
-            else ""
-        )
         keep_ids = await self._batch_keep_ids(
             session,
             player_id=player_id,
@@ -597,7 +592,6 @@ class EconomyRepository:
               AND state = 'active'
               AND locked_trade_id IS NULL
               {rarity_clause}
-              {collaboration_clause}
               {keep_clause}
             """,
             (player_id, scope_id, rarity_param, *keep_ids),
@@ -615,7 +609,6 @@ class EconomyRepository:
               AND state = 'active'
               AND locked_trade_id IS NULL
               {rarity_clause}
-              {collaboration_clause}
               {keep_clause}
             """,
             (now, now, player_id, scope_id, rarity_param, *keep_ids),
@@ -638,7 +631,6 @@ class EconomyRepository:
                     AND state = 'sold'
                     AND disposed_at = ?
                     {rarity_clause}
-                    {collaboration_clause}
                     {keep_clause}
               )
             """,
@@ -659,20 +651,33 @@ class EconomyRepository:
     ) -> list[str]:
         """Return instance ids that must be kept from one batch operation.
 
-        开关关闭时无需额外实例；联动猪由批量 SQL 独立全部保护。开关开启时，
-        在本批操作范围内按模板各保留一个最高价值的普通猪猪或美食实例。
+        联动猪无论开关状态都按模板保留一个最高价值实例。开关开启时，
+        在本批操作范围内再按模板各保留一个最高价值的普通猪猪或美食实例。
         """
 
-        if not keep_highest:
-            return []
-        return await highest_instance_ids_per_template(
-            session,
-            player_id=player_id,
-            scope_id=scope_id,
-            asset_kind=asset_kind,
-            max_rarity=max_rarity,
-            rarity=rarity,
-        )
+        keep_ids: list[str] = []
+        if asset_kind == "pig":
+            keep_ids.extend(
+                await highest_collaboration_pig_ids_per_template(
+                    session,
+                    player_id=player_id,
+                    scope_id=scope_id,
+                    max_rarity=max_rarity,
+                    rarity=rarity,
+                )
+            )
+        if keep_highest:
+            keep_ids.extend(
+                await highest_instance_ids_per_template(
+                    session,
+                    player_id=player_id,
+                    scope_id=scope_id,
+                    asset_kind=asset_kind,
+                    max_rarity=max_rarity,
+                    rarity=rarity,
+                )
+            )
+        return list(dict.fromkeys(keep_ids))
 
     async def get_food_by_instance_id(
         self,

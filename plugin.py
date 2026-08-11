@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import base64
 import os
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import replace
 from pathlib import Path
 from re import escape
@@ -203,6 +203,29 @@ class PigCatcherPlugin(MaiBotPlugin):
 
         return self._animation_composer
 
+    async def _regulation_chat_messages(
+        self,
+        chat_id: str,
+        start_time: float,
+        end_time: float,
+        limit: int,
+    ) -> Sequence[Mapping[str, object]]:
+        """Read bounded message metadata through the public MaiBot SDK."""
+
+        result = await self.ctx.message.get_by_time_in_chat(
+            chat_id,
+            str(start_time),
+            str(end_time),
+            limit=int(limit),
+            limit_mode="latest",
+            filter_mai=True,
+            filter_command=True,
+            include_binary_data=False,
+        )
+        if not isinstance(result, list):
+            raise RuntimeError("MaiBot 群消息查询没有返回列表。")
+        return tuple(item for item in result if isinstance(item, Mapping))
+
     @property
     def gameplay_service(self) -> GameplayService | None:
         """Expose the active gameplay service for command-level acceptance."""
@@ -330,6 +353,7 @@ class PigCatcherPlugin(MaiBotPlugin):
                 database,
                 settings.regulation,
                 admin_user_ids=settings.access.admin_user_ids,
+                chat_message_provider=self._regulation_chat_messages,
             )
             self._regulation_service = regulation_service
             self._social_service = SocialService(
@@ -1916,7 +1940,7 @@ class PigCatcherPlugin(MaiBotPlugin):
     @Command(
         "pig_catcher_pig_detail",
         description="查看一只当前持有猪猪的详情",
-        pattern=r"^/抓猪详情(?:\s+(?P<selector>.*?))?\s*$",
+        pattern=r"^/(?:猪猪详情|抓猪详情)(?:\s+(?P<selector>.*?))?\s*$",
     )
     async def handle_pig_detail(
         self,
@@ -1948,7 +1972,7 @@ class PigCatcherPlugin(MaiBotPlugin):
         except Exception as exc:
             return await self._command_error(
                 stream_id=identity.stream_id,
-                operation="抓猪详情",
+                operation="猪猪详情",
                 error=exc,
             )
 
