@@ -37,6 +37,8 @@ NEXT_COLLABORATION_CATCH = "next-collaboration-catch"
 NEXT_EXTREME_FIVE_STAR_COOK = "next-extreme-five-star-cook"
 NEXT_FIVE_SIX_STAR_CATCH = "next-five-six-star-catch"
 NEXT_SMALL_SIX_STAR_CATCH = "next-small-six-star-catch"
+GROUP_NEXT_EXCLUSIVE_HIGH_STAR_CATCH = "group-next-exclusive-high-star-catch"
+GROUP_WINDOW_HIGH_STAR_BOOST = "group-window-high-star-boost"
 # Schema 18 前糖醋排骨使用的历史独占加权；保留解析能力以兼容旧审计快照。
 EXCLUSIVE_CATCH_QUALITY = "exclusive-catch-quality"
 
@@ -89,12 +91,19 @@ COOK_EFFECT_IDS = frozenset(
 )
 QUOTA_EFFECT_IDS = frozenset({CURRENT_WINDOW_CATCHES, TODAY_WINDOW_CATCHES})
 IMMEDIATE_EFFECT_IDS = frozenset({WEEKLY_WINDOW_CATCHES, PERMANENT_WINDOW_CATCH})
+GROUP_EFFECT_IDS = frozenset(
+    {
+        GROUP_NEXT_EXCLUSIVE_HIGH_STAR_CATCH,
+        GROUP_WINDOW_HIGH_STAR_BOOST,
+    }
+)
 SUPPORTED_EFFECT_IDS = (
     CATCH_EFFECT_IDS
     | COOK_EFFECT_IDS
     | {EXTRA_CATCHES}
     | QUOTA_EFFECT_IDS
     | IMMEDIATE_EFFECT_IDS
+    | GROUP_EFFECT_IDS
     | {QUOTA_RESET_CHANCE}
 )
 
@@ -176,6 +185,33 @@ class CookingEffectApplication:
     skipped_summaries: tuple[str, ...] = ()
 
 
+@dataclass(frozen=True, slots=True)
+class ActiveGroupFoodEffect:
+    """One current-scope six-star food effect shared by every player."""
+
+    group_effect_entry_id: str
+    effect_id: str
+    params: Mapping[str, object]
+    granted_uses_per_player: int
+    consumed_uses: int
+    source_user_id: str
+    starts_at: str
+    expires_at: str
+    created_at: str
+
+
+@dataclass(frozen=True, slots=True)
+class GroupCatchEffectApplication:
+    """Group-wide probability and dedicated-quota selection for one catch."""
+
+    weights: tuple[float, ...]
+    consumed_entry_ids: tuple[str, ...]
+    dedicated_entry_id: str
+    summaries: tuple[str, ...]
+    skipped_summaries: tuple[str, ...]
+    exclusive: bool
+
+
 def active_effect_from_row(row: Mapping[str, object]) -> ActiveFoodEffect:
     """Decode one repository row and reject malformed persisted parameters."""
 
@@ -194,6 +230,32 @@ def active_effect_from_row(row: Mapping[str, object]) -> ActiveFoodEffect:
         granted_uses=int(row["granted_uses"]),
         consumed_uses=int(row["consumed_uses"]),
         expires_at=str(row.get("expires_at") or ""),
+        created_at=str(row["created_at"]),
+    )
+
+
+def active_group_effect_from_row(row: Mapping[str, object]) -> ActiveGroupFoodEffect:
+    """Decode one current group-effect row and validate its persisted parameters."""
+
+    try:
+        params = json.loads(str(row.get("params_json") or "{}"))
+    except json.JSONDecodeError as exc:
+        raise FoodEffectError("群体美食效果参数不是有效 JSON。") from exc
+    if not isinstance(params, dict):
+        raise FoodEffectError("群体美食效果参数必须是 JSON 对象。")
+    effect_id = str(row.get("effect_id") or "")
+    if effect_id not in GROUP_EFFECT_IDS:
+        raise FoodEffectError(f"群体美食效果“{effect_id}”尚未注册。")
+    resolve_food_effect(effect_id, params)
+    return ActiveGroupFoodEffect(
+        group_effect_entry_id=str(row["group_effect_entry_id"]),
+        effect_id=effect_id,
+        params=params,
+        granted_uses_per_player=int(row["granted_uses_per_player"]),
+        consumed_uses=int(row.get("consumed_uses") or 0),
+        source_user_id=str(row.get("source_user_id") or ""),
+        starts_at=str(row["starts_at"]),
+        expires_at=str(row["expires_at"]),
         created_at=str(row["created_at"]),
     )
 
@@ -384,6 +446,58 @@ def resolve_food_effect(
                 "新增概率只从 1 至 3 星转移，不压低 4 星或 5 星。"
             ),
         )
+    if normalized_id == GROUP_NEXT_EXCLUSIVE_HIGH_STAR_CATCH:
+        five_multiplier = _number(raw, "five_star_multiplier", lower=1.01, upper=20.0)
+        six_multiplier = _number(raw, "six_star_multiplier", lower=1.01, upper=20.0)
+        uses_per_player = _integer(raw, "uses_per_player", lower=1, upper=3)
+        self_coin = _integer(raw, "self_coin", lower=0, upper=1_000_000)
+        other_coin = _integer(raw, "other_coin", lower=0, upper=1_000_000)
+        return FoodEffectGrant(
+            normalized_id,
+            {
+                "five_star_multiplier": five_multiplier,
+                "six_star_multiplier": six_multiplier,
+                "uses_per_player": uses_per_player,
+                "self_coin": self_coin,
+                "other_coin": other_coin,
+                "source_label": str(raw.get("source_label") or "神龙化猪七星云海锅").strip(),
+            },
+            uses_per_player,
+            (
+                f"食用者立即获得 {self_coin} 猪币，其余本群已登记玩家各获得 {other_coin} 猪币；"
+                f"有效期内本群每名玩家的下一次抓猪，5 星与 6 星相对权重分别 ×{five_multiplier:g} "
+                f"和 ×{six_multiplier:g}，并按六星菜独占规则结算。"
+            ),
+        )
+    if normalized_id == GROUP_WINDOW_HIGH_STAR_BOOST:
+        five_multiplier = _number(raw, "five_star_multiplier", lower=1.001, upper=4.0)
+        six_multiplier = _number(raw, "six_star_multiplier", lower=1.001, upper=4.0)
+        coin_per_player = _integer(raw, "coin_per_player", lower=0, upper=1_000_000)
+        dedicated_catches = _integer(raw, "dedicated_catches", lower=0, upper=20)
+        source_label = str(raw.get("source_label") or "六星菜").strip()
+        if not source_label or len(source_label) > 64:
+            raise FoodEffectError("群体美食效果的 source_label 必须是 1 至 64 个字符。")
+        quota_text = (
+            f"，并让每名玩家获得 {dedicated_catches} 次专属抓猪额度"
+            if dedicated_catches
+            else ""
+        )
+        return FoodEffectGrant(
+            normalized_id,
+            {
+                "five_star_multiplier": five_multiplier,
+                "six_star_multiplier": six_multiplier,
+                "coin_per_player": coin_per_player,
+                "dedicated_catches": dedicated_catches,
+                "source_label": source_label,
+            },
+            max(1, dedicated_catches),
+            (
+                f"本群已登记玩家各获得 {coin_per_player} 猪币{quota_text}；"
+                f"到次日同一抓猪时段刷新前，5 星与 6 星相对权重分别 ×{five_multiplier:g} "
+                f"和 ×{six_multiplier:g}，可与道具和非六星菜叠加。"
+            ),
+        )
     if normalized_id == NEXT_PIG_STATURE:
         mode = str(raw.get("mode") or "").strip()
         if mode not in {"giant", "mini"}:
@@ -499,9 +613,53 @@ def resolve_food_effect(
         )
     if normalized_id == QUOTA_RESET_CHANCE:
         count = _integer(raw, "count", lower=1, upper=3)
+        dedicated_catches = _integer(
+            raw,
+            "group_dedicated_catches",
+            lower=0,
+            upper=20,
+        ) if "group_dedicated_catches" in raw else 0
+        five_multiplier = _number(
+            raw,
+            "five_star_multiplier",
+            lower=1.001,
+            upper=4.0,
+        ) if "five_star_multiplier" in raw else 1.0
+        six_multiplier = _number(
+            raw,
+            "six_star_multiplier",
+            lower=1.001,
+            upper=4.0,
+        ) if "six_star_multiplier" in raw else 1.0
+        group_coin = _integer(
+            raw,
+            "group_coin",
+            lower=0,
+            upper=1_000_000,
+        ) if "group_coin" in raw else 0
+        params: dict[str, object] = {"count": count}
+        if dedicated_catches or group_coin or five_multiplier > 1.0 or six_multiplier > 1.0:
+            params.update(
+                {
+                    "group_dedicated_catches": dedicated_catches,
+                    "five_star_multiplier": five_multiplier,
+                    "six_star_multiplier": six_multiplier,
+                    "group_coin": group_coin,
+                }
+            )
+            return FoodEffectGrant(
+                normalized_id,
+                params,
+                count,
+                (
+                    f"获得 {count} 次 /重置额度 机会；每次重置会让本群已登记玩家各获得 "
+                    f"{group_coin} 猪币和 {dedicated_catches} 次专属抓猪额度，并在次日同一时段"
+                    f"刷新前令 5 星与 6 星相对权重分别 ×{five_multiplier:g} 和 ×{six_multiplier:g}。"
+                ),
+            )
         return FoodEffectGrant(
             normalized_id,
-            {"count": count},
+            params,
             count,
             f"获得 {count} 次重置本群抓猪额度窗口的机会，可发送 /重置额度 使用。",
         )
@@ -823,6 +981,129 @@ def apply_catch_effects(
         skipped_summaries=tuple(skipped),
         collaboration_only=collaboration_only,
         giant_template_multiplier=giant_template_multiplier,
+    )
+
+
+def has_compatible_exclusive_group_catch_effect(
+    effects: Sequence[ActiveGroupFoodEffect],
+) -> bool:
+    """Whether one per-player group exclusive catch use is still available."""
+
+    return any(
+        effect.effect_id == GROUP_NEXT_EXCLUSIVE_HIGH_STAR_CATCH
+        and effect.consumed_uses < effect.granted_uses_per_player
+        for effect in effects
+    )
+
+
+def apply_group_catch_effects(
+    weights: Sequence[float],
+    effects: Sequence[ActiveGroupFoodEffect],
+) -> GroupCatchEffectApplication:
+    """Apply one exclusive group effect or the strongest ordinary group boost.
+
+    Six-star group boosts never multiply with each other. The exclusive cloud-sea
+    pot takes priority and consumes one per-player use. Otherwise the strongest
+    current-window multiplier may stack with one item and ordinary food effects;
+    its dedicated quota, when present, is consumed separately after settlement.
+    """
+
+    adjusted = normalize_weights(weights)
+    exclusive_candidates = [
+        effect
+        for effect in effects
+        if effect.effect_id == GROUP_NEXT_EXCLUSIVE_HIGH_STAR_CATCH
+        and effect.consumed_uses < effect.granted_uses_per_player
+    ]
+    if exclusive_candidates:
+        chosen = exclusive_candidates[0]
+        grant = resolve_food_effect(chosen.effect_id, chosen.params)
+        adjusted = apply_monotonic_high_rarity_multipliers(
+            adjusted,
+            (
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                float(grant.params["five_star_multiplier"]),
+                float(grant.params["six_star_multiplier"]),
+            ),
+        )
+        source_label = str(grant.params["source_label"])
+        summary = (
+            f"{source_label}全群独占（发动群友 ID：{chosen.source_user_id}）："
+            "本次 5 星与 6 星相对权重分别 "
+            f"×{float(grant.params['five_star_multiplier']):g} 和 "
+            f"×{float(grant.params['six_star_multiplier']):g}。"
+        )
+        skipped = tuple(
+            f"{str(effect.params.get('source_label') or '六星菜')}全群加成"
+            "（本次由神龙化猪七星云海锅独占，未叠加）"
+            for effect in effects
+            if effect.group_effect_entry_id != chosen.group_effect_entry_id
+        )
+        return GroupCatchEffectApplication(
+            weights=adjusted,
+            consumed_entry_ids=(chosen.group_effect_entry_id,),
+            dedicated_entry_id="",
+            summaries=(summary,),
+            skipped_summaries=skipped,
+            exclusive=True,
+        )
+
+    ordinary = [
+        effect
+        for effect in effects
+        if effect.effect_id == GROUP_WINDOW_HIGH_STAR_BOOST
+    ]
+    if not ordinary:
+        return GroupCatchEffectApplication(
+            weights=adjusted,
+            consumed_entry_ids=(),
+            dedicated_entry_id="",
+            summaries=(),
+            skipped_summaries=(),
+            exclusive=False,
+        )
+
+    def strength(effect: ActiveGroupFoodEffect) -> tuple[float, float]:
+        grant = resolve_food_effect(effect.effect_id, effect.params)
+        five = float(grant.params["five_star_multiplier"])
+        six = float(grant.params["six_star_multiplier"])
+        return max(five, six), five + six
+
+    chosen = max(ordinary, key=strength)
+    grant = resolve_food_effect(chosen.effect_id, chosen.params)
+    five_multiplier = float(grant.params["five_star_multiplier"])
+    six_multiplier = float(grant.params["six_star_multiplier"])
+    adjusted = apply_monotonic_high_rarity_multipliers(
+        adjusted,
+        (1.0, 1.0, 1.0, 1.0, five_multiplier, six_multiplier),
+    )
+    remaining = max(
+        0,
+        chosen.granted_uses_per_player - chosen.consumed_uses,
+    )
+    source_label = str(grant.params["source_label"])
+    quota_text = f"；专属抓猪额度剩余 {remaining} 次" if remaining else ""
+    summary = (
+        f"{source_label}全群加成（发动群友 ID：{chosen.source_user_id}）："
+        "5 星与 6 星相对权重分别 "
+        f"×{five_multiplier:g} 和 ×{six_multiplier:g}{quota_text}。"
+    )
+    skipped = tuple(
+        f"{str(effect.params.get('source_label') or '六星菜')}全群权重加成"
+        "（同类六星群体加成只取最高倍率，未相乘）"
+        for effect in ordinary
+        if effect.group_effect_entry_id != chosen.group_effect_entry_id
+    )
+    return GroupCatchEffectApplication(
+        weights=adjusted,
+        consumed_entry_ids=(),
+        dedicated_entry_id=(chosen.group_effect_entry_id if remaining else ""),
+        summaries=(summary,),
+        skipped_summaries=skipped,
+        exclusive=False,
     )
 
 

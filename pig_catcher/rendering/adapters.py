@@ -105,7 +105,17 @@ def _collection_view(collection: object) -> CollectionProgressViewModel:
 def _probability_line(weights: Sequence[float]) -> str:
     """Format final rarity weights as a compact probability line."""
 
-    return " ".join(f"{index + 1}★{value:.1f}%" for index, value in enumerate(weights) if value > 0)
+    def formatted(value: float) -> str:
+        rounded_tenth = round(float(value), 1)
+        if abs(float(value) - rounded_tenth) <= 0.0005:
+            return f"{value:.1f}"
+        return f"{value:.3f}"
+
+    return " ".join(
+        f"{index + 1}★{formatted(value)}%"
+        for index, value in enumerate(weights)
+        if value > 0
+    )
 
 
 def _probability_sources(

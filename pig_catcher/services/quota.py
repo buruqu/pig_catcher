@@ -5,18 +5,23 @@ from __future__ import annotations
 import json
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from hashlib import sha256
 from pathlib import Path
 from uuid import uuid4
 
 from ..domain.errors import DomainValidationError, ReceiptConflictError
-from ..domain.food_effects import QUOTA_RESET_CHANCE
+from ..domain.food_effects import (
+    GROUP_WINDOW_HIGH_STAR_BOOST,
+    QUOTA_RESET_CHANCE,
+    resolve_food_effect,
+)
 from ..domain.models import CommandIdentity, CommandReceipt, ScopeKey
 from ..domain.ports import Clock, MessageKeyFactory, SystemClock
 from ..domain.quota import CatchQuotaWindow, catch_quota_window
 from ..infrastructure.database import PigCatcherDatabase
 from ..infrastructure.repositories import (
+    EconomyRepository,
     FrameworkRepository,
     QuotaRepository,
     ReceiptRepository,
@@ -48,6 +53,10 @@ class CatchQuotaResetResult:
     created_at: str
     receipt: CommandReceipt | None = None
     receipt_created: bool = True
+    group_rewarded_players: int = 0
+    group_coin_reward: int = 0
+    group_dedicated_catches: int = 0
+    group_effect_expires_at: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,6 +88,7 @@ class CatchQuotaResetService:
         repository: QuotaRepository | None = None,
         framework_repository: FrameworkRepository | None = None,
         receipt_repository: ReceiptRepository | None = None,
+        economy_repository: EconomyRepository | None = None,
         clock: Clock | None = None,
         id_factory: Callable[[], str] | None = None,
     ) -> None:
@@ -89,6 +99,7 @@ class CatchQuotaResetService:
         self.repository = repository or QuotaRepository()
         self.framework_repository = framework_repository or FrameworkRepository()
         self.receipt_repository = receipt_repository or ReceiptRepository()
+        self.economy_repository = economy_repository or EconomyRepository()
         self.clock = clock or SystemClock()
         self.id_factory = id_factory or (lambda: uuid4().hex)
 
@@ -575,7 +586,7 @@ class CatchQuotaResetService:
                 return self._result_from_receipt(existing, receipt_created=False)
             effect_row = await session.fetch_one(
                 """
-                SELECT effect_entry_id
+                SELECT effect_entry_id, source_food_instance_id, params_json
                 FROM player_food_effects
                 WHERE player_id = ?
                   AND effect_id = ?
@@ -591,6 +602,32 @@ class CatchQuotaResetService:
                     "你没有可用的重置额度机会；食用六星菜“糖醋排骨”可获得一次，"
                     "发送 /重置额度 即可使用。"
                 )
+            effect_grant = resolve_food_effect(
+                QUOTA_RESET_CHANCE,
+                json.loads(str(effect_row["params_json"] or "{}")),
+            )
+            group_dedicated_catches = int(
+                effect_grant.params.get("group_dedicated_catches") or 0
+            )
+            group_coin_reward = int(effect_grant.params.get("group_coin") or 0)
+            five_star_multiplier = float(
+                effect_grant.params.get("five_star_multiplier") or 1.0
+            )
+            six_star_multiplier = float(
+                effect_grant.params.get("six_star_multiplier") or 1.0
+            )
+            enhanced_group_reset = bool(
+                group_dedicated_catches
+                or group_coin_reward
+                or five_star_multiplier > 1.0
+                or six_star_multiplier > 1.0
+            )
+            group_effect_entry_id = self.id_factory() if enhanced_group_reset else ""
+            group_effect_expires_at = (
+                iso_timestamp(window.start + timedelta(days=1))
+                if enhanced_group_reset
+                else ""
+            )
             await self.framework_repository.touch_identity(
                 session,
                 identity=identity,
@@ -617,6 +654,28 @@ class CatchQuotaResetService:
                 affected_players=affected_players,
                 backup_path=backup_path,
             )
+            scoped_players = (
+                await self.economy_repository.players_in_scope(
+                    session,
+                    scope_id=scope_id,
+                )
+                if enhanced_group_reset
+                else []
+            )
+            group_rewarded_players = (
+                len(scoped_players) if group_coin_reward > 0 else 0
+            )
+            detail.update(
+                {
+                    "group_effect_entry_id": group_effect_entry_id,
+                    "group_effect_expires_at": group_effect_expires_at,
+                    "group_rewarded_players": group_rewarded_players,
+                    "group_coin_reward": group_coin_reward,
+                    "group_dedicated_catches": group_dedicated_catches,
+                    "five_star_multiplier": five_star_multiplier,
+                    "six_star_multiplier": six_star_multiplier,
+                }
+            )
             result_payload = {
                 "audit_event_id": audit_event_id,
                 "scope_id": scope_id,
@@ -628,12 +687,22 @@ class CatchQuotaResetService:
                 "affected_players": affected_players,
                 "backup_path": str(backup_path),
                 "created_at": now_text,
+                "group_rewarded_players": group_rewarded_players,
+                "group_coin_reward": group_coin_reward,
+                "group_dedicated_catches": group_dedicated_catches,
+                "group_effect_expires_at": group_effect_expires_at,
             }
             summary = self._command_summary(
                 identity=identity,
                 window=window,
                 cleared_catches=cleared_catches,
                 affected_players=affected_players,
+                group_rewarded_players=group_rewarded_players,
+                group_coin_reward=group_coin_reward,
+                group_dedicated_catches=group_dedicated_catches,
+                five_star_multiplier=five_star_multiplier,
+                six_star_multiplier=six_star_multiplier,
+                group_effect_expires_at=group_effect_expires_at,
             )
             reservation = await self.receipt_repository.reserve(
                 session,
@@ -678,6 +747,52 @@ class CatchQuotaResetService:
                 ),
                 now=now_text,
             )
+            if enhanced_group_reset:
+                group_params = {
+                    "coin_per_player": group_coin_reward,
+                    "dedicated_catches": group_dedicated_catches,
+                    "five_star_multiplier": five_star_multiplier,
+                    "six_star_multiplier": six_star_multiplier,
+                    "source_label": "糖醋排骨",
+                }
+                await self.economy_repository.insert_group_food_effect(
+                    session,
+                    group_effect_entry_id=group_effect_entry_id,
+                    scope_id=scope_id,
+                    source_player_id=identity.player_id,
+                    source_food_instance_id=str(
+                        effect_row["source_food_instance_id"]
+                    ),
+                    effect_id=GROUP_WINDOW_HIGH_STAR_BOOST,
+                    params_json=json.dumps(
+                        group_params,
+                        ensure_ascii=False,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    ),
+                    granted_uses_per_player=group_dedicated_catches,
+                    starts_at=now_text,
+                    expires_at=group_effect_expires_at,
+                    now=now_text,
+                )
+                for index, player in enumerate(scoped_players):
+                    if group_coin_reward <= 0:
+                        break
+                    balance = await self.economy_repository.apply_currency_change(
+                        session,
+                        player_id=str(player["player_id"]),
+                        scope_id=scope_id,
+                        amount=group_coin_reward,
+                        reason_code="quota-reset-group-food-effect",
+                        reason_text="糖醋排骨重置额度全群奖励",
+                        source_object_type="quota-reset",
+                        source_object_id=audit_event_id,
+                        ledger_entry_id=self.id_factory(),
+                        idempotency_key=f"{idempotency_key}:group-coin:{index}",
+                        now=now_text,
+                    )
+                    if balance is None:
+                        raise RuntimeError("糖醋排骨全群猪币奖励写入失败。")
             cursor = await session.execute(
                 """
                 UPDATE player_food_effects
@@ -701,6 +816,10 @@ class CatchQuotaResetService:
             created_at=now_text,
             receipt=reservation.receipt,
             receipt_created=True,
+            group_rewarded_players=group_rewarded_players,
+            group_coin_reward=group_coin_reward,
+            group_dedicated_catches=group_dedicated_catches,
+            group_effect_expires_at=group_effect_expires_at,
         )
 
     def _reset_detail(
@@ -735,15 +854,29 @@ class CatchQuotaResetService:
         window: CatchQuotaWindow,
         cleared_catches: int,
         affected_players: int,
+        group_rewarded_players: int = 0,
+        group_coin_reward: int = 0,
+        group_dedicated_catches: int = 0,
+        five_star_multiplier: float = 1.0,
+        six_star_multiplier: float = 1.0,
+        group_effect_expires_at: str = "",
     ) -> str:
         group_label = identity.group_name or "当前群"
+        group_bonus = ""
+        if group_effect_expires_at:
+            group_bonus = (
+                f"\n糖醋排骨全群强化：{group_rewarded_players} 名已登记玩家各 +"
+                f"{group_coin_reward} 猪币、各获 {group_dedicated_catches} 次专属抓猪额度；"
+                f"5 星/6 星相对权重 ×{five_star_multiplier:g}/×{six_star_multiplier:g}；"
+                f"有效至 {group_effect_expires_at}。"
+            )
         return (
             "【抓猪次数已重置】\n"
             f"群：{group_label}\n"
             f"时段：{window.label}\n"
             f"已归零：{cleared_catches} 次，涉及 {affected_players} 名玩家\n"
             f"基础额度：{self.window_limit} 次/人\n"
-            "历史抓取、资产和累计统计均已保留。"
+            f"历史抓取、资产和累计统计均已保留。{group_bonus}"
         )
 
     @staticmethod
@@ -794,6 +927,16 @@ class CatchQuotaResetService:
                 created_at=str(payload["created_at"]),
                 receipt=receipt,
                 receipt_created=receipt_created,
+                group_rewarded_players=int(
+                    payload.get("group_rewarded_players") or 0
+                ),
+                group_coin_reward=int(payload.get("group_coin_reward") or 0),
+                group_dedicated_catches=int(
+                    payload.get("group_dedicated_catches") or 0
+                ),
+                group_effect_expires_at=str(
+                    payload.get("group_effect_expires_at") or ""
+                ),
             )
         except (KeyError, TypeError, ValueError) as exc:
             raise ReceiptConflictError("额度重置回执中的业务结果无法解析。") from exc

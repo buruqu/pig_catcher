@@ -24,11 +24,16 @@ from ..domain.errors import (
     ReceiptConflictError,
 )
 from ..domain.food_effects import (
+    CATCH_EFFECT_IDS,
     QUOTA_EXEMPT_CATCH_EFFECTS,
     active_effect_from_row,
+    active_group_effect_from_row,
     active_quota_effect_bonuses,
     apply_catch_effects,
+    apply_group_catch_effects,
     has_compatible_exclusive_catch_effect,
+    has_compatible_exclusive_group_catch_effect,
+    resolve_food_effect,
 )
 from ..domain.gameplay import (
     CATCH_COIN_REWARDS,
@@ -472,6 +477,15 @@ def _format_collection_rows(rows: Sequence[Mapping[str, object]]) -> tuple[Colle
     return tuple(_collection_from_row(row) for row in rows)
 
 
+def _format_probability(value: float) -> str:
+    """Keep small six-star multipliers visible without making normal cards noisy."""
+
+    rounded_tenth = round(float(value), 1)
+    if math.isclose(float(value), rounded_tenth, abs_tol=0.0005):
+        return f"{value:.1f}"
+    return f"{value:.3f}"
+
+
 def format_catch_summary(result: CatchResult) -> str:
     """Return a complete path-free text fallback for a catch."""
 
@@ -494,7 +508,11 @@ def format_catch_summary(result: CatchResult) -> str:
     effect_text = f"\n美食加成：{'；'.join(result.effect_summaries)}" if result.effect_summaries else ""
     excluded_text = f"\n互斥未叠加：{'；'.join(result.excluded_summaries)}" if result.excluded_summaries else ""
     quota_text = "\n专属次数：本次未消耗正常抓猪额度" if result.quota_exempt_catch else ""
-    probability_line = " ".join(f"{index + 1}★{value:.1f}%" for index, value in enumerate(result.weights) if value > 0)
+    probability_line = " ".join(
+        f"{index + 1}★{_format_probability(value)}%"
+        for index, value in enumerate(result.weights)
+        if value > 0
+    )
     probability_source_parts = [
         f"等级 Lv.{progress.level}",
         f"饲料 Lv.{result.feed_level}",
@@ -781,6 +799,15 @@ class GameplayService:
                     now=now,
                 )
             )
+            active_group_effects = tuple(
+                active_group_effect_from_row(row)
+                for row in await self.economy_repository.list_active_group_food_effects(
+                    session,
+                    scope_id=identity.scope.value,
+                    player_id=identity.player_id,
+                    now=now,
+                )
+            )
             current_window_bonus, today_window_bonus = active_quota_effect_bonuses(
                 active_effects
             )
@@ -853,10 +880,20 @@ class GameplayService:
                 action_type="catching",
             )
             armed_item, _ = self._armed_item(armed_row, "catching")
+            equipped_item = armed_item
+            group_exclusive_effect_active = (
+                has_compatible_exclusive_group_catch_effect(active_group_effects)
+            )
+            personal_exclusive_effect_active = (
+                not group_exclusive_effect_active
+                and has_compatible_exclusive_catch_effect(
+                    active_effects,
+                    six_star_available=bool(buckets[Rarity.SIX]),
+                )
+            )
             # 六星菜独占效果：回到未受等级、饲料、道具和普通菜影响的基础层。
-            exclusive_effect_active = has_compatible_exclusive_catch_effect(
-                active_effects,
-                six_star_available=bool(buckets[Rarity.SIX]),
+            exclusive_effect_active = (
+                group_exclusive_effect_active or personal_exclusive_effect_active
             )
             if exclusive_effect_active:
                 armed_item = None
@@ -866,9 +903,51 @@ class GameplayService:
                 player_level=1 if exclusive_effect_active else probability_level,
                 item_id=armed_item.item_id if armed_item is not None else "",
             )
-            effect_application = apply_catch_effects(weights, active_effects)
-            weights = effect_application.weights
-            excluded_summaries = effect_application.skipped_summaries
+            if group_exclusive_effect_active:
+                effect_application = apply_catch_effects(weights, ())
+                group_effect_application = apply_group_catch_effects(
+                    weights,
+                    active_group_effects,
+                )
+                weights = group_effect_application.weights
+                effect_summaries = group_effect_application.summaries
+                excluded_summaries = group_effect_application.skipped_summaries
+                excluded_summaries += tuple(
+                    resolve_food_effect(effect.effect_id, effect.params).summary
+                    + "（本次由全群六星菜独占，未生效且未消耗）"
+                    for effect in active_effects
+                    if effect.effect_id in CATCH_EFFECT_IDS
+                )
+                if equipped_item is not None:
+                    excluded_summaries += (
+                        f"已装备的“{equipped_item.display_name}”受全群六星菜独占规则影响，"
+                        "本次未生效且未消耗。",
+                    )
+            else:
+                effect_application = apply_catch_effects(weights, active_effects)
+                weights = effect_application.weights
+                effect_summaries = effect_application.summaries
+                excluded_summaries = effect_application.skipped_summaries
+                if personal_exclusive_effect_active:
+                    group_effect_application = apply_group_catch_effects(weights, ())
+                    if active_group_effects:
+                        excluded_summaries += (
+                            "当前全群六星菜加成本次由个人六星菜独占规则接管，未参与结算。",
+                        )
+                elif effect_application.collaboration_only:
+                    group_effect_application = apply_group_catch_effects(weights, ())
+                    if active_group_effects:
+                        excluded_summaries += (
+                            "当前全群六星菜概率加成不改变联动猪固定品质分布，本次未参与结算。",
+                        )
+                else:
+                    group_effect_application = apply_group_catch_effects(
+                        weights,
+                        active_group_effects,
+                    )
+                    weights = group_effect_application.weights
+                    effect_summaries += group_effect_application.summaries
+                    excluded_summaries += group_effect_application.skipped_summaries
             candidate_buckets = buckets
             if effect_application.collaboration_only:
                 collaboration_templates = [
@@ -895,6 +974,10 @@ class GameplayService:
             quota_exempt_catch = any(
                 consumed_effect_ids.get(entry_id) in QUOTA_EXEMPT_CATCH_EFFECTS
                 for entry_id in effect_application.consumed_entry_ids
+            )
+            quota_exempt_catch = bool(
+                quota_exempt_catch
+                or group_effect_application.dedicated_entry_id
             )
             if catch_restriction is not None and total_catch_count >= daily_limit:
                 expiry = str(catch_restriction.get("expires_at") or "")
@@ -963,7 +1046,13 @@ class GameplayService:
                 "template_roll": template_roll,
                 "attribute_rolls": list(attribute_rolls),
                 "food_effect_entry_ids": list(effect_application.consumed_entry_ids),
-                "food_effect_summaries": list(effect_application.summaries),
+                "food_effect_summaries": list(effect_summaries),
+                "group_food_effect_entry_ids": list(
+                    group_effect_application.consumed_entry_ids
+                ),
+                "group_dedicated_effect_entry_id": (
+                    group_effect_application.dedicated_entry_id
+                ),
                 "stature_bias": effect_application.stature_bias,
                 "collaboration_only": effect_application.collaboration_only,
                 "giant_template_multiplier": effect_application.giant_template_multiplier,
@@ -1109,6 +1198,18 @@ class GameplayService:
                     effect_entry_ids=effect_application.consumed_entry_ids,
                     now=now,
                 )
+            group_effect_uses = {
+                *group_effect_application.consumed_entry_ids,
+            }
+            if group_effect_application.dedicated_entry_id:
+                group_effect_uses.add(group_effect_application.dedicated_entry_id)
+            for group_effect_entry_id in sorted(group_effect_uses):
+                await self.economy_repository.consume_group_food_effect_use(
+                    session,
+                    group_effect_entry_id=group_effect_entry_id,
+                    player_id=identity.player_id,
+                    now=now,
+                )
             if using_extra_catch:
                 await self.economy_repository.consume_extra_catch(
                     session,
@@ -1141,7 +1242,7 @@ class GameplayService:
                 "item_id": armed_item.item_id if armed_item is not None else "",
                 "item_name": armed_item.display_name if armed_item is not None else "",
                 "weights": [round(value, 8) for value in weights],
-                "effect_summaries": list(effect_application.summaries),
+                "effect_summaries": list(effect_summaries),
                 "excluded_summaries": list(excluded_summaries),
                 "exclusive_effect_active": exclusive_effect_active,
                 "quota_exempt_catch": quota_exempt_catch,
@@ -1178,7 +1279,7 @@ class GameplayService:
                 item_id=armed_item.item_id if armed_item is not None else "",
                 item_name=armed_item.display_name if armed_item is not None else "",
                 weights=weights,
-                effect_summaries=effect_application.summaries,
+                effect_summaries=effect_summaries,
                 excluded_summaries=excluded_summaries,
                 exclusive_effect_active=exclusive_effect_active,
                 quota_exempt_catch=quota_exempt_catch,
@@ -1223,7 +1324,7 @@ class GameplayService:
                 item_id=armed_item.item_id if armed_item is not None else "",
                 item_name=armed_item.display_name if armed_item is not None else "",
                 weights=weights,
-                effect_summaries=effect_application.summaries,
+                effect_summaries=effect_summaries,
                 excluded_summaries=excluded_summaries,
                 exclusive_effect_active=exclusive_effect_active,
                 quota_exempt_catch=quota_exempt_catch,

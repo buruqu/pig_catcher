@@ -29,9 +29,12 @@ from pig_catcher.domain.errors import (
 from pig_catcher.domain.food_effects import (
     QUOTA_EXEMPT_CATCH_EFFECTS,
     ActiveFoodEffect,
+    ActiveGroupFoodEffect,
     active_quota_effect_bonuses,
     apply_catch_effects,
     apply_cooking_effects,
+    apply_group_catch_effects,
+    has_compatible_exclusive_group_catch_effect,
     resolve_food_effect,
 )
 from pig_catcher.domain.gameplay import (
@@ -433,6 +436,117 @@ def _active_effect(
         expires_at="",
         created_at=created_at,
     )
+
+
+def _active_group_effect(
+    entry_id: str,
+    effect_id: str,
+    params: dict[str, object],
+    *,
+    source_user_id: str,
+    granted_uses: int = 0,
+    consumed_uses: int = 0,
+    created_at: str = "2026-08-11T04:00:00.000Z",
+) -> ActiveGroupFoodEffect:
+    return ActiveGroupFoodEffect(
+        group_effect_entry_id=entry_id,
+        effect_id=effect_id,
+        params=params,
+        granted_uses_per_player=granted_uses,
+        consumed_uses=consumed_uses,
+        source_user_id=source_user_id,
+        starts_at="2026-08-11T04:00:00.000Z",
+        expires_at="2026-08-12T04:00:00.000Z",
+        created_at=created_at,
+    )
+
+
+def test_group_six_star_catch_effects_are_exclusive_and_show_activator_id() -> None:
+    cloud_pot = _active_group_effect(
+        "cloud-pot",
+        "group-next-exclusive-high-star-catch",
+        {
+            "five_star_multiplier": 8,
+            "six_star_multiplier": 8,
+            "uses_per_player": 1,
+            "self_coin": 18888,
+            "other_coin": 1680,
+            "source_label": "神龙化猪七星云海锅",
+        },
+        source_user_id="OFFICIAL_OPEN_ID",
+        granted_uses=1,
+    )
+    weaker = _active_group_effect(
+        "omelette",
+        "group-window-high-star-boost",
+        {
+            "five_star_multiplier": 1.004,
+            "six_star_multiplier": 1.004,
+            "coin_per_player": 1004,
+            "dedicated_catches": 0,
+            "source_label": "猪鼻蛋包饭",
+        },
+        source_user_id="other-user",
+    )
+    assert has_compatible_exclusive_group_catch_effect((cloud_pot, weaker))
+    applied = apply_group_catch_effects(BASE_CATCH_WEIGHTS, (cloud_pot, weaker))
+    assert applied.exclusive is True
+    assert applied.consumed_entry_ids == ("cloud-pot",)
+    assert applied.weights[4] > BASE_CATCH_WEIGHTS[4]
+    assert applied.weights[5] > BASE_CATCH_WEIGHTS[5]
+    assert "发动群友 ID：OFFICIAL_OPEN_ID" in applied.summaries[0]
+    assert all("other-user" not in text for text in applied.skipped_summaries)
+
+
+def test_group_window_effect_uses_strongest_multiplier_and_dedicated_quota() -> None:
+    omelette = _active_group_effect(
+        "omelette",
+        "group-window-high-star-boost",
+        {
+            "five_star_multiplier": 1.004,
+            "six_star_multiplier": 1.004,
+            "coin_per_player": 1004,
+            "dedicated_catches": 0,
+            "source_label": "猪鼻蛋包饭",
+        },
+        source_user_id="1004",
+        created_at="2026-08-11T04:00:00.000Z",
+    )
+    ribs = _active_group_effect(
+        "ribs",
+        "group-window-high-star-boost",
+        {
+            "five_star_multiplier": 1.007,
+            "six_star_multiplier": 1.007,
+            "coin_per_player": 1007,
+            "dedicated_catches": 10,
+            "source_label": "糖醋排骨",
+        },
+        source_user_id="1455722694",
+        granted_uses=10,
+        consumed_uses=3,
+        created_at="2026-08-11T04:00:01.000Z",
+    )
+    ordinary_food = apply_catch_effects(
+        BASE_CATCH_WEIGHTS,
+        [
+            _active_effect(
+                "ordinary-food",
+                "next-catch-quality",
+                {"multiplier": 2.2},
+                created_at="2026-08-11T03:59:59.000Z",
+            )
+        ],
+    )
+    applied = apply_group_catch_effects(ordinary_food.weights, (omelette, ribs))
+    assert applied.exclusive is False
+    assert applied.consumed_entry_ids == ()
+    assert applied.dedicated_entry_id == "ribs"
+    assert applied.weights[4] >= ordinary_food.weights[4]
+    assert applied.weights[5] >= ordinary_food.weights[5]
+    assert "发动群友 ID：1455722694" in applied.summaries[0]
+    assert "剩余 7 次" in applied.summaries[0]
+    assert any("只取最高倍率" in text for text in applied.skipped_summaries)
 
 
 def test_targeted_probability_food_only_uses_lower_rarity_as_donor() -> None:

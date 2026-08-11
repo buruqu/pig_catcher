@@ -25,11 +25,11 @@ def _entries() -> list[dict[str, object]]:
     return list(payload["entries"])
 
 
-def test_formal_catalog_has_all_215_named_assets_and_stable_ids() -> None:
+def test_formal_catalog_has_all_223_named_assets_and_stable_ids() -> None:
     entries = _entries()
-    assert len(entries) == 215
-    assert len({entry["template_id"] for entry in entries}) == 215
-    assert len({entry["source_path"] for entry in entries}) == 215
+    assert len(entries) == 223
+    assert len({entry["template_id"] for entry in entries}) == 223
+    assert len({entry["source_path"] for entry in entries}) == 223
     assert all(str(entry["description"]).strip() for entry in entries)
     pig_counts = Counter(
         int(entry["rarity"])
@@ -41,8 +41,8 @@ def test_formal_catalog_has_all_215_named_assets_and_stable_ids() -> None:
         for entry in entries
         if entry["kind"] == "food"
     )
-    assert pig_counts == {1: 20, 2: 20, 3: 21, 4: 28, 5: 31, 6: 32}
-    assert food_counts == {1: 3, 2: 6, 3: 7, 4: 8, 5: 7, 6: 32}
+    assert pig_counts == {1: 20, 2: 20, 3: 21, 4: 28, 5: 31, 6: 36}
+    assert food_counts == {1: 3, 2: 6, 3: 7, 4: 8, 5: 7, 6: 36}
 
 
 def test_high_rarity_food_effects_cover_new_gameplay_families() -> None:
@@ -104,10 +104,31 @@ def test_high_rarity_food_effects_cover_new_gameplay_families() -> None:
     assert foods["猪保千猪排轮盘"]["effect_id"] == "even-catch-distribution"
     assert foods["猪保千猪排轮盘"]["effect_params"] == {"uses": 10}
     assert foods["糖醋排骨"]["effect_id"] == "quota-reset"
-    assert foods["糖醋排骨"]["effect_params"] == {"count": 1}
+    assert foods["糖醋排骨"]["effect_params"] == {
+        "count": 1,
+        "five_star_multiplier": 1.007,
+        "group_coin": 1007,
+        "group_dedicated_catches": 10,
+        "six_star_multiplier": 1.007,
+    }
+    assert foods["猪鼻蛋包饭"]["effect_id"] == "group-window-high-star-boost"
     assert foods["猪鼻蛋包饭"]["effect_params"] == {
-        "six_star_percent": 60,
-        "uses": 2,
+        "coin_per_player": 1004,
+        "dedicated_catches": 0,
+        "five_star_multiplier": 1.004,
+        "six_star_multiplier": 1.004,
+        "source_label": "猪鼻蛋包饭",
+    }
+    assert foods["神龙化猪七星云海锅"]["effect_id"] == (
+        "group-next-exclusive-high-star-catch"
+    )
+    assert foods["神龙化猪七星云海锅"]["effect_params"] == {
+        "five_star_multiplier": 8,
+        "other_coin": 1680,
+        "self_coin": 18888,
+        "six_star_multiplier": 8,
+        "source_label": "神龙化猪七星云海锅",
+        "uses_per_player": 1,
     }
     assert foods["撅撅猪派"]["effect_params"] == {"count": 1, "max_bonus": 5}
     assert foods["向你道早猪猪巧克力螺"]["effect_params"] == {"count": 5}
@@ -178,7 +199,7 @@ def test_group_custom_assets_are_confined_and_keep_user_text() -> None:
         for entry in entries
         if entry.get("group_scope_id")
     ]
-    assert len(group_entries) == 64
+    assert len(group_entries) == 72
     assert {entry["group_scope_id"] for entry in group_entries} == {
         "qq:1092931381",
         "qq:237716658",
@@ -204,6 +225,8 @@ def test_group_custom_assets_are_confined_and_keep_user_text() -> None:
         "彩彩修车猪慕斯",
         "ob一串猪",
         "糖醋排骨",
+        "神龙化猪",
+        "神龙化猪七星云海锅",
     } <= set(descriptions)
     assert "社区" in descriptions["彩彩修车猪"]
     assert "不是官方职业设定" in descriptions["彩彩修车猪"]
@@ -234,7 +257,7 @@ def test_group_custom_assets_are_confined_and_keep_user_text() -> None:
         for scope in {str(entry["group_scope_id"]) for entry in group_entries}
     }
     baseline = by_scope[PAIRED_GROUP_SCOPES[0][0]]
-    assert len(baseline) == 16
+    assert len(baseline) == 18
     assert all(scope_catalog == baseline for scope_catalog in by_scope.values())
     for qq_scope, official_scope in PAIRED_GROUP_SCOPES:
         assert by_scope[qq_scope] == by_scope[official_scope]
@@ -487,6 +510,20 @@ def test_new_pigs_keep_reviewed_descriptions_and_rarities() -> None:
     assert pigs["chuchu猪"]["description"] == (
         "戴上CHU²的猫耳耳机站到DJ台前，作词、作曲和制作全都要由自己掌控；"
         "这只年少却专业的制作人猪想用最强音乐改变世界，态度再强势也守礼，手边永远少不了肉干。"
+    )
+    shenlong_pigs = [
+        entry
+        for entry in _entries()
+        if entry["kind"] == "pig" and entry["display_name"] == "神龙化猪"
+    ]
+    assert len(shenlong_pigs) == 4
+    assert all(entry["rarity"] == 6 for entry in shenlong_pigs)
+    assert all("七星云海" in entry["description"] for entry in shenlong_pigs)
+    assert all(
+        str(entry["paired_food_template_id"]).endswith(
+            "shenlong-seven-star-cloud-sea-pot"
+        )
+        for entry in shenlong_pigs
     )
     assert pigs["LOCK猪"]["source_path"].endswith("LOCK猪.png")
     assert pigs["彩彩修车猪"]["paired_food_template_id"].endswith(

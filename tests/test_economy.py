@@ -2320,6 +2320,109 @@ async def test_batch_cook_defaults_to_low_rarity_and_keeps_highest(
 
 
 @pytest.mark.asyncio
+async def test_cloud_sea_pot_eat_rewards_scope_and_creates_one_day_group_effect(
+    tmp_path: Path,
+) -> None:
+    database = await _database_with_catalog(
+        tmp_path,
+        pig_rarities=(6,),
+        food_rarities=(6,),
+        effect_ids={6: "group-next-exclusive-high-star-catch"},
+        effect_params={
+            6: {
+                "five_star_multiplier": 8,
+                "six_star_multiplier": 8,
+                "uses_per_player": 1,
+                "self_coin": 18888,
+                "other_coin": 1680,
+                "source_label": "神龙化猪七星云海锅",
+            }
+        },
+        manifest_version=4,
+    )
+    clock = FixedClock()
+    eater = _identity(user_id="200", message_id="cloud-source")
+    other = _identity(user_id="300", message_id="cloud-other")
+    now = iso_timestamp(clock.now())
+    async with database.transaction() as session:
+        await FrameworkRepository().touch_identity(
+            session,
+            identity=other,
+            now=now,
+        )
+    catching = GameplayService(
+        database,
+        CatchingSection(cooldown_seconds=0),
+        random_source=SequenceRandom(0.0, 0.0, 0.5, 0.5, 0.5, 0.5, 0.5),
+        clock=clock,
+        id_factory=iter(("cloud-source-pig", "cloud-source-ledger")).__next__,
+        short_code_factory=lambda: "CLOUDPIG",
+    )
+    source = await catching.catch(eater)
+    economy = EconomyService(
+        database,
+        CookingSection(cook_cooldown_seconds=0),
+        EconomySection(),
+        random_source=SequenceRandom(0.999, 0.0, 0.5),
+        clock=clock,
+        id_factory=iter(
+            (
+                "cloud-food",
+                "cloud-cook-ledger",
+                "cloud-group-effect",
+                "cloud-eater-ledger",
+                "cloud-other-ledger",
+            )
+        ).__next__,
+        short_code_factory=lambda: "CLOUDFOD",
+    )
+    cooked = await economy.cook(
+        _identity(user_id="200", message_id="cloud-cook"),
+        source.pig.selector,
+    )
+    assert cooked.foods[0].rarity == 6
+    eat_identity = _identity(user_id="200", message_id="cloud-eat")
+    eaten = await economy.eat(eat_identity, cooked.foods[0].selector)
+    duplicate = await economy.eat(eat_identity, cooked.foods[0].selector)
+    assert eaten.effect.queued_effect_id == "group-next-exclusive-high-star-catch"
+    assert eaten.effect.coin_bonus == 18888
+    assert duplicate.receipt_created is False
+    balances = await database.fetch_all(
+        "SELECT platform_user_id, coin_balance FROM players ORDER BY platform_user_id"
+    )
+    balance_by_user = {
+        str(row["platform_user_id"]): int(row["coin_balance"])
+        for row in balances
+    }
+    assert balance_by_user["300"] == 1680
+    assert balance_by_user["200"] == eaten.coin_balance
+    effect = await database.fetch_one(
+        """
+        SELECT effect.effect_id, effect.granted_uses_per_player,
+               effect.starts_at, effect.expires_at,
+               source.platform_user_id AS source_user_id
+        FROM group_food_effects AS effect
+        JOIN players AS source ON source.player_id = effect.source_player_id
+        WHERE effect.group_effect_entry_id = 'cloud-group-effect'
+        """
+    )
+    assert effect is not None
+    assert tuple(effect) == (
+        "group-next-exclusive-high-star-catch",
+        1,
+        "2026-07-28T04:00:00.000Z",
+        "2026-07-29T04:00:00.000Z",
+        "200",
+    )
+    ledgers = await database.fetch_one(
+        "SELECT COUNT(*) AS count FROM currency_ledger "
+        "WHERE reason_code = 'group-food-effect'"
+    )
+    assert ledgers is not None and ledgers["count"] == 2
+    await database.close()
+
+
+@pytest.mark.asyncio
 async def test_pig_dumpling_stacks_five_layers_and_consumes_together(
     tmp_path: Path,
 ) -> None:

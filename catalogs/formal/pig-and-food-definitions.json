@@ -1,7 +1,7 @@
 {
   "definition_version": 1,
   "catalog_id": "pig-catcher-user-library-v1",
-  "source_label": "用户于 2026-07-28 至 2026-08-04 提供的抓猪素材库，本地授权使用",
+  "source_label": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
   "license": "user-provided-local-use",
   "entries": [
     {
@@ -1792,10 +1792,13 @@
         "冲榜"
       ],
       "group_scope_id": "qq:1092931381",
-      "effect_id": "next-six-star-cook",
+      "effect_id": "group-window-high-star-boost",
       "effect_params": {
-        "six_star_percent": 60,
-        "uses": 2
+        "coin_per_player": 1004,
+        "dedicated_catches": 0,
+        "five_star_multiplier": 1.004,
+        "six_star_multiplier": 1.004,
+        "source_label": "猪鼻蛋包饭"
       }
     },
     {
@@ -1849,10 +1852,13 @@
         "冲榜"
       ],
       "group_scope_id": "qq:237716658",
-      "effect_id": "next-six-star-cook",
+      "effect_id": "group-window-high-star-boost",
       "effect_params": {
-        "six_star_percent": 60,
-        "uses": 2
+        "coin_per_player": 1004,
+        "dedicated_catches": 0,
+        "five_star_multiplier": 1.004,
+        "six_star_multiplier": 1.004,
+        "source_label": "猪鼻蛋包饭"
       }
     },
     {
@@ -3011,7 +3017,11 @@
       "group_scope_id": "qq:1092931381",
       "effect_id": "quota-reset",
       "effect_params": {
-        "count": 1
+        "count": 1,
+        "five_star_multiplier": 1.007,
+        "group_coin": 1007,
+        "group_dedicated_catches": 10,
+        "six_star_multiplier": 1.007
       }
     },
     {
@@ -3029,7 +3039,11 @@
       "group_scope_id": "qq:237716658",
       "effect_id": "quota-reset",
       "effect_params": {
-        "count": 1
+        "count": 1,
+        "five_star_multiplier": 1.007,
+        "group_coin": 1007,
+        "group_dedicated_catches": 10,
+        "six_star_multiplier": 1.007
       }
     },
     {
@@ -3063,7 +3077,11 @@
       "group_scope_id": "qq-official:5E5854406D0297D6FEAE696A13E3A339",
       "effect_id": "quota-reset",
       "effect_params": {
-        "count": 1
+        "count": 1,
+        "five_star_multiplier": 1.007,
+        "group_coin": 1007,
+        "group_dedicated_catches": 10,
+        "six_star_multiplier": 1.007
       }
     },
     {
@@ -3097,7 +3115,11 @@
       "group_scope_id": "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
       "effect_id": "quota-reset",
       "effect_params": {
-        "count": 1
+        "count": 1,
+        "five_star_multiplier": 1.007,
+        "group_coin": 1007,
+        "group_dedicated_catches": 10,
+        "six_star_multiplier": 1.007
       }
     },
     {
@@ -3249,10 +3271,13 @@
         "冲榜"
       ],
       "group_scope_id": "qq-official:5E5854406D0297D6FEAE696A13E3A339",
-      "effect_id": "next-six-star-cook",
+      "effect_id": "group-window-high-star-boost",
       "effect_params": {
-        "six_star_percent": 60,
-        "uses": 2
+        "coin_per_player": 1004,
+        "dedicated_catches": 0,
+        "five_star_multiplier": 1.004,
+        "six_star_multiplier": 1.004,
+        "source_label": "猪鼻蛋包饭"
       }
     },
     {
@@ -3501,10 +3526,13 @@
         "冲榜"
       ],
       "group_scope_id": "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
-      "effect_id": "next-six-star-cook",
+      "effect_id": "group-window-high-star-boost",
       "effect_params": {
-        "six_star_percent": 60,
-        "uses": 2
+        "coin_per_player": 1004,
+        "dedicated_catches": 0,
+        "five_star_multiplier": 1.004,
+        "six_star_multiplier": 1.004,
+        "source_label": "猪鼻蛋包饭"
       }
     },
     {
@@ -3727,6 +3755,162 @@
         "character_id": "chu2",
         "character_name": "CHU²",
         "official_profile_url": "https://bang-dream-gbp-en.bushiroad.com/character/raise-a-suilen/chu2/"
+      }
+    },
+    {
+      "template_id": "pig-g1092931381-shenlong-hua",
+      "source_path": "定制猪群友库/1092931381/神龙化猪.png",
+      "kind": "pig",
+      "display_name": "神龙化猪",
+      "rarity": 6,
+      "description": "金鳞盘在圆滚滚的猪身上，双角一抬便踏云而起；当聚光灯落下，它从猪圈一路神龙化，尾后的七星云海都跟着翻涌。",
+      "fat_profile": "balanced",
+      "recipe_tags": [
+        "群友定制",
+        "神龙化",
+        "七星云海"
+      ],
+      "group_scope_id": "qq:1092931381",
+      "paired_food_template_id": "food-g1092931381-shenlong-seven-star-cloud-sea-pot"
+    },
+    {
+      "template_id": "food-g1092931381-shenlong-seven-star-cloud-sea-pot",
+      "source_path": "定制美食库/1092931381/神龙化猪七星云海锅.png",
+      "kind": "food",
+      "display_name": "神龙化猪七星云海锅",
+      "rarity": 6,
+      "description": "七颗星沉进乳白云海，神龙化猪盘踞锅心，金鳞、龙角与云纹在热气中若隐若现；一锅开席，福运与猪币便沿群聊翻涌。",
+      "recipe_tags": [
+        "群友定制",
+        "神龙化",
+        "七星云海锅"
+      ],
+      "group_scope_id": "qq:1092931381",
+      "effect_id": "group-next-exclusive-high-star-catch",
+      "effect_params": {
+        "five_star_multiplier": 8,
+        "other_coin": 1680,
+        "self_coin": 18888,
+        "six_star_multiplier": 8,
+        "source_label": "神龙化猪七星云海锅",
+        "uses_per_player": 1
+      }
+    },
+    {
+      "template_id": "pig-g237716658-shenlong-hua",
+      "source_path": "定制猪群友库/237716658/神龙化猪.png",
+      "kind": "pig",
+      "display_name": "神龙化猪",
+      "rarity": 6,
+      "description": "金鳞盘在圆滚滚的猪身上，双角一抬便踏云而起；当聚光灯落下，它从猪圈一路神龙化，尾后的七星云海都跟着翻涌。",
+      "fat_profile": "balanced",
+      "recipe_tags": [
+        "群友定制",
+        "神龙化",
+        "七星云海"
+      ],
+      "group_scope_id": "qq:237716658",
+      "paired_food_template_id": "food-g237716658-shenlong-seven-star-cloud-sea-pot"
+    },
+    {
+      "template_id": "food-g237716658-shenlong-seven-star-cloud-sea-pot",
+      "source_path": "定制美食库/237716658/神龙化猪七星云海锅.png",
+      "kind": "food",
+      "display_name": "神龙化猪七星云海锅",
+      "rarity": 6,
+      "description": "七颗星沉进乳白云海，神龙化猪盘踞锅心，金鳞、龙角与云纹在热气中若隐若现；一锅开席，福运与猪币便沿群聊翻涌。",
+      "recipe_tags": [
+        "群友定制",
+        "神龙化",
+        "七星云海锅"
+      ],
+      "group_scope_id": "qq:237716658",
+      "effect_id": "group-next-exclusive-high-star-catch",
+      "effect_params": {
+        "five_star_multiplier": 8,
+        "other_coin": 1680,
+        "self_coin": 18888,
+        "six_star_multiplier": 8,
+        "source_label": "神龙化猪七星云海锅",
+        "uses_per_player": 1
+      }
+    },
+    {
+      "template_id": "pig-qo5e5854406d0297d6feae696a13e3a339-shenlong-hua",
+      "source_path": "定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/神龙化猪.png",
+      "kind": "pig",
+      "display_name": "神龙化猪",
+      "rarity": 6,
+      "description": "金鳞盘在圆滚滚的猪身上，双角一抬便踏云而起；当聚光灯落下，它从猪圈一路神龙化，尾后的七星云海都跟着翻涌。",
+      "fat_profile": "balanced",
+      "recipe_tags": [
+        "群友定制",
+        "神龙化",
+        "七星云海"
+      ],
+      "group_scope_id": "qq-official:5E5854406D0297D6FEAE696A13E3A339",
+      "paired_food_template_id": "food-qo5e5854406d0297d6feae696a13e3a339-shenlong-seven-star-cloud-sea-pot"
+    },
+    {
+      "template_id": "food-qo5e5854406d0297d6feae696a13e3a339-shenlong-seven-star-cloud-sea-pot",
+      "source_path": "定制美食库/5E5854406D0297D6FEAE696A13E3A339/神龙化猪七星云海锅.png",
+      "kind": "food",
+      "display_name": "神龙化猪七星云海锅",
+      "rarity": 6,
+      "description": "七颗星沉进乳白云海，神龙化猪盘踞锅心，金鳞、龙角与云纹在热气中若隐若现；一锅开席，福运与猪币便沿群聊翻涌。",
+      "recipe_tags": [
+        "群友定制",
+        "神龙化",
+        "七星云海锅"
+      ],
+      "group_scope_id": "qq-official:5E5854406D0297D6FEAE696A13E3A339",
+      "effect_id": "group-next-exclusive-high-star-catch",
+      "effect_params": {
+        "five_star_multiplier": 8,
+        "other_coin": 1680,
+        "self_coin": 18888,
+        "six_star_multiplier": 8,
+        "source_label": "神龙化猪七星云海锅",
+        "uses_per_player": 1
+      }
+    },
+    {
+      "template_id": "pig-qo9ea2810f378fbd7dc3219c56ceab3520-shenlong-hua",
+      "source_path": "定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/神龙化猪.png",
+      "kind": "pig",
+      "display_name": "神龙化猪",
+      "rarity": 6,
+      "description": "金鳞盘在圆滚滚的猪身上，双角一抬便踏云而起；当聚光灯落下，它从猪圈一路神龙化，尾后的七星云海都跟着翻涌。",
+      "fat_profile": "balanced",
+      "recipe_tags": [
+        "群友定制",
+        "神龙化",
+        "七星云海"
+      ],
+      "group_scope_id": "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
+      "paired_food_template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-shenlong-seven-star-cloud-sea-pot"
+    },
+    {
+      "template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-shenlong-seven-star-cloud-sea-pot",
+      "source_path": "定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/神龙化猪七星云海锅.png",
+      "kind": "food",
+      "display_name": "神龙化猪七星云海锅",
+      "rarity": 6,
+      "description": "七颗星沉进乳白云海，神龙化猪盘踞锅心，金鳞、龙角与云纹在热气中若隐若现；一锅开席，福运与猪币便沿群聊翻涌。",
+      "recipe_tags": [
+        "群友定制",
+        "神龙化",
+        "七星云海锅"
+      ],
+      "group_scope_id": "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
+      "effect_id": "group-next-exclusive-high-star-catch",
+      "effect_params": {
+        "five_star_multiplier": 8,
+        "other_coin": 1680,
+        "self_coin": 18888,
+        "six_star_multiplier": 8,
+        "source_label": "神龙化猪七星云海锅",
+        "uses_per_player": 1
       }
     }
   ]

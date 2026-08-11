@@ -1,9 +1,9 @@
 {
   "source_root": "asset_library/current/media",
   "definitions": "catalogs/formal/pig-and-food-definitions.json",
-  "entry_count": 215,
-  "unique_binary_count": 167,
-  "stored_binary_count": 218,
+  "entry_count": 223,
+  "unique_binary_count": 169,
+  "stored_binary_count": 226,
   "duplicate_aliases": [
     {
       "source_path": "猪猪素材库/紫色品质/翻滚猪.jpg",
@@ -1516,6 +1516,62 @@
       "media_path": "media/猪猪素材库/金色品质/chuchu猪.png",
       "sha256": "87e16367c702f416504d0315f6c859e354a863b52fe4ec285952f27425a5ca2e",
       "bytes": 2098370
+    },
+    {
+      "template_id": "pig-g1092931381-shenlong-hua",
+      "source_path": "定制猪群友库/1092931381/神龙化猪.png",
+      "media_path": "media/定制猪群友库/1092931381/神龙化猪.png",
+      "sha256": "bfe1e8840bb26cba5554e0c53ff4d93103a55b241e630959146687ab6255b2a8",
+      "bytes": 1618937
+    },
+    {
+      "template_id": "food-g1092931381-shenlong-seven-star-cloud-sea-pot",
+      "source_path": "定制美食库/1092931381/神龙化猪七星云海锅.png",
+      "media_path": "media/定制美食库/1092931381/神龙化猪七星云海锅.png",
+      "sha256": "48295dcbd7f81624361e16e6c75d80ba3d0b4fe08041072912368652a7611313",
+      "bytes": 2581772
+    },
+    {
+      "template_id": "pig-g237716658-shenlong-hua",
+      "source_path": "定制猪群友库/237716658/神龙化猪.png",
+      "media_path": "media/定制猪群友库/237716658/神龙化猪.png",
+      "sha256": "bfe1e8840bb26cba5554e0c53ff4d93103a55b241e630959146687ab6255b2a8",
+      "bytes": 1618937
+    },
+    {
+      "template_id": "food-g237716658-shenlong-seven-star-cloud-sea-pot",
+      "source_path": "定制美食库/237716658/神龙化猪七星云海锅.png",
+      "media_path": "media/定制美食库/237716658/神龙化猪七星云海锅.png",
+      "sha256": "48295dcbd7f81624361e16e6c75d80ba3d0b4fe08041072912368652a7611313",
+      "bytes": 2581772
+    },
+    {
+      "template_id": "pig-qo5e5854406d0297d6feae696a13e3a339-shenlong-hua",
+      "source_path": "定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/神龙化猪.png",
+      "media_path": "media/定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/神龙化猪.png",
+      "sha256": "bfe1e8840bb26cba5554e0c53ff4d93103a55b241e630959146687ab6255b2a8",
+      "bytes": 1618937
+    },
+    {
+      "template_id": "food-qo5e5854406d0297d6feae696a13e3a339-shenlong-seven-star-cloud-sea-pot",
+      "source_path": "定制美食库/5E5854406D0297D6FEAE696A13E3A339/神龙化猪七星云海锅.png",
+      "media_path": "media/定制美食库/5E5854406D0297D6FEAE696A13E3A339/神龙化猪七星云海锅.png",
+      "sha256": "48295dcbd7f81624361e16e6c75d80ba3d0b4fe08041072912368652a7611313",
+      "bytes": 2581772
+    },
+    {
+      "template_id": "pig-qo9ea2810f378fbd7dc3219c56ceab3520-shenlong-hua",
+      "source_path": "定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/神龙化猪.png",
+      "media_path": "media/定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/神龙化猪.png",
+      "sha256": "bfe1e8840bb26cba5554e0c53ff4d93103a55b241e630959146687ab6255b2a8",
+      "bytes": 1618937
+    },
+    {
+      "template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-shenlong-seven-star-cloud-sea-pot",
+      "source_path": "定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/神龙化猪七星云海锅.png",
+      "media_path": "media/定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/神龙化猪七星云海锅.png",
+      "sha256": "48295dcbd7f81624361e16e6c75d80ba3d0b4fe08041072912368652a7611313",
+      "bytes": 2581772
     }
   ]
 }

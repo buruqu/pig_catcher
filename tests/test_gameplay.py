@@ -20,6 +20,7 @@ from pig_catcher.domain.errors import (
 )
 from pig_catcher.domain.models import CommandIdentity, ScopeKey
 from pig_catcher.infrastructure import PigCatcherDatabase
+from pig_catcher.infrastructure.repositories import EconomyRepository, FrameworkRepository
 from pig_catcher.rendering import pig_card_view, profile_view
 from pig_catcher.services import (
     AssetCatalogService,
@@ -753,6 +754,170 @@ async def test_daily_quota_reset_keeps_receipts_and_lifetime_statistics(
     )
     assert rows is not None
     assert tuple(rows) == (3, 3)
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_group_six_star_catch_displays_activator_and_consumes_per_player(
+    tmp_path: Path,
+) -> None:
+    database = await _database_with_catalog(
+        tmp_path,
+        [
+            _pig_entry("one-pig", rarity=1),
+            _pig_entry("five-pig", rarity=5),
+            _pig_entry("six-pig", rarity=6, group_id="100"),
+            _food_entry(
+                "cloud-pot-food",
+                effect_id="group-next-exclusive-high-star-catch",
+                effect_params={
+                    "five_star_multiplier": 8,
+                    "six_star_multiplier": 8,
+                    "uses_per_player": 1,
+                    "self_coin": 18888,
+                    "other_coin": 1680,
+                    "source_label": "神龙化猪七星云海锅",
+                },
+            ),
+        ],
+    )
+    clock = MutableClock(datetime(2026, 8, 11, 4, 0, tzinfo=UTC))
+    activator = _identity(user_id="1455722694", message_id="activator")
+    catcher = _identity(user_id="OFFICIAL_OPEN_ID", message_id="group-catch-1")
+    now = "2026-08-11T04:00:00.000Z"
+    async with database.transaction() as session:
+        framework = FrameworkRepository()
+        await framework.touch_identity(session, identity=activator, now=now)
+        await framework.touch_identity(session, identity=catcher, now=now)
+        await session.execute(
+            """
+            INSERT INTO food_instances(
+                food_instance_id, short_code, scope_id, owner_player_id,
+                template_id, template_version, rarity, display_name_snapshot,
+                portion_weight, fat_category, official_value, effect_id,
+                effect_params_json, ruleset_version, random_snapshot_json,
+                state, acquired_at, disposed_at, updated_at
+            ) VALUES (
+                'cloud-pot-source', 'CLOUD001', ?, ?, 'cloud-pot-food', 1, 6,
+                '神龙化猪七星云海锅', 1.0, 'balanced', 25000,
+                'group-next-exclusive-high-star-catch',
+                '{"five_star_multiplier":8,"other_coin":1680,"self_coin":18888,"six_star_multiplier":8,"source_label":"神龙化猪七星云海锅","uses_per_player":1}',
+                18, '{}', 'consumed', ?, ?, ?
+            )
+            """,
+            (
+                activator.scope.value,
+                activator.player_id,
+                now,
+                now,
+                now,
+            ),
+        )
+        await EconomyRepository().insert_group_food_effect(
+            session,
+            group_effect_entry_id="cloud-pot-group-effect",
+            scope_id=activator.scope.value,
+            source_player_id=activator.player_id,
+            source_food_instance_id="cloud-pot-source",
+            effect_id="group-next-exclusive-high-star-catch",
+            params_json=(
+                '{"five_star_multiplier":8,"other_coin":1680,"self_coin":18888,'
+                '"six_star_multiplier":8,"source_label":"神龙化猪七星云海锅",'
+                '"uses_per_player":1}'
+            ),
+            granted_uses_per_player=1,
+            starts_at=now,
+            expires_at="2026-08-12T04:00:00.000Z",
+            now=now,
+        )
+        await session.execute(
+            """
+            INSERT INTO player_food_effects(
+                effect_entry_id, player_id, source_food_instance_id,
+                effect_id, params_json, granted_uses, consumed_uses,
+                created_at, updated_at
+            ) VALUES (
+                'ordinary-player-effect', ?, 'cloud-pot-source',
+                'next-catch-quality', '{"multiplier":2.2}', 1, 0, ?, ?
+            )
+            """,
+            (catcher.player_id, now, now),
+        )
+        await session.execute(
+            "INSERT INTO item_inventory(player_id, item_id, quantity, updated_at) "
+            "VALUES (?, 'super-lucky-whistle', 1, ?)",
+            (catcher.player_id, now),
+        )
+        await session.execute(
+            "INSERT INTO armed_items(player_id, action_type, item_id, armed_at) "
+            "VALUES (?, 'catching', 'super-lucky-whistle', ?)",
+            (catcher.player_id, now),
+        )
+
+    service = GameplayService(
+        database,
+        CatchingSection(cooldown_seconds=0, daily_limit=5),
+        random_source=SequenceRandom(*_catch_rolls(), *_catch_rolls()),
+        clock=clock,
+        id_factory=iter(
+            (
+                "group-effect-pig-1",
+                "group-effect-ledger-1",
+                "group-effect-pig-2",
+                "group-effect-ledger-2",
+            )
+        ).__next__,
+        short_code_factory=iter(("CLOUDP01", "CLOUDP02")).__next__,
+    )
+    first = await service.catch(catcher)
+    duplicate = await service.catch(catcher)
+    assert first.exclusive_effect_active is True
+    assert duplicate.receipt_created is False
+    assert any(
+        "发动群友 ID：1455722694" in summary
+        for summary in first.effect_summaries
+    )
+    assert any("未生效且未消耗" in text for text in first.excluded_summaries)
+    assert "发动群友 ID：1455722694" in format_catch_summary(first)
+    assert "发动群友 ID：1455722694" in pig_card_view(
+        first.pig,
+        mode_label="抓猪成功",
+        catch=first,
+    ).effect_summaries[0]
+    usage = await database.fetch_one(
+        "SELECT consumed_uses FROM group_food_effect_usage "
+        "WHERE group_effect_entry_id = 'cloud-pot-group-effect' AND player_id = ?",
+        (catcher.player_id,),
+    )
+    ordinary = await database.fetch_one(
+        "SELECT consumed_uses FROM player_food_effects "
+        "WHERE effect_entry_id = 'ordinary-player-effect'"
+    )
+    item = await database.fetch_one(
+        "SELECT quantity FROM item_inventory "
+        "WHERE player_id = ? AND item_id = 'super-lucky-whistle'",
+        (catcher.player_id,),
+    )
+    assert usage is not None and usage["consumed_uses"] == 1
+    assert ordinary is not None and ordinary["consumed_uses"] == 0
+    assert item is not None and item["quantity"] == 1
+
+    second = await service.catch(
+        _identity(user_id="OFFICIAL_OPEN_ID", message_id="group-catch-2")
+    )
+    assert second.exclusive_effect_active is False
+    assert all("发动群友 ID" not in text for text in second.effect_summaries)
+    ordinary = await database.fetch_one(
+        "SELECT consumed_uses FROM player_food_effects "
+        "WHERE effect_entry_id = 'ordinary-player-effect'"
+    )
+    item = await database.fetch_one(
+        "SELECT quantity FROM item_inventory "
+        "WHERE player_id = ? AND item_id = 'super-lucky-whistle'",
+        (catcher.player_id,),
+    )
+    assert ordinary is not None and ordinary["consumed_uses"] == 1
+    assert item is not None and item["quantity"] == 0
     await database.close()
 
 

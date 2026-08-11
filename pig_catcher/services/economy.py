@@ -49,6 +49,9 @@ from ..domain.food_effects import (
     COOK_PROBABILITY_GROUP,
     CURRENT_WINDOW_CATCHES,
     EXTRA_CATCHES,
+    GROUP_EFFECT_IDS,
+    GROUP_NEXT_EXCLUSIVE_HIGH_STAR_CATCH,
+    GROUP_WINDOW_HIGH_STAR_BOOST,
     NEXT_STACKABLE_SIX_STAR_COOK_BONUS,
     PERMANENT_WINDOW_CATCH,
     TODAY_WINDOW_CATCHES,
@@ -1513,7 +1516,11 @@ class EconomyService:
             )
             effect = self._food_effect(food)
             effect_expires_at = effect.expires_at
-            if effect.queued_effect_id in {
+            if effect.queued_effect_id in GROUP_EFFECT_IDS:
+                effect_expires_at = self._next_same_window_effect_expiry(
+                    now_datetime
+                )
+            elif effect.queued_effect_id in {
                 CURRENT_WINDOW_CATCHES,
                 TODAY_WINDOW_CATCHES,
             }:
@@ -1594,6 +1601,7 @@ class EconomyService:
             if effect.queued_effect_id and effect.queued_effect_id not in {
                 WEEKLY_WINDOW_CATCHES,
                 PERMANENT_WINDOW_CATCH,
+                *GROUP_EFFECT_IDS,
             }:
                 effect_entry_id = self._new_identifier()
                 if effect.queued_effect_id == EXTRA_CATCHES:
@@ -1614,6 +1622,32 @@ class EconomyService:
                     expires_at=effect_expires_at or None,
                     now=now,
                 )
+            elif effect.queued_effect_id in GROUP_EFFECT_IDS:
+                effect_entry_id = self._new_identifier()
+                granted_uses_per_player = (
+                    int(effect.queued_effect_params["uses_per_player"])
+                    if effect.queued_effect_id
+                    == GROUP_NEXT_EXCLUSIVE_HIGH_STAR_CATCH
+                    else int(effect.queued_effect_params["dedicated_catches"])
+                )
+                await self.repository.insert_group_food_effect(
+                    session,
+                    group_effect_entry_id=effect_entry_id,
+                    scope_id=identity.scope.value,
+                    source_player_id=identity.player_id,
+                    source_food_instance_id=food.food_instance_id,
+                    effect_id=effect.queued_effect_id,
+                    params_json=json.dumps(
+                        dict(effect.queued_effect_params),
+                        ensure_ascii=False,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    ),
+                    granted_uses_per_player=granted_uses_per_player,
+                    starts_at=now,
+                    expires_at=effect_expires_at,
+                    now=now,
+                )
             base_experience = EAT_EXPERIENCE_REWARDS[Rarity(food.rarity)]
             total_experience = await self.repository.add_experience(
                 session,
@@ -1621,7 +1655,19 @@ class EconomyService:
                 experience=base_experience + effect.experience_bonus,
                 now=now,
             )
-            if effect.coin_bonus:
+            group_rewarded_players = 0
+            if effect.queued_effect_id in GROUP_EFFECT_IDS:
+                coin_balance, group_rewarded_players = (
+                    await self._apply_group_food_coin_rewards(
+                        session,
+                        identity=identity,
+                        food=food,
+                        effect=effect,
+                        idempotency_key=idempotency_key,
+                        now=now,
+                    )
+                )
+            elif effect.coin_bonus:
                 coin_balance = await self.repository.apply_currency_change(
                     session,
                     player_id=identity.player_id,
@@ -1656,6 +1702,7 @@ class EconomyService:
                 "queued_effect_params": dict(effect.queued_effect_params),
                 "effect_granted_uses": effect.granted_uses,
                 "effect_expires_at": effect_expires_at,
+                "group_rewarded_players": group_rewarded_players,
                 "total_experience": total_experience,
                 "coin_balance": coin_balance,
             }
@@ -2419,8 +2466,14 @@ class EconomyService:
         except FoodEffectError:
             grant = None
         if grant is not None:
+            coin_bonus = 0
+            if grant.effect_id == GROUP_NEXT_EXCLUSIVE_HIGH_STAR_CATCH:
+                coin_bonus = int(grant.params["self_coin"])
+            elif grant.effect_id == GROUP_WINDOW_HIGH_STAR_BOOST:
+                coin_bonus = int(grant.params["coin_per_player"])
             return FoodEffectOutcome(
                 summary=grant.summary,
+                coin_bonus=coin_bonus,
                 queued_effect_id=grant.effect_id,
                 queued_effect_params=grant.params,
                 granted_uses=grant.granted_uses,
@@ -2739,6 +2792,62 @@ class EconomyService:
             raise RuntimeError("实例 ID 生成器返回了无效值。")
         return candidate
 
+    async def _apply_group_food_coin_rewards(
+        self,
+        session: DatabaseSession,
+        *,
+        identity: CommandIdentity,
+        food: FoodView,
+        effect: FoodEffectOutcome,
+        idempotency_key: str,
+        now: str,
+    ) -> tuple[int, int]:
+        """Reward every registered player in the exact scope, atomically."""
+
+        players = await self.repository.players_in_scope(
+            session,
+            scope_id=identity.scope.value,
+        )
+        eater_balance: int | None = None
+        rewarded = 0
+        for index, player in enumerate(players):
+            player_id = str(player["player_id"])
+            if effect.queued_effect_id == GROUP_NEXT_EXCLUSIVE_HIGH_STAR_CATCH:
+                amount = int(
+                    effect.queued_effect_params[
+                        "self_coin" if player_id == identity.player_id else "other_coin"
+                    ]
+                )
+            elif effect.queued_effect_id == GROUP_WINDOW_HIGH_STAR_BOOST:
+                amount = int(effect.queued_effect_params["coin_per_player"])
+            else:
+                raise RuntimeError("群体猪币奖励关联了未知的六星菜效果。")
+            if amount <= 0:
+                if player_id == identity.player_id:
+                    eater_balance = int(player["coin_balance"])
+                continue
+            balance = await self.repository.apply_currency_change(
+                session,
+                player_id=player_id,
+                scope_id=identity.scope.value,
+                amount=amount,
+                reason_code="group-food-effect",
+                reason_text=f"食用{food.display_name}的全群奖励",
+                source_object_type="food",
+                source_object_id=food.food_instance_id,
+                ledger_entry_id=self._new_identifier(),
+                idempotency_key=f"{idempotency_key}:group-coin:{index}",
+                now=now,
+            )
+            if balance is None:
+                raise RuntimeError("六星菜全群猪币奖励写入失败。")
+            rewarded += 1
+            if player_id == identity.player_id:
+                eater_balance = balance
+        if eater_balance is None:
+            raise RuntimeError("六星菜食用者不在当前群玩家清单中。")
+        return eater_balance, rewarded
+
     @staticmethod
     def _daily_effect_expiry(now: datetime) -> str:
         beijing_timezone = timezone(timedelta(hours=8), "Asia/Shanghai")
@@ -2750,6 +2859,14 @@ class EconomyService:
             tzinfo=beijing_timezone,
         )
         return iso_timestamp(expiry)
+
+    def _next_same_window_effect_expiry(self, now: datetime) -> str:
+        window = catch_quota_window(
+            now,
+            refresh_hours=self.quota_refresh_hours,
+            timezone_name=self.quota_timezone_name,
+        )
+        return iso_timestamp(window.start + timedelta(days=1))
 
     def _rolling_seven_day_effect_expiry(self, now: datetime) -> str:
         anniversary_window = catch_quota_window(

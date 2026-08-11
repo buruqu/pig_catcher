@@ -46,6 +46,8 @@ async def test_empty_database_migrates_and_passes_integrity_check(tmp_path: Path
         "command_receipts",
         "currency_ledger",
         "player_food_effects",
+        "group_food_effects",
+        "group_food_effect_usage",
         "player_catch_quota_bonuses",
         "player_restrictions",
         "trade_offers",
@@ -79,7 +81,7 @@ async def test_empty_database_migrates_and_passes_integrity_check(tmp_path: Path
 
 
 @pytest.mark.asyncio
-async def test_v21_migrates_food_effects_and_repairs_intermediate_pig_cookie(
+async def test_v22_migrates_food_effects_and_repairs_intermediate_pig_cookie(
     tmp_path: Path,
 ) -> None:
     path = tmp_path / "v17-food-effects.sqlite3"
@@ -315,7 +317,17 @@ async def test_v21_migrates_food_effects_and_repairs_intermediate_pig_cookie(
         )
         for row in templates
     }
-    assert migrated["糖醋排骨"] == ("quota-reset", '{"count":1}')
+    assert migrated["糖醋排骨"] == (
+        "quota-reset",
+        '{"count":1,"five_star_multiplier":1.007,"group_coin":1007,'
+        '"group_dedicated_catches":10,"six_star_multiplier":1.007}',
+    )
+    assert migrated["猪鼻蛋包饭"] == (
+        "group-window-high-star-boost",
+        '{"coin_per_player":1004,"dedicated_catches":0,'
+        '"five_star_multiplier":1.004,"six_star_multiplier":1.004,'
+        '"source_label":"猪鼻蛋包饭"}',
+    )
     assert migrated["一猪六吃"] == (
         "next-six-star-cook-bonus",
         '{"bonus_percent":15}',
@@ -338,7 +350,12 @@ async def test_v21_migrates_food_effects_and_repairs_intermediate_pig_cookie(
         )
         for row in effects
     }
-    assert active["糖醋排骨"] == ("quota-reset", '{"count":1}', 1)
+    assert active["糖醋排骨"] == (
+        "quota-reset",
+        '{"count":1,"five_star_multiplier":1.007,"group_coin":1007,'
+        '"group_dedicated_catches":10,"six_star_multiplier":1.007}',
+        1,
+    )
     assert active["猪鼻蛋包饭"][2] == 2
     assert active["小马猪蒙布朗"][2] == 5
     assert active["雾蓝键盘大福"][2] == 10

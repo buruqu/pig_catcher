@@ -208,6 +208,150 @@ class EconomyRepository:
         )
         return [dict(row) for row in rows]
 
+    async def players_in_scope(
+        self,
+        session: DatabaseSession,
+        *,
+        scope_id: str,
+    ) -> list[dict[str, object]]:
+        """Return every registered player in deterministic reward order."""
+
+        rows = await session.fetch_all(
+            """
+            SELECT player_id, display_name, coin_balance, created_at
+            FROM players
+            WHERE scope_id = ?
+            ORDER BY created_at, player_id
+            """,
+            (scope_id,),
+        )
+        return [dict(row) for row in rows]
+
+    async def insert_group_food_effect(
+        self,
+        session: DatabaseSession,
+        *,
+        group_effect_entry_id: str,
+        scope_id: str,
+        source_player_id: str,
+        source_food_instance_id: str,
+        effect_id: str,
+        params_json: str,
+        granted_uses_per_player: int,
+        starts_at: str,
+        expires_at: str,
+        now: str,
+    ) -> None:
+        """Persist one independently expiring six-star group effect."""
+
+        await session.execute(
+            """
+            INSERT INTO group_food_effects(
+                group_effect_entry_id, scope_id, source_player_id,
+                source_food_instance_id, effect_id, params_json,
+                granted_uses_per_player, starts_at, expires_at,
+                created_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                group_effect_entry_id,
+                scope_id,
+                source_player_id,
+                source_food_instance_id,
+                effect_id,
+                params_json,
+                granted_uses_per_player,
+                starts_at,
+                expires_at,
+                now,
+                now,
+            ),
+        )
+
+    async def list_active_group_food_effects(
+        self,
+        session: DatabaseSession,
+        *,
+        scope_id: str,
+        player_id: str,
+        now: str,
+    ) -> list[dict[str, object]]:
+        """Return active group effects with this player's independent usage."""
+
+        rows = await session.fetch_all(
+            """
+            SELECT
+                effect.group_effect_entry_id,
+                effect.effect_id,
+                effect.params_json,
+                effect.granted_uses_per_player,
+                COALESCE(usage.consumed_uses, 0) AS consumed_uses,
+                source.platform_user_id AS source_user_id,
+                effect.starts_at,
+                effect.expires_at,
+                effect.created_at
+            FROM group_food_effects AS effect
+            JOIN players AS source
+              ON source.player_id = effect.source_player_id
+            LEFT JOIN group_food_effect_usage AS usage
+              ON usage.group_effect_entry_id = effect.group_effect_entry_id
+             AND usage.player_id = ?
+            WHERE effect.scope_id = ?
+              AND effect.starts_at <= ?
+              AND effect.expires_at > ?
+            ORDER BY effect.created_at, effect.group_effect_entry_id
+            """,
+            (player_id, scope_id, now, now),
+        )
+        return [dict(row) for row in rows]
+
+    async def consume_group_food_effect_use(
+        self,
+        session: DatabaseSession,
+        *,
+        group_effect_entry_id: str,
+        player_id: str,
+        now: str,
+    ) -> None:
+        """Consume one per-player group-effect use or rollback the catch."""
+
+        await session.execute(
+            """
+            INSERT OR IGNORE INTO group_food_effect_usage(
+                group_effect_entry_id, player_id, consumed_uses, updated_at
+            )
+            VALUES (?, ?, 0, ?)
+            """,
+            (group_effect_entry_id, player_id, now),
+        )
+        cursor = await session.execute(
+            """
+            UPDATE group_food_effect_usage
+            SET consumed_uses = consumed_uses + 1,
+                updated_at = ?
+            WHERE group_effect_entry_id = ?
+              AND player_id = ?
+              AND consumed_uses < (
+                  SELECT granted_uses_per_player
+                  FROM group_food_effects
+                  WHERE group_effect_entry_id = ?
+                    AND starts_at <= ?
+                    AND expires_at > ?
+              )
+            """,
+            (
+                now,
+                group_effect_entry_id,
+                player_id,
+                group_effect_entry_id,
+                now,
+                now,
+            ),
+        )
+        if cursor.rowcount != 1:
+            raise RuntimeError("全群美食效果次数已变化，本次抓猪未结算。")
+
     async def insert_food_effect(
         self,
         session: DatabaseSession,
