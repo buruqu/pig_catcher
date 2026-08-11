@@ -75,9 +75,11 @@ def _pig_entry(
     rarity: int,
     display_name: str | None = None,
     group_id: str | None = None,
+    stature_profile: str = "standard",
+    collection: dict[str, object] | None = None,
 ) -> dict[str, object]:
     group_only = group_id is not None
-    return {
+    entry: dict[str, object] = {
         "template_id": template_id,
         "kind": "pig",
         "display_name": display_name or f"{rarity}星测试猪",
@@ -95,8 +97,12 @@ def _pig_entry(
         "weight_min_kg": 20.0,
         "weight_max_kg": 120.0,
         "fat_profile": "balanced",
+        "stature_profile": stature_profile,
         "recipe_tags": ["测试"],
     }
+    if collection is not None:
+        entry["collection"] = collection
+    return entry
 
 
 def _food_entry(
@@ -179,6 +185,144 @@ def _catch_rolls(
     ),
 ) -> tuple[float, ...]:
     return (rarity_roll, template_roll, *attributes)
+
+
+def test_giant_food_template_weight_prefers_giant_five_star_candidates() -> None:
+    candidates = [
+        {"template_id": "giant", "stature_profile": "giant"},
+        {"template_id": "normal", "stature_profile": "standard"},
+    ]
+    uniform = GameplayService._select_template(candidates, 0.6)
+    weighted = GameplayService._select_template(
+        candidates,
+        0.6,
+        giant_template_multiplier=4.0,
+    )
+    assert uniform["template_id"] == "normal"
+    assert weighted["template_id"] == "giant"
+
+
+@pytest.mark.asyncio
+async def test_collaboration_food_guarantees_collab_and_preserves_probability_item(
+    tmp_path: Path,
+) -> None:
+    collections = [
+        {
+            "collaboration_name": "测试企划",
+            "collection_id": "collab-test",
+            "collection_name": "测试联动",
+            "slot": index,
+            "total": 3,
+            "character_id": f"member-{index}",
+            "character_name": f"成员{index}",
+            "official_profile_url": f"https://example.com/member-{index}",
+        }
+        for index in range(1, 4)
+    ]
+    database = await _database_with_catalog(
+        tmp_path,
+        [
+            _pig_entry("ordinary-three", rarity=3),
+            _pig_entry("ordinary-four", rarity=4),
+            _pig_entry("ordinary-five", rarity=5),
+            _pig_entry("collab-three", rarity=3, collection=collections[0]),
+            _pig_entry("collab-four", rarity=4, collection=collections[1]),
+            _pig_entry("collab-five", rarity=5, collection=collections[2]),
+            _food_entry(
+                "collaboration-stew",
+                effect_id="next-collaboration-catch",
+                effect_params={
+                    "three_star_percent": 15,
+                    "four_star_percent": 55,
+                    "five_star_percent": 30,
+                },
+                display_name="猪猪白菜炖粉条",
+                rarity=5,
+                group_id=None,
+            ),
+        ],
+    )
+    identity = _identity(message_id="collaboration-catch")
+    await FrameworkService(database).touch_identity(
+        _identity(message_id="collaboration-initialize")
+    )
+    now = "2026-08-11T00:00:00.000Z"
+    async with database.transaction() as session:
+        await session.execute(
+            """
+            INSERT INTO food_instances(
+                food_instance_id, short_code, scope_id, owner_player_id,
+                template_id, template_version, rarity, display_name_snapshot,
+                portion_weight, fat_category, official_value, effect_id,
+                effect_params_json, ruleset_version, random_snapshot_json,
+                state, acquired_at, disposed_at, updated_at
+            ) VALUES (
+                'collaboration-source', 'COLLAB01', ?, ?, 'collaboration-stew',
+                1, 5, '猪猪白菜炖粉条', 1.0, 'balanced', 1100,
+                'next-collaboration-catch',
+                '{"five_star_percent":30,"four_star_percent":55,"three_star_percent":15}',
+                17, '{}', 'consumed', ?, ?, ?
+            )
+            """,
+            (identity.scope.value, identity.player_id, now, now, now),
+        )
+        await session.execute(
+            """
+            INSERT INTO player_food_effects(
+                effect_entry_id, player_id, source_food_instance_id,
+                effect_id, params_json, granted_uses, consumed_uses,
+                created_at, updated_at
+            ) VALUES (
+                'collaboration-effect', ?, 'collaboration-source',
+                'next-collaboration-catch',
+                '{"five_star_percent":30,"four_star_percent":55,"three_star_percent":15}',
+                1, 0, ?, ?
+            )
+            """,
+            (identity.player_id, now, now),
+        )
+        await session.execute(
+            """
+            INSERT INTO item_inventory(player_id, item_id, quantity, updated_at)
+            VALUES (?, 'super-lucky-whistle', 1, ?)
+            """,
+            (identity.player_id, now),
+        )
+        await session.execute(
+            """
+            INSERT INTO armed_items(player_id, action_type, item_id, armed_at)
+            VALUES (?, 'catching', 'super-lucky-whistle', ?)
+            """,
+            (identity.player_id, now),
+        )
+
+    service = GameplayService(
+        database,
+        CatchingSection(cooldown_seconds=0),
+        random_source=SequenceRandom(*_catch_rolls(rarity_roll=0.8)),
+        id_factory=iter(("collaboration-pig", "collaboration-ledger")).__next__,
+        short_code_factory=lambda: "COLLPIG1",
+    )
+    result = await service.catch(identity)
+    assert result.pig.rarity == 5
+    assert result.pig.collection_name == "测试联动"
+    assert result.weights == pytest.approx((0, 0, 15, 55, 30, 0))
+    assert any("保留未消耗" in summary for summary in result.excluded_summaries)
+    item = await database.fetch_one(
+        "SELECT quantity FROM item_inventory WHERE player_id = ? AND item_id = 'super-lucky-whistle'",
+        (identity.player_id,),
+    )
+    armed = await database.fetch_one(
+        "SELECT item_id FROM armed_items WHERE player_id = ? AND action_type = 'catching'",
+        (identity.player_id,),
+    )
+    effect = await database.fetch_one(
+        "SELECT consumed_uses FROM player_food_effects WHERE effect_entry_id = 'collaboration-effect'"
+    )
+    assert item is not None and item["quantity"] == 1
+    assert armed is not None and armed["item_id"] == "super-lucky-whistle"
+    assert effect is not None and effect["consumed_uses"] == 1
+    await database.close()
 
 
 @pytest.mark.asyncio

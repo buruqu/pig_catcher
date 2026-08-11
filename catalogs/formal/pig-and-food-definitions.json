@@ -1542,10 +1542,9 @@
         "饼干",
         "甜点"
       ],
-      "effect_id": "next-pig-rarity",
+      "effect_id": "next-small-six-star-catch",
       "effect_params": {
-        "rarity": 4,
-        "multiplier": 2.4
+        "bonus_percent": 1
       }
     },
     {
@@ -1638,8 +1637,8 @@
       ],
       "effect_id": "next-food-rarity",
       "effect_params": {
-        "rarity": 4,
-        "multiplier": 2.4
+        "rarity": 5,
+        "multiplier": 2.0
       }
     },
     {
@@ -1674,7 +1673,7 @@
       ],
       "effect_id": "next-cook-quality",
       "effect_params": {
-        "shift_percent": 10,
+        "shift_percent": 15,
         "uses": 1
       }
     },
@@ -1702,10 +1701,11 @@
         "黑芝麻",
         "甜点"
       ],
-      "effect_id": "next-pig-stature",
+      "effect_id": "next-giant-five-star-catch",
       "effect_params": {
-        "mode": "giant",
-        "strength": 0.5
+        "five_star_multiplier": 3.0,
+        "stature_bias": 0.5,
+        "giant_template_multiplier": 4.0
       }
     },
     {
@@ -1720,10 +1720,11 @@
         "白菜",
         "粉条"
       ],
-      "effect_id": "next-cook-quality",
+      "effect_id": "next-collaboration-catch",
       "effect_params": {
-        "shift_percent": 24,
-        "uses": 1
+        "three_star_percent": 15,
+        "four_star_percent": 55,
+        "five_star_percent": 30
       }
     },
     {
@@ -2201,10 +2202,10 @@
         "饺子",
         "主食"
       ],
-      "effect_id": "next-food-rarity",
+      "effect_id": "next-stackable-six-star-cook-bonus",
       "effect_params": {
-        "rarity": 3,
-        "multiplier": 4.0
+        "bonus_percent": 1,
+        "max_stacks": 5
       }
     },
     {
@@ -2237,10 +2238,9 @@
         "莓果",
         "甜点"
       ],
-      "effect_id": "next-cook-quality",
+      "effect_id": "next-extreme-five-star-cook",
       "effect_params": {
-        "shift_percent": 18,
-        "uses": 2
+        "five_star_percent": 85
       }
     },
     {
@@ -2256,8 +2256,8 @@
       ],
       "effect_id": "next-catch-quality",
       "effect_params": {
-        "multiplier": 2.2,
-        "uses": 2
+        "multiplier": 3.0,
+        "uses": 3
       }
     },
     {
@@ -2272,10 +2272,10 @@
         "甜品",
         "奶香"
       ],
-      "effect_id": "next-pig-rarity",
+      "effect_id": "next-five-six-star-catch",
       "effect_params": {
-        "rarity": 5,
-        "multiplier": 6.0
+        "five_star_bonus_percent": 20,
+        "six_star_bonus_percent": 3
       }
     },
     {

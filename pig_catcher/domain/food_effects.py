@@ -31,6 +31,12 @@ QUOTA_RESET_CHANCE = "quota-reset"
 CURRENT_WINDOW_CATCHES = "current-window-catches"
 TODAY_WINDOW_CATCHES = "today-window-catches"
 NEXT_SIX_STAR_COOK_BONUS = "next-six-star-cook-bonus"
+NEXT_STACKABLE_SIX_STAR_COOK_BONUS = "next-stackable-six-star-cook-bonus"
+NEXT_GIANT_FIVE_STAR_CATCH = "next-giant-five-star-catch"
+NEXT_COLLABORATION_CATCH = "next-collaboration-catch"
+NEXT_EXTREME_FIVE_STAR_COOK = "next-extreme-five-star-cook"
+NEXT_FIVE_SIX_STAR_CATCH = "next-five-six-star-catch"
+NEXT_SMALL_SIX_STAR_CATCH = "next-small-six-star-catch"
 # Schema 18 前糖醋排骨使用的历史独占加权；保留解析能力以兼容旧审计快照。
 EXCLUSIVE_CATCH_QUALITY = "exclusive-catch-quality"
 
@@ -64,6 +70,10 @@ CATCH_EFFECT_IDS = frozenset(
         NEXT_HIGH_STAR_CATCH,
         EVEN_CATCH_DISTRIBUTION,
         EXCLUSIVE_CATCH_QUALITY,
+        NEXT_GIANT_FIVE_STAR_CATCH,
+        NEXT_COLLABORATION_CATCH,
+        NEXT_FIVE_SIX_STAR_CATCH,
+        NEXT_SMALL_SIX_STAR_CATCH,
     }
 )
 COOK_EFFECT_IDS = frozenset(
@@ -71,8 +81,10 @@ COOK_EFFECT_IDS = frozenset(
         NEXT_COOK_QUALITY,
         NEXT_SIX_STAR_COOK,
         NEXT_SIX_STAR_COOK_BONUS,
+        NEXT_STACKABLE_SIX_STAR_COOK_BONUS,
         NEXT_FOOD_RARITY,
         NEXT_FIVE_STAR_COOK,
+        NEXT_EXTREME_FIVE_STAR_COOK,
     }
 )
 QUOTA_EFFECT_IDS = frozenset({CURRENT_WINDOW_CATCHES, TODAY_WINDOW_CATCHES})
@@ -96,6 +108,10 @@ CATCH_PROBABILITY_GROUP = frozenset(
         NEXT_HIGH_STAR_CATCH,
         EVEN_CATCH_DISTRIBUTION,
         EXCLUSIVE_CATCH_QUALITY,
+        NEXT_GIANT_FIVE_STAR_CATCH,
+        NEXT_COLLABORATION_CATCH,
+        NEXT_FIVE_SIX_STAR_CATCH,
+        NEXT_SMALL_SIX_STAR_CATCH,
     }
 )
 # 抓猪体型组：与概率组正交，可同时生效。
@@ -107,7 +123,9 @@ COOK_PROBABILITY_GROUP = frozenset(
         NEXT_FOOD_RARITY,
         NEXT_SIX_STAR_COOK,
         NEXT_SIX_STAR_COOK_BONUS,
+        NEXT_STACKABLE_SIX_STAR_COOK_BONUS,
         NEXT_FIVE_STAR_COOK,
+        NEXT_EXTREME_FIVE_STAR_COOK,
     }
 )
 
@@ -144,6 +162,8 @@ class CatchEffectApplication:
     consumed_entry_ids: tuple[str, ...]
     summaries: tuple[str, ...]
     skipped_summaries: tuple[str, ...] = ()
+    collaboration_only: bool = False
+    giant_template_multiplier: float = 1.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -252,6 +272,18 @@ def resolve_food_effect(
             1,
             f"下一次用 6 星猪做菜时，6 星菜最终概率额外 +{bonus:g} 个百分点（最高 50%）。",
         )
+    if normalized_id == NEXT_STACKABLE_SIX_STAR_COOK_BONUS:
+        bonus = _number(raw, "bonus_percent", lower=0.1, upper=5.0)
+        max_stacks = _integer(raw, "max_stacks", lower=1, upper=5)
+        return FoodEffectGrant(
+            normalized_id,
+            {"bonus_percent": bonus, "max_stacks": max_stacks},
+            1,
+            (
+                f"下一次用 6 星猪做菜时，6 星菜最终概率额外 +{bonus:g} 个百分点；"
+                f"同类最多叠加 {max_stacks} 层，并在该次做菜一并消耗。"
+            ),
+        )
     if normalized_id == NEXT_SIX_STAR_COOK:
         percent = _number(raw, "six_star_percent", lower=11.0, upper=60.0)
         uses = _integer(raw, "uses", lower=1, upper=10) if "uses" in raw else 1
@@ -341,6 +373,17 @@ def resolve_food_effect(
             f"下一次{target}时，{rarity} 星{noun}相对权重提升至 ×{multiplier:g}；"
             "新增概率仅从更低星级转移，不压低更高星级。",
         )
+    if normalized_id == NEXT_SMALL_SIX_STAR_CATCH:
+        bonus = _number(raw, "bonus_percent", lower=0.1, upper=3.0)
+        return FoodEffectGrant(
+            normalized_id,
+            {"bonus_percent": bonus},
+            1,
+            (
+                f"下一次抓猪时，6 星最终概率额外 +{bonus:g} 个百分点；"
+                "新增概率只从 1 至 3 星转移，不压低 4 星或 5 星。"
+            ),
+        )
     if normalized_id == NEXT_PIG_STATURE:
         mode = str(raw.get("mode") or "").strip()
         if mode not in {"giant", "mini"}:
@@ -352,6 +395,58 @@ def resolve_food_effect(
             {"mode": mode, "strength": strength},
             1,
             f"下一次抓猪更容易出现{label}个体。",
+        )
+    if normalized_id == NEXT_GIANT_FIVE_STAR_CATCH:
+        multiplier = _number(raw, "five_star_multiplier", lower=1.01, upper=8.0)
+        stature_bias = _number(raw, "stature_bias", lower=0.05, upper=0.50)
+        template_multiplier = _number(raw, "giant_template_multiplier", lower=1.01, upper=10.0)
+        return FoodEffectGrant(
+            normalized_id,
+            {
+                "five_star_multiplier": multiplier,
+                "stature_bias": stature_bias,
+                "giant_template_multiplier": template_multiplier,
+            },
+            1,
+            (
+                f"下一次抓猪：5 星相对权重 ×{multiplier:g}、体型偏移 +{stature_bias:.2f}；"
+                f"若抓到 5 星，巨物模板抽取权重 ×{template_multiplier:g}。"
+            ),
+        )
+    if normalized_id == NEXT_COLLABORATION_CATCH:
+        three = _number(raw, "three_star_percent", lower=0.1, upper=100.0)
+        four = _number(raw, "four_star_percent", lower=0.1, upper=100.0)
+        five = _number(raw, "five_star_percent", lower=0.1, upper=100.0)
+        if not 99.5 <= three + four + five <= 100.5:
+            raise FoodEffectError("联动猪抓取效果的三星、四星、五星概率合计必须等于 100%。")
+        return FoodEffectGrant(
+            normalized_id,
+            {
+                "three_star_percent": round(three, 4),
+                "four_star_percent": round(four, 4),
+                "five_star_percent": round(five, 4),
+            },
+            1,
+            (
+                "下一次抓猪必定获得联动猪："
+                f"3 星 {three:g}%、4 星 {four:g}%、5 星 {five:g}%。"
+            ),
+        )
+    if normalized_id == NEXT_FIVE_SIX_STAR_CATCH:
+        five_bonus = _number(raw, "five_star_bonus_percent", lower=1.0, upper=30.0)
+        six_bonus = _number(raw, "six_star_bonus_percent", lower=0.1, upper=10.0)
+        return FoodEffectGrant(
+            normalized_id,
+            {
+                "five_star_bonus_percent": five_bonus,
+                "six_star_bonus_percent": six_bonus,
+            },
+            1,
+            (
+                "下一次抓猪时，5 星最终概率额外 "
+                f"+{five_bonus:g} 个百分点、6 星额外 +{six_bonus:g} 个百分点；"
+                "新增概率只从 1 至 3 星转移。"
+            ),
         )
     if normalized_id == NEXT_HIGH_STAR_CATCH:
         uses = _integer(raw, "uses", lower=1, upper=10)
@@ -382,6 +477,17 @@ def resolve_food_effect(
             {"uses": uses},
             uses,
             f"接下来 {uses} 次做菜必定获得 5 星美食。",
+        )
+    if normalized_id == NEXT_EXTREME_FIVE_STAR_COOK:
+        percent = _number(raw, "five_star_percent", lower=51.0, upper=95.0)
+        return FoodEffectGrant(
+            normalized_id,
+            {"five_star_percent": percent},
+            1,
+            (
+                "下一次使用 1 至 5 星猪做菜时，5 星菜最终概率至少为 "
+                f"{percent:g}%；6 星猪不触发且效果保留。"
+            ),
         )
     if normalized_id == EVEN_CATCH_DISTRIBUTION:
         uses = _integer(raw, "uses", lower=1, upper=10)
@@ -501,6 +607,54 @@ def _exclusive_skipped_summary(effect: ActiveFoodEffect) -> str:
     return resolve_food_effect(effect.effect_id, effect.params).summary + "（本次由六星菜独占规则接管，未生效且未消耗）"
 
 
+def _lift_five_and_six_by_points(
+    weights: Sequence[float],
+    *,
+    five_star_bonus: float,
+    six_star_bonus: float,
+) -> tuple[float, ...]:
+    """Fund fixed 5/6-star point bonuses only from the 1-3-star pool."""
+
+    adjusted = list(normalize_weights(weights))
+    five_bonus = max(0.0, float(five_star_bonus))
+    six_bonus = max(0.0, float(six_star_bonus))
+    if adjusted[5] <= 0.0:
+        five_bonus += six_bonus
+        six_bonus = 0.0
+    requested = five_bonus + six_bonus
+    donor_total = sum(adjusted[:3])
+    if requested <= 0.0 or donor_total <= 0.0:
+        return tuple(adjusted)
+    funding_scale = min(1.0, donor_total / requested)
+    funded = requested * funding_scale
+    donor_scale = (donor_total - funded) / donor_total
+    adjusted[:3] = [value * donor_scale for value in adjusted[:3]]
+    adjusted[4] += five_bonus * funding_scale
+    adjusted[5] += six_bonus * funding_scale
+    return normalize_weights(adjusted)
+
+
+def _raise_five_star_cook_floor(
+    weights: Sequence[float],
+    *,
+    five_star_percent: float,
+) -> tuple[float, ...]:
+    """Raise a normal cook's five-star result to a declared minimum."""
+
+    adjusted = list(normalize_weights(weights))
+    target = max(adjusted[4], min(100.0, float(five_star_percent)))
+    donor_total = sum(adjusted[:4])
+    requested = target - adjusted[4]
+    if requested <= 0.0 or donor_total <= 0.0:
+        return tuple(adjusted)
+    funded = min(donor_total, requested)
+    donor_scale = (donor_total - funded) / donor_total
+    adjusted[:4] = [value * donor_scale for value in adjusted[:4]]
+    adjusted[4] += funded
+    adjusted[5] = 0.0
+    return normalize_weights(adjusted)
+
+
 def apply_catch_effects(
     weights: Sequence[float],
     effects: Sequence[ActiveFoodEffect],
@@ -512,6 +666,8 @@ def apply_catch_effects(
     consumed: list[str] = []
     summaries: list[str] = []
     skipped: list[str] = []
+    collaboration_only = False
+    giant_template_multiplier = 1.0
 
     def exclusive_compatible(effect: ActiveFoodEffect) -> bool:
         return effect.effect_id != NEXT_SIX_STAR_CATCH or adjusted[5] > 0
@@ -568,13 +724,27 @@ def apply_catch_effects(
         )
 
     ordinary_probability_group = CATCH_PROBABILITY_GROUP - EXCLUSIVE_CATCH_EFFECTS
-    for group in (ordinary_probability_group, CATCH_STATURE_GROUP):
-        chosen, group_skipped = _one_per_group(effects, group)
-        skipped.extend(group_skipped)
-        if chosen is None:
-            continue
-        grant = resolve_food_effect(chosen.effect_id, chosen.params)
-        if chosen.effect_id == NEXT_CATCH_QUALITY:
+
+    def ordinary_probability_compatible(effect: ActiveFoodEffect) -> bool:
+        if effect.effect_id == NEXT_PIG_RARITY:
+            grant = resolve_food_effect(effect.effect_id, effect.params)
+            target_index = int(grant.params["rarity"]) - 1
+            return adjusted[target_index] > 0.0 and sum(adjusted[:target_index]) > 0.0
+        if effect.effect_id == NEXT_GIANT_FIVE_STAR_CATCH:
+            return adjusted[4] > 0.0 and sum(adjusted[:4]) > 0.0
+        if effect.effect_id == NEXT_SMALL_SIX_STAR_CATCH:
+            return adjusted[5] > 0.0 and sum(adjusted[:3]) > 0.0
+        return True
+
+    probability_effect, probability_skipped = _one_per_group(
+        effects,
+        ordinary_probability_group,
+        compatible=ordinary_probability_compatible,
+    )
+    skipped.extend(probability_skipped)
+    if probability_effect is not None:
+        grant = resolve_food_effect(probability_effect.effect_id, probability_effect.params)
+        if probability_effect.effect_id == NEXT_CATCH_QUALITY:
             multiplier = float(grant.params["multiplier"])
             adjusted = list(
                 apply_monotonic_high_rarity_multipliers(
@@ -582,7 +752,7 @@ def apply_catch_effects(
                     (1.0, 1.0, 1.0, multiplier, multiplier, multiplier),
                 )
             )
-        elif chosen.effect_id == NEXT_PIG_RARITY:
+        elif probability_effect.effect_id == NEXT_PIG_RARITY:
             adjusted = list(
                 lift_target_rarity_from_lower(
                     adjusted,
@@ -590,17 +760,69 @@ def apply_catch_effects(
                     multiplier=float(grant.params["multiplier"]),
                 )
             )
-        elif chosen.effect_id == NEXT_PIG_STATURE:
+        elif probability_effect.effect_id == NEXT_GIANT_FIVE_STAR_CATCH:
+            adjusted = list(
+                lift_target_rarity_from_lower(
+                    adjusted,
+                    target_rarity=5,
+                    multiplier=float(grant.params["five_star_multiplier"]),
+                )
+            )
+            stature_bias += float(grant.params["stature_bias"])
+            giant_template_multiplier = float(grant.params["giant_template_multiplier"])
+        elif probability_effect.effect_id == NEXT_COLLABORATION_CATCH:
+            adjusted = [
+                0.0,
+                0.0,
+                float(grant.params["three_star_percent"]),
+                float(grant.params["four_star_percent"]),
+                float(grant.params["five_star_percent"]),
+                0.0,
+            ]
+            collaboration_only = True
+        elif probability_effect.effect_id == NEXT_FIVE_SIX_STAR_CATCH:
+            adjusted = list(
+                _lift_five_and_six_by_points(
+                    adjusted,
+                    five_star_bonus=float(grant.params["five_star_bonus_percent"]),
+                    six_star_bonus=float(grant.params["six_star_bonus_percent"]),
+                )
+            )
+        elif probability_effect.effect_id == NEXT_SMALL_SIX_STAR_CATCH:
+            adjusted = list(
+                _lift_five_and_six_by_points(
+                    adjusted,
+                    five_star_bonus=0.0,
+                    six_star_bonus=float(grant.params["bonus_percent"]),
+                )
+            )
+        consumed.append(probability_effect.effect_entry_id)
+        summaries.append(grant.summary)
+
+    if probability_effect is not None and probability_effect.effect_id == NEXT_GIANT_FIVE_STAR_CATCH:
+        for effect in effects:
+            if effect.effect_id in CATCH_STATURE_GROUP:
+                skipped.append(
+                    resolve_food_effect(effect.effect_id, effect.params).summary
+                    + "（复合巨物效果已占用体型效果位，未叠加且未消耗）"
+                )
+    else:
+        stature_effect, stature_skipped = _one_per_group(effects, CATCH_STATURE_GROUP)
+        skipped.extend(stature_skipped)
+        if stature_effect is not None:
+            grant = resolve_food_effect(stature_effect.effect_id, stature_effect.params)
             direction = 1.0 if grant.params["mode"] == "giant" else -1.0
             stature_bias += direction * float(grant.params["strength"])
-        consumed.append(chosen.effect_entry_id)
-        summaries.append(grant.summary)
+            consumed.append(stature_effect.effect_entry_id)
+            summaries.append(grant.summary)
     return CatchEffectApplication(
         weights=normalize_weights(adjusted),
         stature_bias=max(-0.50, min(0.50, stature_bias)),
         consumed_entry_ids=tuple(consumed),
         summaries=tuple(summaries),
         skipped_summaries=tuple(skipped),
+        collaboration_only=collaboration_only,
+        giant_template_multiplier=giant_template_multiplier,
     )
 
 
@@ -658,44 +880,119 @@ def apply_cooking_effects(
             skipped_summaries=tuple(skipped),
         )
 
-    def compatible(effect: ActiveFoodEffect) -> bool:
-        if effect.effect_id == NEXT_SIX_STAR_COOK_BONUS:
-            return rarity is Rarity.SIX
-        return effect.effect_id not in EXCLUSIVE_COOK_EFFECTS and rarity is not Rarity.SIX
-
-    chosen, group_skipped = _one_per_group(
-        effects,
-        COOK_PROBABILITY_GROUP - EXCLUSIVE_COOK_EFFECTS,
-        compatible=compatible,
+    normal_cook_group = frozenset(
+        {
+            NEXT_COOK_QUALITY,
+            NEXT_FOOD_RARITY,
+            NEXT_EXTREME_FIVE_STAR_COOK,
+        }
     )
-    skipped.extend(group_skipped)
-    if chosen is not None:
-        grant = resolve_food_effect(chosen.effect_id, chosen.params)
-        if chosen.effect_id == NEXT_COOK_QUALITY:
-            lowest_index = next(index for index, value in enumerate(adjusted) if value > 0)
-            target_index = min(lowest_index + 1, len(adjusted) - 1)
-            shift = min(
-                adjusted[lowest_index],
-                float(grant.params["shift_percent"]),
-            )
-            adjusted[lowest_index] -= shift
-            adjusted[target_index] += shift
-        elif chosen.effect_id == NEXT_FOOD_RARITY:
-            adjusted = list(
-                lift_target_rarity_from_lower(
-                    adjusted,
-                    target_rarity=int(grant.params["rarity"]),
-                    multiplier=float(grant.params["multiplier"]),
+    six_star_bonus_group = frozenset({NEXT_SIX_STAR_COOK_BONUS})
+
+    if rarity is Rarity.SIX:
+        for effect in effects:
+            if effect.effect_id in normal_cook_group:
+                skipped.append(
+                    resolve_food_effect(effect.effect_id, effect.params).summary
+                    + "（当前使用 6 星猪，不适用且未消耗）"
                 )
+
+        standard_bonus, standard_skipped = _one_per_group(effects, six_star_bonus_group)
+        skipped.extend(standard_skipped)
+        selected_ids: set[str] = set()
+        total_bonus = 0.0
+        if standard_bonus is not None:
+            grant = resolve_food_effect(standard_bonus.effect_id, standard_bonus.params)
+            selected_ids.add(standard_bonus.effect_entry_id)
+            total_bonus += float(grant.params["bonus_percent"])
+            summaries.append(grant.summary)
+
+        stackable = [
+            effect
+            for effect in effects
+            if effect.effect_id == NEXT_STACKABLE_SIX_STAR_COOK_BONUS
+        ]
+        if stackable:
+            first_grant = resolve_food_effect(stackable[0].effect_id, stackable[0].params)
+            max_stacks = int(first_grant.params["max_stacks"])
+            selected_stackable = stackable[:max_stacks]
+            for effect in selected_stackable:
+                grant = resolve_food_effect(effect.effect_id, effect.params)
+                selected_ids.add(effect.effect_entry_id)
+                total_bonus += float(grant.params["bonus_percent"])
+            if selected_stackable:
+                stack_bonus = sum(
+                    float(resolve_food_effect(effect.effect_id, effect.params).params["bonus_percent"])
+                    for effect in selected_stackable
+                )
+                summaries.append(
+                    f"猪饺叠加 {len(selected_stackable)} 层：本次 6 星菜概率额外 "
+                    f"+{stack_bonus:g} 个百分点。"
+                )
+            skipped.extend(
+                resolve_food_effect(effect.effect_id, effect.params).summary
+                + f"（已达到 {max_stacks} 层上限，未消耗）"
+                for effect in stackable[max_stacks:]
             )
-        elif chosen.effect_id == NEXT_SIX_STAR_COOK_BONUS:
-            bonus = float(grant.params["bonus_percent"])
-            shifted = min(adjusted[4], bonus, max(0.0, 50.0 - adjusted[5]))
+
+        if total_bonus > 0.0:
+            shifted = min(adjusted[4], total_bonus, max(0.0, 50.0 - adjusted[5]))
             adjusted[4] -= shifted
             adjusted[5] += shifted
-        consumed.append(chosen.effect_entry_id)
-        summaries.append(grant.summary)
-    if rarity is not Rarity.SIX:
+        consumed.extend(
+            effect.effect_entry_id
+            for effect in effects
+            if effect.effect_entry_id in selected_ids
+        )
+    else:
+        for effect in effects:
+            if effect.effect_id in six_star_bonus_group | {NEXT_STACKABLE_SIX_STAR_COOK_BONUS}:
+                skipped.append(
+                    resolve_food_effect(effect.effect_id, effect.params).summary
+                    + "（需要使用 6 星猪，当前未消耗）"
+                )
+
+        def normal_cook_compatible(effect: ActiveFoodEffect) -> bool:
+            if effect.effect_id != NEXT_FOOD_RARITY:
+                return True
+            grant = resolve_food_effect(effect.effect_id, effect.params)
+            target_index = int(grant.params["rarity"]) - 1
+            return adjusted[target_index] > 0.0 and sum(adjusted[:target_index]) > 0.0
+
+        chosen, group_skipped = _one_per_group(
+            effects,
+            normal_cook_group,
+            compatible=normal_cook_compatible,
+        )
+        skipped.extend(group_skipped)
+        if chosen is not None:
+            grant = resolve_food_effect(chosen.effect_id, chosen.params)
+            if chosen.effect_id == NEXT_COOK_QUALITY:
+                lowest_index = next(index for index, value in enumerate(adjusted) if value > 0)
+                target_index = min(lowest_index + 1, len(adjusted) - 1)
+                shift = min(
+                    adjusted[lowest_index],
+                    float(grant.params["shift_percent"]),
+                )
+                adjusted[lowest_index] -= shift
+                adjusted[target_index] += shift
+            elif chosen.effect_id == NEXT_FOOD_RARITY:
+                adjusted = list(
+                    lift_target_rarity_from_lower(
+                        adjusted,
+                        target_rarity=int(grant.params["rarity"]),
+                        multiplier=float(grant.params["multiplier"]),
+                    )
+                )
+            elif chosen.effect_id == NEXT_EXTREME_FIVE_STAR_COOK:
+                adjusted = list(
+                    _raise_five_star_cook_floor(
+                        adjusted,
+                        five_star_percent=float(grant.params["five_star_percent"]),
+                    )
+                )
+            consumed.append(chosen.effect_entry_id)
+            summaries.append(grant.summary)
         adjusted[5] = 0.0
     return CookingEffectApplication(
         weights=normalize_weights(adjusted),

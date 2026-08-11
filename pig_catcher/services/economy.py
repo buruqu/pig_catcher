@@ -49,6 +49,7 @@ from ..domain.food_effects import (
     COOK_PROBABILITY_GROUP,
     CURRENT_WINDOW_CATCHES,
     EXTRA_CATCHES,
+    NEXT_STACKABLE_SIX_STAR_COOK_BONUS,
     PERMANENT_WINDOW_CATCH,
     TODAY_WINDOW_CATCHES,
     WEEKLY_WINDOW_CATCHES,
@@ -1556,6 +1557,23 @@ class EconomyService:
                 )
                 if permanent_total is None:
                     raise FoodEffectError("永久抓猪时段额度已经达到 +5 上限；美食未消耗。")
+            elif effect.queued_effect_id == NEXT_STACKABLE_SIX_STAR_COOK_BONUS:
+                active_rows = await self.repository.list_active_food_effects(
+                    session,
+                    player_id=identity.player_id,
+                    now=now,
+                )
+                active_layers = sum(
+                    int(row["granted_uses"]) - int(row["consumed_uses"])
+                    for row in active_rows
+                    if str(row.get("effect_id") or "") == NEXT_STACKABLE_SIX_STAR_COOK_BONUS
+                )
+                max_stacks = int(effect.queued_effect_params["max_stacks"])
+                if active_layers >= max_stacks:
+                    raise FoodEffectError(
+                        f"猪饺的六星菜概率加成已经叠加 {max_stacks} 层；"
+                        "请先用 6 星猪做菜后再食用，美食未消耗。"
+                    )
             consumed = await self.repository.consume_food(
                 session,
                 food_instance_id=food.food_instance_id,

@@ -59,19 +59,35 @@ def test_high_rarity_food_effects_cover_new_gameplay_families() -> None:
     assert foods["一猪六吃"]["effect_params"] == {"bonus_percent": 15}
     assert foods["一盒油炸猪"]["effect_id"] == "current-window-catches"
     assert foods["一盒油炸猪"]["effect_params"] == {"count": 2}
+    assert foods["猪利猪"]["effect_id"] == "next-small-six-star-catch"
+    assert foods["猪利猪"]["effect_params"] == {"bonus_percent": 1}
+    assert foods["猪籽军舰"]["effect_params"] == {"rarity": 5, "multiplier": 2.0}
+    assert foods["猪猪玉子烧"]["effect_params"] == {"shift_percent": 15, "uses": 1}
+    assert foods["猪饺"]["effect_id"] == "next-stackable-six-star-cook-bonus"
+    assert foods["猪饺"]["effect_params"] == {"bonus_percent": 1, "max_stacks": 5}
+    assert foods["黑猪麻汤圆"]["effect_id"] == "next-giant-five-star-catch"
+    assert foods["黑猪麻汤圆"]["effect_params"] == {
+        "five_star_multiplier": 3.0,
+        "stature_bias": 0.5,
+        "giant_template_multiplier": 4.0,
+    }
+    assert foods["猪猪白菜炖粉条"]["effect_id"] == "next-collaboration-catch"
     assert foods["猪猪白菜炖粉条"]["effect_params"] == {
-        "shift_percent": 24,
-        "uses": 1,
+        "three_star_percent": 15,
+        "four_star_percent": 55,
+        "five_star_percent": 30,
     }
-    assert foods["猪咪莓蛋糕"]["effect_params"] == {
-        "shift_percent": 18,
-        "uses": 2,
-    }
+    assert foods["猪咪莓蛋糕"]["effect_id"] == "next-extreme-five-star-cook"
+    assert foods["猪咪莓蛋糕"]["effect_params"] == {"five_star_percent": 85}
     assert foods["猪果冻"]["effect_params"] == {
-        "multiplier": 2.2,
-        "uses": 2,
+        "multiplier": 3.0,
+        "uses": 3,
     }
-    assert foods["猪皮奶"]["effect_params"] == {"rarity": 5, "multiplier": 6.0}
+    assert foods["猪皮奶"]["effect_id"] == "next-five-six-star-catch"
+    assert foods["猪皮奶"]["effect_params"] == {
+        "five_star_bonus_percent": 20,
+        "six_star_bonus_percent": 3,
+    }
     assert foods["小马猪蒙布朗"]["effect_params"] == {
         "six_star_percent": 60,
         "uses": 5,
@@ -122,17 +138,16 @@ def test_five_star_food_routes_are_stronger_than_four_star_counterparts() -> Non
     assert five_catch["multiplier"] > four_catch["multiplier"]
     assert five_catch["uses"] > four_catch["uses"]
 
-    four_cook = foods["猪猪玉子烧"]["effect_params"]
-    five_cook_once = foods["猪猪白菜炖粉条"]["effect_params"]
-    five_cook_twice = foods["猪咪莓蛋糕"]["effect_params"]
-    assert five_cook_once["shift_percent"] > four_cook["shift_percent"]
-    assert five_cook_twice["shift_percent"] > four_cook["shift_percent"]
-    assert five_cook_twice["uses"] > four_cook["uses"]
+    assert foods["猪猪玉子烧"]["effect_params"]["shift_percent"] == 15
+    assert foods["猪咪莓蛋糕"]["effect_params"]["five_star_percent"] == 85
+    collaboration = foods["猪猪白菜炖粉条"]["effect_params"]
+    assert collaboration["four_star_percent"] + collaboration["five_star_percent"] == 85
 
-    four_five_star_target = foods["珍猪奶茶"]["effect_params"]
-    five_five_star_target = foods["猪皮奶"]["effect_params"]
-    assert five_five_star_target["rarity"] == four_five_star_target["rarity"] == 5
-    assert five_five_star_target["multiplier"] > four_five_star_target["multiplier"]
+    assert foods["珍猪奶茶"]["effect_params"] == {"rarity": 5, "multiplier": 2.5}
+    assert foods["猪皮奶"]["effect_params"] == {
+        "five_star_bonus_percent": 20,
+        "six_star_bonus_percent": 3,
+    }
 
     assert foods["一盒油炸猪"]["effect_id"] == "current-window-catches"
     assert foods["猪寿司拼盘"]["effect_id"] == "today-window-catches"

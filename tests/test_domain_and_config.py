@@ -675,6 +675,115 @@ def test_ordinary_six_star_cook_bonus_stacks_then_caps_at_fifty_percent() -> Non
     assert near_cap.weights == pytest.approx((0, 0, 0, 0, 50, 50))
 
 
+def test_expanded_catch_food_effects_have_exact_monotonic_results() -> None:
+    small_six = _active_effect(
+        "pig-cookie",
+        "next-small-six-star-catch",
+        {"bonus_percent": 1},
+        created_at="2026-08-11T00:00:00.000Z",
+    )
+    small_six_result = apply_catch_effects(BASE_CATCH_WEIGHTS, [small_six])
+    assert small_six_result.weights[3:6] == pytest.approx((8.0, 4.0, 2.0))
+
+    giant = _active_effect(
+        "giant-tangyuan",
+        "next-giant-five-star-catch",
+        {
+            "five_star_multiplier": 3.0,
+            "stature_bias": 0.5,
+            "giant_template_multiplier": 4.0,
+        },
+        created_at="2026-08-11T00:00:01.000Z",
+    )
+    giant_result = apply_catch_effects(BASE_CATCH_WEIGHTS, [giant])
+    assert giant_result.weights[4] == pytest.approx(100.0 / 9.0)
+    assert giant_result.weights[5] == pytest.approx(1.0)
+    assert giant_result.stature_bias == pytest.approx(0.5)
+    assert giant_result.giant_template_multiplier == pytest.approx(4.0)
+
+    collaboration = _active_effect(
+        "collaboration-stew",
+        "next-collaboration-catch",
+        {"three_star_percent": 15, "four_star_percent": 55, "five_star_percent": 30},
+        created_at="2026-08-11T00:00:02.000Z",
+    )
+    collaboration_result = apply_catch_effects(BASE_CATCH_WEIGHTS, [collaboration])
+    assert collaboration_result.weights == pytest.approx((0, 0, 15, 55, 30, 0))
+    assert collaboration_result.collaboration_only is True
+
+    high_pair = _active_effect(
+        "pig-skin-milk",
+        "next-five-six-star-catch",
+        {"five_star_bonus_percent": 20, "six_star_bonus_percent": 3},
+        created_at="2026-08-11T00:00:03.000Z",
+    )
+    high_pair_result = apply_catch_effects(BASE_CATCH_WEIGHTS, [high_pair])
+    assert high_pair_result.weights[3:] == pytest.approx((8, 24, 4))
+    assert sum(high_pair_result.weights[:3]) == pytest.approx(64)
+
+
+def test_expanded_cooking_food_effects_include_five_dumpling_layers() -> None:
+    five_star_target = _active_effect(
+        "roe-gunkan",
+        "next-food-rarity",
+        {"rarity": 5, "multiplier": 2.0},
+        created_at="2026-08-11T00:00:00.000Z",
+    )
+    targeted = apply_cooking_effects(
+        cooking_weights(3),
+        [five_star_target],
+        source_rarity=3,
+    )
+    assert targeted.weights[4] == pytest.approx(200.0 / 51.0)
+    assert targeted.weights[5] == 0.0
+
+    extreme = _active_effect(
+        "berry-cake",
+        "next-extreme-five-star-cook",
+        {"five_star_percent": 85},
+        created_at="2026-08-11T00:00:01.000Z",
+    )
+    for source_rarity in range(1, 6):
+        result = apply_cooking_effects(
+            cooking_weights(source_rarity),
+            [extreme],
+            source_rarity=source_rarity,
+        )
+        assert result.weights[4] == pytest.approx(85.0)
+        assert result.weights[5] == 0.0
+
+    six_ways = _active_effect(
+        "six-ways",
+        "next-six-star-cook-bonus",
+        {"bonus_percent": 15},
+        created_at="2026-08-11T00:00:02.000Z",
+    )
+    dumplings = [
+        _active_effect(
+            f"dumpling-{index}",
+            "next-stackable-six-star-cook-bonus",
+            {"bonus_percent": 1, "max_stacks": 5},
+            created_at=f"2026-08-11T00:00:0{index + 2}.000Z",
+        )
+        for index in range(1, 6)
+    ]
+    stacked = apply_cooking_effects(
+        (0, 0, 0, 0, 80, 20),
+        [six_ways, *dumplings],
+        source_rarity=6,
+    )
+    assert stacked.weights == pytest.approx((0, 0, 0, 0, 60, 40))
+    assert stacked.consumed_entry_ids == (
+        "six-ways",
+        "dumpling-1",
+        "dumpling-2",
+        "dumpling-3",
+        "dumpling-4",
+        "dumpling-5",
+    )
+    assert any("猪饺叠加 5 层" in summary for summary in stacked.summaries)
+
+
 def test_numeric_level_and_honor_title_remain_separate_progress_tracks() -> None:
     assert level_progress(0).level == 1
     assert level_progress(50).level == 2

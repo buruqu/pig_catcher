@@ -79,7 +79,7 @@ async def test_empty_database_migrates_and_passes_integrity_check(tmp_path: Path
 
 
 @pytest.mark.asyncio
-async def test_v19_repairs_legacy_six_ways_effect_and_preserves_v18_rebalance(
+async def test_v21_migrates_food_effects_and_repairs_intermediate_pig_cookie(
     tmp_path: Path,
 ) -> None:
     path = tmp_path / "v17-food-effects.sqlite3"
@@ -94,7 +94,7 @@ async def test_v19_repairs_legacy_six_ways_effect_and_preserves_v18_rebalance(
         )
         """
     )
-    for migration in MIGRATIONS[:-2]:
+    for migration in (item for item in MIGRATIONS if item.version <= 17):
         for statement in migration.statements:
             connection.execute(statement)
         connection.execute(
@@ -143,6 +143,15 @@ async def test_v19_repairs_legacy_six_ways_effect_and_preserves_v18_rebalance(
         "彩彩修车猪慕斯": ("next-five-star-cook", '{"uses":5}', 5),
         "猪保千猪排轮盘": ("even-catch-distribution", '{"uses":5}', 5),
         "一猪六吃": ("next-six-star-cook", '{"six_star_percent":50}', 1),
+        "猪利猪": ("next-pig-rarity", '{"multiplier":2.4,"rarity":4}', 1),
+        "猪籽军舰": ("next-food-rarity", '{"multiplier":2.4,"rarity":4}', 1),
+        "猪猪玉子烧": ("next-cook-quality", '{"shift_percent":10,"uses":1}', 1),
+        "猪饺": ("next-food-rarity", '{"multiplier":4.0,"rarity":3}', 1),
+        "黑猪麻汤圆": ("next-pig-stature", '{"mode":"giant","strength":0.5}', 1),
+        "猪猪白菜炖粉条": ("next-cook-quality", '{"shift_percent":24,"uses":1}', 1),
+        "猪咪莓蛋糕": ("next-cook-quality", '{"shift_percent":18,"uses":2}', 2),
+        "猪果冻": ("next-catch-quality", '{"multiplier":2.2,"uses":2}', 2),
+        "猪皮奶": ("next-pig-rarity", '{"multiplier":6.0,"rarity":5}', 1),
     }
     for index, (name, (effect_id, params, granted_uses)) in enumerate(
         old_effects.items(),
@@ -251,12 +260,51 @@ async def test_v19_repairs_legacy_six_ways_effect_and_preserves_v18_rebalance(
         """,
         (now, now),
     )
+
+    # 先按正式路径执行 18-20，再模拟生产热加载曾短暂写入的猪利猪早期方案。
+    # Schema 21 必须把模板、可用实例和未消费队列全部收敛到最终 +1 个百分点规则。
+    for migration in (item for item in MIGRATIONS if 18 <= item.version <= 20):
+        for statement in migration.statements:
+            connection.execute(statement)
+        connection.execute(
+            "INSERT INTO schema_migrations(version, name, applied_at) VALUES (?, ?, 'now')",
+            (migration.version, migration.name),
+        )
+        connection.execute(f"PRAGMA user_version = {migration.version}")
+    connection.execute(
+        """
+        UPDATE food_templates
+        SET effect_id = 'next-pig-rarity',
+            effect_params_json = '{"multiplier":2.0,"rarity":6}'
+        WHERE display_name = '猪利猪'
+        """
+    )
+    connection.execute(
+        """
+        UPDATE food_instances
+        SET effect_id = 'next-pig-rarity',
+            effect_params_json = '{"multiplier":2.0,"rarity":6}'
+        WHERE display_name_snapshot = '猪利猪'
+        """
+    )
+    connection.execute(
+        """
+        UPDATE player_food_effects
+        SET effect_id = 'next-pig-rarity',
+            params_json = '{"multiplier":2.0,"rarity":6}'
+        WHERE source_food_instance_id IN (
+            SELECT food_instance_id
+            FROM food_instances
+            WHERE display_name_snapshot = '猪利猪'
+        )
+        """
+    )
     connection.commit()
     connection.close()
 
     database = PigCatcherDatabase(path)
     await database.open()
-    assert await database.schema_version() == 19
+    assert await database.schema_version() == SCHEMA_VERSION
     templates = await database.fetch_all(
         "SELECT display_name, effect_id, effect_params_json FROM food_templates ORDER BY display_name"
     )
@@ -299,6 +347,51 @@ async def test_v19_repairs_legacy_six_ways_effect_and_preserves_v18_rebalance(
     assert active["一猪六吃"] == (
         "next-six-star-cook-bonus",
         '{"bonus_percent":15}',
+        1,
+    )
+    assert active["猪利猪"] == (
+        "next-small-six-star-catch",
+        '{"bonus_percent":1}',
+        1,
+    )
+    assert active["猪籽军舰"] == (
+        "next-food-rarity",
+        '{"multiplier":2.0,"rarity":5}',
+        1,
+    )
+    assert active["猪猪玉子烧"] == (
+        "next-cook-quality",
+        '{"shift_percent":15,"uses":1}',
+        1,
+    )
+    assert active["猪饺"] == (
+        "next-stackable-six-star-cook-bonus",
+        '{"bonus_percent":1,"max_stacks":5}',
+        1,
+    )
+    assert active["黑猪麻汤圆"] == (
+        "next-giant-five-star-catch",
+        '{"five_star_multiplier":3.0,"giant_template_multiplier":4.0,"stature_bias":0.5}',
+        1,
+    )
+    assert active["猪猪白菜炖粉条"] == (
+        "next-collaboration-catch",
+        '{"five_star_percent":30,"four_star_percent":55,"three_star_percent":15}',
+        1,
+    )
+    assert active["猪咪莓蛋糕"] == (
+        "next-extreme-five-star-cook",
+        '{"five_star_percent":85}',
+        1,
+    )
+    assert active["猪果冻"] == (
+        "next-catch-quality",
+        '{"multiplier":3.0,"uses":3}',
+        3,
+    )
+    assert active["猪皮奶"] == (
+        "next-five-six-star-catch",
+        '{"five_star_bonus_percent":20,"six_star_bonus_percent":3}',
         1,
     )
     quota = await database.fetch_one(

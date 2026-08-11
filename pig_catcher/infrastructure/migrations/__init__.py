@@ -20,6 +20,8 @@ from .v0016_alphanumeric_short_codes import MIGRATION_0016
 from .v0017_automatic_regulation import MIGRATION_0017
 from .v0018_food_effect_rebalance import MIGRATION_0018
 from .v0019_six_ways_effect_repair import MIGRATION_0019
+from .v0020_food_effect_expansion import MIGRATION_0020
+from .v0021_pig_cookie_effect_repair import MIGRATION_0021
 
 MIGRATIONS: tuple[Migration, ...] = (
     MIGRATION_0001,
@@ -41,6 +43,8 @@ MIGRATIONS: tuple[Migration, ...] = (
     MIGRATION_0017,
     MIGRATION_0018,
     MIGRATION_0019,
+    MIGRATION_0020,
+    MIGRATION_0021,
 )
 
 __all__ = ["MIGRATIONS", "Migration"]

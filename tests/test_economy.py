@@ -2320,6 +2320,101 @@ async def test_batch_cook_defaults_to_low_rarity_and_keeps_highest(
 
 
 @pytest.mark.asyncio
+async def test_pig_dumpling_stacks_five_layers_and_consumes_together(
+    tmp_path: Path,
+) -> None:
+    database = await _database_with_catalog(
+        tmp_path,
+        pig_rarities=(6,),
+        food_rarities=(4, 5, 6),
+        effect_ids={4: "next-stackable-six-star-cook-bonus"},
+        effect_params={4: {"bonus_percent": 1, "max_stacks": 5}},
+        manifest_version=4,
+    )
+    clock = FixedClock()
+    catching = GameplayService(
+        database,
+        CatchingSection(cooldown_seconds=0),
+        random_source=SequenceRandom(0.0, 0.0, 0.5, 0.5, 0.5, 0.5, 0.5),
+        clock=clock,
+        id_factory=iter(("dumpling-source-pig", "dumpling-catch-ledger")).__next__,
+        short_code_factory=lambda: "DUMPPIG1",
+    )
+    caught = await catching.catch(_identity(message_id="dumpling-catch"))
+    now = iso_timestamp(clock.now())
+    async with database.transaction() as session:
+        for index in range(1, 7):
+            await session.execute(
+                """
+                INSERT INTO food_instances(
+                    food_instance_id, short_code, scope_id, owner_player_id,
+                    template_id, template_version, rarity, display_name_snapshot,
+                    portion_weight, fat_category, official_value, effect_id,
+                    effect_params_json, ruleset_version, random_snapshot_json,
+                    state, acquired_at, updated_at
+                ) VALUES (
+                    ?, ?, ?, ?, 'food-4-common', 1, 4, '4星测试菜',
+                    1.0, 'balanced', 320,
+                    'next-stackable-six-star-cook-bonus',
+                    '{"bonus_percent":1,"max_stacks":5}', 17, '{}',
+                    'active', ?, ?
+                )
+                """,
+                (
+                    f"dumpling-food-{index}",
+                    f"DUMP{index:04d}",
+                    caught.pig.scope_id,
+                    caught.pig.owner_player_id,
+                    now,
+                    now,
+                ),
+            )
+
+    cooking = EconomyService(
+        database,
+        CookingSection(cook_cooldown_seconds=0),
+        EconomySection(),
+        random_source=SequenceRandom(0.0, 0.0, 0.5),
+        clock=clock,
+    )
+    for index in range(1, 6):
+        eaten = await cooking.eat(
+            _identity(message_id=f"dumpling-eat-{index}"),
+            f"4星测试菜#DUMP{index:04d}",
+        )
+        assert eaten.effect.queued_effect_id == "next-stackable-six-star-cook-bonus"
+
+    with pytest.raises(FoodEffectError, match="已经叠加 5 层"):
+        await cooking.eat(
+            _identity(message_id="dumpling-eat-6"),
+            "4星测试菜#DUMP0006",
+        )
+    sixth = await database.fetch_one(
+        "SELECT state FROM food_instances WHERE food_instance_id = 'dumpling-food-6'"
+    )
+    assert sixth is not None and sixth["state"] == "active"
+
+    cooked = await cooking.cook(
+        _identity(message_id="dumpling-six-star-cook"),
+        caught.pig.selector,
+    )
+    assert cooked.weights == pytest.approx((0, 0, 0, 0, 85, 15))
+    assert any("猪饺叠加 5 层" in summary for summary in cooked.effect_summaries)
+    queue = await database.fetch_one(
+        """
+        SELECT COUNT(*) AS entries, SUM(consumed_uses) AS consumed
+        FROM player_food_effects
+        WHERE player_id = ?
+          AND effect_id = 'next-stackable-six-star-cook-bonus'
+        """,
+        (caught.pig.owner_player_id,),
+    )
+    assert queue is not None
+    assert (queue["entries"], queue["consumed"]) == (5, 5)
+    await database.close()
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("effect_id", "advance", "expected_after_advance"),
     [

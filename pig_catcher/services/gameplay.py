@@ -85,6 +85,9 @@ _FAT_LABELS = {
     "balanced": "均衡",
     "fatty": "偏肥",
 }
+_CATCH_PROBABILITY_ITEM_IDS = frozenset(
+    {"lucky-whistle", "super-lucky-whistle", "star-pig-radar"}
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -849,7 +852,7 @@ class GameplayService:
                 player_id=identity.player_id,
                 action_type="catching",
             )
-            armed_item, armed_quantity = self._armed_item(armed_row, "catching")
+            armed_item, _ = self._armed_item(armed_row, "catching")
             # 六星菜独占效果：回到未受等级、饲料、道具和普通菜影响的基础层。
             exclusive_effect_active = has_compatible_exclusive_catch_effect(
                 active_effects,
@@ -865,6 +868,27 @@ class GameplayService:
             )
             effect_application = apply_catch_effects(weights, active_effects)
             weights = effect_application.weights
+            excluded_summaries = effect_application.skipped_summaries
+            candidate_buckets = buckets
+            if effect_application.collaboration_only:
+                collaboration_templates = [
+                    template
+                    for template in templates
+                    if str(template.get("collection_id") or "").strip()
+                ]
+                candidate_buckets = self._template_buckets(collaboration_templates)
+                available = tuple(
+                    weight if candidate_buckets[rarity] else 0.0
+                    for rarity, weight in zip(Rarity, weights, strict=True)
+                )
+                if not any(available):
+                    raise NoDrawableTemplateError("当前群没有可用联动猪，效果已保留且本次抓猪未结算。")
+                weights = normalize_weights(available)
+                if armed_item is not None and armed_item.item_id in _CATCH_PROBABILITY_ITEM_IDS:
+                    excluded_summaries += (
+                        f"已装备的“{armed_item.display_name}”不改变联动猪固定品质分布，本次保留未消耗。",
+                    )
+                    armed_item = None
             consumed_effect_ids = {
                 effect.effect_entry_id: effect.effect_id for effect in active_effects
             }
@@ -903,9 +927,17 @@ class GameplayService:
             settled_daily_count = daily_count + (0 if quota_exempt_catch else 1)
             rarity_roll = self.random_source.random()
             rarity = choose_rarity(weights, rarity_roll)
-            candidates = buckets[rarity]
+            candidates = candidate_buckets[rarity]
             template_roll = self.random_source.random()
-            template = candidates[min(int(template_roll * len(candidates)), len(candidates) - 1)]
+            template = self._select_template(
+                candidates,
+                template_roll,
+                giant_template_multiplier=(
+                    effect_application.giant_template_multiplier
+                    if rarity is Rarity.FIVE
+                    else 1.0
+                ),
+            )
             attribute_rolls = tuple(self.random_source.random() for _ in range(5))
             attributes = generate_pig_attributes(
                 rarity=rarity,
@@ -933,6 +965,8 @@ class GameplayService:
                 "food_effect_entry_ids": list(effect_application.consumed_entry_ids),
                 "food_effect_summaries": list(effect_application.summaries),
                 "stature_bias": effect_application.stature_bias,
+                "collaboration_only": effect_application.collaboration_only,
+                "giant_template_multiplier": effect_application.giant_template_multiplier,
                 "extra_catch_granted": extra_granted,
                 "extra_catch_used": using_extra_catch,
                 "permanent_window_bonus": permanent_bonus,
@@ -1108,7 +1142,7 @@ class GameplayService:
                 "item_name": armed_item.display_name if armed_item is not None else "",
                 "weights": [round(value, 8) for value in weights],
                 "effect_summaries": list(effect_application.summaries),
-                "excluded_summaries": list(effect_application.skipped_summaries),
+                "excluded_summaries": list(excluded_summaries),
                 "exclusive_effect_active": exclusive_effect_active,
                 "quota_exempt_catch": quota_exempt_catch,
             }
@@ -1145,7 +1179,7 @@ class GameplayService:
                 item_name=armed_item.display_name if armed_item is not None else "",
                 weights=weights,
                 effect_summaries=effect_application.summaries,
-                excluded_summaries=effect_application.skipped_summaries,
+                excluded_summaries=excluded_summaries,
                 exclusive_effect_active=exclusive_effect_active,
                 quota_exempt_catch=quota_exempt_catch,
                 global_size_record=global_size_record,
@@ -1190,7 +1224,7 @@ class GameplayService:
                 item_name=armed_item.display_name if armed_item is not None else "",
                 weights=weights,
                 effect_summaries=effect_application.summaries,
-                excluded_summaries=effect_application.skipped_summaries,
+                excluded_summaries=excluded_summaries,
                 exclusive_effect_active=exclusive_effect_active,
                 quota_exempt_catch=quota_exempt_catch,
                 global_size_record=global_size_record,
@@ -1869,6 +1903,37 @@ class GameplayService:
                 raise DomainValidationError("素材库中存在无效猪猪品质。") from exc
             buckets[rarity].append(template)
         return buckets
+
+    @staticmethod
+    def _select_template(
+        candidates: Sequence[Mapping[str, object]],
+        roll: float,
+        *,
+        giant_template_multiplier: float = 1.0,
+    ) -> Mapping[str, object]:
+        """Select one template, optionally weighting giant-profile candidates."""
+
+        if not candidates:
+            raise NoDrawableTemplateError("所选品质没有可用猪猪素材。")
+        normalized_roll = float(roll)
+        if not 0.0 <= normalized_roll < 1.0:
+            raise DomainValidationError("模板随机落点必须位于 [0, 1)。")
+        multiplier = max(1.0, float(giant_template_multiplier))
+        if multiplier == 1.0:
+            return candidates[min(int(normalized_roll * len(candidates)), len(candidates) - 1)]
+        candidate_weights = [
+            multiplier
+            if str(candidate.get("stature_profile") or "") == StatureProfile.GIANT.value
+            else 1.0
+            for candidate in candidates
+        ]
+        target = normalized_roll * sum(candidate_weights)
+        cumulative = 0.0
+        for candidate, weight in zip(candidates, candidate_weights, strict=True):
+            cumulative += weight
+            if target < cumulative:
+                return candidate
+        return candidates[-1]
 
     def _available_weights(
         self,

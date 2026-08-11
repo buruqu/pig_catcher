@@ -1133,3 +1133,33 @@
 - 最终门禁：pytest `240 passed`；Ruff、Python `compileall`、`uv lock --check` 与
   `git diff --check` 全部通过。未代替玩家在真实群发送测试命令，避免消耗其抓猪次数；可由
   玩家直接重试原 `/抓猪` 消息完成真实群观察。
+
+## 48. v1.14.0 四至六星菜效果更新验收
+
+- 验收日期：`2026-08-11`。Ruleset 17 重做 9 道公共四/五星菜，覆盖固定六星百分点、
+  五星做菜倍率、五层猪饺、巨物五星复合偏向、联动猪固定池、非六星原料五星菜 85% 下限、
+  猪果冻三次 `×3` 与猪皮奶五星/六星固定百分点。23 道四至六星菜的当前效果与叠加边界
+  已完整写入公告。
+- Schema 20 更新正式模板、可用/锁定菜品和未消费效果。开发目录由运行中 MaiBot 监视，
+  因此该迁移在人工发布备份前已被热加载自动执行；最近一份迁移前自动备份
+  `data/plugins/local.pig-catcher/backups/pig-catcher-20260810T144808070416Z.sqlite3`
+  已验证为 Schema 19、`quick_check=ok`、外键异常 0。发现生产“猪利猪”仍保留早期参数后，
+  新增 Schema 21 可重复收敛迁移，并将模板和 45 份可用实例全部修正为六星 `+1` 个百分点。
+- 生产目录完成受控 Manifest 4 导入：活动目录哈希
+  `e43e01b437ba166ee0be0f79c4dc7893830625e627fd251d9b8517a3e412dcf1`，模板 215 项。
+  最终数据库为 Schema 21、`quick_check=ok`、外键异常 0；本轮 9 个模板不匹配 0，
+  356 份可用/锁定实例不匹配 0，9 条未消费效果不匹配 0。
+- 最终在线备份为
+  `data/plugins/local.pig-catcher/backups/pig_catcher-post-v1.14.0-final-20260811-104131-138781.sqlite3`，
+  已验证 Schema 21、`quick_check=ok`、外键异常 0，活动目录哈希与生产一致。迁移收敛前后另
+  保留 Schema 20 与 Schema 21 阶段备份，便于精确回滚。
+- 两个 QQ 官方群公告均由控制面板一次性发送并成功审计：
+  `qq-official:5E5854406D0297D6FEAE696A13E3A339` 的公告 ID 为
+  `bbe17fd3b8a344b9b89c0fbd3bb70cf8`；
+  `qq-official:9EA2810F378FBD7DC3219C56CEAB3520` 的公告 ID 为
+  `6bc07d28bcde4ddfb0182567b8c1278f`。两组均有
+  `announcement-send-claimed → announcement-send-succeeded`，未自动重试。
+- 最终门禁：pytest `245 passed`；Ruff、Python `compileall`、`uv lock --check`、
+  严格 215 项素材构建/导入、版本元数据和 `git diff --check` 全部通过。专项回归覆盖五层
+  猪饺一次消费、第六层拒绝保留、联动固定分布与概率道具保留、巨物模板加权、五星菜
+  85% 下限、Schema 20 全量迁移和 Schema 21 中间态收敛。
