@@ -1797,6 +1797,8 @@
         "coin_per_player": 1004,
         "dedicated_catches": 0,
         "five_star_multiplier": 1.004,
+        "personal_six_star_cook_percent": 60,
+        "personal_six_star_cook_uses": 2,
         "six_star_multiplier": 1.004,
         "source_label": "猪鼻蛋包饭"
       }
@@ -1857,6 +1859,8 @@
         "coin_per_player": 1004,
         "dedicated_catches": 0,
         "five_star_multiplier": 1.004,
+        "personal_six_star_cook_percent": 60,
+        "personal_six_star_cook_uses": 2,
         "six_star_multiplier": 1.004,
         "source_label": "猪鼻蛋包饭"
       }
@@ -2352,7 +2356,8 @@
         "uses": 10,
         "four_star_percent": 60,
         "five_star_percent": 30,
-        "six_star_percent": 10
+        "six_star_percent": 10,
+        "last_use_six_star_percent": 50
       }
     },
     {
@@ -2423,7 +2428,8 @@
         "uses": 10,
         "four_star_percent": 60,
         "five_star_percent": 30,
-        "six_star_percent": 10
+        "six_star_percent": 10,
+        "last_use_six_star_percent": 50
       }
     },
     {
@@ -2823,7 +2829,8 @@
       "group_scope_id": "qq:1092931381",
       "effect_id": "even-catch-distribution",
       "effect_params": {
-        "uses": 10
+        "uses": 10,
+        "last_use_six_star_percent": 50
       }
     },
     {
@@ -2842,7 +2849,8 @@
       "group_scope_id": "qq:237716658",
       "effect_id": "even-catch-distribution",
       "effect_params": {
-        "uses": 10
+        "uses": 10,
+        "last_use_six_star_percent": 50
       }
     },
     {
@@ -3021,6 +3029,9 @@
         "five_star_multiplier": 1.007,
         "group_coin": 1007,
         "group_dedicated_catches": 10,
+        "hidden_boost_chance_percent": 10,
+        "hidden_five_star_multiplier": 10.04,
+        "hidden_six_star_multiplier": 10.04,
         "six_star_multiplier": 1.007
       }
     },
@@ -3043,6 +3054,9 @@
         "five_star_multiplier": 1.007,
         "group_coin": 1007,
         "group_dedicated_catches": 10,
+        "hidden_boost_chance_percent": 10,
+        "hidden_five_star_multiplier": 10.04,
+        "hidden_six_star_multiplier": 10.04,
         "six_star_multiplier": 1.007
       }
     },
@@ -3081,6 +3095,9 @@
         "five_star_multiplier": 1.007,
         "group_coin": 1007,
         "group_dedicated_catches": 10,
+        "hidden_boost_chance_percent": 10,
+        "hidden_five_star_multiplier": 10.04,
+        "hidden_six_star_multiplier": 10.04,
         "six_star_multiplier": 1.007
       }
     },
@@ -3119,6 +3136,9 @@
         "five_star_multiplier": 1.007,
         "group_coin": 1007,
         "group_dedicated_catches": 10,
+        "hidden_boost_chance_percent": 10,
+        "hidden_five_star_multiplier": 10.04,
+        "hidden_six_star_multiplier": 10.04,
         "six_star_multiplier": 1.007
       }
     },
@@ -3276,6 +3296,8 @@
         "coin_per_player": 1004,
         "dedicated_catches": 0,
         "five_star_multiplier": 1.004,
+        "personal_six_star_cook_percent": 60,
+        "personal_six_star_cook_uses": 2,
         "six_star_multiplier": 1.004,
         "source_label": "猪鼻蛋包饭"
       }
@@ -3318,7 +3340,8 @@
         "uses": 10,
         "four_star_percent": 60,
         "five_star_percent": 30,
-        "six_star_percent": 10
+        "six_star_percent": 10,
+        "last_use_six_star_percent": 50
       }
     },
     {
@@ -3374,7 +3397,8 @@
       "group_scope_id": "qq-official:5E5854406D0297D6FEAE696A13E3A339",
       "effect_id": "even-catch-distribution",
       "effect_params": {
-        "uses": 10
+        "uses": 10,
+        "last_use_six_star_percent": 50
       }
     },
     {
@@ -3531,6 +3555,8 @@
         "coin_per_player": 1004,
         "dedicated_catches": 0,
         "five_star_multiplier": 1.004,
+        "personal_six_star_cook_percent": 60,
+        "personal_six_star_cook_uses": 2,
         "six_star_multiplier": 1.004,
         "source_label": "猪鼻蛋包饭"
       }
@@ -3573,7 +3599,8 @@
         "uses": 10,
         "four_star_percent": 60,
         "five_star_percent": 30,
-        "six_star_percent": 10
+        "six_star_percent": 10,
+        "last_use_six_star_percent": 50
       }
     },
     {
@@ -3629,7 +3656,8 @@
       "group_scope_id": "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
       "effect_id": "even-catch-distribution",
       "effect_params": {
-        "uses": 10
+        "uses": 10,
+        "last_use_six_star_percent": 50
       }
     },
     {

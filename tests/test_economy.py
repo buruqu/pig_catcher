@@ -2443,6 +2443,105 @@ async def test_cloud_sea_pot_eat_rewards_scope_and_creates_one_day_group_effect(
 
 
 @pytest.mark.asyncio
+async def test_pig_nose_omelette_keeps_group_rewards_and_restores_two_cooks(
+    tmp_path: Path,
+) -> None:
+    params = {
+        "coin_per_player": 1004,
+        "dedicated_catches": 0,
+        "five_star_multiplier": 1.004,
+        "personal_six_star_cook_percent": 60,
+        "personal_six_star_cook_uses": 2,
+        "six_star_multiplier": 1.004,
+        "source_label": "猪鼻蛋包饭",
+    }
+    database = await _database_with_catalog(
+        tmp_path,
+        pig_rarities=(6,),
+        food_rarities=(6,),
+        effect_ids={6: "group-window-high-star-boost"},
+        effect_params={6: params},
+        manifest_version=4,
+    )
+    clock = FixedClock()
+    eater = _identity(user_id="200", message_id="omelette-source")
+    other = _identity(user_id="300", message_id="omelette-other")
+    now = iso_timestamp(clock.now())
+    async with database.transaction() as session:
+        await FrameworkRepository().touch_identity(session, identity=other, now=now)
+    catching = GameplayService(
+        database,
+        CatchingSection(cooldown_seconds=0),
+        random_source=SequenceRandom(0.0, 0.0, 0.5, 0.5, 0.5, 0.5, 0.5),
+        clock=clock,
+        id_factory=iter(("omelette-source-pig", "omelette-source-ledger")).__next__,
+        short_code_factory=lambda: "OMELEPIG",
+    )
+    source = await catching.catch(eater)
+    economy = EconomyService(
+        database,
+        CookingSection(cook_cooldown_seconds=0),
+        EconomySection(),
+        random_source=SequenceRandom(0.999, 0.0, 0.5),
+        clock=clock,
+        id_factory=iter(
+            (
+                "omelette-food",
+                "omelette-cook-ledger",
+                "omelette-group-effect",
+                "omelette-personal-effect",
+                "omelette-eater-ledger",
+                "omelette-other-ledger",
+            )
+        ).__next__,
+        short_code_factory=lambda: "OMELEFOD",
+    )
+    cooked = await economy.cook(
+        _identity(user_id="200", message_id="omelette-cook"),
+        source.pig.selector,
+    )
+    eaten = await economy.eat(
+        _identity(user_id="200", message_id="omelette-eat"),
+        cooked.foods[0].selector,
+    )
+    assert eaten.effect.queued_effect_id == "group-window-high-star-boost"
+    assert eaten.effect.coin_bonus == 1004
+    assert "连续 2 次" in eaten.effect.summary
+    personal = await database.fetch_one(
+        """
+        SELECT effect_id, params_json, granted_uses, consumed_uses
+        FROM player_food_effects
+        WHERE effect_entry_id = 'omelette-personal-effect'
+        """
+    )
+    assert personal is not None
+    assert tuple(personal) == (
+        "next-six-star-cook",
+        '{"six_star_percent":60.0,"uses":2}',
+        2,
+        0,
+    )
+    group_effect = await database.fetch_one(
+        """
+        SELECT effect_id, params_json, granted_uses_per_player
+        FROM group_food_effects
+        WHERE group_effect_entry_id = 'omelette-group-effect'
+        """
+    )
+    assert group_effect is not None
+    assert group_effect["effect_id"] == "group-window-high-star-boost"
+    assert group_effect["granted_uses_per_player"] == 0
+    assert json.loads(str(group_effect["params_json"])) == params
+    balances = await database.fetch_all(
+        "SELECT platform_user_id, coin_balance FROM players ORDER BY platform_user_id"
+    )
+    assert {str(row["platform_user_id"]): int(row["coin_balance"]) for row in balances}[
+        "300"
+    ] == 1004
+    await database.close()
+
+
+@pytest.mark.asyncio
 async def test_pig_dumpling_stacks_five_layers_and_consumes_together(
     tmp_path: Path,
 ) -> None:

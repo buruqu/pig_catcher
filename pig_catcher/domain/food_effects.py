@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from .enums import Rarity
 from .errors import FoodEffectError
@@ -210,6 +210,8 @@ class GroupCatchEffectApplication:
     summaries: tuple[str, ...]
     skipped_summaries: tuple[str, ...]
     exclusive: bool
+    hidden_boost_roll: float | None = None
+    hidden_boost_triggered: bool = False
 
 
 def active_effect_from_row(row: Mapping[str, object]) -> ActiveFoodEffect:
@@ -474,6 +476,43 @@ def resolve_food_effect(
         six_multiplier = _number(raw, "six_star_multiplier", lower=1.001, upper=4.0)
         coin_per_player = _integer(raw, "coin_per_player", lower=0, upper=1_000_000)
         dedicated_catches = _integer(raw, "dedicated_catches", lower=0, upper=20)
+        personal_cook_uses = (
+            _integer(raw, "personal_six_star_cook_uses", lower=0, upper=10)
+            if "personal_six_star_cook_uses" in raw
+            else 0
+        )
+        personal_cook_percent = 0.0
+        if personal_cook_uses:
+            personal_cook_percent = _number(
+                raw,
+                "personal_six_star_cook_percent",
+                lower=11.0,
+                upper=60.0,
+            )
+        elif "personal_six_star_cook_percent" in raw:
+            raise FoodEffectError(
+                "个人六星做菜概率存在时，personal_six_star_cook_uses 必须大于 0。"
+            )
+        hidden_chance = (
+            _number(raw, "hidden_boost_chance_percent", lower=0.1, upper=100.0)
+            if "hidden_boost_chance_percent" in raw
+            else 0.0
+        )
+        hidden_five_multiplier = 1.0
+        hidden_six_multiplier = 1.0
+        if hidden_chance:
+            hidden_five_multiplier = _number(
+                raw,
+                "hidden_five_star_multiplier",
+                lower=five_multiplier,
+                upper=20.0,
+            )
+            hidden_six_multiplier = _number(
+                raw,
+                "hidden_six_star_multiplier",
+                lower=six_multiplier,
+                upper=20.0,
+            )
         source_label = str(raw.get("source_label") or "六星菜").strip()
         if not source_label or len(source_label) > 64:
             raise FoodEffectError("群体美食效果的 source_label 必须是 1 至 64 个字符。")
@@ -482,20 +521,48 @@ def resolve_food_effect(
             if dedicated_catches
             else ""
         )
+        params: dict[str, object] = {
+            "five_star_multiplier": five_multiplier,
+            "six_star_multiplier": six_multiplier,
+            "coin_per_player": coin_per_player,
+            "dedicated_catches": dedicated_catches,
+            "source_label": source_label,
+        }
+        personal_text = ""
+        if personal_cook_uses:
+            params.update(
+                {
+                    "personal_six_star_cook_uses": personal_cook_uses,
+                    "personal_six_star_cook_percent": personal_cook_percent,
+                }
+            )
+            personal_text = (
+                f"；食用者还获得连续 {personal_cook_uses} 次六星猪做菜机会，"
+                f"每次六星菜概率为 {personal_cook_percent:g}%"
+            )
+        hidden_text = ""
+        if hidden_chance:
+            params.update(
+                {
+                    "hidden_boost_chance_percent": hidden_chance,
+                    "hidden_five_star_multiplier": hidden_five_multiplier,
+                    "hidden_six_star_multiplier": hidden_six_multiplier,
+                }
+            )
+            hidden_text = (
+                f"；每次专属抓猪有 {hidden_chance:g}% 概率触发隐藏爆发，"
+                f"令本次 5 星与 6 星相对权重改为 ×{hidden_five_multiplier:g} "
+                f"和 ×{hidden_six_multiplier:g}"
+            )
         return FoodEffectGrant(
             normalized_id,
-            {
-                "five_star_multiplier": five_multiplier,
-                "six_star_multiplier": six_multiplier,
-                "coin_per_player": coin_per_player,
-                "dedicated_catches": dedicated_catches,
-                "source_label": source_label,
-            },
+            params,
             max(1, dedicated_catches),
             (
                 f"本群已登记玩家各获得 {coin_per_player} 猪币{quota_text}；"
                 f"到次日同一抓猪时段刷新前，5 星与 6 星相对权重分别 ×{five_multiplier:g} "
-                f"和 ×{six_multiplier:g}，可与道具和非六星菜叠加。"
+                f"和 ×{six_multiplier:g}，可与道具和非六星菜叠加"
+                f"{personal_text}{hidden_text}。"
             ),
         )
     if normalized_id == NEXT_PIG_STATURE:
@@ -570,18 +637,38 @@ def resolve_food_effect(
         total = four + five + six
         if total < 99.5 or total > 100.5:
             raise FoodEffectError("高星抓猪效果的三档概率合计必须等于 100%。")
+        last_six = (
+            _number(raw, "last_use_six_star_percent", lower=0.0, upper=100.0)
+            if "last_use_six_star_percent" in raw
+            else 0.0
+        )
+        last_four = 0.0
+        if last_six:
+            last_four = 100.0 - five - last_six
+            if last_four < 0.0:
+                raise FoodEffectError("高星抓猪小保底的五星与六星概率合计不能超过 100%。")
+            if last_six <= six:
+                raise FoodEffectError("高星抓猪小保底的六星概率必须高于普通次数。")
+        params: dict[str, object] = {
+            "uses": uses,
+            "four_star_percent": round(four, 4),
+            "five_star_percent": round(five, 4),
+            "six_star_percent": round(six, 4),
+        }
+        pity_text = ""
+        if last_six:
+            params["last_use_six_star_percent"] = round(last_six, 4)
+            pity_text = (
+                f"；最后一次小保底为 4 星 {last_four:g}%、5 星 {five:g}%、"
+                f"6 星 {last_six:g}%"
+            )
         return FoodEffectGrant(
             normalized_id,
-            {
-                "uses": uses,
-                "four_star_percent": round(four, 4),
-                "five_star_percent": round(five, 4),
-                "six_star_percent": round(six, 4),
-            },
+            params,
             uses,
             (
                 f"接下来 {uses} 次专属抓猪必定获得高星猪：4 星 {four:g}%、"
-                f"5 星 {five:g}%、6 星 {six:g}%；不消耗正常时段额度。"
+                f"5 星 {five:g}%、6 星 {six:g}%{pity_text}；不消耗正常时段额度。"
             ),
         )
     if normalized_id == NEXT_FIVE_STAR_COOK:
@@ -605,11 +692,26 @@ def resolve_food_effect(
         )
     if normalized_id == EVEN_CATCH_DISTRIBUTION:
         uses = _integer(raw, "uses", lower=1, upper=10)
+        last_six = (
+            _number(raw, "last_use_six_star_percent", lower=0.0, upper=100.0)
+            if "last_use_six_star_percent" in raw
+            else 0.0
+        )
+        if last_six and last_six <= 100.0 / 6.0:
+            raise FoodEffectError("轮盘小保底的六星概率必须高于普通轮盘概率。")
+        params: dict[str, object] = {"uses": uses}
+        pity_text = ""
+        if last_six:
+            params["last_use_six_star_percent"] = round(last_six, 4)
+            pity_text = f"；最后一次小保底将六星概率提升为 {last_six:g}%"
         return FoodEffectGrant(
             normalized_id,
-            {"uses": uses},
+            params,
             uses,
-            f"接下来 {uses} 次专属抓猪，所有品质概率完全相同；不消耗正常时段额度。",
+            (
+                f"接下来 {uses} 次专属抓猪，所有品质概率完全相同{pity_text}；"
+                "不消耗正常时段额度。"
+            ),
         )
     if normalized_id == QUOTA_RESET_CHANCE:
         count = _integer(raw, "count", lower=1, upper=3)
@@ -637,8 +739,34 @@ def resolve_food_effect(
             lower=0,
             upper=1_000_000,
         ) if "group_coin" in raw else 0
+        hidden_chance = (
+            _number(raw, "hidden_boost_chance_percent", lower=0.1, upper=100.0)
+            if "hidden_boost_chance_percent" in raw
+            else 0.0
+        )
+        hidden_five_multiplier = 1.0
+        hidden_six_multiplier = 1.0
+        if hidden_chance:
+            hidden_five_multiplier = _number(
+                raw,
+                "hidden_five_star_multiplier",
+                lower=five_multiplier,
+                upper=20.0,
+            )
+            hidden_six_multiplier = _number(
+                raw,
+                "hidden_six_star_multiplier",
+                lower=six_multiplier,
+                upper=20.0,
+            )
         params: dict[str, object] = {"count": count}
-        if dedicated_catches or group_coin or five_multiplier > 1.0 or six_multiplier > 1.0:
+        if (
+            dedicated_catches
+            or group_coin
+            or five_multiplier > 1.0
+            or six_multiplier > 1.0
+            or hidden_chance
+        ):
             params.update(
                 {
                     "group_dedicated_catches": dedicated_catches,
@@ -647,6 +775,19 @@ def resolve_food_effect(
                     "group_coin": group_coin,
                 }
             )
+            hidden_text = ""
+            if hidden_chance:
+                params.update(
+                    {
+                        "hidden_boost_chance_percent": hidden_chance,
+                        "hidden_five_star_multiplier": hidden_five_multiplier,
+                        "hidden_six_star_multiplier": hidden_six_multiplier,
+                    }
+                )
+                hidden_text = (
+                    f"；每次专属抓猪有 {hidden_chance:g}% 概率令本次 5 星/6 星"
+                    f"相对权重爆发为 ×{hidden_five_multiplier:g}/×{hidden_six_multiplier:g}"
+                )
             return FoodEffectGrant(
                 normalized_id,
                 params,
@@ -654,7 +795,8 @@ def resolve_food_effect(
                 (
                     f"获得 {count} 次 /重置额度 机会；每次重置会让本群已登记玩家各获得 "
                     f"{group_coin} 猪币和 {dedicated_catches} 次专属抓猪额度，并在次日同一时段"
-                    f"刷新前令 5 星与 6 星相对权重分别 ×{five_multiplier:g} 和 ×{six_multiplier:g}。"
+                    f"刷新前令 5 星与 6 星相对权重分别 ×{five_multiplier:g} 和 ×{six_multiplier:g}"
+                    f"{hidden_text}。"
                 ),
             )
         return FoodEffectGrant(
@@ -838,6 +980,7 @@ def apply_catch_effects(
     skipped.extend(exclusive_skipped)
     if exclusive is not None:
         grant = resolve_food_effect(exclusive.effect_id, exclusive.params)
+        exclusive_summary = grant.summary
         if exclusive.effect_id == NEXT_SIX_STAR_CATCH:
             target = float(grant.params["six_star_percent"])
             lower_total = sum(adjusted[:5])
@@ -848,12 +991,36 @@ def apply_catch_effects(
             four = float(grant.params["four_star_percent"])
             five = float(grant.params["five_star_percent"])
             six = float(grant.params["six_star_percent"])
+            remaining = exclusive.granted_uses - exclusive.consumed_uses
+            last_six = float(grant.params.get("last_use_six_star_percent") or 0.0)
+            if remaining == 1 and last_six > 0.0:
+                six = last_six
+                four = 100.0 - five - six
+                exclusive_summary += (
+                    f" 小保底触发：这是最后一次专属抓猪，六星概率提升为 {six:g}%。"
+                )
             if adjusted[5] <= 0 and six > 0:
                 five += six
                 six = 0.0
             adjusted = [0.0, 0.0, 0.0, four, five, six]
         elif exclusive.effect_id == EVEN_CATCH_DISTRIBUTION:
-            adjusted = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0] if adjusted[5] > 0 else [1.0, 1.0, 1.0, 1.0, 2.0, 0.0]
+            remaining = exclusive.granted_uses - exclusive.consumed_uses
+            last_six = float(grant.params.get("last_use_six_star_percent") or 0.0)
+            if remaining == 1 and last_six > 0.0:
+                other = (100.0 - last_six) / 5.0
+                adjusted = [other, other, other, other, other, last_six]
+                exclusive_summary += (
+                    f" 小保底触发：这是最后一次专属抓猪，六星概率提升为 {last_six:g}%。"
+                )
+                if adjusted[5] > 0 and weights[5] <= 0:
+                    adjusted[4] += adjusted[5]
+                    adjusted[5] = 0.0
+            else:
+                adjusted = (
+                    [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+                    if adjusted[5] > 0
+                    else [1.0, 1.0, 1.0, 1.0, 2.0, 0.0]
+                )
         elif exclusive.effect_id == EXCLUSIVE_CATCH_QUALITY:
             multiplier = float(grant.params["multiplier"])
             adjusted = list(
@@ -863,7 +1030,7 @@ def apply_catch_effects(
                 )
             )
         consumed.append(exclusive.effect_entry_id)
-        summaries.append(grant.summary)
+        summaries.append(exclusive_summary)
         already_reported = {
             exclusive.effect_entry_id,
             *(effect.effect_entry_id for effect in effects if effect.effect_id in EXCLUSIVE_CATCH_EFFECTS),
@@ -1104,6 +1271,75 @@ def apply_group_catch_effects(
         summaries=(summary,),
         skipped_summaries=skipped,
         exclusive=False,
+    )
+
+
+def group_hidden_boost_chance(
+    application: GroupCatchEffectApplication,
+    effects: Sequence[ActiveGroupFoodEffect],
+) -> float:
+    """Return the hidden-proc chance for the selected dedicated group quota."""
+
+    if not application.dedicated_entry_id or application.exclusive:
+        return 0.0
+    for effect in effects:
+        if effect.group_effect_entry_id != application.dedicated_entry_id:
+            continue
+        grant = resolve_food_effect(effect.effect_id, effect.params)
+        return float(grant.params.get("hidden_boost_chance_percent") or 0.0)
+    return 0.0
+
+
+def apply_group_hidden_boost(
+    application: GroupCatchEffectApplication,
+    effects: Sequence[ActiveGroupFoodEffect],
+    *,
+    roll: float,
+) -> GroupCatchEffectApplication:
+    """Resolve one per-catch hidden multiplier without changing quota selection."""
+
+    chance = group_hidden_boost_chance(application, effects)
+    if chance <= 0.0:
+        return application
+    numeric_roll = float(roll)
+    if numeric_roll < 0.0 or numeric_roll >= 1.0:
+        raise FoodEffectError("隐藏效果随机值必须位于 [0, 1) 区间。")
+    if numeric_roll >= chance / 100.0:
+        return replace(application, hidden_boost_roll=numeric_roll)
+
+    chosen = next(
+        effect
+        for effect in effects
+        if effect.group_effect_entry_id == application.dedicated_entry_id
+    )
+    grant = resolve_food_effect(chosen.effect_id, chosen.params)
+    base_five = float(grant.params["five_star_multiplier"])
+    base_six = float(grant.params["six_star_multiplier"])
+    hidden_five = float(grant.params["hidden_five_star_multiplier"])
+    hidden_six = float(grant.params["hidden_six_star_multiplier"])
+    boosted_weights = apply_monotonic_high_rarity_multipliers(
+        application.weights,
+        (
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            hidden_five / base_five,
+            hidden_six / base_six,
+        ),
+    )
+    source_label = str(grant.params["source_label"])
+    hidden_summary = (
+        f"🔥 {source_label}隐藏效果爆发（发动群友 ID：{chosen.source_user_id}）："
+        f"本次专属抓猪的 5 星与 6 星相对权重由 ×{base_five:g}/×{base_six:g} "
+        f"改为 ×{hidden_five:g}/×{hidden_six:g}！"
+    )
+    return replace(
+        application,
+        weights=boosted_weights,
+        summaries=application.summaries + (hidden_summary,),
+        hidden_boost_roll=numeric_roll,
+        hidden_boost_triggered=True,
     )
 
 

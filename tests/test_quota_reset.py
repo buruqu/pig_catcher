@@ -137,12 +137,17 @@ async def test_sugar_ribs_reset_grants_atomic_group_rewards_and_dedicated_catche
         "five_star_multiplier": 1.007,
         "group_coin": 1007,
         "group_dedicated_catches": 10,
+        "hidden_boost_chance_percent": 10,
+        "hidden_five_star_multiplier": 10.04,
+        "hidden_six_star_multiplier": 10.04,
         "six_star_multiplier": 1.007,
     }
     database = await _database_with_catalog(
         tmp_path,
         [
             _pig_entry("one-pig", rarity=1),
+            _pig_entry("five-pig", rarity=5),
+            _pig_entry("six-pig", rarity=6, group_id="100"),
             _food_entry(
                 "sugar-ribs-food",
                 effect_id="quota-reset",
@@ -170,7 +175,7 @@ async def test_sugar_ribs_reset_grants_atomic_group_rewards_and_dedicated_catche
             ) VALUES (
                 'sugar-ribs-source', 'SUGARRIB', ?, ?, 'sugar-ribs-food', 1,
                 6, '糖醋排骨', 1.0, 'balanced', 25000, 'quota-reset',
-                '{"count":1,"five_star_multiplier":1.007,"group_coin":1007,"group_dedicated_catches":10,"six_star_multiplier":1.007}',
+                '{"count":1,"five_star_multiplier":1.007,"group_coin":1007,"group_dedicated_catches":10,"hidden_boost_chance_percent":10,"hidden_five_star_multiplier":10.04,"hidden_six_star_multiplier":10.04,"six_star_multiplier":1.007}',
                 18, '{}', 'consumed', ?, ?, ?
             )
             """,
@@ -184,7 +189,7 @@ async def test_sugar_ribs_reset_grants_atomic_group_rewards_and_dedicated_catche
                 created_at, updated_at
             ) VALUES (
                 'sugar-reset-chance', ?, 'sugar-ribs-source', 'quota-reset',
-                '{"count":1,"five_star_multiplier":1.007,"group_coin":1007,"group_dedicated_catches":10,"six_star_multiplier":1.007}',
+                '{"count":1,"five_star_multiplier":1.007,"group_coin":1007,"group_dedicated_catches":10,"hidden_boost_chance_percent":10,"hidden_five_star_multiplier":10.04,"hidden_six_star_multiplier":10.04,"six_star_multiplier":1.007}',
                 1, 0, ?, ?
             )
             """,
@@ -217,6 +222,9 @@ async def test_sugar_ribs_reset_grants_atomic_group_rewards_and_dedicated_catche
     assert result.group_rewarded_players == 2
     assert result.group_coin_reward == 1007
     assert result.group_dedicated_catches == 10
+    assert result.hidden_boost_chance_percent == pytest.approx(10)
+    assert result.hidden_five_star_multiplier == pytest.approx(10.04)
+    assert result.hidden_six_star_multiplier == pytest.approx(10.04)
     assert result.group_effect_expires_at == "2026-08-12T04:00:00.000Z"
     assert duplicate.receipt_created is False
     balances = await database.fetch_all(
@@ -246,7 +254,7 @@ async def test_sugar_ribs_reset_grants_atomic_group_rewards_and_dedicated_catche
     gameplay = GameplayService(
         database,
         CatchingSection(cooldown_seconds=0, daily_limit=1),
-        random_source=SequenceRandom(*_catch_rolls(), *_catch_rolls()),
+        random_source=SequenceRandom(0.05, *_catch_rolls(), *_catch_rolls()),
         clock=clock,
         id_factory=iter(
             (
@@ -267,6 +275,9 @@ async def test_sugar_ribs_reset_grants_atomic_group_rewards_and_dedicated_catche
         "发动群友 ID：1455722694" in summary
         for summary in caught.effect_summaries
     )
+    assert any("隐藏效果爆发" in summary for summary in caught.effect_summaries)
+    assert caught.weights[4] > 4.0
+    assert caught.weights[5] > 1.0
     usage = await database.fetch_one(
         "SELECT consumed_uses FROM group_food_effect_usage "
         "WHERE group_effect_entry_id = 'sugar-group-effect' AND player_id = ?",

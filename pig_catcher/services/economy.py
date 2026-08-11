@@ -52,6 +52,7 @@ from ..domain.food_effects import (
     GROUP_EFFECT_IDS,
     GROUP_NEXT_EXCLUSIVE_HIGH_STAR_CATCH,
     GROUP_WINDOW_HIGH_STAR_BOOST,
+    NEXT_SIX_STAR_COOK,
     NEXT_STACKABLE_SIX_STAR_COOK_BONUS,
     PERMANENT_WINDOW_CATCH,
     TODAY_WINDOW_CATCHES,
@@ -1598,6 +1599,7 @@ class EconomyService:
                 now=now,
             )
             effect_entry_id = ""
+            personal_effect_entry_id = ""
             if effect.queued_effect_id and effect.queued_effect_id not in {
                 WEEKLY_WINDOW_CATCHES,
                 PERMANENT_WINDOW_CATCH,
@@ -1648,6 +1650,40 @@ class EconomyService:
                     expires_at=effect_expires_at,
                     now=now,
                 )
+                personal_cook_uses = int(
+                    effect.queued_effect_params.get("personal_six_star_cook_uses")
+                    or 0
+                )
+                if personal_cook_uses:
+                    personal_effect_entry_id = self._new_identifier()
+                    personal_cook_params = {
+                        "six_star_percent": float(
+                            effect.queued_effect_params[
+                                "personal_six_star_cook_percent"
+                            ]
+                        ),
+                        "uses": personal_cook_uses,
+                    }
+                    personal_grant = resolve_food_effect(
+                        NEXT_SIX_STAR_COOK,
+                        personal_cook_params,
+                    )
+                    await self.repository.insert_food_effect(
+                        session,
+                        effect_entry_id=personal_effect_entry_id,
+                        player_id=identity.player_id,
+                        source_food_instance_id=food.food_instance_id,
+                        effect_id=personal_grant.effect_id,
+                        params_json=json.dumps(
+                            personal_grant.params,
+                            ensure_ascii=False,
+                            sort_keys=True,
+                            separators=(",", ":"),
+                        ),
+                        granted_uses=personal_grant.granted_uses,
+                        expires_at=None,
+                        now=now,
+                    )
             base_experience = EAT_EXPERIENCE_REWARDS[Rarity(food.rarity)]
             total_experience = await self.repository.add_experience(
                 session,
@@ -1698,6 +1734,7 @@ class EconomyService:
                 "effect_experience_bonus": effect.experience_bonus,
                 "effect_coin_bonus": effect.coin_bonus,
                 "effect_entry_id": effect_entry_id,
+                "personal_effect_entry_id": personal_effect_entry_id,
                 "queued_effect_id": effect.queued_effect_id,
                 "queued_effect_params": dict(effect.queued_effect_params),
                 "effect_granted_uses": effect.granted_uses,

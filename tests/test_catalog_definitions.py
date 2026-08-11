@@ -97,18 +97,25 @@ def test_high_rarity_food_effects_cover_new_gameplay_families() -> None:
         "four_star_percent": 60,
         "five_star_percent": 30,
         "six_star_percent": 10,
+        "last_use_six_star_percent": 50,
     }
     assert foods["雾蓝键盘大福"]["effect_id"] == "next-high-star-catch"
     assert foods["彩彩修车猪慕斯"]["effect_id"] == "next-five-star-cook"
     assert foods["彩彩修车猪慕斯"]["effect_params"] == {"uses": 10}
     assert foods["猪保千猪排轮盘"]["effect_id"] == "even-catch-distribution"
-    assert foods["猪保千猪排轮盘"]["effect_params"] == {"uses": 10}
+    assert foods["猪保千猪排轮盘"]["effect_params"] == {
+        "uses": 10,
+        "last_use_six_star_percent": 50,
+    }
     assert foods["糖醋排骨"]["effect_id"] == "quota-reset"
     assert foods["糖醋排骨"]["effect_params"] == {
         "count": 1,
         "five_star_multiplier": 1.007,
         "group_coin": 1007,
         "group_dedicated_catches": 10,
+        "hidden_boost_chance_percent": 10,
+        "hidden_five_star_multiplier": 10.04,
+        "hidden_six_star_multiplier": 10.04,
         "six_star_multiplier": 1.007,
     }
     assert foods["猪鼻蛋包饭"]["effect_id"] == "group-window-high-star-boost"
@@ -116,6 +123,8 @@ def test_high_rarity_food_effects_cover_new_gameplay_families() -> None:
         "coin_per_player": 1004,
         "dedicated_catches": 0,
         "five_star_multiplier": 1.004,
+        "personal_six_star_cook_percent": 60,
+        "personal_six_star_cook_uses": 2,
         "six_star_multiplier": 1.004,
         "source_label": "猪鼻蛋包饭",
     }

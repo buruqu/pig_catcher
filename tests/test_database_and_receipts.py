@@ -81,7 +81,7 @@ async def test_empty_database_migrates_and_passes_integrity_check(tmp_path: Path
 
 
 @pytest.mark.asyncio
-async def test_v22_migrates_food_effects_and_repairs_intermediate_pig_cookie(
+async def test_v23_migrates_food_effects_and_repairs_intermediate_pig_cookie(
     tmp_path: Path,
 ) -> None:
     path = tmp_path / "v17-food-effects.sqlite3"
@@ -301,6 +301,48 @@ async def test_v22_migrates_food_effects_and_repairs_intermediate_pig_cookie(
         )
         """
     )
+    for migration in (item for item in MIGRATIONS if 21 <= item.version <= 22):
+        for statement in migration.statements:
+            connection.execute(statement)
+        connection.execute(
+            "INSERT INTO schema_migrations(version, name, applied_at) VALUES (?, ?, 'now')",
+            (migration.version, migration.name),
+        )
+        connection.execute(f"PRAGMA user_version = {migration.version}")
+    connection.execute(
+        """
+        INSERT INTO group_food_effects(
+            group_effect_entry_id, scope_id, source_player_id,
+            source_food_instance_id, effect_id, params_json,
+            granted_uses_per_player, starts_at, expires_at,
+            created_at, updated_at
+        ) VALUES (
+            'active-ribs-group-effect', 'qq:100', 'qq:100:200',
+            'food-instance-1', 'group-window-high-star-boost',
+            '{"coin_per_player":1007,"dedicated_catches":10,"five_star_multiplier":1.007,"six_star_multiplier":1.007,"source_label":"糖醋排骨"}',
+            10, '2026-08-10T07:29:16.657Z', '2099-08-11T07:29:16.657Z',
+            ?, ?
+        )
+        """,
+        (now, now),
+    )
+    connection.execute(
+        """
+        INSERT INTO group_food_effects(
+            group_effect_entry_id, scope_id, source_player_id,
+            source_food_instance_id, effect_id, params_json,
+            granted_uses_per_player, starts_at, expires_at,
+            created_at, updated_at
+        ) VALUES (
+            'active-omelette-group-effect', 'qq:100', 'qq:100:200',
+            'food-instance-2', 'group-window-high-star-boost',
+            '{"coin_per_player":1004,"dedicated_catches":0,"five_star_multiplier":1.004,"six_star_multiplier":1.004,"source_label":"猪鼻蛋包饭"}',
+            0, '2026-08-10T07:29:16.657Z', '2099-08-11T07:29:16.657Z',
+            ?, ?
+        )
+        """,
+        (now, now),
+    )
     connection.commit()
     connection.close()
 
@@ -320,12 +362,15 @@ async def test_v22_migrates_food_effects_and_repairs_intermediate_pig_cookie(
     assert migrated["糖醋排骨"] == (
         "quota-reset",
         '{"count":1,"five_star_multiplier":1.007,"group_coin":1007,'
-        '"group_dedicated_catches":10,"six_star_multiplier":1.007}',
+        '"group_dedicated_catches":10,"hidden_boost_chance_percent":10,'
+        '"hidden_five_star_multiplier":10.04,"hidden_six_star_multiplier":10.04,'
+        '"six_star_multiplier":1.007}',
     )
     assert migrated["猪鼻蛋包饭"] == (
         "group-window-high-star-boost",
         '{"coin_per_player":1004,"dedicated_catches":0,'
-        '"five_star_multiplier":1.004,"six_star_multiplier":1.004,'
+        '"five_star_multiplier":1.004,"personal_six_star_cook_percent":60,'
+        '"personal_six_star_cook_uses":2,"six_star_multiplier":1.004,'
         '"source_label":"猪鼻蛋包饭"}',
     )
     assert migrated["一猪六吃"] == (
@@ -353,14 +398,25 @@ async def test_v22_migrates_food_effects_and_repairs_intermediate_pig_cookie(
     assert active["糖醋排骨"] == (
         "quota-reset",
         '{"count":1,"five_star_multiplier":1.007,"group_coin":1007,'
-        '"group_dedicated_catches":10,"six_star_multiplier":1.007}',
+        '"group_dedicated_catches":10,"hidden_boost_chance_percent":10,'
+        '"hidden_five_star_multiplier":10.04,"hidden_six_star_multiplier":10.04,'
+        '"six_star_multiplier":1.007}',
         1,
     )
     assert active["猪鼻蛋包饭"][2] == 2
     assert active["小马猪蒙布朗"][2] == 5
-    assert active["雾蓝键盘大福"][2] == 10
+    assert active["雾蓝键盘大福"] == (
+        "next-high-star-catch",
+        '{"five_star_percent":30,"four_star_percent":60,'
+        '"last_use_six_star_percent":50,"six_star_percent":10,"uses":10}',
+        10,
+    )
     assert active["彩彩修车猪慕斯"][2] == 10
-    assert active["猪保千猪排轮盘"][2] == 10
+    assert active["猪保千猪排轮盘"] == (
+        "even-catch-distribution",
+        '{"last_use_six_star_percent":50,"uses":10}',
+        10,
+    )
     assert active["一猪六吃"] == (
         "next-six-star-cook-bonus",
         '{"bonus_percent":15}',
@@ -410,6 +466,29 @@ async def test_v22_migrates_food_effects_and_repairs_intermediate_pig_cookie(
         "next-five-six-star-catch",
         '{"five_star_bonus_percent":20,"six_star_bonus_percent":3}',
         1,
+    )
+    group_effect_rows = await database.fetch_all(
+        """
+        SELECT group_effect_entry_id, params_json
+        FROM group_food_effects
+        ORDER BY group_effect_entry_id
+        """
+    )
+    group_effects = {
+        str(row["group_effect_entry_id"]): str(row["params_json"])
+        for row in group_effect_rows
+    }
+    assert group_effects["active-ribs-group-effect"] == (
+        '{"coin_per_player":1007,"dedicated_catches":10,'
+        '"five_star_multiplier":1.007,"hidden_boost_chance_percent":10,'
+        '"hidden_five_star_multiplier":10.04,"hidden_six_star_multiplier":10.04,'
+        '"six_star_multiplier":1.007,"source_label":"糖醋排骨"}'
+    )
+    assert group_effects["active-omelette-group-effect"] == (
+        '{"coin_per_player":1004,"dedicated_catches":0,'
+        '"five_star_multiplier":1.004,"personal_six_star_cook_percent":60,'
+        '"personal_six_star_cook_uses":2,"six_star_multiplier":1.004,'
+        '"source_label":"猪鼻蛋包饭"}'
     )
     quota = await database.fetch_one(
         "SELECT weekly_expires_at FROM player_catch_quota_bonuses WHERE player_id = 'qq:100:200'"

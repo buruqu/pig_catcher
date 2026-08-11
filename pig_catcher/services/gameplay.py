@@ -31,6 +31,8 @@ from ..domain.food_effects import (
     active_quota_effect_bonuses,
     apply_catch_effects,
     apply_group_catch_effects,
+    apply_group_hidden_boost,
+    group_hidden_boost_chance,
     has_compatible_exclusive_catch_effect,
     has_compatible_exclusive_group_catch_effect,
     resolve_food_effect,
@@ -1019,6 +1021,24 @@ class GameplayService:
             if remaining:
                 raise CatchCooldownError(remaining)
             settled_daily_count = daily_count + (0 if quota_exempt_catch else 1)
+            hidden_boost_chance = group_hidden_boost_chance(
+                group_effect_application,
+                active_group_effects,
+            )
+            if hidden_boost_chance > 0.0:
+                previous_group_summaries = group_effect_application.summaries
+                group_effect_application = apply_group_hidden_boost(
+                    group_effect_application,
+                    active_group_effects,
+                    roll=self.random_source.random(),
+                )
+                weights = group_effect_application.weights
+                if group_effect_application.hidden_boost_triggered:
+                    prefix_length = len(effect_summaries) - len(previous_group_summaries)
+                    effect_summaries = (
+                        effect_summaries[:prefix_length]
+                        + group_effect_application.summaries
+                    )
             rarity_roll = self.random_source.random()
             rarity = choose_rarity(weights, rarity_roll)
             candidates = candidate_buckets[rarity]
@@ -1063,6 +1083,10 @@ class GameplayService:
                 ),
                 "group_dedicated_effect_entry_id": (
                     group_effect_application.dedicated_entry_id
+                ),
+                "group_hidden_boost_roll": group_effect_application.hidden_boost_roll,
+                "group_hidden_boost_triggered": (
+                    group_effect_application.hidden_boost_triggered
                 ),
                 "stature_bias": effect_application.stature_bias,
                 "collaboration_only": effect_application.collaboration_only,
@@ -1257,6 +1281,9 @@ class GameplayService:
                 "excluded_summaries": list(excluded_summaries),
                 "exclusive_effect_active": exclusive_effect_active,
                 "quota_exempt_catch": quota_exempt_catch,
+                "group_hidden_boost_triggered": (
+                    group_effect_application.hidden_boost_triggered
+                ),
             }
             provisional_receipt = CommandReceipt(
                 receipt_id="",

@@ -34,6 +34,8 @@ from pig_catcher.domain.food_effects import (
     apply_catch_effects,
     apply_cooking_effects,
     apply_group_catch_effects,
+    apply_group_hidden_boost,
+    group_hidden_boost_chance,
     has_compatible_exclusive_group_catch_effect,
     resolve_food_effect,
 )
@@ -430,13 +432,15 @@ def _active_effect(
     params: dict[str, object],
     *,
     created_at: str,
+    granted_uses: int = 1,
+    consumed_uses: int = 0,
 ) -> ActiveFoodEffect:
     return ActiveFoodEffect(
         effect_entry_id=effect_entry_id,
         effect_id=effect_id,
         params=params,
-        granted_uses=1,
-        consumed_uses=0,
+        granted_uses=granted_uses,
+        consumed_uses=consumed_uses,
         expires_at="",
         created_at=created_at,
     )
@@ -525,6 +529,9 @@ def test_group_window_effect_uses_strongest_multiplier_and_dedicated_quota() -> 
             "coin_per_player": 1007,
             "dedicated_catches": 10,
             "source_label": "糖醋排骨",
+            "hidden_boost_chance_percent": 10,
+            "hidden_five_star_multiplier": 10.04,
+            "hidden_six_star_multiplier": 10.04,
         },
         source_user_id="1455722694",
         granted_uses=10,
@@ -551,6 +558,19 @@ def test_group_window_effect_uses_strongest_multiplier_and_dedicated_quota() -> 
     assert "发动群友 ID：1455722694" in applied.summaries[0]
     assert "剩余 7 次" in applied.summaries[0]
     assert any("只取最高倍率" in text for text in applied.skipped_summaries)
+    assert group_hidden_boost_chance(applied, (omelette, ribs)) == pytest.approx(10)
+    missed = apply_group_hidden_boost(applied, (omelette, ribs), roll=0.10)
+    assert missed.hidden_boost_triggered is False
+    assert missed.weights == pytest.approx(applied.weights)
+    boosted = apply_group_hidden_boost(applied, (omelette, ribs), roll=0.0999)
+    assert boosted.hidden_boost_triggered is True
+    direct_hidden = apply_monotonic_high_rarity_multipliers(
+        ordinary_food.weights,
+        (1.0, 1.0, 1.0, 1.0, 10.04, 10.04),
+    )
+    assert boosted.weights == pytest.approx(direct_hidden)
+    assert "隐藏效果爆发" in boosted.summaries[-1]
+    assert "×10.04/×10.04" in boosted.summaries[-1]
 
 
 def test_targeted_probability_food_only_uses_lower_rarity_as_donor() -> None:
@@ -679,12 +699,35 @@ def test_six_star_exclusive_effects_override_weights_with_multi_uses() -> None:
     high_star = _active_effect(
         "high-star",
         "next-high-star-catch",
-        {"uses": 10, "four_star_percent": 60, "five_star_percent": 30, "six_star_percent": 10},
+        {
+            "uses": 10,
+            "four_star_percent": 60,
+            "five_star_percent": 30,
+            "six_star_percent": 10,
+            "last_use_six_star_percent": 50,
+        },
         created_at="2026-08-07T00:00:00.000Z",
+        granted_uses=10,
     )
     application = apply_catch_effects(BASE_CATCH_WEIGHTS, [high_star])
     assert application.weights == pytest.approx((0.0, 0.0, 0.0, 60.0, 30.0, 10.0))
     assert application.consumed_entry_ids == ("high-star",)
+    high_star_last = _active_effect(
+        "high-star-last",
+        "next-high-star-catch",
+        high_star.params,
+        created_at="2026-08-07T00:00:00.000Z",
+        granted_uses=10,
+        consumed_uses=9,
+    )
+    high_star_last_application = apply_catch_effects(
+        BASE_CATCH_WEIGHTS,
+        [high_star_last],
+    )
+    assert high_star_last_application.weights == pytest.approx(
+        (0.0, 0.0, 0.0, 20.0, 30.0, 50.0)
+    )
+    assert "小保底触发" in high_star_last_application.summaries[0]
     # 彩彩修车猪慕斯：必出五星菜
     five_cook = _active_effect(
         "five-cook",
@@ -702,8 +745,9 @@ def test_six_star_exclusive_effects_override_weights_with_multi_uses() -> None:
     even = _active_effect(
         "even",
         "even-catch-distribution",
-        {"uses": 10},
+        {"uses": 10, "last_use_six_star_percent": 50},
         created_at="2026-08-07T00:00:00.000Z",
+        granted_uses=10,
     )
     even_application = apply_catch_effects(BASE_CATCH_WEIGHTS, [even])
     assert all(
@@ -716,6 +760,19 @@ def test_six_star_exclusive_effects_override_weights_with_multi_uses() -> None:
     even_no_six = apply_catch_effects(no_six, [even])
     assert even_no_six.weights[4] == pytest.approx(100.0 / 6 * 2)
     assert even_no_six.weights[5] == 0.0
+    even_last = _active_effect(
+        "even-last",
+        "even-catch-distribution",
+        even.params,
+        created_at="2026-08-07T00:00:00.000Z",
+        granted_uses=10,
+        consumed_uses=9,
+    )
+    even_last_application = apply_catch_effects(BASE_CATCH_WEIGHTS, [even_last])
+    assert even_last_application.weights == pytest.approx(
+        (10.0, 10.0, 10.0, 10.0, 10.0, 50.0)
+    )
+    assert "小保底触发" in even_last_application.summaries[0]
     # 糖醋排骨独占加权
     exclusive = _active_effect(
         "exclusive",

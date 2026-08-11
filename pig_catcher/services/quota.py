@@ -57,6 +57,9 @@ class CatchQuotaResetResult:
     group_coin_reward: int = 0
     group_dedicated_catches: int = 0
     group_effect_expires_at: str = ""
+    hidden_boost_chance_percent: float = 0.0
+    hidden_five_star_multiplier: float = 1.0
+    hidden_six_star_multiplier: float = 1.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -616,11 +619,21 @@ class CatchQuotaResetService:
             six_star_multiplier = float(
                 effect_grant.params.get("six_star_multiplier") or 1.0
             )
+            hidden_boost_chance_percent = float(
+                effect_grant.params.get("hidden_boost_chance_percent") or 0.0
+            )
+            hidden_five_star_multiplier = float(
+                effect_grant.params.get("hidden_five_star_multiplier") or 1.0
+            )
+            hidden_six_star_multiplier = float(
+                effect_grant.params.get("hidden_six_star_multiplier") or 1.0
+            )
             enhanced_group_reset = bool(
                 group_dedicated_catches
                 or group_coin_reward
                 or five_star_multiplier > 1.0
                 or six_star_multiplier > 1.0
+                or hidden_boost_chance_percent > 0.0
             )
             group_effect_entry_id = self.id_factory() if enhanced_group_reset else ""
             group_effect_expires_at = (
@@ -674,6 +687,9 @@ class CatchQuotaResetService:
                     "group_dedicated_catches": group_dedicated_catches,
                     "five_star_multiplier": five_star_multiplier,
                     "six_star_multiplier": six_star_multiplier,
+                    "hidden_boost_chance_percent": hidden_boost_chance_percent,
+                    "hidden_five_star_multiplier": hidden_five_star_multiplier,
+                    "hidden_six_star_multiplier": hidden_six_star_multiplier,
                 }
             )
             result_payload = {
@@ -691,6 +707,9 @@ class CatchQuotaResetService:
                 "group_coin_reward": group_coin_reward,
                 "group_dedicated_catches": group_dedicated_catches,
                 "group_effect_expires_at": group_effect_expires_at,
+                "hidden_boost_chance_percent": hidden_boost_chance_percent,
+                "hidden_five_star_multiplier": hidden_five_star_multiplier,
+                "hidden_six_star_multiplier": hidden_six_star_multiplier,
             }
             summary = self._command_summary(
                 identity=identity,
@@ -703,6 +722,9 @@ class CatchQuotaResetService:
                 five_star_multiplier=five_star_multiplier,
                 six_star_multiplier=six_star_multiplier,
                 group_effect_expires_at=group_effect_expires_at,
+                hidden_boost_chance_percent=hidden_boost_chance_percent,
+                hidden_five_star_multiplier=hidden_five_star_multiplier,
+                hidden_six_star_multiplier=hidden_six_star_multiplier,
             )
             reservation = await self.receipt_repository.reserve(
                 session,
@@ -755,6 +777,20 @@ class CatchQuotaResetService:
                     "six_star_multiplier": six_star_multiplier,
                     "source_label": "糖醋排骨",
                 }
+                if hidden_boost_chance_percent > 0.0:
+                    group_params.update(
+                        {
+                            "hidden_boost_chance_percent": (
+                                hidden_boost_chance_percent
+                            ),
+                            "hidden_five_star_multiplier": (
+                                hidden_five_star_multiplier
+                            ),
+                            "hidden_six_star_multiplier": (
+                                hidden_six_star_multiplier
+                            ),
+                        }
+                    )
                 await self.economy_repository.insert_group_food_effect(
                     session,
                     group_effect_entry_id=group_effect_entry_id,
@@ -820,6 +856,9 @@ class CatchQuotaResetService:
             group_coin_reward=group_coin_reward,
             group_dedicated_catches=group_dedicated_catches,
             group_effect_expires_at=group_effect_expires_at,
+            hidden_boost_chance_percent=hidden_boost_chance_percent,
+            hidden_five_star_multiplier=hidden_five_star_multiplier,
+            hidden_six_star_multiplier=hidden_six_star_multiplier,
         )
 
     def _reset_detail(
@@ -860,15 +899,24 @@ class CatchQuotaResetService:
         five_star_multiplier: float = 1.0,
         six_star_multiplier: float = 1.0,
         group_effect_expires_at: str = "",
+        hidden_boost_chance_percent: float = 0.0,
+        hidden_five_star_multiplier: float = 1.0,
+        hidden_six_star_multiplier: float = 1.0,
     ) -> str:
         group_label = identity.group_name or "当前群"
         group_bonus = ""
         if group_effect_expires_at:
+            hidden_bonus = ""
+            if hidden_boost_chance_percent > 0.0:
+                hidden_bonus = (
+                    f"每次专属抓猪有 {hidden_boost_chance_percent:g}% 概率爆发为 "
+                    f"×{hidden_five_star_multiplier:g}/×{hidden_six_star_multiplier:g}；"
+                )
             group_bonus = (
                 f"\n糖醋排骨全群强化：{group_rewarded_players} 名已登记玩家各 +"
                 f"{group_coin_reward} 猪币、各获 {group_dedicated_catches} 次专属抓猪额度；"
                 f"5 星/6 星相对权重 ×{five_star_multiplier:g}/×{six_star_multiplier:g}；"
-                f"有效至 {group_effect_expires_at}。"
+                f"{hidden_bonus}有效至 {group_effect_expires_at}。"
             )
         return (
             "【抓猪次数已重置】\n"
@@ -936,6 +984,15 @@ class CatchQuotaResetService:
                 ),
                 group_effect_expires_at=str(
                     payload.get("group_effect_expires_at") or ""
+                ),
+                hidden_boost_chance_percent=float(
+                    payload.get("hidden_boost_chance_percent") or 0.0
+                ),
+                hidden_five_star_multiplier=float(
+                    payload.get("hidden_five_star_multiplier") or 1.0
+                ),
+                hidden_six_star_multiplier=float(
+                    payload.get("hidden_six_star_multiplier") or 1.0
                 ),
             )
         except (KeyError, TypeError, ValueError) as exc:
