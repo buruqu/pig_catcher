@@ -588,7 +588,7 @@ async def test_third_round_templates_render_all_business_views(
         catalog_new=True,
         size_record=True,
         effect_summaries=(
-            "糖醋排骨全群加成（发动群友 ID：OFFICIAL_OPEN_ID）：5 星与 6 星相对权重 ×1.007。",
+            "糖醋排骨全群加成（发动群友：数佳）：5 星与 6 星相对权重 ×1.007。",
         ),
         probability_line="1★90.0% 5★8.993% 6★1.007%",
         probability_sources="美食加成 ×1",
@@ -603,7 +603,8 @@ async def test_third_round_templates_render_all_business_views(
     assert "+45 EXP · 600/800" in pig_html
     assert 'width: 42.86%' in pig_html
     assert "六星菜专属次数 · 本次未扣正常额度" in pig_html
-    assert "发动群友 ID：OFFICIAL_OPEN_ID" in pig_html
+    assert "发动群友：数佳" in pig_html
+    assert "OFFICIAL_OPEN_ID" not in pig_html
     assert "6★1.007%" in pig_html
     await renderer.render_static_pig_card(replace(pig, coin_reward=None), None)
     missing_pig_html, _ = capability.calls[-1]

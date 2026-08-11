@@ -157,7 +157,11 @@ async def test_sugar_ribs_reset_grants_atomic_group_rewards_and_dedicated_catche
         ],
     )
     clock = MutableClock(datetime(2026, 8, 11, 4, 0, tzinfo=UTC))
-    eater = _identity(user_id="1455722694", message_id="sugar-reset")
+    eater = _identity(
+        user_id="1455722694",
+        message_id="sugar-reset",
+        display_name="千早の花火",
+    )
     other = _identity(user_id="OFFICIAL_OPEN_ID", message_id="other-profile")
     now = "2026-08-11T04:00:00.000Z"
     async with database.transaction() as session:
@@ -272,9 +276,10 @@ async def test_sugar_ribs_reset_grants_atomic_group_rewards_and_dedicated_catche
     assert caught.quota_exempt_catch is True
     assert caught.daily_count == 0
     assert any(
-        "发动群友 ID：1455722694" in summary
+        "发动群友：千早の花火" in summary
         for summary in caught.effect_summaries
     )
+    assert all("1455722694" not in summary for summary in caught.effect_summaries)
     assert any("隐藏效果爆发" in summary for summary in caught.effect_summaries)
     assert caught.weights[4] > 4.0
     assert caught.weights[5] > 1.0
@@ -289,5 +294,5 @@ async def test_sugar_ribs_reset_grants_atomic_group_rewards_and_dedicated_catche
         _identity(user_id="OFFICIAL_OPEN_ID", message_id="sugar-expired-catch")
     )
     assert expired.quota_exempt_catch is False
-    assert all("发动群友 ID" not in summary for summary in expired.effect_summaries)
+    assert all("发动群友" not in summary for summary in expired.effect_summaries)
     await database.close()

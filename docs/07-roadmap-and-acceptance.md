@@ -1240,3 +1240,15 @@
   旧猪鼻蛋包饭不补发两次做菜机会，避免追溯增益。
 - 最终离线门禁：pytest `258 passed`；Ruff、Python `compileall`、Manifest JSON 解析、
   `uv lock --check`、`git diff --check` 和 `maibot-pig-catcher` Skill `quick_validate` 全部通过。
+
+## 52. v1.17.1 全群加成发动者昵称验收
+
+- 验收日期：`2026-08-11`。插件升级为 `local.pig-catcher v1.17.1`；Schema `23`、
+  Ruleset `20` 和 Asset Manifest `4` 不变，不需要数据迁移。
+- 群效果仓储现在同时读取发动者稳定 `platform_user_id` 和当前 `display_name`。云海锅、
+  糖醋排骨、猪鼻蛋包饭及隐藏爆发的抓猪图/文字摘要仅显示“发动群友：QQ 昵称”。
+- 结构化抓猪随机快照和幂等回执仍保留发动者稳定平台 ID 与昵称快照，用户可见渲染
+  不再泄露数字 QQ、QQ 官方 OpenID 或内部 `player_id`。旧的已提交抓猪回执保留原历史摘要，
+  不重写已发送结果。
+- 最终离线门禁：pytest `258 passed`；Ruff、Python `compileall`、Manifest JSON 解析、
+  `uv lock --check`、`git diff --check` 和 `maibot-pig-catcher` Skill `quick_validate` 全部通过。

@@ -195,6 +195,7 @@ class ActiveGroupFoodEffect:
     granted_uses_per_player: int
     consumed_uses: int
     source_user_id: str
+    source_display_name: str
     starts_at: str
     expires_at: str
     created_at: str
@@ -212,6 +213,8 @@ class GroupCatchEffectApplication:
     exclusive: bool
     hidden_boost_roll: float | None = None
     hidden_boost_triggered: bool = False
+    source_user_id: str = ""
+    source_display_name: str = ""
 
 
 def active_effect_from_row(row: Mapping[str, object]) -> ActiveFoodEffect:
@@ -249,6 +252,7 @@ def active_group_effect_from_row(row: Mapping[str, object]) -> ActiveGroupFoodEf
     if effect_id not in GROUP_EFFECT_IDS:
         raise FoodEffectError(f"群体美食效果“{effect_id}”尚未注册。")
     resolve_food_effect(effect_id, params)
+    source_display_name = str(row.get("source_display_name") or "").strip()
     return ActiveGroupFoodEffect(
         group_effect_entry_id=str(row["group_effect_entry_id"]),
         effect_id=effect_id,
@@ -256,6 +260,8 @@ def active_group_effect_from_row(row: Mapping[str, object]) -> ActiveGroupFoodEf
         granted_uses_per_player=int(row["granted_uses_per_player"]),
         consumed_uses=int(row.get("consumed_uses") or 0),
         source_user_id=str(row.get("source_user_id") or ""),
+        # 昵称缺失时使用中性文案，不得回退泄露 QQ 号或 OpenID。
+        source_display_name=source_display_name or "未命名群友",
         starts_at=str(row["starts_at"]),
         expires_at=str(row["expires_at"]),
         created_at=str(row["created_at"]),
@@ -1163,6 +1169,16 @@ def has_compatible_exclusive_group_catch_effect(
     )
 
 
+def _group_effect_display_name(effect: ActiveGroupFoodEffect) -> str:
+    """Return a visible nickname without falling back to a platform identifier."""
+
+    display_name = effect.source_display_name.strip()
+    source_user_id = effect.source_user_id.strip()
+    if not display_name or display_name.casefold() == source_user_id.casefold():
+        return "未命名群友"
+    return display_name
+
+
 def apply_group_catch_effects(
     weights: Sequence[float],
     effects: Sequence[ActiveGroupFoodEffect],
@@ -1197,8 +1213,9 @@ def apply_group_catch_effects(
             ),
         )
         source_label = str(grant.params["source_label"])
+        source_display_name = _group_effect_display_name(chosen)
         summary = (
-            f"{source_label}全群独占（发动群友 ID：{chosen.source_user_id}）："
+            f"{source_label}全群独占（发动群友：{source_display_name}）："
             "本次 5 星与 6 星相对权重分别 "
             f"×{float(grant.params['five_star_multiplier']):g} 和 "
             f"×{float(grant.params['six_star_multiplier']):g}。"
@@ -1216,6 +1233,8 @@ def apply_group_catch_effects(
             summaries=(summary,),
             skipped_summaries=skipped,
             exclusive=True,
+            source_user_id=chosen.source_user_id,
+            source_display_name=source_display_name,
         )
 
     ordinary = [
@@ -1252,9 +1271,10 @@ def apply_group_catch_effects(
         chosen.granted_uses_per_player - chosen.consumed_uses,
     )
     source_label = str(grant.params["source_label"])
+    source_display_name = _group_effect_display_name(chosen)
     quota_text = f"；专属抓猪额度剩余 {remaining} 次" if remaining else ""
     summary = (
-        f"{source_label}全群加成（发动群友 ID：{chosen.source_user_id}）："
+        f"{source_label}全群加成（发动群友：{source_display_name}）："
         "5 星与 6 星相对权重分别 "
         f"×{five_multiplier:g} 和 ×{six_multiplier:g}{quota_text}。"
     )
@@ -1271,6 +1291,8 @@ def apply_group_catch_effects(
         summaries=(summary,),
         skipped_summaries=skipped,
         exclusive=False,
+        source_user_id=chosen.source_user_id,
+        source_display_name=source_display_name,
     )
 
 
@@ -1329,8 +1351,9 @@ def apply_group_hidden_boost(
         ),
     )
     source_label = str(grant.params["source_label"])
+    source_display_name = _group_effect_display_name(chosen)
     hidden_summary = (
-        f"🔥 {source_label}隐藏效果爆发（发动群友 ID：{chosen.source_user_id}）："
+        f"🔥 {source_label}隐藏效果爆发（发动群友：{source_display_name}）："
         f"本次专属抓猪的 5 星与 6 星相对权重由 ×{base_five:g}/×{base_six:g} "
         f"改为 ×{hidden_five:g}/×{hidden_six:g}！"
     )

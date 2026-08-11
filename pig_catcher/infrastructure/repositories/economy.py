@@ -288,6 +288,7 @@ class EconomyRepository:
                 effect.granted_uses_per_player,
                 COALESCE(usage.consumed_uses, 0) AS consumed_uses,
                 source.platform_user_id AS source_user_id,
+                source.display_name AS source_display_name,
                 effect.starts_at,
                 effect.expires_at,
                 effect.created_at

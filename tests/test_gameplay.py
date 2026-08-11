@@ -782,7 +782,11 @@ async def test_group_six_star_catch_displays_activator_and_consumes_per_player(
         ],
     )
     clock = MutableClock(datetime(2026, 8, 11, 4, 0, tzinfo=UTC))
-    activator = _identity(user_id="1455722694", message_id="activator")
+    activator = _identity(
+        user_id="1455722694",
+        message_id="activator",
+        display_name="千早の花火",
+    )
     catcher = _identity(user_id="OFFICIAL_OPEN_ID", message_id="group-catch-1")
     now = "2026-08-11T04:00:00.000Z"
     async with database.transaction() as session:
@@ -874,16 +878,25 @@ async def test_group_six_star_catch_displays_activator_and_consumes_per_player(
     assert first.exclusive_effect_active is True
     assert duplicate.receipt_created is False
     assert any(
-        "发动群友 ID：1455722694" in summary
+        "发动群友：千早の花火" in summary
         for summary in first.effect_summaries
     )
+    assert all("1455722694" not in summary for summary in first.effect_summaries)
     assert any("未生效且未消耗" in text for text in first.excluded_summaries)
-    assert "发动群友 ID：1455722694" in format_catch_summary(first)
-    assert "发动群友 ID：1455722694" in pig_card_view(
+    assert "发动群友：千早の花火" in format_catch_summary(first)
+    assert "发动群友：千早の花火" in pig_card_view(
         first.pig,
         mode_label="抓猪成功",
         catch=first,
     ).effect_summaries[0]
+    snapshot_row = await database.fetch_one(
+        "SELECT random_snapshot_json FROM pig_instances WHERE pig_instance_id = ?",
+        (first.pig.pig_instance_id,),
+    )
+    assert snapshot_row is not None
+    snapshot = json.loads(str(snapshot_row["random_snapshot_json"]))
+    assert snapshot["group_effect_source_user_id"] == "1455722694"
+    assert snapshot["group_effect_source_display_name"] == "千早の花火"
     usage = await database.fetch_one(
         "SELECT consumed_uses FROM group_food_effect_usage "
         "WHERE group_effect_entry_id = 'cloud-pot-group-effect' AND player_id = ?",
@@ -906,7 +919,7 @@ async def test_group_six_star_catch_displays_activator_and_consumes_per_player(
         _identity(user_id="OFFICIAL_OPEN_ID", message_id="group-catch-2")
     )
     assert second.exclusive_effect_active is False
-    assert all("发动群友 ID" not in text for text in second.effect_summaries)
+    assert all("发动群友" not in text for text in second.effect_summaries)
     ordinary = await database.fetch_one(
         "SELECT consumed_uses FROM player_food_effects "
         "WHERE effect_entry_id = 'ordinary-player-effect'"

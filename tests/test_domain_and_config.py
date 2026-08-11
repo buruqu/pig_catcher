@@ -452,6 +452,7 @@ def _active_group_effect(
     params: dict[str, object],
     *,
     source_user_id: str,
+    source_display_name: str,
     granted_uses: int = 0,
     consumed_uses: int = 0,
     created_at: str = "2026-08-11T04:00:00.000Z",
@@ -463,13 +464,14 @@ def _active_group_effect(
         granted_uses_per_player=granted_uses,
         consumed_uses=consumed_uses,
         source_user_id=source_user_id,
+        source_display_name=source_display_name,
         starts_at="2026-08-11T04:00:00.000Z",
         expires_at="2026-08-12T04:00:00.000Z",
         created_at=created_at,
     )
 
 
-def test_group_six_star_catch_effects_are_exclusive_and_show_activator_id() -> None:
+def test_group_six_star_catch_effects_are_exclusive_and_show_activator_nickname() -> None:
     cloud_pot = _active_group_effect(
         "cloud-pot",
         "group-next-exclusive-high-star-catch",
@@ -482,6 +484,7 @@ def test_group_six_star_catch_effects_are_exclusive_and_show_activator_id() -> N
             "source_label": "神龙化猪七星云海锅",
         },
         source_user_id="OFFICIAL_OPEN_ID",
+        source_display_name="数佳",
         granted_uses=1,
     )
     weaker = _active_group_effect(
@@ -495,6 +498,7 @@ def test_group_six_star_catch_effects_are_exclusive_and_show_activator_id() -> N
             "source_label": "猪鼻蛋包饭",
         },
         source_user_id="other-user",
+        source_display_name="其他群友",
     )
     assert has_compatible_exclusive_group_catch_effect((cloud_pot, weaker))
     applied = apply_group_catch_effects(BASE_CATCH_WEIGHTS, (cloud_pot, weaker))
@@ -502,8 +506,20 @@ def test_group_six_star_catch_effects_are_exclusive_and_show_activator_id() -> N
     assert applied.consumed_entry_ids == ("cloud-pot",)
     assert applied.weights[4] > BASE_CATCH_WEIGHTS[4]
     assert applied.weights[5] > BASE_CATCH_WEIGHTS[5]
-    assert "发动群友 ID：OFFICIAL_OPEN_ID" in applied.summaries[0]
+    assert "发动群友：数佳" in applied.summaries[0]
+    assert "OFFICIAL_OPEN_ID" not in applied.summaries[0]
     assert all("other-user" not in text for text in applied.skipped_summaries)
+    identifier_only = _active_group_effect(
+        "identifier-only",
+        "group-next-exclusive-high-star-catch",
+        cloud_pot.params,
+        source_user_id="OFFICIAL_OPEN_ID",
+        source_display_name="OFFICIAL_OPEN_ID",
+        granted_uses=1,
+    )
+    masked = apply_group_catch_effects(BASE_CATCH_WEIGHTS, (identifier_only,))
+    assert "发动群友：未命名群友" in masked.summaries[0]
+    assert "OFFICIAL_OPEN_ID" not in masked.summaries[0]
 
 
 def test_group_window_effect_uses_strongest_multiplier_and_dedicated_quota() -> None:
@@ -518,6 +534,7 @@ def test_group_window_effect_uses_strongest_multiplier_and_dedicated_quota() -> 
             "source_label": "猪鼻蛋包饭",
         },
         source_user_id="1004",
+        source_display_name="猪鼻哥",
         created_at="2026-08-11T04:00:00.000Z",
     )
     ribs = _active_group_effect(
@@ -534,6 +551,7 @@ def test_group_window_effect_uses_strongest_multiplier_and_dedicated_quota() -> 
             "hidden_six_star_multiplier": 10.04,
         },
         source_user_id="1455722694",
+        source_display_name="千早の花火",
         granted_uses=10,
         consumed_uses=3,
         created_at="2026-08-11T04:00:01.000Z",
@@ -555,7 +573,8 @@ def test_group_window_effect_uses_strongest_multiplier_and_dedicated_quota() -> 
     assert applied.dedicated_entry_id == "ribs"
     assert applied.weights[4] >= ordinary_food.weights[4]
     assert applied.weights[5] >= ordinary_food.weights[5]
-    assert "发动群友 ID：1455722694" in applied.summaries[0]
+    assert "发动群友：千早の花火" in applied.summaries[0]
+    assert "1455722694" not in applied.summaries[0]
     assert "剩余 7 次" in applied.summaries[0]
     assert any("只取最高倍率" in text for text in applied.skipped_summaries)
     assert group_hidden_boost_chance(applied, (omelette, ribs)) == pytest.approx(10)

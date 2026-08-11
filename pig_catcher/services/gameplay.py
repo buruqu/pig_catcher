@@ -1088,6 +1088,12 @@ class GameplayService:
                 "group_hidden_boost_triggered": (
                     group_effect_application.hidden_boost_triggered
                 ),
+                "group_effect_source_user_id": (
+                    group_effect_application.source_user_id
+                ),
+                "group_effect_source_display_name": (
+                    group_effect_application.source_display_name
+                ),
                 "stature_bias": effect_application.stature_bias,
                 "collaboration_only": effect_application.collaboration_only,
                 "giant_template_multiplier": effect_application.giant_template_multiplier,
@@ -1283,6 +1289,12 @@ class GameplayService:
                 "quota_exempt_catch": quota_exempt_catch,
                 "group_hidden_boost_triggered": (
                     group_effect_application.hidden_boost_triggered
+                ),
+                "group_effect_source_user_id": (
+                    group_effect_application.source_user_id
+                ),
+                "group_effect_source_display_name": (
+                    group_effect_application.source_display_name
                 ),
             }
             provisional_receipt = CommandReceipt(
