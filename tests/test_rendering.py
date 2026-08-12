@@ -902,11 +902,42 @@ async def test_fourth_round_templates_render_food_and_economy_views(
     assert "&lt;script&gt;" in food_html
     assert "data:image/png;base64," in food_html
     assert "主厨香料" in food_html
-    assert "最终品质概率" in food_html
+    assert "本次最终概率" in food_html
     assert "1★ 75.0%" in food_html
+    assert "data-food-probability" in food_html
+    assert "food-card__probability-primary" in food_html
+    assert "pig-card--probability" in food_html
+    assert food_html.count("1★ 75.0% · 2★ 22.0% · 3★ 3.0%") == 1
     assert "Lv.5 · 抓猪老手" in food_html
     assert "+40 EXP · 900/1250" in food_html
     assert 'width: 22.22%' in food_html
+    long_effect_food = replace(
+        food,
+        display_name="糖醋排骨",
+        effect_summary=(
+            "获得 1 次 /重置额度 机会；真正发动时为本群已登记玩家发放猪币、"
+            "专属抓猪额度和高星权重，并让每次专属抓猪都有隐藏爆发概率。"
+        ),
+        probability_summary="",
+        probability_line="5★ 64.0% · 6★ 36.0%",
+        probability_sources="等级 Lv.18、厨具 Lv.5、道具·超级主厨香料、美食加成 ×2",
+        effect_summaries=(
+            "下一次用 6 星猪做菜时，6 星菜最终概率额外 +15 个百分点（最高 50%）。",
+            "猪饺叠加 1 层：本次 6 星菜概率额外 +1 个百分点。",
+        ),
+        excluded_summaries=(
+            "六星菜独占生效，普通概率加成保留且本次未叠加。",
+        ),
+    )
+    await renderer.render_static_food_card(long_effect_food, source)
+    long_effect_html, _ = capability.calls[-1]
+    assert "5★ 64.0% · 6★ 36.0%" in long_effect_html
+    assert "本次概率加成" in long_effect_html
+    assert "猪饺叠加 1 层" in long_effect_html
+    assert "互斥未叠加" in long_effect_html
+    assert "普通概率加成保留且本次未叠加" in long_effect_html
+    assert long_effect_html.index("本次最终概率") < long_effect_html.index("成品效果")
+    assert long_effect_html.count("5★ 64.0% · 6★ 36.0%") == 1
     await renderer.render_static_food_card(replace(food, coin_reward=None), None)
     missing_food_html, _ = capability.calls[-1]
     assert "素材文件暂时不可用" in missing_food_html

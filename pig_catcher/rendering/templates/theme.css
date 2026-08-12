@@ -549,6 +549,29 @@ footer strong {
   height: 1170px;
 }
 
+.food-card.pig-card--probability {
+  height: auto;
+  min-height: 950px;
+}
+
+.food-card.pig-card--long.pig-card--probability {
+  height: auto;
+  min-height: 1170px;
+}
+
+.food-card.pig-card--probability .pig-card__receipt {
+  position: relative;
+  left: auto;
+  right: auto;
+  top: auto;
+  margin: 548px 38px 18px;
+}
+
+.food-card.pig-card--long.pig-card--probability .pig-card__receipt {
+  top: auto;
+  margin-top: 768px;
+}
+
 .pig-card__header {
   height: 126px;
 }
@@ -710,6 +733,76 @@ footer strong {
   line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.food-card__probability {
+  grid-column: 1 / -1;
+  padding: 18px 20px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  gap: 14px 24px;
+  overflow-wrap: anywhere;
+  background: #fffafd;
+  border-top: 3px solid var(--rarity-color);
+}
+
+.food-card__probability-primary,
+.food-card__probability-source {
+  min-width: 0;
+}
+
+.food-card__probability-primary span,
+.food-card__probability-primary strong,
+.food-card__probability-source span,
+.food-card__probability-source strong {
+  display: block;
+}
+
+.food-card__probability-primary span,
+.food-card__probability-source span,
+.food-card__probability-row > span {
+  margin-bottom: 5px;
+  color: #896f79;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.food-card__probability-primary strong {
+  color: #3a3035;
+  font-size: 22px;
+  line-height: 1.4;
+}
+
+.food-card__probability-source strong {
+  color: #725f68;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.food-card__probability-row {
+  grid-column: 1 / -1;
+  min-width: 0;
+  padding-top: 12px;
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 16px;
+  border-top: 1px solid #eadfe3;
+}
+
+.food-card__probability-row > span {
+  margin: 0;
+}
+
+.food-card__probability-row p {
+  min-width: 0;
+  margin: 0;
+  color: #5f4c55;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.food-card__probability-row--muted p {
+  color: #86757d;
 }
 
 .receipt-level-progress {

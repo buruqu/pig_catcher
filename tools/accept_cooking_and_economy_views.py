@@ -9,6 +9,7 @@ import math
 import sqlite3
 import sys
 from collections.abc import Awaitable, Mapping, Sequence
+from dataclasses import replace
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont, ImageOps
@@ -113,6 +114,46 @@ def food_card(
         bonus_selector="命令测试菜#B19F2C3D" if cooking else "",
         probability_line=("1★ 14.0% · 2★ 58.0% · 3★ 24.0% · 4★ 4.0%" if cooking else ""),
         probability_sources=("等级 Lv.5、厨具 Lv.3、道具·主厨香料" if cooking else ""),
+    )
+
+
+def long_effect_cooking_card(row: Mapping[str, object]) -> FoodCardViewModel:
+    """Reproduce the production sugar-ribs result that previously hid probability."""
+
+    return replace(
+        food_card(row, cooking=True),
+        display_name="糖醋排骨",
+        owner_display_name="千早の花火",
+        short_code="9QHWWSWI",
+        portion_weight=65.37,
+        fat_label="偏瘦",
+        official_value=23564,
+        source_selector="ob一串猪#SDPA67DF",
+        effect_summary=(
+            "获得 1 次 /重置额度 机会；每次重置会让本群已登记玩家各获得 1007 猪币和 "
+            "10 次专属抓猪额度，并在次日同一时段刷新前令 5 星与 6 星相对权重分别 "
+            "×1.007 和 ×1.007；每次专属抓猪有 10% 概率令本次 5 星/6 星相对权重"
+            "爆发为 ×10.04/×10.04。"
+        ),
+        coin_reward=1500,
+        experience_reward=800,
+        coin_balance=5180,
+        total_experience=15685,
+        player_level=18,
+        level_title="抓猪大神",
+        next_level_experience=16200,
+        level_progress_percent=80.0,
+        cookware_level=5,
+        item_name="超级主厨香料",
+        bonus_selector="",
+        probability_line="5★ 64.0% · 6★ 36.0%",
+        probability_sources=(
+            "等级 Lv.18、厨具 Lv.5、道具·超级主厨香料、美食加成 ×2"
+        ),
+        effect_summaries=(
+            "下一次用 6 星猪做菜时，6 星菜最终概率额外 +15 个百分点（最高 50%）。",
+            "猪饺叠加 1 层：本次 6 星菜概率额外 +1 个百分点。",
+        ),
     )
 
 
@@ -507,6 +548,21 @@ async def run(args: argparse.Namespace) -> dict[str, object]:
                     cooking=True,
                 ),
                 data_dir / str(rows[8]["image_relpath"]),
+            ),
+        )
+        sugar_result = next(
+            (
+                row
+                for row in rows
+                if str(row["display_name"]) == "糖醋排骨"
+            ),
+            rows[-1],
+        )
+        await record(
+            "cooking-long-effect-probability",
+            renderer.render_static_food_card(
+                long_effect_cooking_card(sugar_result),
+                data_dir / str(sugar_result["image_relpath"]),
             ),
         )
         inventory = inventory_view(rows)

@@ -9,7 +9,8 @@
   </style>
 </head>
 <body>
-  <main class="game-sheet pig-card rarity-{{ view.rarity }}{% if view.description|length > 160 %} pig-card--long{% endif %}" data-pig-catcher-root data-render-ready="true">
+  {% set has_probability = view.coin_reward is not none and (view.probability_line or view.probability_summary) %}
+  <main class="game-sheet pig-card food-card rarity-{{ view.rarity }}{% if view.description|length > 160 %} pig-card--long{% endif %}{% if has_probability %} pig-card--probability{% endif %}" data-pig-catcher-root data-render-ready="true">
     <header class="game-header pig-card__header">
       <div class="game-header__copy">
         <p class="game-header__eyebrow">{{ view.mode_label }} · {{ view.owner_display_name }}</p>
@@ -58,11 +59,7 @@
       </div>
       <p class="pig-card__description" style="font-size: {% if view.description|length > 350 %}13{% elif view.description|length > 250 %}14{% elif view.description|length > 160 %}15{% elif view.description|length > 115 %}16{% elif view.description|length > 80 %}17{% else %}19{% endif %}px;line-height:{% if view.description|length > 160 %}1.45{% else %}1.55{% endif %}">{{ view.description }}</p>
       <p class="pig-card__subline">
-        效果：{{ view.effect_summary }} · 获得于 {{ view.acquired_at }}
-        {% if view.probability_line %}<br>本次最终概率：{{ view.probability_line }}{% elif view.probability_summary %}<br>最终品质概率：{{ view.probability_summary }}{% endif %}
-        {% if view.probability_sources %}<br>概率来源：{{ view.probability_sources }}{% endif %}
-        {% if view.effect_summaries %}<br>本次美食加成：{{ view.effect_summaries | join("；") }}{% endif %}
-        {% if view.excluded_summaries %}<br>互斥未叠加：{{ view.excluded_summaries | join("；") }}{% endif %}
+        {% if not has_probability %}效果：{{ view.effect_summary }} · {% endif %}获得于 {{ view.acquired_at }}
       </p>
     </section>
 
@@ -93,6 +90,32 @@
         <span>加餐 / 当前状态</span>
         <strong style="font-size: {% if view.bonus_selector|length > 24 %}13{% else %}16{% endif %}px">{{ view.bonus_selector or "无" }} · {{ view.coin_balance }} 币</strong>
       </div>
+      {% if has_probability %}
+      <div class="food-card__probability" data-food-probability>
+        <div class="food-card__probability-primary">
+          <span>本次最终概率</span>
+          <strong>{{ view.probability_line or view.probability_summary }}</strong>
+        </div>
+        <div class="food-card__probability-source">
+          <span>概率来源</span>
+          <strong>{{ view.probability_sources or "基础做菜概率" }}</strong>
+        </div>
+        <div class="food-card__probability-row">
+          <span>成品效果</span>
+          <p>{{ view.effect_summary }}</p>
+        </div>
+        <div class="food-card__probability-row">
+          <span>本次概率加成</span>
+          <p>{{ view.effect_summaries | join("；") if view.effect_summaries else "无额外菜品效果" }}</p>
+        </div>
+        {% if view.excluded_summaries %}
+        <div class="food-card__probability-row food-card__probability-row--muted">
+          <span>互斥未叠加</span>
+          <p>{{ view.excluded_summaries | join("；") }}</p>
+        </div>
+        {% endif %}
+      </div>
+      {% endif %}
       {% else %}
       <div class="pig-card__receipt-item">
         <span>实例编号</span>
@@ -113,7 +136,7 @@
       {% endif %}
     </section>
 
-    <footer class="game-footer" style="position:absolute;left:0;right:0;bottom:0">
+    <footer class="game-footer"{% if not has_probability %} style="position:absolute;left:0;right:0;bottom:0"{% endif %}>
       <span>名称与短编号共同定位这份美食</span>
       <strong>{{ view.mode_label }}</strong>
     </footer>
