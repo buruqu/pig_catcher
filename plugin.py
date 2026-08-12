@@ -68,6 +68,8 @@ from .pig_catcher.rendering import (
     batch_sale_receipt_view,
     catalog_media_paths,
     catalog_view,
+    daily_giants_media_paths,
+    daily_giants_view,
     eat_receipt_view,
     food_card_view,
     food_catalog_media_paths,
@@ -116,6 +118,7 @@ from .pig_catcher.services import (
     format_catalog_summary,
     format_catch_summary,
     format_cooking_summary,
+    format_daily_giants_summary,
     format_eat_summary,
     format_food_catalog_summary,
     format_food_detail_summary,
@@ -2098,6 +2101,45 @@ class PigCatcherPlugin(MaiBotPlugin):
             return await self._command_error(
                 stream_id=identity.stream_id,
                 operation="猪猪纪录",
+                error=exc,
+            )
+
+    @Command(
+        "pig_catcher_daily_giants",
+        description="查看当前群北京时间今天的最大体型与最重体重排行",
+        pattern=r"^/今日巨物\s*$",
+    )
+    async def handle_daily_giants(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_command(
+            stream_id,
+            kwargs,
+            feature_enabled=self.settings.features.records_enabled,
+            feature_label="群纪录",
+        )
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            result = await cast(GameplayService, self._gameplay_service).daily_giants(
+                identity
+            )
+            renderer = cast(PigCatcherRenderer, self._renderer)
+            data_dir = Path(self.ctx.paths.data_dir).resolve()
+            return await self._deliver_query(
+                stream_id=identity.stream_id,
+                render=lambda: renderer.render_daily_giants(
+                    daily_giants_view(result),
+                    daily_giants_media_paths(data_dir, result),
+                ),
+                fallback_text=format_daily_giants_summary(result),
+            )
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation="今日巨物",
                 error=exc,
             )
 

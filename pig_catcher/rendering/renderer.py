@@ -17,6 +17,7 @@ from .models import (
     AssetPreviewViewModel,
     BatchCookingViewModel,
     CatalogViewModel,
+    DailyGiantsViewModel,
     EconomyReceiptViewModel,
     FoodCardViewModel,
     FoodCatalogViewModel,
@@ -231,6 +232,27 @@ class PigCatcherRenderer:
         """Render current-group size and weight records."""
 
         return await self._render_template("records.html", view=view)
+
+    async def render_daily_giants(
+        self,
+        view: DailyGiantsViewModel,
+        media_paths: Mapping[str, Path],
+    ) -> RenderedImage:
+        """Render today's current-group size and weight rankings."""
+
+        items = (*view.size_items, *view.weight_items)
+        media_data_urls = self._list_media_data_urls(
+            (
+                (item.key, item.media_visible, item.is_animated)
+                for item in items
+            ),
+            media_paths,
+        )
+        return await self._render_template(
+            "daily_giants.html",
+            view=view,
+            media_data_urls=media_data_urls,
+        )
 
     async def render_item_receipt(
         self,

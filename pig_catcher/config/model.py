@@ -133,8 +133,11 @@ class FeaturesSection(PluginConfigBase):
     )
     records_enabled: bool = Field(
         default=True,
-        description="是否允许查看当前群猪猪纪录",
-        json_schema_extra=_ui("允许群纪录", "对应 /猪猪纪录；数据严格按平台和群隔离"),
+        description="是否允许查看当前群猪猪纪录和今日巨物排行",
+        json_schema_extra=_ui(
+            "允许群纪录",
+            "对应 /猪猪纪录 和 /今日巨物；数据严格按平台和群隔离",
+        ),
     )
     items_enabled: bool = Field(
         default=True,

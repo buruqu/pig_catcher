@@ -18,6 +18,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from pig_catcher.rendering import (  # noqa: E402
+    DailyGiantItemViewModel,
+    DailyGiantsViewModel,
     EconomyReceiptRowViewModel,
     EconomyReceiptViewModel,
     GiantSightingViewModel,
@@ -308,6 +310,55 @@ def ranking_view() -> RankingViewModel:
     )
 
 
+def daily_giants_view() -> DailyGiantsViewModel:
+    """Build a full ten-player dual board for Chromium layout acceptance."""
+
+    size_items = tuple(
+        DailyGiantItemViewModel(
+            key=f"size:player-{index}",
+            rank=index + 1,
+            holder_display_name=(
+                "名字很长但仍需清晰展示的巨物收藏家" if index == 8 else f"体型猎人{index + 1}号"
+            ),
+            display_name=("大象" if index == 0 else "特小猪"),
+            rarity=2,
+            short_code=f"SIZE{index + 1:04d}",
+            size_value=2694.7 - index * 181.3,
+            weight_value=75770.78 - index * 1732.61,
+            acquired_at=f"2026-08-12 {9 + index:02d}:08",
+            media_visible=index < 2,
+            is_animated=False,
+            image_fit="contain",
+        )
+        for index in range(10)
+    )
+    weight_items = tuple(
+        DailyGiantItemViewModel(
+            key=f"weight:player-{index}",
+            rank=index + 1,
+            holder_display_name=f"重量猎人{index + 1}号",
+            display_name=("大象" if index == 0 else "特小猪"),
+            rarity=2,
+            short_code=f"WGHT{index + 1:04d}",
+            size_value=1888.8 - index * 121.7,
+            weight_value=88888.88 - index * 2188.19,
+            acquired_at=f"2026-08-12 {9 + index:02d}:18",
+            media_visible=index < 2,
+            is_animated=False,
+            image_fit="contain",
+        )
+        for index in range(10)
+    )
+    return DailyGiantsViewModel(
+        group_name="官方群-今日巨物双榜视觉验收群",
+        date_label="北京时间 2026-08-12 23:59 截止",
+        participant_count=15,
+        catch_count=67,
+        size_items=size_items,
+        weight_items=weight_items,
+    )
+
+
 def _font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     path = Path("C:/Windows/Fonts/msyh.ttc")
     return ImageFont.truetype(str(path), size) if path.is_file() else ImageFont.load_default()
@@ -449,6 +500,19 @@ async def run(args: argparse.Namespace) -> dict[str, object]:
                 {
                     "pig-r2-elephant": data_dir / str(elephant["image_relpath"]),
                     "pig-r2-tiny": data_dir / str(tiny["image_relpath"]),
+                },
+            ),
+        )
+        daily_giants = daily_giants_view()
+        await record(
+            "daily-giants-full",
+            renderer.render_daily_giants(
+                daily_giants,
+                {
+                    "size:player-0": data_dir / str(elephant["image_relpath"]),
+                    "size:player-1": data_dir / str(tiny["image_relpath"]),
+                    "weight:player-0": data_dir / str(elephant["image_relpath"]),
+                    "weight:player-1": data_dir / str(tiny["image_relpath"]),
                 },
             ),
         )

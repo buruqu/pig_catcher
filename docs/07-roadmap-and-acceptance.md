@@ -1252,3 +1252,18 @@
   不重写已发送结果。
 - 最终离线门禁：pytest `258 passed`；Ruff、Python `compileall`、Manifest JSON 解析、
   `uv lock --check`、`git diff --check` 和 `maibot-pig-catcher` Skill `quick_validate` 全部通过。
+
+## 53. v1.18.0 今日巨物双榜验收
+
+- 验收日期：`2026-08-12`。插件升级为 `local.pig-catcher v1.18.0`；Schema `23`、
+  Ruleset `20` 和 Asset Manifest `4` 不变，不需要数据库迁移。
+- 新增 `/今日巨物`：严格按当前 `platform + group_id` 与北京时间自然日查询真实抓取实例，
+  同时生成最大体型榜和最重体重榜；每名玩家在每榜只保留当天最佳一只。
+- 管理员发放资产不计入；猪猪后续售卖、做菜、赠送或交易不抹除原抓取人的当日成绩。
+  主指标同分时依次比较另一项属性、较早抓到时间和稳定玩家 ID。
+- 使用独立白粉双榜长图、紧凑 WebP 素材预览和文字降级；功能沿用“群纪录”开关，不新增配置迁移。
+- 最终离线门禁：pytest `260 passed`；Ruff、Python `compileall`、Manifest JSON、配置 TOML、
+  `uv lock --check`、`git diff --check` 和 Skill `quick_validate` 全部通过。真实 Chromium 满榜
+  长图为 `1128 x 2522`、`316,408` 字节，DOM 诊断零文字裁切、零元素越界、零坏图。
+- 本轮未发送真实 QQ 测试消息，也未重启 MaiBot；命令将在用户下一次正常重启加载插件后生效，
+  真实群内可达性由用户按正常使用观察。

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root { --font-family: {{ font_family }}; }
+    {{ theme_css | safe }}
+  </style>
+</head>
+<body>
+  <main class="game-sheet daily-giants-sheet" data-pig-catcher-root data-render-ready="true">
+    <header class="game-header">
+      <div class="game-header__copy">
+        <p class="game-header__eyebrow">今日巨物 · 最大体型与最重体重</p>
+        <h1 style="font-size:{% if view.group_name|length > 48 %}18{% elif view.group_name|length > 28 %}28{% else %}42{% endif %}px">{{ view.group_name or "当前群" }}</h1>
+      </div>
+      <div class="game-header__meta">
+        <span>{{ view.date_label }}</span>
+        <strong>{{ view.catch_count }} 只</strong>
+      </div>
+    </header>
+
+    <section class="daily-giants-summary">
+      <span>今日参榜玩家</span><strong>{{ view.participant_count }} 人</strong>
+      <span>统计范围</span><strong>北京时间 00:00 至当前</strong>
+      <span>入榜规则</span><strong>每人每榜仅取最佳一只</strong>
+    </section>
+
+    {% macro ranking(title, subtitle, items, metric) %}
+    <section class="daily-giants-board daily-giants-board--{{ metric }}">
+      <div class="daily-giants-board__heading">
+        <div><span>{{ title }}</span><strong>{{ subtitle }}</strong></div>
+        <b>TOP {{ items|length }}</b>
+      </div>
+      {% if items %}
+      <div class="daily-giants-list">
+        {% for item in items %}
+        <article class="daily-giant-row daily-giant-row--{{ item.rank if item.rank <= 3 else 'standard' }} rarity-{{ item.rarity }}">
+          <div class="daily-giant-row__rank">{{ item.rank }}</div>
+          <div class="daily-giant-row__media">
+            {% if media_data_urls.get(item.key) %}
+            <img src="{{ media_data_urls[item.key] }}" alt="{{ item.display_name }}" style="object-fit:{{ item.image_fit }}">
+            {% elif item.is_animated %}
+            <span>GIF<br>动态猪猪</span>
+            {% else %}
+            <span>{{ "★" * item.rarity }}<br>猪猪</span>
+            {% endif %}
+          </div>
+          <div class="daily-giant-row__copy">
+            <strong style="font-size:{% if item.holder_display_name|length > 40 %}14{% elif item.holder_display_name|length > 24 %}17{% else %}21{% endif %}px">{{ item.holder_display_name }}</strong>
+            <span>{{ "★" * item.rarity }} {{ item.display_name }} #{{ item.short_code }}</span>
+            <small>{{ item.acquired_at }}</small>
+          </div>
+          <div class="daily-giant-row__metric">
+            {% if metric == "size" %}
+            <strong>{{ "%.1f"|format(item.size_value) }} cm</strong>
+            <span>{{ "%.2f"|format(item.weight_value) }} kg</span>
+            {% else %}
+            <strong>{{ "%.2f"|format(item.weight_value) }} kg</strong>
+            <span>{{ "%.1f"|format(item.size_value) }} cm</span>
+            {% endif %}
+          </div>
+        </article>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty-state daily-giants-empty">今天还没有抓到猪猪</div>
+      {% endif %}
+    </section>
+    {% endmacro %}
+
+    {{ ranking("最大体型榜", "按体长降序；同体型依次比较体重、抓到时间", view.size_items, "size") }}
+    {{ ranking("最重体重榜", "按体重降序；同体重依次比较体型、抓到时间", view.weight_items, "weight") }}
+
+    <footer class="game-footer">
+      <span>只统计本群今天真实抓取的猪猪；售卖、做菜或赠送后仍保留当日成绩</span>
+      <strong>{{ view.date_label }}</strong>
+    </footer>
+  </main>
+</body>
+</html>

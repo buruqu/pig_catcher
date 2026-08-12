@@ -6,7 +6,7 @@ import json
 import math
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import UTC, datetime, time, timedelta, timezone
 from typing import Any
 from uuid import uuid4
 
@@ -332,6 +332,38 @@ class GiantSightingEntry:
     size_qualified: bool
     weight_qualified: bool
     achieved_at: str
+
+
+@dataclass(frozen=True, slots=True)
+class DailyGiantEntry:
+    """One player's best pig for one of today's two giant rankings."""
+
+    rank: int
+    player_id: str
+    holder_display_name: str
+    pig_instance_id: str
+    display_name: str
+    rarity: int
+    short_code: str
+    size_value: float
+    weight_value: float
+    acquired_at: str
+    image_relpath: str
+    image_fit: str
+    media_visible: bool
+    is_animated: bool
+
+
+@dataclass(frozen=True, slots=True)
+class DailyGiants:
+    """Today's current-group best-size and best-weight leaderboards."""
+
+    group_name: str
+    date_label: str
+    participant_count: int
+    catch_count: int
+    size_entries: tuple[DailyGiantEntry, ...]
+    weight_entries: tuple[DailyGiantEntry, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -709,6 +741,34 @@ def format_records_summary(result: RecordsPage) -> str:
                 f"{sighting.size_value:.1f}cm / {sighting.weight_value:.2f}kg｜"
                 f"{sighting.giant_score:.1f}分｜{sighting.holder_display_name}"
             )
+    return "\n".join(lines)
+
+
+def format_daily_giants_summary(result: DailyGiants) -> str:
+    """Return a readable fallback for today's two current-group rankings."""
+
+    lines = [
+        f"【今日巨物 · {result.date_label}】",
+        f"群：{result.group_name or '当前群'}",
+        f"今日抓猪：{result.catch_count} 只；参榜：{result.participant_count} 人",
+    ]
+    if not result.size_entries:
+        lines.append("今天还没有抓到猪猪。")
+        return "\n".join(lines)
+    lines.append("—— 最大体型榜 ——")
+    for entry in result.size_entries:
+        lines.append(
+            f"{entry.rank}. {entry.holder_display_name}｜{'★' * entry.rarity} "
+            f"{entry.display_name}#{entry.short_code}｜{entry.size_value:.1f} cm｜"
+            f"{entry.weight_value:.2f} kg"
+        )
+    lines.append("—— 最重体重榜 ——")
+    for entry in result.weight_entries:
+        lines.append(
+            f"{entry.rank}. {entry.holder_display_name}｜{'★' * entry.rarity} "
+            f"{entry.display_name}#{entry.short_code}｜{entry.weight_value:.2f} kg｜"
+            f"{entry.size_value:.1f} cm"
+        )
     return "\n".join(lines)
 
 
@@ -1800,6 +1860,65 @@ class GameplayService:
                 )
                 for row in sighting_rows
             ),
+        )
+
+    async def daily_giants(self, identity: CommandIdentity) -> DailyGiants:
+        """Read today's per-player best size and weight in the current scope."""
+
+        now_datetime = _safe_datetime(self.clock.now())
+        beijing_timezone = timezone(timedelta(hours=8), "Asia/Shanghai")
+        local_now = now_datetime.astimezone(beijing_timezone)
+        local_start = datetime.combine(
+            local_now.date(),
+            time.min,
+            tzinfo=beijing_timezone,
+        )
+        start_at = iso_timestamp(local_start.astimezone(UTC))
+        end_at = iso_timestamp(now_datetime)
+        async with self.database.transaction() as session:
+            await self.framework_repository.touch_identity(
+                session,
+                identity=identity,
+                now=end_at,
+            )
+            participant_count, catch_count, size_rows, weight_rows = (
+                await self.repository.daily_giants(
+                    session,
+                    scope_id=identity.scope.value,
+                    start_at=start_at,
+                    end_at=end_at,
+                    limit=self.ranking.ranking_page_size,
+                )
+            )
+
+        def entries(rows: Sequence[Mapping[str, object]]) -> tuple[DailyGiantEntry, ...]:
+            return tuple(
+                DailyGiantEntry(
+                    rank=index,
+                    player_id=str(row["player_id"]),
+                    holder_display_name=str(row["holder_display_name"]),
+                    pig_instance_id=str(row["pig_instance_id"]),
+                    display_name=str(row["display_name"]),
+                    rarity=int(row["rarity"]),
+                    short_code=str(row["short_code"]),
+                    size_value=float(row["size_value"]),
+                    weight_value=float(row["weight_value"]),
+                    acquired_at=str(row["acquired_at"]),
+                    image_relpath=str(row["image_relpath"]),
+                    image_fit=str(row["image_fit"]),
+                    media_visible=bool(row["media_visible"]),
+                    is_animated=bool(row["is_animated"]),
+                )
+                for index, row in enumerate(rows, start=1)
+            )
+
+        return DailyGiants(
+            group_name=identity.group_name,
+            date_label=f"北京时间 {local_now:%Y-%m-%d} {local_now:%H:%M} 截止",
+            participant_count=participant_count,
+            catch_count=catch_count,
+            size_entries=entries(size_rows),
+            weight_entries=entries(weight_rows),
         )
 
     async def arm_item(self, identity: CommandIdentity, item_name: str) -> ItemActionResult:

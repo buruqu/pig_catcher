@@ -292,6 +292,36 @@ class GiantSightingViewModel:
 
 
 @dataclass(frozen=True, slots=True)
+class DailyGiantItemViewModel:
+    """One player's best pig in a daily size or weight ranking."""
+
+    key: str
+    rank: int
+    holder_display_name: str
+    display_name: str
+    rarity: int
+    short_code: str
+    size_value: float
+    weight_value: float
+    acquired_at: str
+    media_visible: bool
+    is_animated: bool
+    image_fit: str
+
+
+@dataclass(frozen=True, slots=True)
+class DailyGiantsViewModel:
+    """Two current-group giant rankings for the Beijing calendar day."""
+
+    group_name: str
+    date_label: str
+    participant_count: int
+    catch_count: int
+    size_items: tuple[DailyGiantItemViewModel, ...]
+    weight_items: tuple[DailyGiantItemViewModel, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class ItemReceiptViewModel:
     """Item equip or cancellation receipt."""
 

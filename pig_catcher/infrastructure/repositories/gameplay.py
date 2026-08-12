@@ -877,6 +877,108 @@ class GameplayRepository:
         total = int(count_row["total_count"]) if count_row is not None else 0
         return total, [dict(row) for row in rows]
 
+    async def daily_giants(
+        self,
+        session: DatabaseSession,
+        *,
+        scope_id: str,
+        start_at: str,
+        end_at: str,
+        limit: int,
+    ) -> tuple[int, int, list[dict[str, object]], list[dict[str, object]]]:
+        """Return each player's best size and weight among today's real catches."""
+
+        summary = await session.fetch_one(
+            """
+            SELECT COUNT(DISTINCT receipt.player_id) AS participant_count,
+                   COUNT(*) AS catch_count
+            FROM command_receipts AS receipt
+            JOIN pig_instances AS instance
+              ON instance.pig_instance_id = receipt.result_object_id
+             AND instance.scope_id = receipt.scope_id
+            WHERE receipt.scope_id = ?
+              AND receipt.command_name = 'pig-catcher.catch'
+              AND receipt.result_type = 'pig'
+              AND receipt.created_at >= ?
+              AND receipt.created_at <= ?
+            """,
+            (scope_id, start_at, end_at),
+        )
+        query = """
+            WITH ranked AS (
+                SELECT
+                    instance.pig_instance_id,
+                    receipt.player_id,
+                    player.display_name AS holder_display_name,
+                    instance.display_name_snapshot AS display_name,
+                    instance.rarity,
+                    instance.short_code,
+                    instance.size_value,
+                    instance.weight_value,
+                    receipt.created_at AS acquired_at,
+                    template.image_relpath,
+                    template.image_fit,
+                    template.is_animated,
+                    CASE
+                        WHEN template.scope_type = 'common' THEN 1
+                        WHEN EXISTS(
+                            SELECT 1
+                            FROM scope_pig_templates AS allowed
+                            WHERE allowed.scope_id = instance.scope_id
+                              AND allowed.template_id = template.template_id
+                              AND allowed.authorized = 1
+                              AND allowed.consent_status = 'granted'
+                        ) THEN 1
+                        ELSE 0
+                    END AS media_visible,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY receipt.player_id
+                        ORDER BY instance.{primary_metric} DESC,
+                                 instance.{secondary_metric} DESC,
+                                 receipt.created_at ASC,
+                                 instance.pig_instance_id ASC
+                    ) AS player_rank
+                FROM command_receipts AS receipt
+                JOIN pig_instances AS instance
+                  ON instance.pig_instance_id = receipt.result_object_id
+                 AND instance.scope_id = receipt.scope_id
+                JOIN players AS player
+                  ON player.player_id = receipt.player_id
+                JOIN pig_templates AS template
+                  ON template.template_id = instance.template_id
+                WHERE receipt.scope_id = ?
+                  AND receipt.command_name = 'pig-catcher.catch'
+                  AND receipt.result_type = 'pig'
+                  AND receipt.created_at >= ?
+                  AND receipt.created_at <= ?
+            )
+            SELECT *
+            FROM ranked
+            WHERE player_rank = 1
+            ORDER BY ranked.{primary_metric} DESC,
+                     ranked.{secondary_metric} DESC,
+                     acquired_at ASC,
+                     player_id ASC
+            LIMIT ?
+        """
+
+        async def best_rows(primary_metric: str, secondary_metric: str) -> list[dict[str, object]]:
+            sql = query.format(
+                primary_metric=primary_metric,
+                secondary_metric=secondary_metric,
+            )
+            rows = await session.fetch_all(sql, (scope_id, start_at, end_at, limit))
+            return [dict(row) for row in rows]
+
+        participant_count = int(summary["participant_count"]) if summary is not None else 0
+        catch_count = int(summary["catch_count"]) if summary is not None else 0
+        return (
+            participant_count,
+            catch_count,
+            await best_rows("size_value", "weight_value"),
+            await best_rows("weight_value", "size_value"),
+        )
+
     async def item_quantity(
         self,
         session: DatabaseSession,

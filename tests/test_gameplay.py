@@ -1083,6 +1083,139 @@ async def test_records_and_profile_aggregates_do_not_multiply_rows(
 
 
 @pytest.mark.asyncio
+async def test_daily_giants_uses_beijing_day_original_catcher_and_exact_scope(
+    tmp_path: Path,
+) -> None:
+    database = await _database_with_catalog(
+        tmp_path,
+        [_pig_entry("daily-giant-pig", rarity=1, display_name="今日测试猪")],
+    )
+    clock = MutableClock(datetime(2026, 8, 11, 15, 59, 59, tzinfo=UTC))
+    id_values = iter(
+        (
+            "old-pig",
+            "old-ledger",
+            "alice-size-pig",
+            "alice-size-ledger",
+            "alice-weight-pig",
+            "alice-weight-ledger",
+            "bob-pig",
+            "bob-ledger",
+            "other-group-pig",
+            "other-group-ledger",
+        )
+    )
+    service = GameplayService(
+        database,
+        CatchingSection(cooldown_seconds=0),
+        random_source=SequenceRandom(*(_catch_rolls() * 5)),
+        clock=clock,
+        id_factory=id_values.__next__,
+        short_code_factory=iter(
+            ("OLDPIG01", "ALICESIZ", "ALICEWGT", "BOBPIG01", "OTHERGRP")
+        ).__next__,
+    )
+
+    old = await service.catch(
+        _identity(user_id="alice", display_name="爱丽丝", message_id="old-catch")
+    )
+    clock.value = datetime(2026, 8, 11, 16, 0, 0, tzinfo=UTC)
+    alice_size = await service.catch(
+        _identity(user_id="alice", display_name="爱丽丝", message_id="alice-size")
+    )
+    clock.value = datetime(2026, 8, 11, 18, 0, 0, tzinfo=UTC)
+    alice_weight = await service.catch(
+        _identity(user_id="alice", display_name="爱丽丝", message_id="alice-weight")
+    )
+    clock.value = datetime(2026, 8, 11, 20, 0, 0, tzinfo=UTC)
+    bob = await service.catch(
+        _identity(user_id="bob", display_name="鲍勃", message_id="bob-catch")
+    )
+    clock.value = datetime(2026, 8, 11, 21, 0, 0, tzinfo=UTC)
+    other_group = await service.catch(
+        _identity(
+            group_id="999",
+            user_id="outside",
+            display_name="隔壁群",
+            message_id="other-group-catch",
+        )
+    )
+
+    async with database.transaction() as session:
+        for pig_instance_id, size_value, weight_value in (
+            (old.pig.pig_instance_id, 999.0, 9999.0),
+            (alice_size.pig.pig_instance_id, 200.0, 400.0),
+            (alice_weight.pig.pig_instance_id, 150.0, 800.0),
+            (bob.pig.pig_instance_id, 190.0, 900.0),
+            (other_group.pig.pig_instance_id, 1000.0, 10000.0),
+        ):
+            await session.execute(
+                """
+                UPDATE pig_instances
+                SET size_value = ?, weight_value = ?
+                WHERE pig_instance_id = ?
+                """,
+                (size_value, weight_value, pig_instance_id),
+            )
+        await session.execute(
+            """
+            UPDATE pig_instances
+            SET owner_player_id = ?, state = 'sold', disposed_at = updated_at
+            WHERE pig_instance_id = ?
+            """,
+            (_identity(user_id="bob").player_id, alice_size.pig.pig_instance_id),
+        )
+        await session.execute(
+            """
+            INSERT INTO pig_instances(
+                pig_instance_id, short_code, scope_id, owner_player_id,
+                template_id, template_version, rarity, display_name_snapshot,
+                size_value, size_percentile, weight_value, weight_percentile,
+                fat_ratio, official_value, ruleset_version, random_snapshot_json,
+                state, acquired_at, updated_at
+            )
+            SELECT 'admin-grant-pig', 'ADMINMAX', scope_id, owner_player_id,
+                   template_id, template_version, rarity, display_name_snapshot,
+                   2000.0, size_percentile, 20000.0, weight_percentile,
+                   fat_ratio, official_value, ruleset_version, random_snapshot_json,
+                   'active', updated_at, updated_at
+            FROM pig_instances
+            WHERE pig_instance_id = ?
+            """,
+            (bob.pig.pig_instance_id,),
+        )
+
+    clock.value = datetime(2026, 8, 12, 4, 0, 0, tzinfo=UTC)
+    result = await service.daily_giants(
+        _identity(user_id="viewer", display_name="查询者", message_id="daily-query")
+    )
+
+    assert result.date_label == "北京时间 2026-08-12 12:00 截止"
+    assert result.participant_count == 2
+    assert result.catch_count == 3
+    assert [entry.holder_display_name for entry in result.size_entries] == [
+        "爱丽丝",
+        "鲍勃",
+    ]
+    assert [entry.short_code for entry in result.size_entries] == [
+        "ALICESIZ",
+        "BOBPIG01",
+    ]
+    assert [entry.holder_display_name for entry in result.weight_entries] == [
+        "鲍勃",
+        "爱丽丝",
+    ]
+    assert [entry.short_code for entry in result.weight_entries] == [
+        "BOBPIG01",
+        "ALICEWGT",
+    ]
+    assert {entry.short_code for entry in (*result.size_entries, *result.weight_entries)}.isdisjoint(
+        {"OLDPIG01", "OTHERGRP", "ADMINMAX"}
+    )
+    await database.close()
+
+
+@pytest.mark.asyncio
 async def test_armed_item_is_idempotent_and_consumed_only_by_successful_catch(
     tmp_path: Path,
 ) -> None:

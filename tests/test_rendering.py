@@ -19,6 +19,8 @@ from pig_catcher.rendering import (
     CatalogItemViewModel,
     CatalogViewModel,
     CollectionProgressViewModel,
+    DailyGiantItemViewModel,
+    DailyGiantsViewModel,
     EconomyReceiptRowViewModel,
     EconomyReceiptViewModel,
     FoodCardViewModel,
@@ -764,6 +766,55 @@ async def test_third_round_templates_render_all_business_views(
         )
     )
     assert "纪录保持者" in capability.calls[-1][0]
+
+    await renderer.render_daily_giants(
+        DailyGiantsViewModel(
+            group_name="测试巨物群",
+            date_label="北京时间 2026-08-12 12:00 截止",
+            participant_count=2,
+            catch_count=3,
+            size_items=(
+                DailyGiantItemViewModel(
+                    key="size:giant-one",
+                    rank=1,
+                    holder_display_name="爱丽丝",
+                    display_name="地球猪",
+                    rarity=5,
+                    short_code="GIANT001",
+                    size_value=2694.7,
+                    weight_value=75770.78,
+                    acquired_at="2026-08-12 09:00",
+                    media_visible=True,
+                    is_animated=False,
+                    image_fit="contain",
+                ),
+            ),
+            weight_items=(
+                DailyGiantItemViewModel(
+                    key="weight:giant-two",
+                    rank=1,
+                    holder_display_name="鲍勃",
+                    display_name="磁流体约束恒星物质猪",
+                    rarity=5,
+                    short_code="GIANT002",
+                    size_value=1888.8,
+                    weight_value=88888.88,
+                    acquired_at="2026-08-12 10:00",
+                    media_visible=True,
+                    is_animated=False,
+                    image_fit="contain",
+                ),
+            ),
+        ),
+        {"size:giant-one": source, "weight:giant-two": source},
+    )
+    daily_html, daily_options = capability.calls[-1]
+    assert "最大体型榜" in daily_html
+    assert "最重体重榜" in daily_html
+    assert "爱丽丝" in daily_html and "鲍勃" in daily_html
+    assert "2694.7 cm" in daily_html and "88888.88 kg" in daily_html
+    assert daily_html.count("data:image/webp;base64,") == 2
+    assert daily_options["allow_network"] is False
 
     await renderer.render_item_receipt(
         ItemReceiptViewModel(

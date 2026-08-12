@@ -236,7 +236,7 @@ async def test_group_reset_command_rejects_unconfigured_user_before_backup(
 def test_plugin_registers_only_explicit_production_commands() -> None:
     plugin = create_plugin()
     components = plugin.get_components()
-    assert len(components) == 47
+    assert len(components) == 48
     commands = {
         component["name"]
         for component in components
@@ -263,6 +263,7 @@ def test_plugin_registers_only_explicit_production_commands() -> None:
         "pig_catcher_inventory",
         "pig_catcher_catalog",
         "pig_catcher_records",
+        "pig_catcher_daily_giants",
         "pig_catcher_use_item",
         "pig_catcher_cancel_item",
         "pig_catcher_cook",
@@ -360,6 +361,19 @@ def test_pig_detail_command_supports_new_and_legacy_names() -> None:
     assert re.search(pattern, "/猪猪详情 地球猪#Pig9Fun")
     assert re.search(pattern, "/抓猪详情 地球猪#pig9fun")
     assert re.search(pattern, "/猪详情 地球猪#pig9fun") is None
+
+
+def test_daily_giants_command_claims_only_the_exact_query() -> None:
+    components = {
+        component["name"]: component
+        for component in create_plugin().get_components()
+    }
+    pattern = components["pig_catcher_daily_giants"]["metadata"][
+        "command_pattern"
+    ]
+    assert re.search(pattern, "/今日巨物")
+    assert re.search(pattern, "/今日巨物   ")
+    assert re.search(pattern, "/今日巨物 2") is None
 
 
 def test_admin_command_patterns_claim_only_the_documented_syntax() -> None:
@@ -694,8 +708,12 @@ async def test_complete_third_round_command_flow_and_duplicate_publication(
         stream_id="stream-10001",
         **_command_kwargs(query_message, arguments="1"),
     )
-    assert len(context.send.images) == 6
-    assert len(context.render.calls) == 6
+    await plugin.handle_daily_giants(
+        stream_id="stream-10001",
+        **_command_kwargs(query_message),
+    )
+    assert len(context.send.images) == 7
+    assert len(context.render.calls) == 7
     assert all(call[1]["allow_network"] is False for call in context.render.calls)
     await plugin.on_unload()
 

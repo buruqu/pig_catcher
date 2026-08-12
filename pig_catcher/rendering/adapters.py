@@ -31,6 +31,8 @@ from ..services.economy import (
 from ..services.gameplay import (
     CatalogPage,
     CatchResult,
+    DailyGiantEntry,
+    DailyGiants,
     InventoryPage,
     ItemActionResult,
     PigView,
@@ -52,6 +54,8 @@ from .models import (
     CatalogItemViewModel,
     CatalogViewModel,
     CollectionProgressViewModel,
+    DailyGiantItemViewModel,
+    DailyGiantsViewModel,
     EconomyReceiptRowViewModel,
     EconomyReceiptViewModel,
     FoodCardViewModel,
@@ -374,6 +378,35 @@ def records_view(page: RecordsPage) -> RecordsViewModel:
             )
             for entry in page.giant_sightings
         ),
+    )
+
+
+def daily_giants_view(result: DailyGiants) -> DailyGiantsViewModel:
+    """Build the two-list view for today's size and weight leaders."""
+
+    def item_view(entry: DailyGiantEntry, *, metric: str) -> DailyGiantItemViewModel:
+        return DailyGiantItemViewModel(
+            key=f"{metric}:{entry.pig_instance_id}",
+            rank=entry.rank,
+            holder_display_name=entry.holder_display_name,
+            display_name=entry.display_name,
+            rarity=entry.rarity,
+            short_code=entry.short_code,
+            size_value=entry.size_value,
+            weight_value=entry.weight_value,
+            acquired_at=_display_time(entry.acquired_at),
+            media_visible=entry.media_visible,
+            is_animated=entry.is_animated,
+            image_fit=entry.image_fit,
+        )
+
+    return DailyGiantsViewModel(
+        group_name=result.group_name,
+        date_label=result.date_label,
+        participant_count=result.participant_count,
+        catch_count=result.catch_count,
+        size_items=tuple(item_view(entry, metric="size") for entry in result.size_entries),
+        weight_items=tuple(item_view(entry, metric="weight") for entry in result.weight_entries),
     )
 
 
@@ -1031,3 +1064,24 @@ def ranking_media_paths(
             continue
         result[entry.player_id] = media_path(data_dir, showcase.image_relpath)
     return result
+
+
+def daily_giants_media_paths(
+    data_dir: Path,
+    result: DailyGiants,
+) -> dict[str, Path]:
+    """Resolve bounded previews for both daily giant lists."""
+
+    paths: dict[str, Path] = {}
+    for metric, entries in (
+        ("size", result.size_entries),
+        ("weight", result.weight_entries),
+    ):
+        for entry in entries:
+            if not entry.media_visible:
+                continue
+            paths[f"{metric}:{entry.pig_instance_id}"] = media_path(
+                data_dir,
+                entry.image_relpath,
+            )
+    return paths
