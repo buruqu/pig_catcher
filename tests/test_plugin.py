@@ -643,6 +643,81 @@ async def _install_test_pig(
     await plugin._asset_service.import_manifest(manifest)
 
 
+async def _install_group_event_foods(plugin: Any, tmp_path: Path) -> None:
+    source = tmp_path / "group-event-assets"
+    source.mkdir()
+    entries: list[dict[str, object]] = []
+    definitions = (
+        (
+            "sugar",
+            "糖醋排骨",
+            "quota-reset",
+            {
+                "count": 1,
+                "five_star_multiplier": 1.007,
+                "group_coin": 1007,
+                "group_dedicated_catches": 10,
+                "hidden_boost_chance_percent": 10,
+                "hidden_five_star_multiplier": 10.04,
+                "hidden_six_star_multiplier": 10.04,
+                "six_star_multiplier": 1.007,
+            },
+        ),
+        (
+            "cloud",
+            "神龙化猪七星云海锅",
+            "group-next-exclusive-high-star-catch",
+            {
+                "five_star_multiplier": 8,
+                "other_coin": 1680,
+                "self_coin": 18888,
+                "six_star_multiplier": 8,
+                "source_label": "神龙化猪七星云海锅",
+                "uses_per_player": 1,
+            },
+        ),
+    )
+    for key, display_name, effect_id, effect_params in definitions:
+        image_name = f"{key}-food.png"
+        Image.new("RGBA", (256, 256), "#F7A7C4").save(
+            source / image_name,
+            format="PNG",
+        )
+        entries.append(
+            {
+                "template_id": f"group-event-{key}-food",
+                "kind": "food",
+                "display_name": display_name,
+                "rarity": 6,
+                "scope": "group",
+                "group_scope_id": "qq:10001",
+                "description": "用于全群大事件命令验收。",
+                "image": image_name,
+                "fit": "contain",
+                "source": "pytest",
+                "license": "test-only",
+                "consent_status": "granted",
+                "recipe_tags": ["六星盛宴"],
+                "effect_id": effect_id,
+                "effect_params": effect_params,
+            }
+        )
+    manifest = source / "assets.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "manifest_version": 2,
+                "catalog_id": "group-event-command-tests",
+                "source_label": "pytest group event catalog",
+                "entries": entries,
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    await plugin._asset_service.import_manifest(manifest)
+
+
 def _command_kwargs(
     message: dict[str, object],
     **groups: str | None,
@@ -952,6 +1027,167 @@ async def test_complete_fourth_round_command_flow_and_duplicate_publication(
         """
     )
     assert item is not None and item["quantity"] == 2
+    await plugin.on_unload()
+
+
+@pytest.mark.asyncio
+async def test_major_food_events_publish_once_and_keep_full_text_fallback(
+    tmp_path: Path,
+) -> None:
+    plugin, context = await create_test_plugin(tmp_path)
+    await _install_group_event_foods(plugin, tmp_path)
+    actor = CommandIdentity(
+        scope=ScopeKey("qq", "10001"),
+        stream_id="stream-10001",
+        user_id="1455722694",
+        display_name="千早の花火",
+        message_id="seed-major-foods",
+        group_name="官方群-CEAB3520",
+    )
+    await plugin.gameplay_service.profile(actor)
+    await plugin.gameplay_service.profile(
+        CommandIdentity(
+            scope=actor.scope,
+            stream_id=actor.stream_id,
+            user_id="other-player",
+            display_name="群友乙",
+            message_id="seed-major-foods-other",
+            group_name=actor.group_name,
+        )
+    )
+    now = "2026-08-12T07:20:00.000Z"
+    foods = (
+        (
+            "sugar-event-instance",
+            "SUGAREVT",
+            "group-event-sugar-food",
+        ),
+        (
+            "cloud-event-instance",
+            "CLOUDEVT",
+            "group-event-cloud-food",
+        ),
+        (
+            "sugar-fallback-instance",
+            "SUGARFBK",
+            "group-event-sugar-food",
+        ),
+        (
+            "cloud-fallback-instance",
+            "CLOUDFBK",
+            "group-event-cloud-food",
+        ),
+    )
+    async with plugin.database.transaction() as session:
+        for instance_id, short_code, template_id in foods:
+            await session.execute(
+                """
+                INSERT INTO food_instances(
+                    food_instance_id, short_code, scope_id, owner_player_id,
+                    template_id, template_version, rarity, display_name_snapshot,
+                    portion_weight, fat_category, official_value, effect_id,
+                    effect_params_json, ruleset_version, random_snapshot_json,
+                    state, acquired_at, updated_at
+                )
+                SELECT ?, ?, ?, ?, template_id, template_version, rarity,
+                       display_name, 1.0, 'balanced', 25000, effect_id,
+                       effect_params_json, 20, '{}', 'active', ?, ?
+                FROM food_templates
+                WHERE template_id = ?
+                """,
+                (
+                    instance_id,
+                    short_code,
+                    actor.scope.value,
+                    actor.player_id,
+                    now,
+                    now,
+                    template_id,
+                ),
+            )
+
+    cases = (
+        (
+            "eat-sugar-event",
+            "糖醋排骨#SUGAREVT",
+            "糖醋排骨登场",
+            "1 次 /重置额度",
+        ),
+        (
+            "eat-cloud-event",
+            "神龙化猪七星云海锅#CLOUDEVT",
+            "七星云海，福泽全群",
+            "5★ / 6★ ×8",
+        ),
+    )
+    for index, (message_id, selector, title, hero) in enumerate(cases, start=1):
+        message = build_message(
+            group_id="10001",
+            group_name="官方群-CEAB3520",
+            user_id="1455722694",
+            display_name="千早の花火",
+            message_id=message_id,
+        )
+        first = await plugin.handle_eat(
+            stream_id="stream-10001",
+            **_command_kwargs(message, selector=selector),
+        )
+        assert first[0] is True
+        assert len(context.send.images) == index
+        html, options = context.render.calls[-1]
+        assert "全群<br>通告" in html
+        assert title in html and hero in html
+        assert "千早の花火" in html
+        assert "1455722694" not in html
+        assert options["allow_network"] is False
+        duplicate = await plugin.handle_eat(
+            stream_id="stream-10001",
+            **_command_kwargs(message, selector=selector),
+        )
+        assert duplicate == (True, "该消息已处理，不重复公示。", 0)
+        assert len(context.send.images) == index
+
+    context.render.error = RuntimeError("synthetic render failure")
+    fallback = await plugin.handle_eat(
+        stream_id="stream-10001",
+        **_command_kwargs(
+            build_message(
+                group_id="10001",
+                group_name="官方群-CEAB3520",
+                user_id="1455722694",
+                display_name="千早の花火",
+                message_id="eat-sugar-fallback",
+            ),
+            selector="糖醋排骨#SUGARFBK",
+        ),
+    )
+    assert fallback[0] is True
+    assert len(context.send.texts) == 1
+    sent_text = context.send.texts[0][1]
+    assert "【全群大事件 · 糖醋排骨登场】" in sent_text
+    assert "千早の花火" in sent_text
+    assert "尚未重置额度" in sent_text
+    assert "1455722694" not in sent_text
+    cloud_fallback = await plugin.handle_eat(
+        stream_id="stream-10001",
+        **_command_kwargs(
+            build_message(
+                group_id="10001",
+                group_name="官方群-CEAB3520",
+                user_id="1455722694",
+                display_name="千早の花火",
+                message_id="eat-cloud-fallback",
+            ),
+            selector="神龙化猪七星云海锅#CLOUDFBK",
+        ),
+    )
+    assert cloud_fallback[0] is True
+    assert len(context.send.texts) == 2
+    cloud_text = context.send.texts[-1][1]
+    assert "【全群大事件 · 神龙临世】" in cloud_text
+    assert "18,888" in cloud_text and "1,680" in cloud_text
+    assert "五星、六星相对权重 ×8" in cloud_text
+    assert "1455722694" not in cloud_text
     await plugin.on_unload()
 
 
@@ -1517,7 +1753,20 @@ async def test_quota_reset_chance_requires_held_effect_and_consumes_once(
                 "qq:10001:20001",
                 food_id,
                 "quota-reset",
-                '{"count":1}',
+                json.dumps(
+                    {
+                        "count": 1,
+                        "five_star_multiplier": 1.007,
+                        "group_coin": 1007,
+                        "group_dedicated_catches": 10,
+                        "hidden_boost_chance_percent": 10,
+                        "hidden_five_star_multiplier": 10.04,
+                        "hidden_six_star_multiplier": 10.04,
+                        "six_star_multiplier": 1.007,
+                    },
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ),
                 1,
                 "2026-07-28T00:00:00.000Z",
                 "2026-07-28T00:00:00.000Z",
@@ -1528,8 +1777,23 @@ async def test_quota_reset_chance_requires_held_effect_and_consumes_once(
         **_command_kwargs(chance_message),
     )
     assert granted[0] is True
-    assert "已归零：1 次" in granted[1]
-    assert len(context.send.texts) == 2  # 拒绝提示 + 成功回执
+    assert "【全群大事件 · 糖醋排骨正式发动】" in granted[1]
+    assert "发动群友：普通成员" in granted[1]
+    assert "各开启 10 次" in granted[1]
+    assert len(context.send.texts) == 1  # 只有前面的拒绝提示；成功输出大事件图
+    assert len(context.send.images) == 3  # 抓猪、做菜、正式发动通告
+    event_html, event_options = context.render.calls[-1]
+    assert "全群额度重置完成" in event_html
+    assert "普通成员" in event_html
+    assert "每人 10 次" in event_html
+    assert "×10.04" in event_html
+    assert event_options["allow_network"] is False
+    duplicate = await plugin.handle_reset_quota_chance(
+        stream_id="stream-10001",
+        **_command_kwargs(chance_message),
+    )
+    assert duplicate == (True, "该消息已处理，不重复公示。", 0)
+    assert len(context.send.images) == 3
     leftover = await plugin.database.fetch_one(
         """
         SELECT consumed_uses, granted_uses
@@ -1553,6 +1817,114 @@ async def test_quota_reset_chance_requires_held_effect_and_consumes_once(
         ),
     )
     assert exhausted[0] is False
+    await plugin.on_unload()
+
+
+@pytest.mark.asyncio
+async def test_quota_reset_event_render_failure_uses_major_event_receipt_text(
+    tmp_path: Path,
+) -> None:
+    plugin, context = await create_test_plugin(tmp_path)
+    await _install_test_pig(plugin, tmp_path, include_food=True)
+    identity = CommandIdentity(
+        scope=ScopeKey("qq", "10001"),
+        stream_id="stream-10001",
+        user_id="1455722694",
+        display_name="千早の花火",
+        message_id="seed-reset-event-fallback",
+        group_name="官方群-CEAB3520",
+    )
+    await plugin.gameplay_service.profile(identity)
+    now = "2026-08-12T07:20:00.000Z"
+    async with plugin.database.transaction() as session:
+        await session.execute(
+            """
+            INSERT INTO food_instances(
+                food_instance_id, short_code, scope_id, owner_player_id,
+                template_id, template_version, rarity, display_name_snapshot,
+                portion_weight, fat_category, official_value, effect_id,
+                effect_params_json, ruleset_version, random_snapshot_json,
+                state, acquired_at, disposed_at, updated_at
+            ) VALUES (
+                'reset-event-source', 'RSTEVT01', ?, ?, 'command-food-1', 1, 6,
+                '糖醋排骨', 1.0, 'balanced', 25000, 'quota-reset',
+                ?, 20, '{}', 'consumed', ?, ?, ?
+            )
+            """,
+            (
+                identity.scope.value,
+                identity.player_id,
+                json.dumps(
+                    {
+                        "count": 1,
+                        "five_star_multiplier": 1.007,
+                        "group_coin": 1007,
+                        "group_dedicated_catches": 10,
+                        "hidden_boost_chance_percent": 10,
+                        "hidden_five_star_multiplier": 10.04,
+                        "hidden_six_star_multiplier": 10.04,
+                        "six_star_multiplier": 1.007,
+                    },
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ),
+                now,
+                now,
+                now,
+            ),
+        )
+        await session.execute(
+            """
+            INSERT INTO player_food_effects(
+                effect_entry_id, player_id, source_food_instance_id,
+                effect_id, params_json, granted_uses, consumed_uses,
+                created_at, updated_at
+            ) VALUES (
+                'reset-event-chance', ?, 'reset-event-source', 'quota-reset',
+                ?, 1, 0, ?, ?
+            )
+            """,
+            (
+                identity.player_id,
+                json.dumps(
+                    {
+                        "count": 1,
+                        "five_star_multiplier": 1.007,
+                        "group_coin": 1007,
+                        "group_dedicated_catches": 10,
+                        "hidden_boost_chance_percent": 10,
+                        "hidden_five_star_multiplier": 10.04,
+                        "hidden_six_star_multiplier": 10.04,
+                        "six_star_multiplier": 1.007,
+                    },
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ),
+                now,
+                now,
+            ),
+        )
+    context.render.error = RuntimeError("synthetic reset render failure")
+    result = await plugin.handle_reset_quota_chance(
+        stream_id="stream-10001",
+        **_command_kwargs(
+            build_message(
+                group_id="10001",
+                group_name="官方群-CEAB3520",
+                user_id="1455722694",
+                display_name="千早の花火",
+                message_id="reset-event-fallback",
+            )
+        ),
+    )
+    assert result[0] is True
+    assert len(context.send.texts) == 1
+    sent_text = context.send.texts[0][1]
+    assert "【全群大事件 · 糖醋排骨正式发动】" in sent_text
+    assert "发动群友：千早の花火" in sent_text
+    assert "各开启 10 次" in sent_text
+    assert "×10.04" in sent_text
+    assert "1455722694" not in sent_text
     await plugin.on_unload()
 
 

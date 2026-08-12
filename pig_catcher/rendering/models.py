@@ -322,6 +322,37 @@ class DailyGiantsViewModel:
 
 
 @dataclass(frozen=True, slots=True)
+class GroupEventRowViewModel:
+    """One headline benefit in a group-wide major-event announcement."""
+
+    label: str
+    value: str
+    detail: str
+
+
+@dataclass(frozen=True, slots=True)
+class GroupEventViewModel:
+    """A high-impact announcement for one committed group-wide effect."""
+
+    tone: str
+    eyebrow: str
+    title: str
+    subtitle: str
+    actor_name: str
+    group_name: str
+    event_time: str
+    hero_label: str
+    hero_value: str
+    rows: tuple[GroupEventRowViewModel, ...]
+    note: str
+    footer: str
+    settlement_committed: bool = True
+    media_visible: bool = False
+    is_animated: bool = False
+    image_fit: str = "contain"
+
+
+@dataclass(frozen=True, slots=True)
 class ItemReceiptViewModel:
     """Item equip or cancellation receipt."""
 

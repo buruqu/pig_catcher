@@ -23,6 +23,7 @@ from .models import (
     FoodCatalogViewModel,
     FoodInventoryViewModel,
     FrameworkPreviewViewModel,
+    GroupEventViewModel,
     InventoryViewModel,
     ItemReceiptViewModel,
     LedgerViewModel,
@@ -369,6 +370,25 @@ class PigCatcherRenderer:
         """Render one purchase, eating, or sale receipt."""
 
         return await self._render_template("economy_receipt.html", view=view)
+
+    async def render_group_event(
+        self,
+        view: GroupEventViewModel,
+        source_path: Path | None = None,
+    ) -> RenderedImage:
+        """Render a high-impact group-wide announcement with bounded food media."""
+
+        media_data_url = ""
+        if view.media_visible and source_path is not None and source_path.is_file():
+            media_data_url = self._compact_preview_data_url(
+                source_path,
+                is_animated=view.is_animated,
+            )
+        return await self._render_template(
+            "group_event.html",
+            view=view,
+            media_data_url=media_data_url,
+        )
 
     async def render_ledger(self, view: LedgerViewModel) -> RenderedImage:
         """Render one reconciled pig-coin ledger page."""

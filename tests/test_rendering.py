@@ -29,6 +29,8 @@ from pig_catcher.rendering import (
     FoodInventoryItemViewModel,
     FoodInventoryViewModel,
     FrameworkPreviewViewModel,
+    GroupEventRowViewModel,
+    GroupEventViewModel,
     InventoryItemViewModel,
     InventoryViewModel,
     ItemReceiptViewModel,
@@ -1106,6 +1108,90 @@ async def test_fourth_round_templates_render_food_and_economy_views(
         )
     )
     assert "对账状态" in capability.calls[-1][0]
+
+
+@pytest.mark.asyncio
+async def test_group_event_templates_render_three_distinct_major_announcements(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "six-star-food.png"
+    Image.new("RGBA", (256, 256), "#F4A7BE").save(source, format="PNG")
+    capability = FakeRender()
+    renderer = PigCatcherRenderer(capability, _options())
+    common = {
+        "actor_name": "千早の花火",
+        "group_name": "官方群-CEAB3520",
+        "event_time": "2026-08-12 15:20",
+        "rows": (
+            GroupEventRowViewModel("全群猪币", "每人 +1,007", "已经原子结算"),
+            GroupEventRowViewModel("专属抓猪", "每人 10 次", "不占正常额度"),
+            GroupEventRowViewModel("高星强化", "5★ / 6★ ×1.007", "10% 隐藏爆发"),
+        ),
+    }
+    await renderer.render_group_event(
+        GroupEventViewModel(
+            tone="sugar",
+            eyebrow="六星盛宴 · 全群事件资格已取得",
+            title="糖醋排骨登场",
+            subtitle="酸甜一响，全群强化蓄势待发",
+            hero_label="发动资格",
+            hero_value="1 次 /重置额度",
+            note="这次只取得发动资格，尚未重置额度。",
+            footer="等待正式发动",
+            settlement_committed=False,
+            media_visible=True,
+            **common,
+        ),
+        source,
+    )
+    sugar_html, sugar_options = capability.calls[-1]
+    assert "全群<br>通告" in sugar_html
+    assert "糖醋排骨登场" in sugar_html
+    assert "1 次 /重置额度" in sugar_html
+    assert "尚未重置额度" in sugar_html
+    assert "本次只取得发动资格；奖励将在正式发动时原子结算" in sugar_html
+    assert "本次事件已经提交" not in sugar_html
+    assert "data:image/webp;base64," in sugar_html
+    assert sugar_options["allow_network"] is False
+
+    await renderer.render_group_event(
+        GroupEventViewModel(
+            tone="cloud",
+            eyebrow="六星盛宴 · 神龙临世",
+            title="七星云海，福泽全群",
+            subtitle="神龙化猪七星云海锅已经开席",
+            hero_label="全群高星权重",
+            hero_value="5★ / 6★ ×8",
+            note="每名玩家各生效一次，且不与其他道具或菜品叠加。",
+            footer="神龙赐福已经结算",
+            media_visible=True,
+            **common,
+        ),
+        source,
+    )
+    cloud_html, _ = capability.calls[-1]
+    assert "七星云海，福泽全群" in cloud_html
+    assert "5★ / 6★ ×8" in cloud_html
+    assert "千早の花火" in cloud_html
+
+    await renderer.render_group_event(
+        GroupEventViewModel(
+            tone="reset",
+            eyebrow="糖醋排骨 · 全群强化正式发动",
+            title="全群额度重置完成",
+            subtitle="新的十连已经开启",
+            hero_label="全群专属抓猪",
+            hero_value="每人 10 次",
+            note="强化持续到次日同一时段刷新。",
+            footer="糖醋排骨全群强化已经正式生效",
+            **common,
+        )
+    )
+    reset_html, _ = capability.calls[-1]
+    assert "全群额度重置完成" in reset_html
+    assert "每人 10 次" in reset_html
+    assert "★★★★★★<br>全群大事件" in reset_html
+    assert "1455722694" not in reset_html
 
 
 @pytest.mark.asyncio

@@ -55,6 +55,7 @@ from ..domain.food_effects import (
     NEXT_SIX_STAR_COOK,
     NEXT_STACKABLE_SIX_STAR_COOK_BONUS,
     PERMANENT_WINDOW_CATCH,
+    QUOTA_RESET_CHANCE,
     TODAY_WINDOW_CATCHES,
     WEEKLY_WINDOW_CATCHES,
     active_effect_from_row,
@@ -279,6 +280,7 @@ class EatResult:
     effect: FoodEffectOutcome
     total_experience: int
     coin_balance: int
+    group_rewarded_players: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -616,6 +618,85 @@ def format_eat_summary(result: EatResult) -> str:
         f"当前累计经验：{result.total_experience}；猪币：{result.coin_balance}\n"
         f"效果：{result.effect.summary}"
     )
+
+
+def is_group_event_food(result: EatResult) -> bool:
+    """Return whether eating this food should replace the receipt with a group event."""
+
+    return result.effect.queued_effect_id in {
+        QUOTA_RESET_CHANCE,
+        GROUP_NEXT_EXCLUSIVE_HIGH_STAR_CATCH,
+    }
+
+
+def _public_actor_name(*, display_name: str, player_id: str) -> str:
+    """Prefer a QQ nickname and never promote a stable platform ID to display copy."""
+
+    normalized = str(display_name or "").strip()
+    platform_user_id = str(player_id or "").rsplit(":", 1)[-1]
+    if not normalized or normalized == platform_user_id:
+        return "未命名群友"
+    return normalized
+
+
+def _paired_multiplier_text(*, five_star: float, six_star: float) -> str:
+    if five_star == six_star:
+        return f"五星、六星相对权重 ×{five_star:g}"
+    return (
+        f"五星相对权重 ×{five_star:g}、"
+        f"六星相对权重 ×{six_star:g}"
+    )
+
+
+def format_group_event_eat_summary(result: EatResult) -> str:
+    """Return the public group-wide announcement fallback for a major dish."""
+
+    actor = _public_actor_name(
+        display_name=result.food.owner_display_name,
+        player_id=result.food.owner_player_id,
+    )
+    if result.effect.queued_effect_id == QUOTA_RESET_CHANCE:
+        params = result.effect.queued_effect_params
+        reset_uses = int(result.effect.granted_uses)
+        group_coin = int(params.get("group_coin") or 0)
+        dedicated_catches = int(params.get("group_dedicated_catches") or 0)
+        five_multiplier = float(params.get("five_star_multiplier") or 1.0)
+        six_multiplier = float(params.get("six_star_multiplier") or 1.0)
+        hidden_chance = float(
+            params.get("hidden_boost_chance_percent") or 0.0
+        )
+        hidden_multiplier = float(
+            params.get("hidden_five_star_multiplier") or 1.0
+        )
+        return (
+            "【全群大事件 · 糖醋排骨登场】\n"
+            f"{actor} 食用了六星菜“糖醋排骨”！\n"
+            f"已获得 {reset_uses} 次全群 /重置额度 机会。\n"
+            f"真正发动重置时，将为本群已登记玩家各发 {group_coin:,} 猪币、"
+            f"各开启 {dedicated_catches} 次专属抓猪，并让"
+            f"{_paired_multiplier_text(five_star=five_multiplier, six_star=six_multiplier)}；"
+            f"每次专属抓猪还有 {hidden_chance:g}% 概率爆发为 ×{hidden_multiplier:g}。\n"
+            "这次只是取得发动资格，尚未重置额度；请由食用者发送 /重置额度。"
+        )
+    if result.effect.queued_effect_id == GROUP_NEXT_EXCLUSIVE_HIGH_STAR_CATCH:
+        params = result.effect.queued_effect_params
+        self_coin = int(params.get("self_coin") or result.effect.coin_bonus)
+        other_coin = int(params.get("other_coin") or 0)
+        uses_per_player = int(params.get("uses_per_player") or 0)
+        five_multiplier = float(params.get("five_star_multiplier") or 1.0)
+        six_multiplier = float(params.get("six_star_multiplier") or 1.0)
+        return (
+            "【全群大事件 · 神龙临世】\n"
+            f"{actor} 食用了六星菜“神龙化猪七星云海锅”！\n"
+            f"{actor} 获得 {self_coin:,} 猪币，其余本群已登记玩家各获得 "
+            f"{other_coin:,} 猪币；"
+            f"本次共惠及 {result.group_rewarded_players} 名玩家。\n"
+            f"全群每名玩家接下来 {uses_per_player} 次抓猪的"
+            f"{_paired_multiplier_text(five_star=five_multiplier, six_star=six_multiplier)}，"
+            "按六星菜独占规则结算，"
+            "不与其他道具或菜品叠加。"
+        )
+    return format_eat_summary(result)
 
 
 def format_store_summary(result: StorePage) -> str:
@@ -1760,6 +1841,7 @@ class EconomyService:
                 effect=effect,
                 total_experience=total_experience,
                 coin_balance=coin_balance,
+                group_rewarded_players=group_rewarded_players,
             )
             receipt = await self._reserve(
                 session,
@@ -1770,7 +1852,11 @@ class EconomyService:
                 result_type="food-consumed",
                 result_object_id=food.food_instance_id,
                 result_payload=payload,
-                text_summary=format_eat_summary(provisional),
+                text_summary=(
+                    format_group_event_eat_summary(provisional)
+                    if is_group_event_food(provisional)
+                    else format_eat_summary(provisional)
+                ),
                 now=now,
             )
             return EatResult(
@@ -1781,6 +1867,7 @@ class EconomyService:
                 effect=effect,
                 total_experience=total_experience,
                 coin_balance=coin_balance,
+                group_rewarded_players=group_rewarded_players,
             )
 
     async def store(
@@ -2604,6 +2691,7 @@ class EconomyService:
             ),
             total_experience=int(payload["total_experience"]),
             coin_balance=int(payload["coin_balance"]),
+            group_rewarded_players=int(payload.get("group_rewarded_players") or 0),
         )
 
     def _purchase_from_receipt(

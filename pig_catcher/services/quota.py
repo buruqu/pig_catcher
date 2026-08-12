@@ -57,9 +57,13 @@ class CatchQuotaResetResult:
     group_coin_reward: int = 0
     group_dedicated_catches: int = 0
     group_effect_expires_at: str = ""
+    five_star_multiplier: float = 1.0
+    six_star_multiplier: float = 1.0
     hidden_boost_chance_percent: float = 0.0
     hidden_five_star_multiplier: float = 1.0
     hidden_six_star_multiplier: float = 1.0
+    actor_display_name: str = ""
+    actor_user_id: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -707,9 +711,13 @@ class CatchQuotaResetService:
                 "group_coin_reward": group_coin_reward,
                 "group_dedicated_catches": group_dedicated_catches,
                 "group_effect_expires_at": group_effect_expires_at,
+                "five_star_multiplier": five_star_multiplier,
+                "six_star_multiplier": six_star_multiplier,
                 "hidden_boost_chance_percent": hidden_boost_chance_percent,
                 "hidden_five_star_multiplier": hidden_five_star_multiplier,
                 "hidden_six_star_multiplier": hidden_six_star_multiplier,
+                "actor_display_name": identity.display_name,
+                "actor_user_id": identity.user_id,
             }
             summary = self._command_summary(
                 identity=identity,
@@ -856,9 +864,13 @@ class CatchQuotaResetService:
             group_coin_reward=group_coin_reward,
             group_dedicated_catches=group_dedicated_catches,
             group_effect_expires_at=group_effect_expires_at,
+            five_star_multiplier=five_star_multiplier,
+            six_star_multiplier=six_star_multiplier,
             hidden_boost_chance_percent=hidden_boost_chance_percent,
             hidden_five_star_multiplier=hidden_five_star_multiplier,
             hidden_six_star_multiplier=hidden_six_star_multiplier,
+            actor_display_name=identity.display_name,
+            actor_user_id=identity.user_id,
         )
 
     def _reset_detail(
@@ -904,19 +916,27 @@ class CatchQuotaResetService:
         hidden_six_star_multiplier: float = 1.0,
     ) -> str:
         group_label = identity.group_name or "当前群"
-        group_bonus = ""
         if group_effect_expires_at:
+            actor_name = str(identity.display_name or "").strip()
+            if not actor_name or actor_name == identity.user_id:
+                actor_name = "未命名群友"
             hidden_bonus = ""
             if hidden_boost_chance_percent > 0.0:
                 hidden_bonus = (
                     f"每次专属抓猪有 {hidden_boost_chance_percent:g}% 概率爆发为 "
                     f"×{hidden_five_star_multiplier:g}/×{hidden_six_star_multiplier:g}；"
                 )
-            group_bonus = (
-                f"\n糖醋排骨全群强化：{group_rewarded_players} 名已登记玩家各 +"
-                f"{group_coin_reward} 猪币、各获 {group_dedicated_catches} 次专属抓猪额度；"
-                f"5 星/6 星相对权重 ×{five_star_multiplier:g}/×{six_star_multiplier:g}；"
-                f"{hidden_bonus}有效至 {group_effect_expires_at}。"
+            return (
+                "【全群大事件 · 糖醋排骨正式发动】\n"
+                f"发动群友：{actor_name}\n"
+                f"生效群聊：{group_label}\n"
+                f"本时段已归零 {cleared_catches} 次，涉及 {affected_players} 名玩家。\n"
+                f"本群 {group_rewarded_players} 名已登记玩家各获得 {group_coin_reward} 猪币、"
+                f"各开启 {group_dedicated_catches} 次不占正常额度的专属抓猪。\n"
+                f"专属抓猪的 5 星/6 星相对权重分别 ×{five_star_multiplier:g}/"
+                f"×{six_star_multiplier:g}；{hidden_bonus}"
+                f"强化有效至 {group_effect_expires_at}。\n"
+                "历史抓取、资产和累计统计全部保留。"
             )
         return (
             "【抓猪次数已重置】\n"
@@ -924,7 +944,7 @@ class CatchQuotaResetService:
             f"时段：{window.label}\n"
             f"已归零：{cleared_catches} 次，涉及 {affected_players} 名玩家\n"
             f"基础额度：{self.window_limit} 次/人\n"
-            f"历史抓取、资产和累计统计均已保留。{group_bonus}"
+            "历史抓取、资产和累计统计均已保留。"
         )
 
     @staticmethod
@@ -985,6 +1005,12 @@ class CatchQuotaResetService:
                 group_effect_expires_at=str(
                     payload.get("group_effect_expires_at") or ""
                 ),
+                five_star_multiplier=float(
+                    payload.get("five_star_multiplier") or 1.0
+                ),
+                six_star_multiplier=float(
+                    payload.get("six_star_multiplier") or 1.0
+                ),
                 hidden_boost_chance_percent=float(
                     payload.get("hidden_boost_chance_percent") or 0.0
                 ),
@@ -994,6 +1020,8 @@ class CatchQuotaResetService:
                 hidden_six_star_multiplier=float(
                     payload.get("hidden_six_star_multiplier") or 1.0
                 ),
+                actor_display_name=str(payload.get("actor_display_name") or ""),
+                actor_user_id=str(payload.get("actor_user_id") or ""),
             )
         except (KeyError, TypeError, ValueError) as exc:
             raise ReceiptConflictError("额度重置回执中的业务结果无法解析。") from exc

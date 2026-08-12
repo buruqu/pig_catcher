@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -38,7 +39,7 @@ from pig_catcher.domain.errors import (
 from pig_catcher.domain.models import CommandIdentity, ScopeKey
 from pig_catcher.infrastructure import PigCatcherDatabase
 from pig_catcher.infrastructure.repositories import EconomyRepository, FrameworkRepository
-from pig_catcher.rendering import food_card_view, store_view
+from pig_catcher.rendering import food_card_view, group_event_eat_view, store_view
 from pig_catcher.services import (
     AssetCatalogService,
     CatchQuotaResetService,
@@ -46,7 +47,9 @@ from pig_catcher.services import (
     GameplayService,
     SocialService,
     format_cooking_summary,
+    format_group_event_eat_summary,
     format_store_summary,
+    is_group_event_food,
 )
 from pig_catcher.services.command_state import iso_timestamp
 
@@ -2365,6 +2368,10 @@ async def test_cloud_sea_pot_eat_rewards_scope_and_creates_one_day_group_effect(
     other = _identity(user_id="300", message_id="cloud-other")
     now = iso_timestamp(clock.now())
     async with database.transaction() as session:
+        await session.execute(
+            "UPDATE food_templates SET display_name = ? WHERE template_id = ?",
+            ("神龙化猪七星云海锅", "food-6-group"),
+        )
         await FrameworkRepository().touch_identity(
             session,
             identity=other,
@@ -2406,6 +2413,27 @@ async def test_cloud_sea_pot_eat_rewards_scope_and_creates_one_day_group_effect(
     duplicate = await economy.eat(eat_identity, cooked.foods[0].selector)
     assert eaten.effect.queued_effect_id == "group-next-exclusive-high-star-catch"
     assert eaten.effect.coin_bonus == 18888
+    assert eaten.group_rewarded_players == 2
+    assert duplicate.group_rewarded_players == 2
+    assert is_group_event_food(eaten)
+    assert "【全群大事件 · 神龙临世】" in eaten.receipt.text_summary
+    assert "成员200" in eaten.receipt.text_summary
+    assert "18,888" in eaten.receipt.text_summary
+    assert "1,680" in eaten.receipt.text_summary
+    assert "五星、六星相对权重 ×8" in eaten.receipt.text_summary
+    assert format_group_event_eat_summary(duplicate) == eaten.receipt.text_summary
+    renamed_result = replace(
+        eaten,
+        food=replace(eaten.food, display_name="改名后的云海盛宴"),
+    )
+    assert is_group_event_food(renamed_result)
+    assert "【全群大事件 · 神龙临世】" in format_group_event_eat_summary(
+        renamed_result
+    )
+    assert group_event_eat_view(
+        renamed_result,
+        group_name="重命名测试群",
+    ).tone == "cloud"
     assert duplicate.receipt_created is False
     balances = await database.fetch_all(
         "SELECT platform_user_id, coin_balance FROM players ORDER BY platform_user_id"

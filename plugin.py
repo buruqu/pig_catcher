@@ -78,6 +78,8 @@ from .pig_catcher.rendering import (
     food_inventory_view,
     food_media_path,
     gift_receipt_view,
+    group_event_eat_view,
+    group_event_quota_reset_view,
     inventory_media_paths,
     inventory_view,
     item_receipt_view,
@@ -124,6 +126,7 @@ from .pig_catcher.services import (
     format_food_detail_summary,
     format_food_inventory_summary,
     format_gift_summary,
+    format_group_event_eat_summary,
     format_inventory_summary,
     format_item_action_summary,
     format_ledger_summary,
@@ -137,6 +140,7 @@ from .pig_catcher.services import (
     format_store_summary,
     format_trade_page_summary,
     format_trade_summary,
+    is_group_event_food,
 )
 from .pig_catcher.version import PLUGIN_VERSION
 
@@ -1759,9 +1763,16 @@ class PigCatcherPlugin(MaiBotPlugin):
                 result.audit_event_id,
                 result.backup_path,
             )
-            return await self._deliver_text_receipt(
+            view = group_event_quota_reset_view(
+                result,
+                group_name=identity.group_name,
+            )
+            renderer = cast(PigCatcherRenderer, self._renderer)
+            return await self._deliver_receipt(
                 stream_id=identity.stream_id,
                 receipt=result.receipt,
+                render=lambda: renderer.render_group_event(view),
+                fallback_text=result.receipt.text_summary,
             )
         except Exception as exc:
             return await self._command_error(
@@ -2470,8 +2481,29 @@ class PigCatcherPlugin(MaiBotPlugin):
                 matched_group(kwargs, "selector"),
             )
             renderer = cast(PigCatcherRenderer, self._renderer)
-            view = eat_receipt_view(result)
-            fallback = result.receipt.text_summary or format_eat_summary(result)
+            if is_group_event_food(result):
+                event_view = group_event_eat_view(
+                    result,
+                    group_name=identity.group_name,
+                )
+                data_dir = Path(self.ctx.paths.data_dir).resolve()
+                source_path = food_media_path(data_dir, result.food)
+                fallback = (
+                    result.receipt.text_summary
+                    or format_group_event_eat_summary(result)
+                )
+                return await self._deliver_receipt(
+                    stream_id=identity.stream_id,
+                    receipt=result.receipt,
+                    render=lambda: renderer.render_group_event(
+                        event_view,
+                        source_path,
+                    ),
+                    fallback_text=fallback,
+                )
+            else:
+                view = eat_receipt_view(result)
+                fallback = result.receipt.text_summary or format_eat_summary(result)
             return await self._deliver_receipt(
                 stream_id=identity.stream_id,
                 receipt=result.receipt,

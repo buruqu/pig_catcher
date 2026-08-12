@@ -11,7 +11,11 @@ from ..domain.economy import (
     cookware_higher_rarity_multiplier,
 )
 from ..domain.errors import RenderError
-from ..domain.food_effects import effect_summary
+from ..domain.food_effects import (
+    GROUP_NEXT_EXCLUSIVE_HIGH_STAR_CATCH,
+    QUOTA_RESET_CHANCE,
+    effect_summary,
+)
 from ..domain.gameplay import level_progress, size_label, weight_label
 from ..domain.rules import catch_weights, cooking_weights
 from ..domain.social import TRADE_STATUS_LABELS
@@ -39,6 +43,7 @@ from ..services.gameplay import (
     PlayerProfile,
     RecordsPage,
 )
+from ..services.quota import CatchQuotaResetResult
 from ..services.social import (
     GiftResult,
     RankingEntry,
@@ -64,6 +69,8 @@ from .models import (
     FoodInventoryItemViewModel,
     FoodInventoryViewModel,
     GiantSightingViewModel,
+    GroupEventRowViewModel,
+    GroupEventViewModel,
     InventoryItemViewModel,
     InventoryViewModel,
     ItemReceiptViewModel,
@@ -94,6 +101,22 @@ def _display_time(value: str) -> str:
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=UTC)
     return parsed.astimezone(_BEIJING_TIMEZONE).strftime("%Y-%m-%d %H:%M")
+
+
+def _public_actor_name(*, display_name: str, stable_id: str) -> str:
+    """Use the QQ nickname in public cards; hide a raw ID fallback."""
+
+    normalized = str(display_name or "").strip()
+    platform_user_id = str(stable_id or "").rsplit(":", 1)[-1]
+    if not normalized or normalized == platform_user_id:
+        return "未命名群友"
+    return normalized
+
+
+def _paired_star_multiplier(*, five_star: float, six_star: float) -> str:
+    if five_star == six_star:
+        return f"5★ / 6★ ×{five_star:g}"
+    return f"5★ ×{five_star:g} / 6★ ×{six_star:g}"
 
 
 def _collection_view(collection: object) -> CollectionProgressViewModel:
@@ -782,6 +805,176 @@ def eat_receipt_view(result: EatResult) -> EconomyReceiptViewModel:
         summary=f"{result.food.stars} {result.food.selector}",
         rows=tuple(rows),
         note=result.effect.summary,
+    )
+
+
+def group_event_eat_view(
+    result: EatResult,
+    *,
+    group_name: str,
+) -> GroupEventViewModel:
+    """Build a major-event announcement for sugar ribs or the cloud-sea pot."""
+
+    actor = _public_actor_name(
+        display_name=result.food.owner_display_name,
+        stable_id=result.food.owner_player_id,
+    )
+    event_time = _display_time(result.receipt.created_at)
+    if result.effect.queued_effect_id == QUOTA_RESET_CHANCE:
+        params = result.effect.queued_effect_params
+        reset_uses = int(result.effect.granted_uses)
+        group_coin = int(params.get("group_coin") or 0)
+        dedicated_catches = int(params.get("group_dedicated_catches") or 0)
+        five_multiplier = float(params.get("five_star_multiplier") or 1.0)
+        six_multiplier = float(params.get("six_star_multiplier") or 1.0)
+        hidden_chance = float(
+            params.get("hidden_boost_chance_percent") or 0.0
+        )
+        return GroupEventViewModel(
+            tone="sugar",
+            eyebrow="六星盛宴 · 全群事件资格已取得",
+            title="糖醋排骨登场",
+            subtitle="酸甜一响，全群强化蓄势待发",
+            actor_name=actor,
+            group_name=group_name or "当前群",
+            event_time=event_time,
+            hero_label="发动资格",
+            hero_value=f"{reset_uses} 次 /重置额度",
+            rows=(
+                GroupEventRowViewModel(
+                    "全群猪币",
+                    f"每人 +{group_coin:,}",
+                    "实际执行 /重置额度 后发放",
+                ),
+                GroupEventRowViewModel(
+                    "专属抓猪",
+                    f"每人 {dedicated_catches} 次",
+                    "不占用正常抓猪额度",
+                ),
+                GroupEventRowViewModel(
+                    "高星强化",
+                    _paired_star_multiplier(
+                        five_star=five_multiplier,
+                        six_star=six_multiplier,
+                    ),
+                    f"每次专属抓猪另有 {hidden_chance:g}% 隐藏爆发",
+                ),
+            ),
+            note=(
+                "本次食用只取得发动资格，尚未重置任何额度。"
+                "请由食用者在本群发送 /重置额度，届时将再次发布正式发动通告。"
+            ),
+            footer="全群事件将在真正发动时原子结算",
+            settlement_committed=False,
+            media_visible=result.food.media_visible,
+            is_animated=result.food.is_animated,
+            image_fit=result.food.image_fit,
+        )
+    if result.effect.queued_effect_id == GROUP_NEXT_EXCLUSIVE_HIGH_STAR_CATCH:
+        params = result.effect.queued_effect_params
+        self_coin = int(params.get("self_coin") or result.effect.coin_bonus)
+        other_coin = int(params.get("other_coin") or 0)
+        uses_per_player = int(params.get("uses_per_player") or 0)
+        five_multiplier = float(params.get("five_star_multiplier") or 1.0)
+        six_multiplier = float(params.get("six_star_multiplier") or 1.0)
+        return GroupEventViewModel(
+            tone="cloud",
+            eyebrow="六星盛宴 · 神龙临世",
+            title="七星云海，福泽全群",
+            subtitle="神龙化猪七星云海锅已经开席",
+            actor_name=actor,
+            group_name=group_name or "当前群",
+            event_time=event_time,
+            hero_label="全群高星权重",
+            hero_value=_paired_star_multiplier(
+                five_star=five_multiplier,
+                six_star=six_multiplier,
+            ),
+            rows=(
+                GroupEventRowViewModel(
+                    "食用者奖励",
+                    f"+{self_coin:,} 猪币",
+                    actor,
+                ),
+                GroupEventRowViewModel(
+                    "其余群友奖励",
+                    f"每人 +{other_coin:,} 猪币",
+                    f"本次共惠及 {result.group_rewarded_players} 名已登记玩家",
+                ),
+                GroupEventRowViewModel(
+                    "下一次抓猪",
+                    (
+                        f"纯基础独占 ×{five_multiplier:g}"
+                        if five_multiplier == six_multiplier
+                        else _paired_star_multiplier(
+                            five_star=five_multiplier,
+                            six_star=six_multiplier,
+                        )
+                    ),
+                    f"每名玩家各生效 {uses_per_player} 次，不与其他道具或菜品叠加",
+                ),
+            ),
+            note=(
+                "全群效果从当前抓猪时段开始，到次日同一时段刷新时清除；"
+                "每名玩家的下一次兼容抓猪独立消费自己的加成。"
+            ),
+            footer="神龙赐福已在本群完成结算",
+            media_visible=result.food.media_visible,
+            is_animated=result.food.is_animated,
+            image_fit=result.food.image_fit,
+        )
+    raise ValueError("该美食不属于全群大事件通告。")
+
+
+def group_event_quota_reset_view(
+    result: CatchQuotaResetResult,
+    *,
+    group_name: str,
+) -> GroupEventViewModel:
+    """Build the formal activation announcement for a sugar-ribs quota reset."""
+
+    actor = _public_actor_name(
+        display_name=result.actor_display_name,
+        stable_id=result.actor_user_id,
+    )
+    return GroupEventViewModel(
+        tone="reset",
+        eyebrow="糖醋排骨 · 全群强化正式发动",
+        title="全群额度重置完成",
+        subtitle="酸甜号令落下，新的十连已经开启",
+        actor_name=actor,
+        group_name=group_name or "当前群",
+        event_time=_display_time(result.created_at),
+        hero_label="全群专属抓猪",
+        hero_value=f"每人 {result.group_dedicated_catches} 次",
+        rows=(
+            GroupEventRowViewModel(
+                "全群猪币",
+                f"每人 +{result.group_coin_reward:,}",
+                f"共惠及 {result.group_rewarded_players} 名已登记玩家",
+            ),
+            GroupEventRowViewModel(
+                "本时段重置",
+                f"归零 {result.cleared_catches} 次",
+                f"涉及 {result.affected_players} 名玩家；历史资产与统计全部保留",
+            ),
+            GroupEventRowViewModel(
+                "高星强化",
+                _paired_star_multiplier(
+                    five_star=result.five_star_multiplier,
+                    six_star=result.six_star_multiplier,
+                ),
+                (
+                    f"每次专属抓猪有 {result.hidden_boost_chance_percent:g}% 概率"
+                    f"爆发为 ×{result.hidden_five_star_multiplier:g}"
+                ),
+            ),
+        ),
+        note=(
+            f"强化持续至 {_display_time(result.group_effect_expires_at)}；"
+            "专属抓猪不扣正常额度，可与普通道具和非六星菜按既定规则叠加。"
+        ),
+        footer="糖醋排骨全群强化已经正式生效",
     )
 
 

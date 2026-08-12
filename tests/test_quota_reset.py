@@ -226,11 +226,24 @@ async def test_sugar_ribs_reset_grants_atomic_group_rewards_and_dedicated_catche
     assert result.group_rewarded_players == 2
     assert result.group_coin_reward == 1007
     assert result.group_dedicated_catches == 10
+    assert result.five_star_multiplier == pytest.approx(1.007)
+    assert result.six_star_multiplier == pytest.approx(1.007)
     assert result.hidden_boost_chance_percent == pytest.approx(10)
     assert result.hidden_five_star_multiplier == pytest.approx(10.04)
     assert result.hidden_six_star_multiplier == pytest.approx(10.04)
+    assert result.actor_display_name == "千早の花火"
+    assert result.actor_user_id == "1455722694"
     assert result.group_effect_expires_at == "2026-08-12T04:00:00.000Z"
     assert duplicate.receipt_created is False
+    assert duplicate.actor_display_name == "千早の花火"
+    assert duplicate.actor_user_id == "1455722694"
+    assert duplicate.five_star_multiplier == pytest.approx(1.007)
+    assert duplicate.six_star_multiplier == pytest.approx(1.007)
+    assert "【全群大事件 · 糖醋排骨正式发动】" in result.receipt.text_summary
+    assert "发动群友：千早の花火" in result.receipt.text_summary
+    assert "1455722694" not in result.receipt.text_summary
+    assert "各开启 10 次" in result.receipt.text_summary
+    assert "×10.04" in result.receipt.text_summary
     balances = await database.fetch_all(
         "SELECT platform_user_id, coin_balance FROM players ORDER BY platform_user_id"
     )

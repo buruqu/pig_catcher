@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root { --font-family: {{ font_family }}; }
+    {{ theme_css | safe }}
+  </style>
+</head>
+<body>
+  <main class="game-sheet group-event group-event--{{ view.tone }}" data-pig-catcher-root data-render-ready="true">
+    <header class="group-event__header">
+      <div class="group-event__seal">全群<br>通告</div>
+      <div class="group-event__heading">
+        <p>{{ view.eyebrow }}</p>
+        <h1 style="font-size:{% if view.title|length > 24 %}36{% elif view.title|length > 16 %}44{% else %}54{% endif %}px">{{ view.title }}</h1>
+        <strong>{{ view.subtitle }}</strong>
+      </div>
+      <div class="group-event__stars">✦<br>✧</div>
+    </header>
+
+    <section class="group-event__identity">
+      <div><span>发动群友</span><strong style="font-size:{% if view.actor_name|length > 32 %}18{% elif view.actor_name|length > 20 %}22{% else %}28{% endif %}px">{{ view.actor_name }}</strong></div>
+      <div><span>生效群聊</span><strong style="font-size:{% if view.group_name|length > 38 %}17{% elif view.group_name|length > 24 %}21{% else %}26{% endif %}px">{{ view.group_name }}</strong></div>
+      <div><span>发动时间</span><strong>{{ view.event_time }}</strong></div>
+    </section>
+
+    <section class="group-event__hero">
+      <div class="group-event__media">
+        {% if media_data_url %}
+        <img src="{{ media_data_url }}" alt="{{ view.title }}" style="object-fit:{{ view.image_fit }}">
+        {% elif view.is_animated %}
+        <span>GIF<br>六星盛宴</span>
+        {% else %}
+        <span>★★★★★★<br>全群大事件</span>
+        {% endif %}
+      </div>
+      <div class="group-event__hero-copy">
+        <span>{{ view.hero_label }}</span>
+        <strong style="font-size:{% if view.hero_value|length > 24 %}34{% elif view.hero_value|length > 16 %}42{% else %}50{% endif %}px">{{ view.hero_value }}</strong>
+        <small>{% if view.settlement_committed %}本次事件已经提交；重复消息不会重复结算或通告{% else %}本次只取得发动资格；奖励将在正式发动时原子结算{% endif %}</small>
+      </div>
+    </section>
+
+    <section class="group-event__benefits">
+      {% for row in view.rows %}
+      <article>
+        <span>{{ row.label }}</span>
+        <strong style="font-size:{% if row.value|length > 24 %}20{% elif row.value|length > 16 %}24{% else %}29{% endif %}px">{{ row.value }}</strong>
+        <small>{{ row.detail }}</small>
+      </article>
+      {% endfor %}
+    </section>
+
+    <section class="group-event__note">
+      <b>事件说明</b>
+      <p>{{ view.note }}</p>
+    </section>
+
+    <footer class="game-footer group-event__footer">
+      <span>{{ view.footer }}</span>
+      <strong>★★★★★★</strong>
+    </footer>
+  </main>
+</body>
+</html>

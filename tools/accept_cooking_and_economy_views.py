@@ -28,6 +28,8 @@ from pig_catcher.rendering import (  # noqa: E402
     FoodCatalogViewModel,
     FoodInventoryItemViewModel,
     FoodInventoryViewModel,
+    GroupEventRowViewModel,
+    GroupEventViewModel,
     LedgerEntryViewModel,
     LedgerViewModel,
     PigCatcherRenderer,
@@ -296,6 +298,109 @@ def profile_view() -> ProfileViewModel:
     )
 
 
+def group_event_view(kind: str) -> GroupEventViewModel:
+    actor = "千早の花火（很有排面的六星盛宴发动群友）"
+    common = {
+        "actor_name": actor,
+        "group_name": "官方群-CEAB3520 · 抓猪六星盛宴视觉验收群",
+        "event_time": "2026-08-12 15:20",
+    }
+    if kind == "sugar":
+        return GroupEventViewModel(
+            tone="sugar",
+            eyebrow="六星盛宴 · 全群事件资格已取得",
+            title="糖醋排骨登场",
+            subtitle="酸甜一响，全群强化蓄势待发",
+            hero_label="发动资格",
+            hero_value="1 次 /重置额度",
+            rows=(
+                GroupEventRowViewModel(
+                    "全群猪币",
+                    "每人 +1,007",
+                    "实际执行 /重置额度 后发放",
+                ),
+                GroupEventRowViewModel(
+                    "专属抓猪",
+                    "每人 10 次",
+                    "不占用正常抓猪额度",
+                ),
+                GroupEventRowViewModel(
+                    "高星强化",
+                    "5★ / 6★ ×1.007",
+                    "每次专属抓猪另有 10% 隐藏爆发",
+                ),
+            ),
+            note=(
+                "本次食用只取得发动资格，尚未重置任何额度。请由食用者在本群发送 "
+                "/重置额度，届时将再次发布正式发动通告。"
+            ),
+            footer="全群事件将在真正发动时原子结算",
+            settlement_committed=False,
+            media_visible=True,
+            **common,
+        )
+    if kind == "cloud":
+        return GroupEventViewModel(
+            tone="cloud",
+            eyebrow="六星盛宴 · 神龙临世",
+            title="七星云海，福泽全群",
+            subtitle="神龙化猪七星云海锅已经开席",
+            hero_label="全群高星权重",
+            hero_value="5★ / 6★ ×8",
+            rows=(
+                GroupEventRowViewModel("食用者奖励", "+18,888 猪币", actor),
+                GroupEventRowViewModel(
+                    "其余群友奖励",
+                    "每人 +1,680 猪币",
+                    "本次共惠及 91 名已登记玩家",
+                ),
+                GroupEventRowViewModel(
+                    "下一次抓猪",
+                    "纯基础独占 ×8",
+                    "每名玩家各生效 1 次，不与其他道具或菜品叠加",
+                ),
+            ),
+            note=(
+                "全群效果从当前抓猪时段开始，到次日同一时段刷新时清除；"
+                "每名玩家的下一次兼容抓猪独立消费自己的加成。"
+            ),
+            footer="神龙赐福已在本群完成结算",
+            media_visible=True,
+            **common,
+        )
+    return GroupEventViewModel(
+        tone="reset",
+        eyebrow="糖醋排骨 · 全群强化正式发动",
+        title="全群额度重置完成",
+        subtitle="酸甜号令落下，新的十连已经开启",
+        hero_label="全群专属抓猪",
+        hero_value="每人 10 次",
+        rows=(
+            GroupEventRowViewModel(
+                "全群猪币",
+                "每人 +1,007",
+                "共惠及 91 名已登记玩家",
+            ),
+            GroupEventRowViewModel(
+                "本时段重置",
+                "归零 322 次",
+                "涉及 91 名玩家；历史资产与统计全部保留",
+            ),
+            GroupEventRowViewModel(
+                "高星强化",
+                "5★ / 6★ ×1.007",
+                "每次专属抓猪有 10% 概率爆发为 ×10.04",
+            ),
+        ),
+        note=(
+            "强化持续至 2026-08-13 12:00；专属抓猪不扣正常额度，"
+            "可与普通道具和非六星菜按既定规则叠加。"
+        ),
+        footer="糖醋排骨全群强化已经正式生效",
+        **common,
+    )
+
+
 def _font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     path = Path("C:/Windows/Fonts/msyh.ttc")
     return ImageFont.truetype(str(path), size) if path.is_file() else ImageFont.load_default()
@@ -456,6 +561,40 @@ async def run(args: argparse.Namespace) -> dict[str, object]:
         )
         await record("ledger-full", renderer.render_ledger(ledger_view()))
         await record("profile-round-four", renderer.render_profile(profile_view()))
+        sugar_media = next(
+            (
+                row
+                for row in rows
+                if str(row["display_name"]) == "糖醋排骨"
+            ),
+            rows[-1],
+        )
+        cloud_media = next(
+            (
+                row
+                for row in rows
+                if str(row["display_name"]) == "神龙化猪七星云海锅"
+            ),
+            rows[-1],
+        )
+        await record(
+            "group-event-sugar-opportunity",
+            renderer.render_group_event(
+                group_event_view("sugar"),
+                data_dir / str(sugar_media["image_relpath"]),
+            ),
+        )
+        await record(
+            "group-event-cloud-feast",
+            renderer.render_group_event(
+                group_event_view("cloud"),
+                data_dir / str(cloud_media["image_relpath"]),
+            ),
+        )
+        await record(
+            "group-event-sugar-reset",
+            renderer.render_group_event(group_event_view("reset")),
+        )
         await capability.close()
         await browser.close()
 
