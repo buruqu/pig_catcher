@@ -185,6 +185,7 @@ class CatchResult:
     item_id: str
     item_name: str
     weights: tuple[float, ...]
+    item_remaining_uses: int = 0
     effect_summaries: tuple[str, ...] = ()
     excluded_summaries: tuple[str, ...] = ()
     exclusive_effect_active: bool = False
@@ -375,6 +376,7 @@ class ItemActionResult:
     operation: str
     item: ItemDefinition
     quantity: int
+    armed_uses: int = 0
 
 
 def _safe_datetime(value: datetime) -> datetime:
@@ -537,6 +539,8 @@ def format_catch_summary(result: CatchResult) -> str:
         records.append("巨物目击已留档")
     record_text = "、".join(records) if records else "未刷新群纪录"
     item_text = result.item_name or "无"
+    if result.item_name:
+        item_text += f"（连续使用队列剩余 {result.item_remaining_uses} 次）"
     new_text = "NEW｜首次收入图鉴\n" if result.catalog_new else ""
     body_text = f"体格：{result.pig.body_label}｜{result.pig.body_description}\n" if result.pig.body_label else ""
     effect_text = f"\n美食加成：{'；'.join(result.effect_summaries)}" if result.effect_summaries else ""
@@ -591,7 +595,17 @@ def format_profile_summary(profile: PlayerProfile) -> str:
         if profile.level.next_threshold is None
         else f"距下一等级 {profile.level.next_threshold - profile.total_experience} 经验"
     )
-    armed = profile.armed_item.display_name if profile.armed_item is not None else "无"
+    armed = (
+        f"{profile.armed_item.display_name}（剩余 {profile.armed_item_quantity} 次）"
+        if profile.armed_item is not None
+        else "无"
+    )
+    cooking_armed = (
+        f"{profile.armed_cooking_item.display_name}"
+        f"（剩余 {profile.armed_cooking_item_quantity} 次）"
+        if profile.armed_cooking_item is not None
+        else "无"
+    )
     return (
         "【抓猪档案】\n"
         f"玩家：{profile.display_name}\n"
@@ -613,8 +627,7 @@ def format_profile_summary(profile: PlayerProfile) -> str:
         f"本时段抓猪：{profile.daily_count}/{profile.daily_limit}\n"
         f"抓猪冷却：{profile.cooldown_remaining_seconds} 秒\n"
         f"已装备抓猪道具：{armed}\n"
-        "已装备做菜道具："
-        f"{profile.armed_cooking_item.display_name if profile.armed_cooking_item else '无'}"
+        f"已装备做菜道具：{cooking_armed}"
     )
 
 
@@ -778,12 +791,15 @@ def format_item_action_summary(result: ItemActionResult) -> str:
     if result.operation == "armed":
         return (
             "【道具已装备】\n"
-            f"{result.item.display_name} 已用于下一次"
+            f"{result.item.display_name} 已安排连续 {result.armed_uses} 次兼容的"
             f"{'抓猪' if result.item.action_type == 'catching' else '做菜'}成功结算。\n"
             f"当前库存：{result.quantity}\n"
             f"效果：{result.item.effect_summary}"
         )
-    return f"【道具已取消】\n已取消装备 {result.item.display_name}，道具未被消耗。\n当前库存：{result.quantity}"
+    return (
+        f"【道具已取消】\n已取消 {result.item.display_name} 的连续使用队列"
+        f"（原剩余 {result.armed_uses} 次），道具未被消耗。\n当前库存：{result.quantity}"
+    )
 
 
 class GameplayService:
@@ -952,7 +968,7 @@ class GameplayService:
                 player_id=identity.player_id,
                 action_type="catching",
             )
-            armed_item, _ = self._armed_item(armed_row, "catching")
+            armed_item, armed_uses = self._armed_item(armed_row, "catching")
             equipped_item = armed_item
             group_exclusive_effect_active = (
                 has_compatible_exclusive_group_catch_effect(active_group_effects)
@@ -1072,6 +1088,12 @@ class GameplayService:
             if using_extra_catch and extra_consumed >= extra_granted:
                 raise DailyCatchLimitError(
                     f"本时段已经抓了 {daily_count}/{daily_limit} 次，额外抓猪机会已用完。"
+                )
+            if using_extra_catch:
+                effect_summaries += (
+                    "额外抓猪次数池：本次结算后剩余 "
+                    f"{max(0, extra_granted - extra_consumed - 1)}/"
+                    f"{extra_granted} 次。",
                 )
             remaining = _cooldown_remaining(
                 now=now_datetime,
@@ -1342,6 +1364,9 @@ class GameplayService:
                 "feed_level": feed_level,
                 "item_id": armed_item.item_id if armed_item is not None else "",
                 "item_name": armed_item.display_name if armed_item is not None else "",
+                "item_remaining_uses": (
+                    max(0, armed_uses - 1) if armed_item is not None else 0
+                ),
                 "weights": [round(value, 8) for value in weights],
                 "effect_summaries": list(effect_summaries),
                 "excluded_summaries": list(excluded_summaries),
@@ -1389,6 +1414,9 @@ class GameplayService:
                 item_id=armed_item.item_id if armed_item is not None else "",
                 item_name=armed_item.display_name if armed_item is not None else "",
                 weights=weights,
+                item_remaining_uses=(
+                    max(0, armed_uses - 1) if armed_item is not None else 0
+                ),
                 effect_summaries=effect_summaries,
                 excluded_summaries=excluded_summaries,
                 exclusive_effect_active=exclusive_effect_active,
@@ -1434,6 +1462,9 @@ class GameplayService:
                 item_id=armed_item.item_id if armed_item is not None else "",
                 item_name=armed_item.display_name if armed_item is not None else "",
                 weights=weights,
+                item_remaining_uses=(
+                    max(0, armed_uses - 1) if armed_item is not None else 0
+                ),
                 effect_summaries=effect_summaries,
                 excluded_summaries=excluded_summaries,
                 exclusive_effect_active=exclusive_effect_active,
@@ -1921,11 +1952,19 @@ class GameplayService:
             weight_entries=entries(weight_rows),
         )
 
-    async def arm_item(self, identity: CommandIdentity, item_name: str) -> ItemActionResult:
-        """Equip an owned item without consuming it until a successful action."""
+    async def arm_item(
+        self,
+        identity: CommandIdentity,
+        item_name: str,
+        *,
+        quantity: int = 1,
+    ) -> ItemActionResult:
+        """Queue an owned item for consecutive compatible successful actions."""
 
         item = item_by_name(item_name)
-        request_payload = {"item_id": item.item_id}
+        if quantity <= 0:
+            raise ItemInventoryError("道具连续使用次数必须是正整数。")
+        request_payload = {"command_version": 2, "item_id": item.item_id, "quantity": quantity}
         idempotency_key = MessageKeyFactory.build(identity, _ARM_ITEM_COMMAND)
         now = iso_timestamp(self.clock.now())
         async with self.database.transaction() as session:
@@ -1945,30 +1984,38 @@ class GameplayService:
                     operation="armed",
                     item=stored_item,
                     quantity=int(payload["quantity"]),
+                    armed_uses=int(payload.get("armed_uses") or 1),
                 )
             await self.framework_repository.touch_identity(
                 session,
                 identity=identity,
                 now=now,
             )
-            quantity = await self.repository.item_quantity(
+            inventory_quantity = await self.repository.item_quantity(
                 session,
                 player_id=identity.player_id,
                 item_id=item.item_id,
             )
-            if quantity <= 0:
+            if inventory_quantity <= 0:
                 raise ItemInventoryError(f"你的背包中没有“{item.display_name}”。")
+            if quantity > inventory_quantity:
+                raise ItemInventoryError(
+                    f"“{item.display_name}”库存只有 {inventory_quantity} 个，"
+                    f"无法安排连续 {quantity} 次。"
+                )
             await self.repository.arm_item(
                 session,
                 player_id=identity.player_id,
                 action_type=item.action_type,
                 item_id=item.item_id,
+                remaining_uses=quantity,
                 now=now,
             )
             payload = {
                 "operation": "armed",
                 "item_id": item.item_id,
-                "quantity": quantity,
+                "quantity": inventory_quantity,
+                "armed_uses": quantity,
             }
             provisional = ItemActionResult(
                 receipt=self._provisional_receipt(
@@ -1984,7 +2031,8 @@ class GameplayService:
                 receipt_created=True,
                 operation="armed",
                 item=item,
-                quantity=quantity,
+                quantity=inventory_quantity,
+                armed_uses=quantity,
             )
             reservation = await self.receipt_repository.reserve(
                 session,
@@ -2009,7 +2057,8 @@ class GameplayService:
                 receipt_created=reservation.created,
                 operation="armed",
                 item=item,
-                quantity=quantity,
+                quantity=inventory_quantity,
+                armed_uses=quantity,
             )
 
     async def cancel_item(
@@ -2041,20 +2090,22 @@ class GameplayService:
                     operation="cancelled",
                     item=stored_item,
                     quantity=int(payload["quantity"]),
+                    armed_uses=int(payload.get("armed_uses") or 1),
                 )
             await self.framework_repository.touch_identity(
                 session,
                 identity=identity,
                 now=now,
             )
-            item_id = await self.repository.cancel_armed_item(
+            cancelled = await self.repository.cancel_armed_item(
                 session,
                 player_id=identity.player_id,
                 action_type=action_type,
             )
-            if item_id is None:
+            if cancelled is None:
                 label = "抓猪" if action_type == "catching" else "做菜"
                 raise ItemInventoryError(f"当前没有为“{label}”装备道具。")
+            item_id, armed_uses = cancelled
             item = item_by_id(item_id)
             quantity = await self.repository.item_quantity(
                 session,
@@ -2065,6 +2116,7 @@ class GameplayService:
                 "operation": "cancelled",
                 "item_id": item.item_id,
                 "quantity": quantity,
+                "armed_uses": armed_uses,
             }
             provisional = ItemActionResult(
                 receipt=self._provisional_receipt(
@@ -2081,6 +2133,7 @@ class GameplayService:
                 operation="cancelled",
                 item=item,
                 quantity=quantity,
+                armed_uses=armed_uses,
             )
             reservation = await self.receipt_repository.reserve(
                 session,
@@ -2106,6 +2159,7 @@ class GameplayService:
                 operation="cancelled",
                 item=item,
                 quantity=quantity,
+                armed_uses=armed_uses,
             )
 
     async def _catch_from_receipt(
@@ -2144,6 +2198,7 @@ class GameplayService:
             item_id=str(payload.get("item_id") or ""),
             item_name=str(payload.get("item_name") or ""),
             weights=tuple(float(value) for value in weights_raw),
+            item_remaining_uses=int(payload.get("item_remaining_uses") or 0),
             effect_summaries=tuple(str(value) for value in payload.get("effect_summaries", []) if str(value).strip()),
             excluded_summaries=tuple(
                 str(value) for value in payload.get("excluded_summaries", []) if str(value).strip()
@@ -2236,10 +2291,11 @@ class GameplayService:
         item = item_by_id(str(row["item_id"]))
         if item.action_type != action_type:
             raise ItemInventoryError("已装备道具与当前动作不兼容，请先取消道具。")
-        quantity = int(row["quantity"] or 0)
-        if quantity <= 0:
+        inventory_quantity = int(row["quantity"] or 0)
+        remaining_uses = int(row.get("remaining_uses") or 0)
+        if inventory_quantity <= 0 or remaining_uses <= 0:
             raise ItemInventoryError(f"已装备的“{item.display_name}”库存不足，请先取消道具。")
-        return item, quantity
+        return item, remaining_uses
 
     @staticmethod
     def _restricted_daily_limit(

@@ -119,6 +119,7 @@ class PigCardViewModel:
     daily_limit: int | None = None
     quota_exempt_catch: bool = False
     item_name: str = ""
+    item_remaining_uses: int = 0
     catalog_new: bool = False
     size_record: bool = False
     weight_record: bool = False
@@ -361,6 +362,7 @@ class ItemReceiptViewModel:
     action_label: str
     quantity: int
     effect_summary: str
+    armed_uses: int = 1
 
 
 @dataclass(frozen=True, slots=True)
@@ -394,6 +396,7 @@ class FoodCardViewModel:
     level_progress_percent: float = 0.0
     cookware_level: int | None = None
     item_name: str = ""
+    item_remaining_uses: int = 0
     catalog_new_count: int = 0
     bonus_selector: str = ""
     probability_summary: str = ""
@@ -490,6 +493,8 @@ class BatchCookingViewModel:
     catalog_new_count: int
     rarity: int | None
     items: tuple[BatchCookingItemViewModel, ...]
+    item_use_summaries: tuple[str, ...] = ()
+    effect_use_summaries: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

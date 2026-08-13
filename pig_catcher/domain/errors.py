@@ -90,7 +90,7 @@ class NoCookablePigError(GameplayError):
 
 
 class BatchCookRestrictedError(GameplayError):
-    """持有多次数做菜效果期间禁止批量做菜。"""
+    """持有来源为六星菜的做菜效果期间禁止批量做菜。"""
 
 
 class PigNotFoundError(GameplayError):

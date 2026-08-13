@@ -825,9 +825,11 @@ async def test_third_round_templates_render_all_business_views(
             action_label="抓猪",
             quantity=2,
             effect_summary="体型百分位 +0.12",
+            armed_uses=2,
         )
     )
     assert "成功动作时才消耗" in capability.calls[-1][0]
+    assert "连续 2 次" in capability.calls[-1][0]
 
 
 @pytest.mark.asyncio
@@ -893,6 +895,7 @@ async def test_fourth_round_templates_render_food_and_economy_views(
         level_progress_percent=22.22,
         cookware_level=2,
         item_name="主厨香料",
+        item_remaining_uses=2,
         catalog_new_count=1,
         probability_summary="1★ 75.0% · 2★ 22.0% · 3★ 3.0%",
     )
@@ -902,6 +905,7 @@ async def test_fourth_round_templates_render_food_and_economy_views(
     assert "&lt;script&gt;" in food_html
     assert "data:image/png;base64," in food_html
     assert "主厨香料" in food_html
+    assert "剩 2 次" in food_html
     assert "本次最终概率" in food_html
     assert "1★ 75.0%" in food_html
     assert "data-food-probability" in food_html

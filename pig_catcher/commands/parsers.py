@@ -67,6 +67,14 @@ class BatchCookQuery:
 
 
 @dataclass(frozen=True, slots=True)
+class ItemUseQuery:
+    """One item name and the number of consecutive compatible uses to arm."""
+
+    item_name: str
+    quantity: int = 1
+
+
+@dataclass(frozen=True, slots=True)
 class GiftQuery:
     """One exact asset selector after removing the structured @ marker."""
 
@@ -519,6 +527,31 @@ def parse_batch_cook_query(arguments: str) -> BatchCookQuery:
     if len(tokens) > 1:
         raise DomainValidationError(f"无法识别批量做菜参数“{tokens[1]}”。")
     return BatchCookQuery(rarity=rarity)
+
+
+def parse_item_use_query(arguments: str) -> ItemUseQuery:
+    """Parse ``/使用道具 <名称> [数量]`` without breaking spaced item names."""
+
+    normalized = str(arguments or "").strip()
+    if not normalized:
+        raise DomainValidationError("格式：/使用道具 道具名称 [数量]。")
+    tokens = normalized.rsplit(maxsplit=1)
+    if len(tokens) == 2:
+        try:
+            quantity = int(tokens[1])
+        except ValueError:
+            quantity = 1
+            item_name = normalized
+        else:
+            item_name = tokens[0].strip()
+    else:
+        item_name = normalized
+        quantity = 1
+    if not item_name:
+        raise DomainValidationError("请填写要使用的道具名称。")
+    if quantity <= 0:
+        raise DomainValidationError("道具连续使用次数必须是正整数。")
+    return ItemUseQuery(item_name=item_name, quantity=quantity)
 
 
 def parse_ledger_page(arguments: str) -> int:

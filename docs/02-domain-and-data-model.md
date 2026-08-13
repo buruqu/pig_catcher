@@ -100,11 +100,12 @@ player_id = scope_id + ":" + platform_user_id
 | `currency_ledger` | 猪币不可变账本 |
 | `upgrades` | 永久升级 |
 | `item_inventory` | 消耗品库存 |
-| `armed_items` | 已装备、等待下次动作使用的道具 |
+| `armed_items` | 已装备道具及同名连续使用队列的剩余次数 |
 | `trade_offers` | 交易报价、锁定和状态 |
 | `display_preferences` | 排行展示偏好 |
 | `player_statistics` | 不随资产转移、售卖或消耗倒退的累计统计 |
 | `player_food_effects` | 美食效果参数、发放次数、已消费次数和有效期 |
+| `pending_food_confirmations` | 玩家最后一份同名菜的待确认实例及 30 秒到期点 |
 | `player_catch_quota_bonuses` | 永久每时段加成、滚动 7 天每时段加成、到期时间与来源美食 |
 | `player_restrictions` | 按玩家保存插件/社交黑名单与可到期的抓猪时段额度上限 |
 | `asset_transfer_events` | 赠送与成交的资产转移审计 |
@@ -305,3 +306,6 @@ PENDING -> EXPIRED
 - Schema 23 为四作用域的猪鼻蛋包饭模板/可用实例加入个人两次做菜参数，为糖醋排骨加入
   隐藏爆发参数，并为雾蓝键盘大福、猪保千猪排轮盘加入最后一次小保底参数。尚未消费的
   个人效果和仍有效的糖醋排骨群效果同步收敛；已完成结算的旧猪鼻蛋包饭不追溯补发机会。
+- Schema 24 为 `armed_items` 增加非负 `remaining_uses`，旧装备默认迁移为 1 次；新增
+  `pending_food_confirmations`，按玩家保存最后一份同名菜、请求名称和 30 秒到期点。迁移不
+  预扣道具库存、不改写美食实例，也不为历史命令补建确认状态。

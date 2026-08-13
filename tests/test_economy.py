@@ -43,7 +43,9 @@ from pig_catcher.rendering import food_card_view, group_event_eat_view, store_vi
 from pig_catcher.services import (
     AssetCatalogService,
     CatchQuotaResetService,
+    EatConfirmationRequest,
     EconomyService,
+    FrameworkService,
     GameplayService,
     SocialService,
     format_cooking_summary,
@@ -786,6 +788,105 @@ async def test_eating_unknown_effect_does_not_consume_then_blank_effect_is_idemp
 
 
 @pytest.mark.asyncio
+async def test_quick_eat_uses_cheapest_same_name_and_confirms_last_copy(
+    tmp_path: Path,
+) -> None:
+    database = await _database_with_catalog(tmp_path, food_rarities=(1,))
+    identity = _identity(message_id="seed-quick-eat")
+    await FrameworkService(database).touch_identity(identity)
+    await _insert_food(
+        database,
+        player_id=identity.player_id,
+        scope_id=identity.scope.value,
+        template_id="food-1-common",
+        display_name="同名测试菜",
+        official_value=50,
+        short_code="QUICK050",
+        instance_id="quick-food-high",
+    )
+    await _insert_food(
+        database,
+        player_id=identity.player_id,
+        scope_id=identity.scope.value,
+        template_id="food-1-common",
+        display_name="同名测试菜",
+        official_value=20,
+        short_code="QUICK020",
+        instance_id="quick-food-low",
+    )
+    clock = FixedClock()
+    economy = EconomyService(
+        database,
+        CookingSection(cook_cooldown_seconds=0),
+        EconomySection(),
+        clock=clock,
+    )
+
+    eaten = await economy.eat_or_confirm(
+        _identity(message_id="quick-eat-low"),
+        "同名测试菜",
+    )
+    assert not isinstance(eaten, EatConfirmationRequest)
+    assert eaten.food.food_instance_id == "quick-food-low"
+    low = await database.fetch_one(
+        "SELECT state FROM food_instances WHERE food_instance_id = ?",
+        ("quick-food-low",),
+    )
+    assert low is not None and low["state"] == "consumed"
+
+    pending = await economy.eat_or_confirm(
+        _identity(message_id="quick-eat-last-prompt"),
+        "同名测试菜",
+    )
+    assert isinstance(pending, EatConfirmationRequest)
+    cancelled = await economy.confirm_eat(
+        _identity(message_id="quick-eat-no"),
+        accepted=False,
+    )
+    assert isinstance(cancelled, str) and "已取消" in cancelled
+
+    pending_again = await economy.eat_or_confirm(
+        _identity(message_id="quick-eat-last-prompt-2"),
+        "同名测试菜",
+    )
+    assert isinstance(pending_again, EatConfirmationRequest)
+    confirmed = await economy.confirm_eat(
+        _identity(message_id="quick-eat-yes"),
+        accepted=True,
+    )
+    assert not isinstance(confirmed, str)
+    assert confirmed.food.food_instance_id == "quick-food-high"
+
+    await _insert_food(
+        database,
+        player_id=identity.player_id,
+        scope_id=identity.scope.value,
+        template_id="food-1-common",
+        display_name="超时测试菜",
+        official_value=30,
+        short_code="TIMEOUT1",
+        instance_id="quick-food-timeout",
+    )
+    timeout_pending = await economy.eat_or_confirm(
+        _identity(message_id="quick-eat-timeout-prompt"),
+        "超时测试菜",
+    )
+    assert isinstance(timeout_pending, EatConfirmationRequest)
+    clock.value += timedelta(seconds=31)
+    expired = await economy.confirm_eat(
+        _identity(message_id="quick-eat-timeout-yes"),
+        accepted=True,
+    )
+    assert isinstance(expired, str) and "超过 30 秒" in expired
+    timeout_food = await database.fetch_one(
+        "SELECT state FROM food_instances WHERE food_instance_id = ?",
+        ("quick-food-timeout",),
+    )
+    assert timeout_food is not None and timeout_food["state"] == "active"
+    await database.close()
+
+
+@pytest.mark.asyncio
 async def test_high_rarity_food_effect_survives_restart_and_is_consumed_once(
     tmp_path: Path,
 ) -> None:
@@ -897,10 +998,11 @@ async def test_extra_catch_food_extends_today_limit_and_consumes_only_bonus_uses
         _identity(message_id="quota-cook"),
         source.pig.selector,
     )
-    await economy.eat(
+    eaten = await economy.eat(
         _identity(message_id="quota-eat"),
         cooked.foods[0].selector,
     )
+    assert "效果可用次数：2 次" in eaten.receipt.text_summary
 
     values = (
         0.0,
@@ -1779,7 +1881,6 @@ async def test_batch_cook_keeps_best_collaboration_duplicate_and_sorts_by_rarity
             ("A1000001", "A1000002", "A1000003", "A1000004")
         ).__next__,
     )
-    identity = _identity(message_id="batch-cook")
     for mid in ("cook-1", "cook-2", "cook-3", "cook-4"):
         await service.catch(_identity(message_id=mid, user_id="200"))
     async with database.transaction() as session:
@@ -1806,7 +1907,10 @@ async def test_batch_cook_keeps_best_collaboration_duplicate_and_sorts_by_rarity
         ).__next__,
         short_code_factory=iter(("ABAD0001", "ABAD0002", "ABAD0003")).__next__,
     )
-    result = await economy.batch_cook(identity, rarity=None)
+    result = await economy.batch_cook(
+        _identity(message_id="batch-cook-ordinary"),
+        rarity=None,
+    )
     assert result.pig_count == 3  # 两只普通猪 + 一只低价值联动重复猪
     assert result.food_count == 3
     # 同一种联动猪只保留最高价值的一只
@@ -1824,7 +1928,7 @@ async def test_batch_cook_keeps_best_collaboration_duplicate_and_sorts_by_rarity
 
 
 @pytest.mark.asyncio
-async def test_batch_cook_is_blocked_while_multi_use_cook_effect_is_held(
+async def test_batch_cook_only_blocks_six_star_origin_cook_effect(
     tmp_path: Path,
 ) -> None:
     from pig_catcher.domain.errors import BatchCookRestrictedError
@@ -1842,6 +1946,7 @@ async def test_batch_cook_is_blocked_while_multi_use_cook_effect_is_held(
             0.0, 0.0, 0.5, 0.5, 0.5, 0.5, 0.5,
             0.0, 0.0, 0.5, 0.5, 0.5, 0.5, 0.5,
             0.0, 0.0, 0.5, 0.5, 0.5, 0.5, 0.5,
+            0.0, 0.0, 0.5, 0.5, 0.5, 0.5, 0.5,
         ),
         clock=clock,
         id_factory=iter(
@@ -1849,9 +1954,10 @@ async def test_batch_cook_is_blocked_while_multi_use_cook_effect_is_held(
                 "pig-m1", "ledger-m1",
                 "pig-m2", "ledger-m2",
                 "pig-m3", "ledger-m3",
+                "pig-m4", "ledger-m4",
             )
         ).__next__,
-        short_code_factory=iter(("A1000001", "A1000002", "A1000003")).__next__,
+        short_code_factory=iter(("A1000001", "A1000002", "A1000003", "A1000004")).__next__,
     )
     identity = _identity(message_id="batch-cook-limit")
     for mid in ("cook-a", "cook-b", "cook-c"):
@@ -1876,6 +1982,7 @@ async def test_batch_cook_is_blocked_while_multi_use_cook_effect_is_held(
             0.0, 0.0, 0.5,
             0.0, 0.0, 0.5,
             0.0, 0.0, 0.5,
+            0.0, 0.0, 0.5,
         ),
         clock=clock,
         id_factory=iter(
@@ -1883,9 +1990,10 @@ async def test_batch_cook_is_blocked_while_multi_use_cook_effect_is_held(
                 "ec-food-1", "ec-ledger-1",
                 "ec-food-2", "ec-ledger-2",
                 "ec-food-3", "ec-ledger-3",
+                "ec-food-4", "ec-ledger-4",
             )
         ).__next__,
-        short_code_factory=iter(("ABAD0001", "ABAD0002", "ABAD0003")).__next__,
+        short_code_factory=iter(("ABAD0001", "ABAD0002", "ABAD0003", "ABAD0004")).__next__,
     )
     await economy.cook(
         _identity(message_id="cook-one"),
@@ -1918,25 +2026,41 @@ async def test_batch_cook_is_blocked_while_multi_use_cook_effect_is_held(
             ),
         )
 
-    # 持有 5 次必出五星菜效果：批量做菜被拒绝
-    with pytest.raises(BatchCookRestrictedError) as excinfo:
-        await economy.batch_cook(identity, rarity=None)
-    assert "只能逐个使用 /做菜" in str(excinfo.value)
+    # 普通菜效果不再拦截批量做菜；本批次按顺序逐只消耗。
+    result = await economy.batch_cook(identity, rarity=None)
+    assert result.pig_count == 2
+    ordinary_effect = await database.fetch_one(
+        "SELECT consumed_uses FROM player_food_effects WHERE effect_entry_id = ?",
+        ("multi-cook-effect",),
+    )
+    assert ordinary_effect is not None and ordinary_effect["consumed_uses"] == 2
 
-    # 效果剩余 1 次：仍然全程禁止批量做菜
+    # 新增原料并把效果来源品质改成六星；剩余一次也必须逐个做菜。
+    await service.catch(_identity(message_id="cook-d", user_id="200"))
     async with database.transaction() as session:
         await session.execute(
             """
-            UPDATE player_food_effects
-            SET consumed_uses = 4, updated_at = ?
+            UPDATE food_instances SET rarity = 6
+            WHERE food_instance_id = ?
+            """,
+            (str(food_row["food_instance_id"]),),
+        )
+        await session.execute(
+            """
+            UPDATE player_food_effects SET consumed_uses = 4, updated_at = ?
             WHERE effect_entry_id = 'multi-cook-effect'
             """,
             ("2026-07-28T00:00:00.000Z",),
         )
-    with pytest.raises(BatchCookRestrictedError):
-        await economy.batch_cook(identity, rarity=None)
+    with pytest.raises(BatchCookRestrictedError) as excinfo:
+        await economy.batch_cook(
+            _identity(message_id="batch-cook-six-star-blocked"),
+            rarity=None,
+        )
+    assert "六星菜做菜效果" in str(excinfo.value)
+    assert "只能逐个使用 /做菜" in str(excinfo.value)
 
-    # 效果用尽（剩余 0）后：放行批量做菜
+    # 六星菜效果用尽后放行。
     async with database.transaction() as session:
         await session.execute(
             """
@@ -1946,8 +2070,109 @@ async def test_batch_cook_is_blocked_while_multi_use_cook_effect_is_held(
             """,
             ("2026-07-28T00:00:00.000Z",),
         )
-    result = await economy.batch_cook(identity, rarity=None)
+    result = await economy.batch_cook(
+        _identity(message_id="batch-cook-six-star-finished"),
+        rarity=None,
+    )
+    assert result.pig_count == 1
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_batch_cook_consumes_queued_same_item_in_source_order(
+    tmp_path: Path,
+) -> None:
+    database = await _database_with_catalog(
+        tmp_path,
+        pig_rarities=(1,),
+        food_rarities=(1, 2),
+    )
+    clock = FixedClock()
+    catching = GameplayService(
+        database,
+        CatchingSection(cooldown_seconds=0),
+        random_source=SequenceRandom(
+            0.0, 0.0, 0.5, 0.5, 0.5, 0.5, 0.5,
+            0.0, 0.0, 0.5, 0.5, 0.5, 0.5, 0.5,
+        ),
+        clock=clock,
+        id_factory=iter(
+            (
+                "batch-item-pig-1",
+                "batch-item-ledger-1",
+                "batch-item-pig-2",
+                "batch-item-ledger-2",
+            )
+        ).__next__,
+        short_code_factory=iter(("BITEM001", "BITEM002")).__next__,
+    )
+    identity = _identity(message_id="batch-item-seed")
+    await catching.catch(identity)
+    await catching.catch(_identity(message_id="batch-item-seed-2"))
+    same_acquired_at = iso_timestamp(clock.now())
+    async with database.transaction() as session:
+        await session.execute(
+            "UPDATE pig_instances SET acquired_at = ? WHERE owner_player_id = ?",
+            (same_acquired_at, identity.player_id),
+        )
+        await session.execute(
+            """
+            INSERT INTO item_inventory(player_id, item_id, quantity, updated_at)
+            VALUES (?, 'chef-spice', 3, ?)
+            """,
+            (identity.player_id, iso_timestamp(clock.now())),
+        )
+    await catching.arm_item(
+        _identity(message_id="batch-item-arm"),
+        "主厨香料",
+        quantity=2,
+    )
+    economy = EconomyService(
+        database,
+        CookingSection(cook_cooldown_seconds=0),
+        EconomySection(),
+        random_source=SequenceRandom(
+            0.0, 0.0, 0.5,
+            0.0, 0.0, 0.5,
+        ),
+        clock=clock,
+        id_factory=iter(
+            (
+                "batch-item-food-1",
+                "batch-item-cook-ledger-1",
+                "batch-item-food-2",
+                "batch-item-cook-ledger-2",
+            )
+        ).__next__,
+        short_code_factory=iter(("BIFood01", "BIFood02")).__next__,
+    )
+    result = await economy.batch_cook(
+        _identity(message_id="batch-item-cook"),
+        rarity=None,
+    )
+    duplicate = await economy.batch_cook(
+        _identity(message_id="batch-item-cook"),
+        rarity=None,
+    )
     assert result.pig_count == 2
+    assert result.receipt_created is True
+    assert duplicate.receipt_created is False
+    assert duplicate.receipt is not None and result.receipt is not None
+    assert duplicate.receipt.receipt_id == result.receipt.receipt_id
+    assert [pig.pig_instance_id for pig in result.source_pigs] == [
+        "batch-item-pig-1",
+        "batch-item-pig-2",
+    ]
+    assert result.item_use_summaries == ("主厨香料 ×2（队列剩余 0 次）",)
+    inventory = await database.fetch_one(
+        "SELECT quantity FROM item_inventory WHERE player_id = ? AND item_id = ?",
+        (identity.player_id, "chef-spice"),
+    )
+    assert inventory is not None and inventory["quantity"] == 1
+    assert await database.fetch_one(
+        "SELECT 1 FROM armed_items WHERE player_id = ? AND action_type = 'cooking'",
+        (identity.player_id,),
+    ) is None
     await database.close()
 
 

@@ -1,6 +1,6 @@
 [plugin]
 enabled = true
-config_version = "1.19.1"
+config_version = "1.20.0"
 framework_phase = "6"
 
 [features]

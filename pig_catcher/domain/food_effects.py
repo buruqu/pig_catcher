@@ -160,6 +160,8 @@ class ActiveFoodEffect:
     consumed_uses: int
     expires_at: str
     created_at: str
+    source_food_rarity: int = 0
+    source_food_name: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -236,6 +238,25 @@ def active_effect_from_row(row: Mapping[str, object]) -> ActiveFoodEffect:
         consumed_uses=int(row["consumed_uses"]),
         expires_at=str(row.get("expires_at") or ""),
         created_at=str(row["created_at"]),
+        source_food_rarity=int(row.get("source_food_rarity") or 0),
+        source_food_name=str(row.get("source_food_name") or ""),
+    )
+
+
+def _consumption_summary(
+    effect: ActiveFoodEffect,
+    summary: str,
+) -> str:
+    """Append the post-settlement remainder for a genuinely multi-use effect."""
+
+    if effect.granted_uses <= 1:
+        return summary
+    remaining = max(
+        0,
+        effect.granted_uses - effect.consumed_uses - 1,
+    )
+    return (
+        f"{summary}（本次结算后剩余 {remaining}/{effect.granted_uses} 次）"
     )
 
 
@@ -967,6 +988,12 @@ def apply_catch_effects(
 ) -> CatchEffectApplication:
     """Apply ordinary effect families or one priority six-star exclusive effect."""
 
+    effects = tuple(
+        sorted(
+            effects,
+            key=lambda effect: (effect.created_at, effect.effect_entry_id),
+        )
+    )
     adjusted = list(normalize_weights(weights))
     stature_bias = 0.0
     consumed: list[str] = []
@@ -1036,7 +1063,7 @@ def apply_catch_effects(
                 )
             )
         consumed.append(exclusive.effect_entry_id)
-        summaries.append(exclusive_summary)
+        summaries.append(_consumption_summary(exclusive, exclusive_summary))
         already_reported = {
             exclusive.effect_entry_id,
             *(effect.effect_entry_id for effect in effects if effect.effect_id in EXCLUSIVE_CATCH_EFFECTS),
@@ -1128,7 +1155,7 @@ def apply_catch_effects(
                 )
             )
         consumed.append(probability_effect.effect_entry_id)
-        summaries.append(grant.summary)
+        summaries.append(_consumption_summary(probability_effect, grant.summary))
 
     if probability_effect is not None and probability_effect.effect_id == NEXT_GIANT_FIVE_STAR_CATCH:
         for effect in effects:
@@ -1145,7 +1172,7 @@ def apply_catch_effects(
             direction = 1.0 if grant.params["mode"] == "giant" else -1.0
             stature_bias += direction * float(grant.params["strength"])
             consumed.append(stature_effect.effect_entry_id)
-            summaries.append(grant.summary)
+            summaries.append(_consumption_summary(stature_effect, grant.summary))
     return CatchEffectApplication(
         weights=normalize_weights(adjusted),
         stature_bias=max(-0.50, min(0.50, stature_bias)),
@@ -1220,6 +1247,15 @@ def apply_group_catch_effects(
             f"×{float(grant.params['five_star_multiplier']):g} 和 "
             f"×{float(grant.params['six_star_multiplier']):g}。"
         )
+        if chosen.granted_uses_per_player > 1:
+            remaining = max(
+                0,
+                chosen.granted_uses_per_player - chosen.consumed_uses - 1,
+            )
+            summary += (
+                f"（本次结算后剩余 {remaining}/"
+                f"{chosen.granted_uses_per_player} 次）"
+            )
         skipped = tuple(
             f"{str(effect.params.get('source_label') or '六星菜')}全群加成"
             "（本次由神龙化猪七星云海锅独占，未叠加）"
@@ -1266,13 +1302,19 @@ def apply_group_catch_effects(
         adjusted,
         (1.0, 1.0, 1.0, 1.0, five_multiplier, six_multiplier),
     )
-    remaining = max(
+    available = max(
         0,
         chosen.granted_uses_per_player - chosen.consumed_uses,
     )
+    remaining = max(0, available - 1)
     source_label = str(grant.params["source_label"])
     source_display_name = _group_effect_display_name(chosen)
-    quota_text = f"；专属抓猪额度剩余 {remaining} 次" if remaining else ""
+    quota_text = (
+        f"；本次结算后专属抓猪额度剩余 {remaining}/"
+        f"{chosen.granted_uses_per_player} 次"
+        if available
+        else ""
+    )
     summary = (
         f"{source_label}全群加成（发动群友：{source_display_name}）："
         "5 星与 6 星相对权重分别 "
@@ -1287,7 +1329,7 @@ def apply_group_catch_effects(
     return GroupCatchEffectApplication(
         weights=adjusted,
         consumed_entry_ids=(),
-        dedicated_entry_id=(chosen.group_effect_entry_id if remaining else ""),
+        dedicated_entry_id=(chosen.group_effect_entry_id if available else ""),
         summaries=(summary,),
         skipped_summaries=skipped,
         exclusive=False,
@@ -1375,6 +1417,12 @@ def apply_cooking_effects(
     """Apply at most one queued effect from each compatible cooking family."""
 
     rarity = Rarity(int(source_rarity))
+    effects = tuple(
+        sorted(
+            effects,
+            key=lambda effect: (effect.created_at, effect.effect_entry_id),
+        )
+    )
     adjusted = list(normalize_weights(weights))
     consumed: list[str] = []
     summaries: list[str] = []
@@ -1406,7 +1454,7 @@ def apply_cooking_effects(
         else:
             adjusted = [0.0, 0.0, 0.0, 0.0, 100.0, 0.0]
         consumed.append(exclusive.effect_entry_id)
-        summaries.append(grant.summary)
+        summaries.append(_consumption_summary(exclusive, grant.summary))
         exclusive_ids = {effect.effect_entry_id for effect in effects if effect.effect_id in EXCLUSIVE_COOK_EFFECTS}
         skipped.extend(
             _exclusive_skipped_summary(effect)
@@ -1445,7 +1493,7 @@ def apply_cooking_effects(
             grant = resolve_food_effect(standard_bonus.effect_id, standard_bonus.params)
             selected_ids.add(standard_bonus.effect_entry_id)
             total_bonus += float(grant.params["bonus_percent"])
-            summaries.append(grant.summary)
+            summaries.append(_consumption_summary(standard_bonus, grant.summary))
 
         stackable = [
             effect
@@ -1532,7 +1580,7 @@ def apply_cooking_effects(
                     )
                 )
             consumed.append(chosen.effect_entry_id)
-            summaries.append(grant.summary)
+            summaries.append(_consumption_summary(chosen, grant.summary))
         adjusted[5] = 0.0
     return CookingEffectApplication(
         weights=normalize_weights(adjusted),

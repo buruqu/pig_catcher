@@ -575,7 +575,7 @@ def test_group_window_effect_uses_strongest_multiplier_and_dedicated_quota() -> 
     assert applied.weights[5] >= ordinary_food.weights[5]
     assert "发动群友：千早の花火" in applied.summaries[0]
     assert "1455722694" not in applied.summaries[0]
-    assert "剩余 7 次" in applied.summaries[0]
+    assert "本次结算后专属抓猪额度剩余 6/10 次" in applied.summaries[0]
     assert any("只取最高倍率" in text for text in applied.skipped_summaries)
     assert group_hidden_boost_chance(applied, (omelette, ribs)) == pytest.approx(10)
     missed = apply_group_hidden_boost(applied, (omelette, ribs), roll=0.10)
@@ -706,6 +706,45 @@ def test_same_family_cooking_effects_do_not_stack_and_report_skipped() -> None:
     assert len(application.skipped_summaries) == 1
     assert "未叠加" in application.skipped_summaries[0]
     # 不同名菜效果签名唯一性由目录测试覆盖；此处仅验证互斥分组
+
+
+def test_effect_resolution_sorts_by_eaten_time_before_selecting_group() -> None:
+    older_catch = _active_effect(
+        "older-catch",
+        "next-catch-quality",
+        {"multiplier": 2.0},
+        created_at="2026-08-07T00:00:00.000Z",
+    )
+    newer_catch = _active_effect(
+        "newer-catch",
+        "next-pig-rarity",
+        {"rarity": 5, "multiplier": 3.0},
+        created_at="2026-08-07T00:00:01.000Z",
+    )
+    catch_application = apply_catch_effects(
+        BASE_CATCH_WEIGHTS,
+        [newer_catch, older_catch],
+    )
+    assert catch_application.consumed_entry_ids == ("older-catch",)
+
+    older_cook = _active_effect(
+        "older-cook",
+        "next-cook-quality",
+        {"shift_percent": 8},
+        created_at="2026-08-07T00:00:00.000Z",
+    )
+    newer_cook = _active_effect(
+        "newer-cook",
+        "next-food-rarity",
+        {"rarity": 4, "multiplier": 2.0},
+        created_at="2026-08-07T00:00:01.000Z",
+    )
+    cook_application = apply_cooking_effects(
+        cooking_weights(3),
+        [newer_cook, older_cook],
+        source_rarity=3,
+    )
+    assert cook_application.consumed_entry_ids == ("older-cook",)
 
 
 def test_six_star_exclusive_effects_override_weights_with_multi_uses() -> None:

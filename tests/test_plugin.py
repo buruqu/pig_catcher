@@ -236,7 +236,7 @@ async def test_group_reset_command_rejects_unconfigured_user_before_backup(
 def test_plugin_registers_only_explicit_production_commands() -> None:
     plugin = create_plugin()
     components = plugin.get_components()
-    assert len(components) == 48
+    assert len(components) == 49
     commands = {
         component["name"]
         for component in components
@@ -272,6 +272,7 @@ def test_plugin_registers_only_explicit_production_commands() -> None:
         "pig_catcher_food_inventory",
         "pig_catcher_food_catalog",
         "pig_catcher_eat",
+        "pig_catcher_eat_confirmation",
         "pig_catcher_store",
         "pig_catcher_purchase",
         "pig_catcher_upgrade",
@@ -1817,6 +1818,67 @@ async def test_quota_reset_chance_requires_held_effect_and_consumes_once(
         ),
     )
     assert exhausted[0] is False
+    await plugin.on_unload()
+
+
+@pytest.mark.asyncio
+async def test_quick_eat_command_requires_last_copy_confirmation(
+    tmp_path: Path,
+) -> None:
+    plugin, context = await create_test_plugin(tmp_path)
+    await _install_test_pig(plugin, tmp_path, include_food=True)
+    actor = CommandIdentity(
+        scope=ScopeKey("qq", "10001"),
+        stream_id="stream-10001",
+        user_id="20001",
+        display_name="测试成员",
+        message_id="quick-eat-seed",
+        group_name="抓猪测试群",
+    )
+    await plugin._framework_service.touch_identity(actor)
+    now = "2026-07-28T04:00:00.000Z"
+    async with plugin.database.transaction() as session:
+        await session.execute(
+            """
+            INSERT INTO food_instances(
+                food_instance_id, short_code, scope_id, owner_player_id,
+                template_id, template_version, rarity, display_name_snapshot,
+                portion_weight, fat_category, official_value, effect_id,
+                effect_params_json, ruleset_version, random_snapshot_json,
+                state, acquired_at, updated_at
+            ) VALUES (
+                'quick-command-food', 'QCMD0001', ?, ?,
+                'command-food-1', 1, 1, '命令测试菜1',
+                1.0, 'balanced', 10, '', '{}', 21, '{}', 'active', ?, ?
+            )
+            """,
+            (actor.scope.value, actor.player_id, now, now),
+        )
+    prompt = await plugin.handle_eat(
+        stream_id="stream-10001",
+        **_command_kwargs(
+            build_message(message_id="quick-eat-prompt"),
+            selector="命令测试菜1",
+        ),
+    )
+    assert prompt[0] is True
+    assert "只剩最后一份" in prompt[1]
+    assert len(context.send.texts) == 1
+    assert context.send.images == []
+    confirmed = await plugin.handle_eat_confirmation(
+        stream_id="stream-10001",
+        **_command_kwargs(
+            build_message(message_id="quick-eat-confirm"),
+            decision="是",
+        ),
+    )
+    assert confirmed[0] is True
+    assert len(context.send.images) == 1
+    row = await plugin.database.fetch_one(
+        "SELECT state FROM food_instances WHERE food_instance_id = ?",
+        ("quick-command-food",),
+    )
+    assert row is not None and row["state"] == "consumed"
     await plugin.on_unload()
 
 

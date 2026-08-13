@@ -46,7 +46,7 @@ from ..domain.errors import (
     UpgradeLimitError,
 )
 from ..domain.food_effects import (
-    COOK_PROBABILITY_GROUP,
+    COOK_EFFECT_IDS,
     CURRENT_WINDOW_CATCHES,
     EXTRA_CATCHES,
     GROUP_EFFECT_IDS,
@@ -207,6 +207,7 @@ class CookingResult:
     weights: tuple[float, ...]
     bonus_serving: bool
     effect_summaries: tuple[str, ...]
+    item_remaining_uses: int = 0
     excluded_summaries: tuple[str, ...] = ()
     exclusive_effect_active: bool = False
 
@@ -281,6 +282,14 @@ class EatResult:
     total_experience: int
     coin_balance: int
     group_rewarded_players: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class EatConfirmationRequest:
+    """A 30-second confirmation before consuming the last copy of one dish."""
+
+    food: FoodView
+    expires_at: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -362,6 +371,10 @@ class BatchCookingResult:
     total_experience: int
     catalog_new_count: int
     rarity: int | None = None
+    item_use_summaries: tuple[str, ...] = ()
+    effect_use_summaries: tuple[str, ...] = ()
+    receipt: CommandReceipt | None = None
+    receipt_created: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -384,6 +397,8 @@ class _CookOutcome:
     effect_summaries: tuple[str, ...]
     excluded_summaries: tuple[str, ...]
     exclusive_effect_active: bool
+    item_remaining_uses: int = 0
+    effect_entry_ids: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -508,6 +523,8 @@ def format_cooking_summary(result: CookingResult) -> str:
     main = result.foods[0]
     bonus = f"\n大份餐盒加餐：{result.foods[1].selector}" if result.bonus_serving and len(result.foods) > 1 else ""
     item = result.item_name or "无"
+    if result.item_name:
+        item += f"（连续使用队列剩余 {result.item_remaining_uses} 次）"
     effect_text = f"\n美食加成：{'；'.join(result.effect_summaries)}" if result.effect_summaries else ""
     excluded_text = f"\n互斥未叠加：{'；'.join(result.excluded_summaries)}" if result.excluded_summaries else ""
     probability_line = " ".join(f"{index + 1}★{value:.1f}%" for index, value in enumerate(result.weights) if value > 0)
@@ -538,6 +555,22 @@ def format_cooking_summary(result: CookingResult) -> str:
         f"本次最终概率：{probability_line}\n"
         f"概率来源：{probability_sources}{effect_text}{excluded_text}"
     )
+
+
+def format_batch_cooking_summary(result: BatchCookingResult) -> str:
+    """Return a complete fallback for one idempotent batch-cooking receipt."""
+
+    lines = [
+        "【批量做菜成功】",
+        f"消耗 {result.pig_count} 只原料猪，产出 {result.food_count} 份美食。",
+        f"奖励：+{result.coin_reward} 猪币 / +{result.experience_reward} 经验。",
+        f"当前余额：{result.coin_balance} 猪币；累计经验：{result.total_experience}。",
+    ]
+    if result.item_use_summaries:
+        lines.append("道具结算：" + "；".join(result.item_use_summaries))
+    if result.effect_use_summaries:
+        lines.append("美食效果：" + "；".join(result.effect_use_summaries))
+    return "\n".join(lines)
 
 
 def format_food_detail_summary(food: FoodView) -> str:
@@ -611,12 +644,17 @@ def format_eat_summary(result: EatResult) -> str:
 
     experience = result.base_experience + result.effect.experience_bonus
     coin = f"；额外 +{result.effect.coin_bonus} 猪币" if result.effect.coin_bonus else ""
+    uses = (
+        f"\n效果可用次数：{result.effect.granted_uses} 次"
+        if result.effect.granted_uses > 1
+        else ""
+    )
     return (
         "【美食品鉴】\n"
         f"已吃掉 {result.food.stars} {result.food.selector}\n"
         f"获得经验：+{experience}{coin}\n"
         f"当前累计经验：{result.total_experience}；猪币：{result.coin_balance}\n"
-        f"效果：{result.effect.summary}"
+        f"效果：{result.effect.summary}{uses}"
     )
 
 
@@ -951,6 +989,7 @@ class EconomyService:
                 "cookware_level": outcome.cookware_level,
                 "item_id": outcome.item_id,
                 "item_name": outcome.item_name,
+                "item_remaining_uses": outcome.item_remaining_uses,
                 "weights": [round(value, 8) for value in outcome.weights],
                 "bonus_serving": outcome.bonus_serving,
                 "effect_summaries": list(outcome.effect_summaries),
@@ -982,6 +1021,7 @@ class EconomyService:
                 weights=outcome.weights,
                 bonus_serving=outcome.bonus_serving,
                 effect_summaries=outcome.effect_summaries,
+                item_remaining_uses=outcome.item_remaining_uses,
                 excluded_summaries=outcome.excluded_summaries,
                 exclusive_effect_active=outcome.exclusive_effect_active,
             )
@@ -1013,6 +1053,7 @@ class EconomyService:
                 weights=outcome.weights,
                 bonus_serving=outcome.bonus_serving,
                 effect_summaries=outcome.effect_summaries,
+                item_remaining_uses=outcome.item_remaining_uses,
                 excluded_summaries=outcome.excluded_summaries,
                 exclusive_effect_active=outcome.exclusive_effect_active,
             )
@@ -1045,9 +1086,9 @@ class EconomyService:
     ) -> BatchCookingResult:
         """Cook every eligible unlocked non-collaboration pig in one transaction.
 
-        Batch cooking never consumes armed items or collaboration pigs. It defaults
-        to rarities 1-3; an explicit rarity may select 1-5. When batch keeping is
-        enabled, one highest-value ordinary pig per template is also excluded.
+        Batch cooking consumes ordinary queued items/effects in deterministic pig
+        order and never consumes collaboration pigs. Six-star-origin cooking
+        effects still require individual cooking so their presentation is preserved.
         """
 
         if rarity is not None and not 1 <= int(rarity) <= 5:
@@ -1055,7 +1096,25 @@ class EconomyService:
         await self._expire_stale_offers()
         now_datetime = _safe_datetime(self.clock.now())
         now = iso_timestamp(now_datetime)
+        request_payload = {
+            "command_version": 2,
+            "rarity": int(rarity) if rarity is not None else None,
+        }
+        batch_key = MessageKeyFactory.build(identity, _BATCH_COOK_COMMAND)
         async with self.database.transaction() as session:
+            existing = await self.receipt_repository.get_by_key(session, batch_key)
+            if existing is not None:
+                validate_existing_receipt(
+                    existing,
+                    identity=identity,
+                    command_name=_BATCH_COOK_COMMAND,
+                    request_payload=request_payload,
+                )
+                return await self._batch_cook_from_receipt(
+                    session,
+                    existing,
+                    receipt_created=False,
+                )
             await self.framework_repository.touch_identity(
                 session,
                 identity=identity,
@@ -1074,19 +1133,25 @@ class EconomyService:
                     now=now,
                 )
             )
-            # 多次数做菜效果（如“接下来 5 次必出五星菜”）持有期间全程禁止批量做菜，
-            # 直到效果剩余次数用尽。
+            # 只有来源确实为六星菜、且会影响做菜的效果禁止批量做菜。
             restricted_effects = [
                 effect
                 for effect in active_effects
-                if effect.effect_id in COOK_PROBABILITY_GROUP and (effect.granted_uses - effect.consumed_uses) >= 1
+                if effect.effect_id in COOK_EFFECT_IDS
+                and effect.source_food_rarity == 6
+                and (effect.granted_uses - effect.consumed_uses) >= 1
             ]
             if restricted_effects:
                 summaries = "；".join(
-                    resolve_food_effect(effect.effect_id, effect.params).summary for effect in restricted_effects
+                    (
+                        effect.source_food_name
+                        or resolve_food_effect(effect.effect_id, effect.params).summary
+                    )
+                    for effect in restricted_effects
                 )
                 raise BatchCookRestrictedError(
-                    f"你持有多次做菜的美食效果（{summaries}），期间只能逐个使用 /做菜，不能批量做菜。"
+                    f"你持有六星菜做菜效果（{summaries}），"
+                    "该效果只能逐个使用 /做菜，不能批量做菜。"
                 )
             rows = await self.gameplay_repository.list_cookable_pigs(
                 session,
@@ -1107,7 +1172,10 @@ class EconomyService:
             catalog_new_count = 0
             last_coin_balance = 0
             last_total_experience = 0
-            batch_key = MessageKeyFactory.build(identity, _BATCH_COOK_COMMAND)
+            item_use_counts: dict[str, int] = {}
+            item_remaining: dict[str, int] = {}
+            effect_use_counts: dict[str, int] = {}
+            effect_last_summaries: dict[str, str] = {}
             for source in source_pigs:
                 outcome = await self._cook_one(
                     session,
@@ -1115,7 +1183,7 @@ class EconomyService:
                     source=source,
                     now=now,
                     idempotency_key=f"{batch_key}:{source.pig_instance_id}",
-                    apply_armed_item=False,
+                    apply_armed_item=True,
                 )
                 foods.extend(outcome.foods)
                 coin_reward += outcome.coin_reward
@@ -1123,6 +1191,75 @@ class EconomyService:
                 catalog_new_count += outcome.catalog_new_count
                 last_coin_balance = outcome.coin_balance
                 last_total_experience = outcome.total_experience
+                if outcome.item_name:
+                    item_use_counts[outcome.item_name] = (
+                        item_use_counts.get(outcome.item_name, 0) + 1
+                    )
+                    item_remaining[outcome.item_name] = outcome.item_remaining_uses
+                for entry_id, summary in zip(
+                    outcome.effect_entry_ids,
+                    outcome.effect_summaries,
+                    strict=False,
+                ):
+                    effect_use_counts[entry_id] = (
+                        effect_use_counts.get(entry_id, 0) + 1
+                    )
+                    effect_last_summaries[entry_id] = summary
+            item_use_summaries = tuple(
+                f"{name} ×{count}（队列剩余 {item_remaining[name]} 次）"
+                for name, count in item_use_counts.items()
+            )
+            effect_use_summaries = tuple(
+                summary
+                + (
+                    f"（本批共触发 {effect_use_counts[entry_id]} 次）"
+                    if effect_use_counts[entry_id] > 1
+                    else ""
+                )
+                for entry_id, summary in effect_last_summaries.items()
+            )
+            payload = {
+                "source_pig_instance_ids": [
+                    source.pig_instance_id for source in source_pigs
+                ],
+                "food_instance_ids": [food.food_instance_id for food in foods],
+                "pig_count": len(source_pigs),
+                "food_count": len(foods),
+                "coin_reward": coin_reward,
+                "experience_reward": experience_reward,
+                "coin_balance": last_coin_balance,
+                "total_experience": last_total_experience,
+                "catalog_new_count": catalog_new_count,
+                "rarity": int(rarity) if rarity is not None else None,
+                "item_use_summaries": list(item_use_summaries),
+                "effect_use_summaries": list(effect_use_summaries),
+            }
+            provisional = BatchCookingResult(
+                source_pigs=source_pigs,
+                foods=tuple(foods),
+                pig_count=len(source_pigs),
+                food_count=len(foods),
+                coin_reward=coin_reward,
+                experience_reward=experience_reward,
+                coin_balance=last_coin_balance,
+                total_experience=last_total_experience,
+                catalog_new_count=catalog_new_count,
+                rarity=rarity,
+                item_use_summaries=item_use_summaries,
+                effect_use_summaries=effect_use_summaries,
+            )
+            receipt = await self._reserve(
+                session,
+                identity=identity,
+                idempotency_key=batch_key,
+                command_name=_BATCH_COOK_COMMAND,
+                request_payload=request_payload,
+                result_type="batch-cooking",
+                result_object_id=(foods[0].food_instance_id if foods else ""),
+                result_payload=payload,
+                text_summary=format_batch_cooking_summary(provisional),
+                now=now,
+            )
             return BatchCookingResult(
                 source_pigs=source_pigs,
                 foods=tuple(foods),
@@ -1134,6 +1271,10 @@ class EconomyService:
                 total_experience=last_total_experience,
                 catalog_new_count=catalog_new_count,
                 rarity=rarity,
+                item_use_summaries=item_use_summaries,
+                effect_use_summaries=effect_use_summaries,
+                receipt=receipt,
+                receipt_created=True,
             )
 
     async def _cook_one(
@@ -1188,7 +1329,7 @@ class EconomyService:
             if apply_armed_item
             else None
         )
-        armed_item, _ = self._armed_item(armed_row)
+        armed_item, armed_uses = self._armed_item(armed_row)
         item_compatible = bool(
             armed_item is not None
             and (
@@ -1456,6 +1597,68 @@ class EconomyService:
             effect_summaries=effect_application.summaries,
             excluded_summaries=effect_application.skipped_summaries,
             exclusive_effect_active=exclusive_effect_active,
+            item_remaining_uses=(
+                max(0, armed_uses - 1) if applied_item is not None else 0
+            ),
+            effect_entry_ids=effect_application.consumed_entry_ids,
+        )
+
+    async def _batch_cook_from_receipt(
+        self,
+        session: DatabaseSession,
+        receipt: CommandReceipt,
+        *,
+        receipt_created: bool,
+    ) -> BatchCookingResult:
+        """Rehydrate one committed batch without touching pigs, items, or effects."""
+
+        if receipt.result_type != "batch-cooking":
+            raise ReceiptConflictError("批量做菜回执类型无效。")
+        payload = receipt_payload(receipt)
+        source_ids = payload.get("source_pig_instance_ids")
+        food_ids = payload.get("food_instance_ids")
+        if not isinstance(source_ids, list) or not source_ids:
+            raise ReceiptConflictError("批量做菜回执缺少原料猪实例。")
+        if not isinstance(food_ids, list) or not food_ids:
+            raise ReceiptConflictError("批量做菜回执缺少美食实例。")
+        source_pigs: list[PigView] = []
+        for source_id in source_ids:
+            row = await self.gameplay_repository.get_pig_by_instance_id(
+                session,
+                pig_instance_id=str(source_id),
+            )
+            if row is None:
+                raise ReceiptConflictError("批量做菜回执关联的原料猪不存在。")
+            source_pigs.append(pig_view_from_row(row))
+        foods = tuple(
+            [await self._food_by_id(session, str(food_id)) for food_id in food_ids]
+        )
+        item_summaries = payload.get("item_use_summaries", [])
+        effect_summaries = payload.get("effect_use_summaries", [])
+        if not isinstance(item_summaries, list) or not isinstance(
+            effect_summaries,
+            list,
+        ):
+            raise ReceiptConflictError("批量做菜回执中的效果摘要无效。")
+        return BatchCookingResult(
+            source_pigs=tuple(source_pigs),
+            foods=foods,
+            pig_count=int(payload["pig_count"]),
+            food_count=int(payload["food_count"]),
+            coin_reward=int(payload["coin_reward"]),
+            experience_reward=int(payload["experience_reward"]),
+            coin_balance=int(payload["coin_balance"]),
+            total_experience=int(payload["total_experience"]),
+            catalog_new_count=int(payload["catalog_new_count"]),
+            rarity=(
+                int(payload["rarity"])
+                if payload.get("rarity") is not None
+                else None
+            ),
+            item_use_summaries=tuple(str(value) for value in item_summaries),
+            effect_use_summaries=tuple(str(value) for value in effect_summaries),
+            receipt=receipt,
+            receipt_created=receipt_created,
         )
 
     async def food_detail(
@@ -1869,6 +2072,133 @@ class EconomyService:
                 coin_balance=coin_balance,
                 group_rewarded_players=group_rewarded_players,
             )
+
+    async def eat_or_confirm(
+        self,
+        identity: CommandIdentity,
+        selector_text: str,
+    ) -> EatResult | EatConfirmationRequest:
+        """Quick-eat the cheapest same-name copy, protecting the last copy."""
+
+        normalized_selector = str(selector_text or "").strip()
+        if not normalized_selector:
+            return await self.eat(identity, normalized_selector)
+        selector = parse_asset_selector(normalized_selector)
+        if selector.short_code is not None:
+            return await self.eat(identity, normalized_selector)
+
+        idempotency_key = MessageKeyFactory.build(identity, _EAT_COMMAND)
+        now_datetime = _safe_datetime(self.clock.now())
+        now = iso_timestamp(now_datetime)
+        selected: FoodView | None = None
+        async with self.database.transaction() as session:
+            existing = await self.receipt_repository.get_by_key(session, idempotency_key)
+            if existing is not None:
+                return await self._eat_from_receipt(
+                    session,
+                    existing,
+                    receipt_created=False,
+                )
+            await self.framework_repository.touch_identity(
+                session,
+                identity=identity,
+                now=now,
+            )
+            rows = await self.repository.find_active_foods(
+                session,
+                player_id=identity.player_id,
+                selector=selector,
+            )
+            if not rows:
+                raise FoodNotFoundError(
+                    f"你的美食背包中找不到“{normalized_selector}”。"
+                )
+            selected = food_view_from_row(rows[0])
+            if len(rows) == 1:
+                expires_at = iso_timestamp(now_datetime + timedelta(seconds=30))
+                await self.repository.upsert_pending_food_confirmation(
+                    session,
+                    player_id=identity.player_id,
+                    food_instance_id=selected.food_instance_id,
+                    requested_name=selector.name,
+                    expires_at=expires_at,
+                    now=now,
+                )
+                return EatConfirmationRequest(
+                    food=selected,
+                    expires_at=expires_at,
+                )
+        assert selected is not None
+        return await self.eat(identity, selected.selector)
+
+    async def confirm_eat(
+        self,
+        identity: CommandIdentity,
+        *,
+        accepted: bool,
+    ) -> EatResult | str:
+        """Resolve the current player's pending last-copy food confirmation."""
+
+        idempotency_key = MessageKeyFactory.build(identity, _EAT_COMMAND)
+        now = iso_timestamp(self.clock.now())
+        selected_selector = ""
+        selected_instance_id = ""
+        selected_name = ""
+        async with self.database.transaction() as session:
+            if accepted:
+                existing = await self.receipt_repository.get_by_key(
+                    session,
+                    idempotency_key,
+                )
+                if existing is not None:
+                    return await self._eat_from_receipt(
+                        session,
+                        existing,
+                        receipt_created=False,
+                    )
+            await self.framework_repository.touch_identity(
+                session,
+                identity=identity,
+                now=now,
+            )
+            pending = await self.repository.get_pending_food_confirmation(
+                session,
+                player_id=identity.player_id,
+            )
+            if pending is None:
+                return "当前没有待确认的最后一道同名菜。"
+            selected_instance_id = str(pending["food_instance_id"])
+            selected_name = str(pending["display_name_snapshot"])
+            if str(pending["expires_at"]) <= now:
+                await self.repository.delete_pending_food_confirmation(
+                    session,
+                    player_id=identity.player_id,
+                )
+                return "吃菜确认已超过 30 秒并自动退出，请重新发送 /吃菜 菜名。"
+            if not accepted:
+                await self.repository.delete_pending_food_confirmation(
+                    session,
+                    player_id=identity.player_id,
+                )
+                return f"已取消食用最后一份“{selected_name}”。"
+            if str(pending["state"]) != "active" or pending["locked_trade_id"] is not None:
+                await self.repository.delete_pending_food_confirmation(
+                    session,
+                    player_id=identity.player_id,
+                )
+                return "待确认美食已不在可用背包中，本次确认已退出。"
+            selected_selector = (
+                f"{selected_name}#{str(pending['short_code'])}"
+            )
+
+        result = await self.eat(identity, selected_selector)
+        async with self.database.transaction() as session:
+            await self.repository.delete_pending_food_confirmation(
+                session,
+                player_id=identity.player_id,
+                food_instance_id=selected_instance_id,
+            )
+        return result
 
     async def store(
         self,
@@ -2653,6 +2983,7 @@ class EconomyService:
             weights=tuple(float(value) for value in raw_weights),
             bonus_serving=bool(payload["bonus_serving"]),
             effect_summaries=tuple(str(value) for value in payload.get("effect_summaries", []) if str(value).strip()),
+            item_remaining_uses=int(payload.get("item_remaining_uses") or 0),
             excluded_summaries=tuple(
                 str(value) for value in payload.get("excluded_summaries", []) if str(value).strip()
             ),
@@ -2909,10 +3240,11 @@ class EconomyService:
         item = item_by_id(str(row["item_id"]))
         if item.action_type != "cooking":
             raise ItemInventoryError("已装备道具与做菜动作不兼容，请先取消道具。")
-        quantity = int(row["quantity"] or 0)
-        if quantity <= 0:
+        inventory_quantity = int(row["quantity"] or 0)
+        remaining_uses = int(row.get("remaining_uses") or 0)
+        if inventory_quantity <= 0 or remaining_uses <= 0:
             raise ItemInventoryError(f"已装备的“{item.display_name}”库存不足，请先取消道具。")
-        return item, quantity
+        return item, remaining_uses
 
     def _new_identifier(self) -> str:
         candidate = str(self.id_factory() or "").strip()

@@ -22,6 +22,8 @@ from pig_catcher.config.model import EconomySection  # noqa: E402
 from pig_catcher.domain.economy import build_store_products  # noqa: E402
 from pig_catcher.domain.rules import BASE_CATCH_WEIGHTS  # noqa: E402
 from pig_catcher.rendering import (  # noqa: E402
+    BatchCookingItemViewModel,
+    BatchCookingViewModel,
     EconomyReceiptRowViewModel,
     EconomyReceiptViewModel,
     FoodCardViewModel,
@@ -110,6 +112,7 @@ def food_card(
         level_progress_percent=26.67 if cooking else 0.0,
         cookware_level=3 if cooking else None,
         item_name="主厨香料" if cooking else "",
+        item_remaining_uses=2 if cooking else 0,
         catalog_new_count=1 if cooking else 0,
         bonus_selector="命令测试菜#B19F2C3D" if cooking else "",
         probability_line=("1★ 14.0% · 2★ 58.0% · 3★ 24.0% · 4★ 4.0%" if cooking else ""),
@@ -145,6 +148,7 @@ def long_effect_cooking_card(row: Mapping[str, object]) -> FoodCardViewModel:
         level_progress_percent=80.0,
         cookware_level=5,
         item_name="超级主厨香料",
+        item_remaining_uses=6,
         bonus_selector="",
         probability_line="5★ 64.0% · 6★ 36.0%",
         probability_sources=(
@@ -563,6 +567,42 @@ async def run(args: argparse.Namespace) -> dict[str, object]:
             renderer.render_static_food_card(
                 long_effect_cooking_card(sugar_result),
                 data_dir / str(sugar_result["image_relpath"]),
+            ),
+        )
+        await record(
+            "batch-cooking-ordered-effects",
+            renderer.render_batch_cook(
+                BatchCookingViewModel(
+                    display_name="连续道具与普通菜品效果验收成员",
+                    pig_count=3,
+                    food_count=3,
+                    coin_reward=180,
+                    experience_reward=210,
+                    catalog_new_count=2,
+                    rarity=None,
+                    items=tuple(
+                        BatchCookingItemViewModel(
+                            key=f"batch-{index}",
+                            display_name=f"批量料理示例 {index}",
+                            short_code=f"BATCH{index:03d}",
+                            rarity=index,
+                            portion_weight=12.5 + index,
+                            fat_label="均衡",
+                            official_value=120 * index,
+                            media_visible=False,
+                            is_animated=False,
+                            image_fit="contain",
+                            source_pig_name=f"原料猪 {index}",
+                        )
+                        for index in range(1, 4)
+                    ),
+                    item_use_summaries=("主厨香料 ×3（队列剩余 2 次）",),
+                    effect_use_summaries=(
+                        "猪籽军舰：下一次做菜五星概率提升（本次结算后剩余 2/5 次）"
+                        "（本批共触发 3 次）",
+                    ),
+                ),
+                {},
             ),
         )
         inventory = inventory_view(rows)

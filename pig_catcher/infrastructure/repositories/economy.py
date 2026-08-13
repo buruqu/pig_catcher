@@ -196,13 +196,18 @@ class EconomyRepository:
         rows = await session.fetch_all(
             """
             SELECT
-                effect_entry_id, effect_id, params_json, granted_uses,
-                consumed_uses, expires_at, created_at
-            FROM player_food_effects
-            WHERE player_id = ?
-              AND consumed_uses < granted_uses
-              AND (expires_at IS NULL OR expires_at > ?)
-            ORDER BY created_at, effect_entry_id
+                effect.effect_entry_id, effect.effect_id, effect.params_json,
+                effect.granted_uses, effect.consumed_uses,
+                effect.expires_at, effect.created_at,
+                source.rarity AS source_food_rarity,
+                source.display_name_snapshot AS source_food_name
+            FROM player_food_effects AS effect
+            JOIN food_instances AS source
+              ON source.food_instance_id = effect.source_food_instance_id
+            WHERE effect.player_id = ?
+              AND effect.consumed_uses < effect.granted_uses
+              AND (effect.expires_at IS NULL OR effect.expires_at > ?)
+            ORDER BY effect.created_at, effect.effect_entry_id
             """,
             (player_id, now),
         )
@@ -492,13 +497,17 @@ class EconomyRepository:
             FROM food_instances AS instance
             WHERE instance.owner_player_id = ?
               AND instance.state = 'active'
+              AND instance.locked_trade_id IS NULL
               AND (
                   instance.display_name_snapshot = ?
                   OR REPLACE(REPLACE(instance.display_name_snapshot, ' ', ''), '　', '')
                      = ? COLLATE NOCASE
               )
               {short_code_clause}
-            ORDER BY instance.acquired_at DESC
+            ORDER BY
+                instance.official_value,
+                instance.acquired_at,
+                instance.food_instance_id
             LIMIT 20
             """,
             parameters,
@@ -512,6 +521,92 @@ class EconomyRepository:
             if result is not None:
                 results.append(result)
         return results
+
+    async def upsert_pending_food_confirmation(
+        self,
+        session: DatabaseSession,
+        *,
+        player_id: str,
+        food_instance_id: str,
+        requested_name: str,
+        expires_at: str,
+        now: str,
+    ) -> None:
+        """Replace this player's pending last-copy food confirmation."""
+
+        await session.execute(
+            """
+            INSERT INTO pending_food_confirmations(
+                player_id, food_instance_id, requested_name,
+                expires_at, created_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(player_id) DO UPDATE SET
+                food_instance_id = excluded.food_instance_id,
+                requested_name = excluded.requested_name,
+                expires_at = excluded.expires_at,
+                created_at = excluded.created_at,
+                updated_at = excluded.updated_at
+            """,
+            (
+                player_id,
+                food_instance_id,
+                requested_name,
+                expires_at,
+                now,
+                now,
+            ),
+        )
+
+    async def get_pending_food_confirmation(
+        self,
+        session: DatabaseSession,
+        *,
+        player_id: str,
+    ) -> dict[str, object] | None:
+        row = await session.fetch_one(
+            """
+            SELECT
+                pending.player_id,
+                pending.food_instance_id,
+                pending.requested_name,
+                pending.expires_at,
+                pending.created_at,
+                food.short_code,
+                food.display_name_snapshot,
+                food.rarity,
+                food.official_value,
+                food.state,
+                food.locked_trade_id
+            FROM pending_food_confirmations AS pending
+            JOIN food_instances AS food
+              ON food.food_instance_id = pending.food_instance_id
+            WHERE pending.player_id = ?
+            """,
+            (player_id,),
+        )
+        return dict(row) if row is not None else None
+
+    async def delete_pending_food_confirmation(
+        self,
+        session: DatabaseSession,
+        *,
+        player_id: str,
+        food_instance_id: str | None = None,
+    ) -> None:
+        if food_instance_id is None:
+            await session.execute(
+                "DELETE FROM pending_food_confirmations WHERE player_id = ?",
+                (player_id,),
+            )
+            return
+        await session.execute(
+            """
+            DELETE FROM pending_food_confirmations
+            WHERE player_id = ? AND food_instance_id = ?
+            """,
+            (player_id, food_instance_id),
+        )
 
     async def cheapest_active_asset_id(
         self,

@@ -33,6 +33,7 @@ from .pig_catcher.commands import (
     parse_food_inventory_query,
     parse_gift_query,
     parse_inventory_query,
+    parse_item_use_query,
     parse_ledger_page,
     parse_purchase_query,
     parse_ranking_query,
@@ -105,6 +106,8 @@ from .pig_catcher.services import (
     CatchQuotaResetService,
     CatchResult,
     CookingResult,
+    EatConfirmationRequest,
+    EatResult,
     EconomyService,
     FoodView,
     FrameworkService,
@@ -116,6 +119,7 @@ from .pig_catcher.services import (
     RegulationService,
     RestrictionAdminService,
     SocialService,
+    format_batch_cooking_summary,
     format_batch_sale_summary,
     format_catalog_summary,
     format_catch_summary,
@@ -2157,7 +2161,7 @@ class PigCatcherPlugin(MaiBotPlugin):
     @Command(
         "pig_catcher_use_item",
         description="装备一个拥有的抓猪或做菜道具",
-        pattern=r"^/使用道具(?:\s+(?P<item_name>.*?))?\s*$",
+        pattern=r"^/使用道具(?:\s+(?P<arguments>.*?))?\s*$",
     )
     async def handle_use_item(
         self,
@@ -2173,10 +2177,15 @@ class PigCatcherPlugin(MaiBotPlugin):
         if rejected is not None or identity is None:
             return rejected or (False, "", 0)
         try:
-            item_name = matched_group(kwargs, "item_name")
+            raw_arguments = matched_group(kwargs, "arguments") or matched_group(
+                kwargs,
+                "item_name",
+            )
+            query = parse_item_use_query(raw_arguments)
             result = await cast(GameplayService, self._gameplay_service).arm_item(
                 identity,
-                item_name,
+                query.item_name,
+                quantity=query.quantity,
             )
             renderer = cast(PigCatcherRenderer, self._renderer)
             view = item_receipt_view(result)
@@ -2302,9 +2311,9 @@ class PigCatcherPlugin(MaiBotPlugin):
             renderer = cast(PigCatcherRenderer, self._renderer)
             view = batch_cook_view(result)
             fallback = (
-                f"【批量做菜成功】消耗 {result.pig_count} 只原料猪，"
-                f"产出 {result.food_count} 份美食，"
-                f"猪币 +{result.coin_reward}，经验 +{result.experience_reward}。"
+                result.receipt.text_summary
+                if result.receipt is not None and result.receipt.text_summary
+                else format_batch_cooking_summary(result)
             )
             data_dir = Path(self.ctx.paths.data_dir).resolve()
             media_paths = {
@@ -2312,6 +2321,13 @@ class PigCatcherPlugin(MaiBotPlugin):
                 for food in result.foods
                 if food_media_path(data_dir, food) is not None
             }
+            if result.receipt is not None:
+                return await self._deliver_receipt(
+                    stream_id=identity.stream_id,
+                    receipt=result.receipt,
+                    render=lambda: renderer.render_batch_cook(view, media_paths),
+                    fallback_text=fallback,
+                )
             return await self._deliver_query(
                 stream_id=identity.stream_id,
                 render=lambda: renderer.render_batch_cook(view, media_paths),
@@ -2476,46 +2492,100 @@ class PigCatcherPlugin(MaiBotPlugin):
         if rejected is not None or identity is None:
             return rejected or (False, "", 0)
         try:
-            result = await cast(EconomyService, self._economy_service).eat(
+            result = await cast(EconomyService, self._economy_service).eat_or_confirm(
                 identity,
                 matched_group(kwargs, "selector"),
             )
-            renderer = cast(PigCatcherRenderer, self._renderer)
-            if is_group_event_food(result):
-                event_view = group_event_eat_view(
-                    result,
-                    group_name=identity.group_name,
-                )
-                data_dir = Path(self.ctx.paths.data_dir).resolve()
-                source_path = food_media_path(data_dir, result.food)
-                fallback = (
-                    result.receipt.text_summary
-                    or format_group_event_eat_summary(result)
-                )
-                return await self._deliver_receipt(
-                    stream_id=identity.stream_id,
-                    receipt=result.receipt,
-                    render=lambda: renderer.render_group_event(
-                        event_view,
-                        source_path,
+            if isinstance(result, EatConfirmationRequest):
+                return await self._reply_text(
+                    identity.stream_id,
+                    (
+                        f"“{result.food.display_name}”只剩最后一份"
+                        f"（{result.food.rarity} 星，价值 {result.food.official_value} 猪币）。\n"
+                        "30 秒内发送 /是 确认食用，发送 /否 取消；超时自动退出。"
                     ),
-                    fallback_text=fallback,
+                    success=True,
                 )
-            else:
-                view = eat_receipt_view(result)
-                fallback = result.receipt.text_summary or format_eat_summary(result)
-            return await self._deliver_receipt(
-                stream_id=identity.stream_id,
-                receipt=result.receipt,
-                render=lambda: renderer.render_economy_receipt(view),
-                fallback_text=fallback,
-            )
+            return await self._deliver_eat_result(identity, result)
         except Exception as exc:
             return await self._command_error(
                 stream_id=identity.stream_id,
                 operation="吃菜",
                 error=exc,
             )
+
+    @Command(
+        "pig_catcher_eat_confirmation",
+        description="确认或取消食用最后一份同名美食",
+        pattern=r"^/(?P<decision>是|否)\s*$",
+    )
+    async def handle_eat_confirmation(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_command(
+            stream_id,
+            kwargs,
+            feature_enabled=self.settings.features.eating_enabled,
+            feature_label="吃菜",
+        )
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            accepted = matched_group(kwargs, "decision") == "是"
+            result = await cast(EconomyService, self._economy_service).confirm_eat(
+                identity,
+                accepted=accepted,
+            )
+            if isinstance(result, str):
+                return await self._reply_text(
+                    identity.stream_id,
+                    result,
+                    success=True,
+                )
+            return await self._deliver_eat_result(identity, result)
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation="确认吃菜",
+                error=exc,
+            )
+
+    async def _deliver_eat_result(
+        self,
+        identity: CommandIdentity,
+        result: EatResult,
+    ) -> tuple[bool, str, int]:
+        renderer = cast(PigCatcherRenderer, self._renderer)
+        if is_group_event_food(result):
+            event_view = group_event_eat_view(
+                result,
+                group_name=identity.group_name,
+            )
+            data_dir = Path(self.ctx.paths.data_dir).resolve()
+            source_path = food_media_path(data_dir, result.food)
+            fallback = (
+                result.receipt.text_summary
+                or format_group_event_eat_summary(result)
+            )
+            return await self._deliver_receipt(
+                stream_id=identity.stream_id,
+                receipt=result.receipt,
+                render=lambda: renderer.render_group_event(
+                    event_view,
+                    source_path,
+                ),
+                fallback_text=fallback,
+            )
+        view = eat_receipt_view(result)
+        fallback = result.receipt.text_summary or format_eat_summary(result)
+        return await self._deliver_receipt(
+            stream_id=identity.stream_id,
+            receipt=result.receipt,
+            render=lambda: renderer.render_economy_receipt(view),
+            fallback_text=fallback,
+        )
 
     @Command(
         "pig_catcher_store",

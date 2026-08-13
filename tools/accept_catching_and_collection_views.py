@@ -249,6 +249,7 @@ def pig_card(
         daily_count=12 if mode_label == "抓猪成功" else None,
         daily_limit=5 if mode_label == "抓猪成功" else None,
         item_name="巨物玉米" if mode_label == "抓猪成功" else "",
+        item_remaining_uses=3 if mode_label == "抓猪成功" else 0,
         catalog_new=True,
         size_record=True,
         weight_record=mode_label == "抓猪成功",
@@ -715,6 +716,7 @@ async def accept(args: argparse.Namespace) -> dict[str, object]:
                         action_label="抓猪",
                         quantity=4,
                         effect_summary="体型百分位 +0.12",
+                        armed_uses=4,
                     )
                 ),
             )
@@ -727,6 +729,7 @@ async def accept(args: argparse.Namespace) -> dict[str, object]:
                         action_label="抓猪",
                         quantity=2,
                         effect_summary="3 至 5 星相对权重 +12%，6 星 +2%",
+                        armed_uses=2,
                     )
                 ),
             )

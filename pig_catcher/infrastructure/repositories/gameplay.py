@@ -161,7 +161,11 @@ class GameplayRepository:
     ) -> dict[str, object] | None:
         row = await session.fetch_one(
             """
-            SELECT armed.item_id, inventory.quantity, armed.armed_at
+            SELECT
+                armed.item_id,
+                inventory.quantity,
+                armed.remaining_uses,
+                armed.armed_at
             FROM armed_items AS armed
             LEFT JOIN item_inventory AS inventory
               ON inventory.player_id = armed.player_id
@@ -360,6 +364,20 @@ class GameplayRepository:
         item_id: str,
         now: str,
     ) -> bool:
+        armed = await session.execute(
+            """
+            UPDATE armed_items
+            SET remaining_uses = remaining_uses - 1,
+                armed_at = ?
+            WHERE player_id = ?
+              AND action_type = ?
+              AND item_id = ?
+              AND remaining_uses > 0
+            """,
+            (now, player_id, action_type, item_id),
+        )
+        if armed.rowcount != 1:
+            return False
         cursor = await session.execute(
             """
             UPDATE item_inventory
@@ -373,7 +391,10 @@ class GameplayRepository:
         await session.execute(
             """
             DELETE FROM armed_items
-            WHERE player_id = ? AND action_type = ? AND item_id = ?
+            WHERE player_id = ?
+              AND action_type = ?
+              AND item_id = ?
+              AND remaining_uses <= 0
             """,
             (player_id, action_type, item_id),
         )
@@ -544,7 +565,10 @@ class GameplayRepository:
               AND instance.locked_trade_id IS NULL
               {rarity_clause}
               {keep_clause}
-            ORDER BY instance.rarity DESC, instance.acquired_at ASC
+            ORDER BY
+                instance.rarity DESC,
+                instance.acquired_at ASC,
+                instance.pig_instance_id ASC
             """,
             parameters,
         )
@@ -1003,17 +1027,21 @@ class GameplayRepository:
         player_id: str,
         action_type: str,
         item_id: str,
+        remaining_uses: int,
         now: str,
     ) -> None:
         await session.execute(
             """
-            INSERT INTO armed_items(player_id, action_type, item_id, armed_at)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO armed_items(
+                player_id, action_type, item_id, armed_at, remaining_uses
+            )
+            VALUES (?, ?, ?, ?, ?)
             ON CONFLICT(player_id, action_type) DO UPDATE SET
                 item_id = excluded.item_id,
-                armed_at = excluded.armed_at
+                armed_at = excluded.armed_at,
+                remaining_uses = excluded.remaining_uses
             """,
-            (player_id, action_type, item_id, now),
+            (player_id, action_type, item_id, now, remaining_uses),
         )
 
     async def cancel_armed_item(
@@ -1022,10 +1050,10 @@ class GameplayRepository:
         *,
         player_id: str,
         action_type: str,
-    ) -> str | None:
+    ) -> tuple[str, int] | None:
         row = await session.fetch_one(
             """
-            SELECT item_id
+            SELECT item_id, remaining_uses
             FROM armed_items
             WHERE player_id = ? AND action_type = ?
             """,
@@ -1040,7 +1068,7 @@ class GameplayRepository:
             """,
             (player_id, action_type),
         )
-        return str(row["item_id"])
+        return str(row["item_id"]), int(row["remaining_uses"])
 
     async def list_baogian_instances(
         self,

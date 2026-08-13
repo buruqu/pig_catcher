@@ -215,6 +215,7 @@ def pig_card_view(
         daily_limit=catch.daily_limit if catch is not None else None,
         quota_exempt_catch=catch.quota_exempt_catch if catch is not None else False,
         item_name=catch.item_name if catch is not None else "",
+        item_remaining_uses=(catch.item_remaining_uses if catch is not None else 0),
         catalog_new=catch.catalog_new if catch is not None else False,
         size_record=catch.size_record if catch is not None else pig.is_size_record,
         weight_record=catch.weight_record if catch is not None else pig.is_weight_record,
@@ -441,6 +442,7 @@ def item_receipt_view(result: ItemActionResult) -> ItemReceiptViewModel:
         item_name=result.item.display_name,
         action_label="抓猪" if result.item.action_type == "catching" else "做菜",
         quantity=result.quantity,
+        armed_uses=result.armed_uses,
         effect_summary=result.item.effect_summary,
     )
 
@@ -485,6 +487,9 @@ def food_card_view(
         level_progress_percent=(progress.progress_percent if progress is not None else 0.0),
         cookware_level=(cooking.cookware_level if cooking is not None else None),
         item_name=cooking.item_name if cooking is not None else "",
+        item_remaining_uses=(
+            cooking.item_remaining_uses if cooking is not None else 0
+        ),
         catalog_new_count=(cooking.catalog_new_count if cooking is not None else 0),
         bonus_selector=bonus_selector,
         probability_summary=(cooking.probability_summary if cooking is not None else ""),
@@ -784,6 +789,8 @@ def batch_cook_view(result: BatchCookingResult) -> BatchCookingViewModel:
         catalog_new_count=result.catalog_new_count,
         rarity=result.rarity,
         items=items,
+        item_use_summaries=result.item_use_summaries,
+        effect_use_summaries=result.effect_use_summaries,
     )
 
 
@@ -797,6 +804,13 @@ def eat_receipt_view(result: EatResult) -> EconomyReceiptViewModel:
     ]
     if result.effect.coin_bonus:
         rows.append(EconomyReceiptRowViewModel("额外猪币", f"+{result.effect.coin_bonus}"))
+    if result.effect.granted_uses > 1:
+        rows.append(
+            EconomyReceiptRowViewModel(
+                "效果可用次数",
+                f"{result.effect.granted_uses} 次",
+            )
+        )
     return EconomyReceiptViewModel(
         eyebrow="美食品鉴 · 成功后消耗一份",
         title="开饭啦",

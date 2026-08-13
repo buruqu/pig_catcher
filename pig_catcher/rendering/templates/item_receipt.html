@@ -12,7 +12,7 @@
   <main class="game-sheet item-receipt" data-pig-catcher-root data-render-ready="true">
     <header class="game-header">
       <div class="game-header__copy">
-        <p class="game-header__eyebrow">一次性道具 · 成功动作时才消耗</p>
+        <p class="game-header__eyebrow">连续使用道具 · 成功动作时才消耗</p>
         <h1>{{ "道具已装备" if view.operation == "armed" else "道具已取消" }}</h1>
       </div>
       <div class="game-header__meta">
@@ -27,20 +27,21 @@
         <h2 style="font-size: {% if view.item_name|length > 45 %}18{% elif view.item_name|length > 28 %}24{% else %}34{% endif %}px">{{ view.item_name }}</h2>
         <p>
           {% if view.operation == "armed" %}
-          已装备到下一次 {{ view.action_label }}。参数错误、冷却或结算失败都不会消耗。
+          已安排连续 {{ view.armed_uses }} 次兼容的 {{ view.action_label }}。参数错误、冷却或结算失败都不会消耗。
           {% else %}
           装备已取消，道具仍完整保留在库存中。
           {% endif %}
         </p>
         <div class="pill-row">
           <span class="pill pill--strong">库存 {{ view.quantity }}</span>
+          <span class="pill">队列 {{ view.armed_uses }} 次</span>
           <span class="pill pill--mint">{{ view.effect_summary }}</span>
         </div>
       </div>
     </section>
 
     <footer class="game-footer">
-      <span>每种动作同时最多装备一个兼容道具</span>
+      <span>每种动作同时最多安排一种同名道具，可批量设置连续使用次数</span>
       <strong>{{ view.item_name }}</strong>
     </footer>
   </main>

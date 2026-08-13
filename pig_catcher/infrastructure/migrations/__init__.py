@@ -24,6 +24,7 @@ from .v0020_food_effect_expansion import MIGRATION_0020
 from .v0021_pig_cookie_effect_repair import MIGRATION_0021
 from .v0022_group_food_effects import MIGRATION_0022
 from .v0023_six_star_food_guarantees import MIGRATION_0023
+from .v0024_quick_eat_and_item_queue import MIGRATION_0024
 
 MIGRATIONS: tuple[Migration, ...] = (
     MIGRATION_0001,
@@ -49,6 +50,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     MIGRATION_0021,
     MIGRATION_0022,
     MIGRATION_0023,
+    MIGRATION_0024,
 )
 
 __all__ = ["MIGRATIONS", "Migration"]

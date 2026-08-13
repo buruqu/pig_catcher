@@ -48,6 +48,7 @@ async def test_empty_database_migrates_and_passes_integrity_check(tmp_path: Path
         "player_food_effects",
         "group_food_effects",
         "group_food_effect_usage",
+        "pending_food_confirmations",
         "player_catch_quota_bonuses",
         "player_restrictions",
         "trade_offers",
@@ -57,6 +58,8 @@ async def test_empty_database_migrates_and_passes_integrity_check(tmp_path: Path
         "anti_abuse_holds",
         "anti_abuse_events",
     } <= names
+    armed_columns = await database.fetch_all("PRAGMA table_info(armed_items)")
+    assert "remaining_uses" in {str(row["name"]) for row in armed_columns}
     pig_columns = await database.fetch_all("PRAGMA table_info(pig_templates)")
     assert "paired_food_template_id" in {str(row["name"]) for row in pig_columns}
     instance_tables = await database.fetch_all(

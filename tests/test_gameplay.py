@@ -1307,6 +1307,48 @@ async def test_coin_bounty_tag_doubles_coins_and_increases_experience_once(
 
 
 @pytest.mark.asyncio
+async def test_same_item_can_queue_multiple_compatible_catches(tmp_path: Path) -> None:
+    database = await _database_with_catalog(
+        tmp_path,
+        [_pig_entry("one-pig", rarity=1)],
+    )
+    identity = _identity(message_id="queue-arm")
+    await FrameworkService(database).touch_identity(identity)
+    async with database.transaction() as session:
+        await session.execute(
+            """
+            INSERT INTO item_inventory(player_id, item_id, quantity, updated_at)
+            VALUES (?, 'giant-corn', 3, '2026-07-28T00:00:00.000Z')
+            """,
+            (identity.player_id,),
+        )
+    service = GameplayService(
+        database,
+        CatchingSection(cooldown_seconds=0),
+        random_source=SequenceRandom(
+            *_catch_rolls(),
+            *_catch_rolls(),
+        ),
+    )
+    armed = await service.arm_item(identity, "巨物玉米", quantity=2)
+    assert armed.armed_uses == 2
+    first = await service.catch(_identity(message_id="queue-catch-1"))
+    second = await service.catch(_identity(message_id="queue-catch-2"))
+    assert (first.item_remaining_uses, second.item_remaining_uses) == (1, 0)
+    assert "剩余 1 次" in format_catch_summary(first)
+    inventory = await database.fetch_one(
+        "SELECT quantity FROM item_inventory WHERE player_id = ? AND item_id = ?",
+        (identity.player_id, "giant-corn"),
+    )
+    assert inventory is not None and inventory["quantity"] == 1
+    assert await database.fetch_one(
+        "SELECT 1 FROM armed_items WHERE player_id = ? AND action_type = 'catching'",
+        (identity.player_id,),
+    ) is None
+    await database.close()
+
+
+@pytest.mark.asyncio
 async def test_item_is_not_consumed_when_catch_fails_cooldown(tmp_path: Path) -> None:
     database = await _database_with_catalog(
         tmp_path,
