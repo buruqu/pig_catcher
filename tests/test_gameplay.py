@@ -1349,6 +1349,58 @@ async def test_same_item_can_queue_multiple_compatible_catches(tmp_path: Path) -
 
 
 @pytest.mark.asyncio
+async def test_last_item_use_rolls_back_when_inventory_is_missing(tmp_path: Path) -> None:
+    database = await _database_with_catalog(
+        tmp_path,
+        [_pig_entry("one-pig", rarity=1)],
+    )
+    identity = _identity(message_id="last-use-arm")
+    await FrameworkService(database).touch_identity(identity)
+    async with database.transaction() as session:
+        await session.execute(
+            """
+            INSERT INTO item_inventory(player_id, item_id, quantity, updated_at)
+            VALUES (?, 'giant-corn', 1, '2026-07-28T00:00:00.000Z')
+            """,
+            (identity.player_id,),
+        )
+    service = GameplayService(
+        database,
+        CatchingSection(cooldown_seconds=0),
+        random_source=SequenceRandom(*_catch_rolls()),
+    )
+    await service.arm_item(identity, "巨物玉米")
+    async with database.transaction() as session:
+        await session.execute(
+            """
+            UPDATE item_inventory
+            SET quantity = 0
+            WHERE player_id = ? AND item_id = 'giant-corn'
+            """,
+            (identity.player_id,),
+        )
+
+    with pytest.raises(ItemInventoryError, match="库存不足"):
+        await service.catch(_identity(message_id="last-use-catch"))
+
+    armed = await database.fetch_one(
+        """
+        SELECT remaining_uses
+        FROM armed_items
+        WHERE player_id = ? AND action_type = 'catching'
+        """,
+        (identity.player_id,),
+    )
+    pigs = await database.fetch_one(
+        "SELECT COUNT(*) AS count FROM pig_instances WHERE owner_player_id = ?",
+        (identity.player_id,),
+    )
+    assert armed is not None and int(armed["remaining_uses"]) == 1
+    assert pigs is not None and int(pigs["count"]) == 0
+    await database.close()
+
+
+@pytest.mark.asyncio
 async def test_item_is_not_consumed_when_catch_fails_cooldown(tmp_path: Path) -> None:
     database = await _database_with_catalog(
         tmp_path,

@@ -1316,3 +1316,15 @@
   零坏图。验收只使用生产数据的一致性只读克隆与素材目录只读链接。
 - 本轮未启动或重启 MaiBot，未读写生产数据库，也未向真实 QQ 群发送消息；用户正常重启后
   才会加载新迁移与命令。
+
+## 57. v1.20.1 连续道具最后一次结算修复验收
+
+- 验收日期：`2026-08-13`。插件升级为 `local.pig-catcher v1.20.1`、Schema `25`；
+  Ruleset `21` 与 Asset Manifest `4` 不变，不调整任何菜品、道具价格或概率数值。
+- 生产日志确认反复报错均发生在连续道具剩余 1 次时：旧逻辑先把 `remaining_uses` 更新为 0，
+  触发生产表 `CHECK (remaining_uses > 0)`，整次抓猪或做菜回滚并向群里回复暂时不可用。
+- 最后一次现在直接删除装备队列；剩余大于 1 次才执行递减。库存扣减和队列变更位于同一
+  `BEGIN IMMEDIATE` 事务，并带当前次数条件，异常或并发变化都会回滚业务结算。
+- Schema 25 已由在线热加载成功迁移生产库，14 条正数队列保留；`PRAGMA quick_check=ok`，
+  `foreign_key_check` 为空。未重启 MaiBot，也未向真实 QQ 群发送测试消息。
+- 离线门禁：pytest `270 passed`；Ruff、Python `compileall` 与 `git diff --check` 全部通过。

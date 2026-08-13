@@ -60,6 +60,11 @@ async def test_empty_database_migrates_and_passes_integrity_check(tmp_path: Path
     } <= names
     armed_columns = await database.fetch_all("PRAGMA table_info(armed_items)")
     assert "remaining_uses" in {str(row["name"]) for row in armed_columns}
+    armed_table = await database.fetch_one(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'armed_items'"
+    )
+    assert armed_table is not None
+    assert "CHECK (remaining_uses > 0)" in str(armed_table["sql"])
     pig_columns = await database.fetch_all("PRAGMA table_info(pig_templates)")
     assert "paired_food_template_id" in {str(row["name"]) for row in pig_columns}
     instance_tables = await database.fetch_all(
@@ -80,6 +85,80 @@ async def test_empty_database_migrates_and_passes_integrity_check(tmp_path: Path
     receipt_column_map = {str(row["name"]): row for row in receipt_columns}
     assert int(receipt_column_map["catch_quota_cost"]["notnull"]) == 1
     assert str(receipt_column_map["catch_quota_cost"]["dflt_value"]) == "1"
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_v24_armed_item_queue_migrates_to_positive_only_rows(tmp_path: Path) -> None:
+    path = tmp_path / "v24-armed-items.sqlite3"
+    connection = sqlite3.connect(path)
+    connection.execute(
+        """
+        CREATE TABLE schema_migrations (
+            version INTEGER PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE,
+            applied_at TEXT NOT NULL
+        )
+        """
+    )
+    for migration in (item for item in MIGRATIONS if item.version <= 24):
+        for statement in migration.statements:
+            connection.execute(statement)
+        connection.execute(
+            "INSERT INTO schema_migrations(version, name, applied_at) VALUES (?, ?, 'now')",
+            (migration.version, migration.name),
+        )
+        connection.execute(f"PRAGMA user_version = {migration.version}")
+    now = "2026-08-13T12:00:00.000Z"
+    connection.execute(
+        """
+        INSERT INTO scopes(
+            scope_id, platform, group_id, group_name, stream_id, created_at, updated_at
+        ) VALUES ('qq:100', 'qq', '100', '测试群', 'stream-100', ?, ?)
+        """,
+        (now, now),
+    )
+    for player_id, platform_user_id in (("qq:100:200", "200"), ("qq:100:201", "201")):
+        connection.execute(
+            """
+            INSERT INTO players(
+                player_id, scope_id, platform_user_id, display_name, created_at, updated_at
+            ) VALUES (?, 'qq:100', ?, '测试成员', ?, ?)
+            """,
+            (player_id, platform_user_id, now, now),
+        )
+    connection.execute(
+        """
+        INSERT INTO armed_items(player_id, action_type, item_id, armed_at, remaining_uses)
+        VALUES ('qq:100:200', 'catching', 'giant-corn', ?, 1)
+        """,
+        (now,),
+    )
+    connection.execute(
+        """
+        INSERT INTO armed_items(player_id, action_type, item_id, armed_at, remaining_uses)
+        VALUES ('qq:100:201', 'cooking', 'precision-knife', ?, 0)
+        """,
+        (now,),
+    )
+    connection.commit()
+    connection.close()
+
+    database = PigCatcherDatabase(path)
+    await database.open()
+    assert await database.schema_version() == SCHEMA_VERSION
+    rows = await database.fetch_all(
+        "SELECT player_id, remaining_uses FROM armed_items ORDER BY player_id"
+    )
+    assert [(str(row["player_id"]), int(row["remaining_uses"])) for row in rows] == [
+        ("qq:100:200", 1)
+    ]
+    table = await database.fetch_one(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'armed_items'"
+    )
+    assert table is not None
+    assert "CHECK (remaining_uses > 0)" in str(table["sql"])
+    assert await database.integrity_check() == ("ok",)
     await database.close()
 
 

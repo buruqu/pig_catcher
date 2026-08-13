@@ -309,3 +309,6 @@ PENDING -> EXPIRED
 - Schema 24 为 `armed_items` 增加非负 `remaining_uses`，旧装备默认迁移为 1 次；新增
   `pending_food_confirmations`，按玩家保存最后一份同名菜、请求名称和 30 秒到期点。迁移不
   预扣道具库存、不改写美食实例，也不为历史命令补建确认状态。
+- Schema 25 重建 `armed_items` 并统一为 `remaining_uses > 0`：最后一份道具结算时直接删除
+  队列记录，正数队列原样迁移，历史耗尽行丢弃。库存扣减与队列删除/递减仍处于同一事务，
+  任一步失败都会回滚整次抓猪或做菜结算。

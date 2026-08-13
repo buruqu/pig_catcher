@@ -364,20 +364,20 @@ class GameplayRepository:
         item_id: str,
         now: str,
     ) -> bool:
-        armed = await session.execute(
+        armed_row = await session.fetch_one(
             """
-            UPDATE armed_items
-            SET remaining_uses = remaining_uses - 1,
-                armed_at = ?
+            SELECT remaining_uses
+            FROM armed_items
             WHERE player_id = ?
               AND action_type = ?
               AND item_id = ?
               AND remaining_uses > 0
             """,
-            (now, player_id, action_type, item_id),
+            (player_id, action_type, item_id),
         )
-        if armed.rowcount != 1:
+        if armed_row is None:
             return False
+        remaining_uses = int(armed_row["remaining_uses"])
         cursor = await session.execute(
             """
             UPDATE item_inventory
@@ -388,16 +388,32 @@ class GameplayRepository:
         )
         if cursor.rowcount != 1:
             return False
-        await session.execute(
-            """
-            DELETE FROM armed_items
-            WHERE player_id = ?
-              AND action_type = ?
-              AND item_id = ?
-              AND remaining_uses <= 0
-            """,
-            (player_id, action_type, item_id),
-        )
+        if remaining_uses == 1:
+            armed = await session.execute(
+                """
+                DELETE FROM armed_items
+                WHERE player_id = ?
+                  AND action_type = ?
+                  AND item_id = ?
+                  AND remaining_uses = 1
+                """,
+                (player_id, action_type, item_id),
+            )
+        else:
+            armed = await session.execute(
+                """
+                UPDATE armed_items
+                SET remaining_uses = remaining_uses - 1,
+                    armed_at = ?
+                WHERE player_id = ?
+                  AND action_type = ?
+                  AND item_id = ?
+                  AND remaining_uses = ?
+                """,
+                (now, player_id, action_type, item_id, remaining_uses),
+            )
+        if armed.rowcount != 1:
+            raise RuntimeError("道具连续使用队列在结算过程中发生并发变化，本次业务已回滚。")
         return True
 
     async def get_pig_by_instance_id(
