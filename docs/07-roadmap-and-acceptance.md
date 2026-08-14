@@ -1328,3 +1328,23 @@
 - Schema 25 已由在线热加载成功迁移生产库，14 条正数队列保留；`PRAGMA quick_check=ok`，
   `foreign_key_check` 为空。未重启 MaiBot，也未向真实 QQ 群发送测试消息。
 - 离线门禁：pytest `270 passed`；Ruff、Python `compileall` 与 `git diff --check` 全部通过。
+
+## 58. v1.21.0 自动监管降敏与全局清零验收
+
+- 验收日期：`2026-08-14`。插件升级为 `local.pig-catcher v1.21.0`、Ruleset `22`；Schema `25`
+  与 Asset Manifest `4` 不变，不调整抓猪、做菜、菜品或道具数值。
+- 配置管理员参与的当前赠送/成交交易完全不创建监管状态；历史流转构图前同样排除管理员。
+  非管理员已有活动限制仍优先执行，三类人工永久黑名单保持独立。
+- 监管单使用固定 `created_at + 24h` 生命周期：到期或人工撤销后从管理列表消失，同时案件
+  分数、成员提醒/累计归零，未发送通知失效，活动限制释放；历史事件与已发送通知保留。
+- `tools/reset_regulation_state.py` 默认只读预览，`--execute` 先在线备份再执行一个立即事务。
+  生产执行前共有 12 张案件、2 张活动案件，最高分 170、总分 1,540；154 条成员记录累计
+  25 次且 103 条已提醒。执行后活动案件、最高分、总分、成员累计和已提醒数全部为 0，
+  8 条可重试失败提醒被固定为撤销原因，活动限制为 0。
+- 清零前备份为
+  `D:\MaiBotArchives\pig_catcher\runtime-backups\pig_catcher-pre-regulation-reset-20260814-025147-294629.sqlite3`；
+  备份仍含原 12 张案件、2 张活动案件和总分 1,540，备份与生产库均 `quick_check=ok`、
+  `foreign_key_check=0`。生产追加 12 条 `global-reset` 事件和 1 条按群通用审计。
+- 离线门禁：pytest `273 passed`；Ruff、Python `compileall`、`uv lock --check`、
+  `git diff --check` 与 Skill `quick_validate` 全部通过。两套运行中插件 Runner 已分别记录
+  `v1.21.0` 加载和注册完成，后续群命令正常执行。

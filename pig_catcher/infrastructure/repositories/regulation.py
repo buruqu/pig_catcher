@@ -117,16 +117,25 @@ class RegulationRepository:
         *,
         scope_id: str,
         case_id_prefix: str,
+        visible_since: str | None = None,
+        active_only: bool = False,
     ) -> list[dict[str, object]]:
+        clauses = ["scope_id = ?", "case_id LIKE ?"]
+        parameters: list[object] = [scope_id, f"{case_id_prefix.strip()}%"]
+        if active_only:
+            clauses.append("status NOT IN ('closed', 'dismissed')")
+        if visible_since is not None:
+            clauses.append("created_at >= ?")
+            parameters.append(visible_since)
         rows = await session.fetch_all(
-            """
+            f"""
             SELECT *
             FROM anti_abuse_cases
-            WHERE scope_id = ? AND case_id LIKE ?
+            WHERE {' AND '.join(clauses)}
             ORDER BY updated_at DESC, case_id
             LIMIT 3
             """,
-            (scope_id, f"{case_id_prefix.strip()}%"),
+            tuple(parameters),
         )
         return [dict(row) for row in rows]
 
@@ -431,6 +440,12 @@ class RegulationRepository:
             UPDATE anti_abuse_notices
             SET status = 'claimed', updated_at = ?
             WHERE notice_id = ? AND status IN ('pending', 'failed')
+              AND EXISTS (
+                  SELECT 1
+                  FROM anti_abuse_cases AS incident
+                  WHERE incident.case_id = anti_abuse_notices.case_id
+                    AND incident.status NOT IN ('closed', 'dismissed')
+              )
             """,
             (now, notice_id),
         )
@@ -648,6 +663,8 @@ class RegulationRepository:
         case_id: str,
         detail_json: str,
         now: str,
+        action: str = "automatic-regulation-released",
+        object_type: str = "anti-abuse-case",
     ) -> None:
         await session.execute(
             """
@@ -655,18 +672,105 @@ class RegulationRepository:
                 audit_event_id, scope_id, actor_user_id, action,
                 object_type, object_id, detail_json, created_at
             )
-            VALUES (?, ?, ?, 'automatic-regulation-released',
-                    'anti-abuse-case', ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 audit_event_id,
                 scope_id,
                 actor_user_id,
+                action,
+                object_type,
                 case_id,
                 detail_json,
                 now,
             ),
         )
+
+    async def cases_for_reset(
+        self,
+        session: DatabaseSession,
+        *,
+        created_before: str | None = None,
+        active_only: bool = False,
+    ) -> list[dict[str, object]]:
+        clauses: list[str] = []
+        parameters: list[object] = []
+        if active_only:
+            clauses.append("status NOT IN ('closed', 'dismissed')")
+        if created_before is not None:
+            clauses.append("created_at <= ?")
+            parameters.append(created_before)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        rows = await session.fetch_all(
+            f"""
+            SELECT *
+            FROM anti_abuse_cases
+            {where}
+            ORDER BY created_at, case_id
+            """,
+            tuple(parameters),
+        )
+        return [dict(row) for row in rows]
+
+    async def reset_case_state(
+        self,
+        session: DatabaseSession,
+        *,
+        case_ids: Sequence[str],
+        now: str,
+        notice_reason: str,
+    ) -> dict[str, int]:
+        normalized = _normalized(case_ids)
+        if not normalized:
+            return {
+                "cases": 0,
+                "members": 0,
+                "notices": 0,
+                "holds": 0,
+            }
+        placeholders = ",".join("?" for _ in normalized)
+        case_cursor = await session.execute(
+            f"""
+            UPDATE anti_abuse_cases
+            SET status = 'dismissed', score = 0,
+                resolved_at = COALESCE(resolved_at, ?), updated_at = ?
+            WHERE case_id IN ({placeholders})
+            """,
+            (now, now, *normalized),
+        )
+        member_cursor = await session.execute(
+            f"""
+            UPDATE anti_abuse_case_members
+            SET warning_served_at = NULL, incident_count = 0,
+                last_incident_at = NULL, updated_at = ?
+            WHERE case_id IN ({placeholders})
+            """,
+            (now, *normalized),
+        )
+        notice_cursor = await session.execute(
+            f"""
+            UPDATE anti_abuse_notices
+            SET status = 'failed', error_text = ?, updated_at = ?
+            WHERE case_id IN ({placeholders})
+              AND status IN ('pending', 'claimed', 'failed')
+            """,
+            (notice_reason[:1000], now, *normalized),
+        )
+        hold_cursor = await session.execute(
+            f"""
+            UPDATE anti_abuse_holds
+            SET status = 'released', released_at = COALESCE(released_at, ?),
+                updated_at = ?
+            WHERE case_id IN ({placeholders}) AND status = 'active'
+            """,
+            (now, now, *normalized),
+        )
+        return {
+            "cases": max(int(case_cursor.rowcount), 0),
+            "members": max(int(member_cursor.rowcount), 0),
+            "notices": max(int(notice_cursor.rowcount), 0),
+            "holds": max(int(hold_cursor.rowcount), 0),
+        }
 
     async def list_cases(
         self,
@@ -674,6 +778,7 @@ class RegulationRepository:
         *,
         scope_id: str,
         limit: int,
+        visible_since: str,
     ) -> list[dict[str, object]]:
         rows = await session.fetch_all(
             """
@@ -687,11 +792,13 @@ class RegulationRepository:
             LEFT JOIN anti_abuse_holds AS hold
               ON hold.case_id = incident.case_id
             WHERE incident.scope_id = ?
+              AND incident.status NOT IN ('closed', 'dismissed')
+              AND incident.created_at >= ?
             GROUP BY incident.case_id
             ORDER BY incident.updated_at DESC, incident.case_id
             LIMIT ?
             """,
-            (scope_id, limit),
+            (scope_id, visible_since, limit),
         )
         return [dict(row) for row in rows]
 

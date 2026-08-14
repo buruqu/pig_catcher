@@ -9,6 +9,7 @@ from collections import defaultdict
 from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
@@ -48,6 +49,7 @@ _STATUS_RANK = {
 }
 _REGULATION_RELEASE_COMMAND = "pig-catcher.admin-regulation-release"
 _CHAT_ACTIVITY_CACHE_MINUTES = 5
+_CASE_LIFETIME_HOURS = 24
 _BEIJING_OFFSET = timedelta(hours=8)
 logger = logging.getLogger(__name__)
 
@@ -171,6 +173,21 @@ class RegulationReleaseResult:
     case_id: str
     released_hold_count: int
     already_closed: bool
+
+
+@dataclass(frozen=True, slots=True)
+class RegulationResetResult:
+    """一次全局监管状态清零的备份与审计结果。"""
+
+    backup_path: Path
+    created_at: str
+    case_count: int
+    previously_active_case_count: int
+    reset_member_count: int
+    invalidated_notice_count: int
+    released_hold_count: int
+    reset_event_ids: tuple[str, ...]
+    audit_event_ids: tuple[str, ...]
 
 
 class RegulationService:
@@ -345,6 +362,66 @@ class RegulationService:
             bool(platform) and f"{platform}:{user_id}" in self.admin_user_ids
         )
 
+    async def _protected_player_ids(
+        self,
+        session: DatabaseSession,
+        player_ids: Sequence[str],
+    ) -> frozenset[str]:
+        rows = await self.repository.player_rows(
+            session,
+            player_ids=_unique(player_ids),
+        )
+        return frozenset(
+            str(row["player_id"])
+            for row in rows
+            if self._is_protected_player(row)
+        )
+
+    async def _expire_stale_cases(
+        self,
+        session: DatabaseSession,
+        *,
+        now_datetime: datetime,
+        now: str,
+    ) -> int:
+        cutoff = iso_timestamp(now_datetime - timedelta(hours=_CASE_LIFETIME_HOURS))
+        cases = await self.repository.cases_for_reset(
+            session,
+            created_before=cutoff,
+            active_only=True,
+        )
+        if not cases:
+            return 0
+        case_ids = tuple(str(row["case_id"]) for row in cases)
+        await self.repository.reset_case_state(
+            session,
+            case_ids=case_ids,
+            now=now,
+            notice_reason="监管单已满 24 小时自动撤销，不再投递。",
+        )
+        for row in cases:
+            await self.repository.insert_event(
+                session,
+                event_id=uuid4().hex,
+                case_id=str(row["case_id"]),
+                scope_id=str(row["scope_id"]),
+                player_id=None,
+                event_type="automatic-expiry",
+                score=0,
+                payload_json=json.dumps(
+                    {
+                        "previous_status": str(row["status"]),
+                        "previous_score": int(row["score"]),
+                        "lifetime_hours": _CASE_LIFETIME_HOURS,
+                        "expired_at": now,
+                    },
+                    ensure_ascii=False,
+                    sort_keys=True,
+                ),
+                now=now,
+            )
+        return len(cases)
+
     @staticmethod
     def _asset_key(row: Mapping[str, object]) -> str:
         instance_id = str(row["asset_instance_id"])
@@ -417,6 +494,11 @@ class RegulationService:
     ) -> RegulationHold | None:
         if not self.scope_enabled(scope_id):
             return None
+        await self._expire_stale_cases(
+            session,
+            now_datetime=_parse_timestamp(now),
+            now=now,
+        )
         await self.repository.expire_holds(session, now=now)
         rows = await self.repository.active_holds(
             session,
@@ -476,10 +558,22 @@ class RegulationService:
     ) -> RegulationOutcome | None:
         if not self.scope_enabled(scope_id):
             return None
+        current_player_ids = _unique(
+            (*active_player_ids, from_player_id, to_player_id)
+        )
+        protected_current_ids = await self._protected_player_ids(
+            session,
+            current_player_ids,
+        )
+        actionable_current_ids = tuple(
+            player_id
+            for player_id in current_player_ids
+            if player_id not in protected_current_ids
+        )
         current_hold = await self.current_hold(
             session,
             scope_id=scope_id,
-            player_ids=active_player_ids,
+            player_ids=actionable_current_ids,
             hold_types=("social", "plugin"),
             now=now,
         )
@@ -491,10 +585,33 @@ class RegulationService:
                 hold_expires_at=current_hold.expires_at,
                 public_message=current_hold.public_message,
             )
+        if (
+            from_player_id in protected_current_ids
+            or to_player_id in protected_current_ids
+        ):
+            return None
 
         now_datetime = _parse_timestamp(now)
         since = iso_timestamp(now_datetime - timedelta(days=self.config.lookback_days))
         rows = await self.repository.transfer_rows(session, scope_id=scope_id, since=since)
+        history_player_ids = _unique(
+            player_id
+            for row in rows
+            for player_id in (
+                str(row["from_player_id"]),
+                str(row["to_player_id"]),
+            )
+        )
+        protected_history_ids = await self._protected_player_ids(
+            session,
+            history_player_ids,
+        )
+        rows = [
+            row
+            for row in rows
+            if str(row["from_player_id"]) not in protected_history_ids
+            and str(row["to_player_id"]) not in protected_history_ids
+        ]
         signals = self._signals_from_rows(rows)
         asset_key = await self.repository.asset_lineage(
             session,
@@ -627,6 +744,7 @@ class RegulationService:
         if incident is None:
             case_id = uuid4().hex
             case_status = "watching"
+            case_created_at = now_datetime
             await self.repository.insert_case(
                 session,
                 case_id=case_id,
@@ -641,8 +759,10 @@ class RegulationService:
         else:
             case_id = str(incident["case_id"])
             case_status = str(incident["status"])
+            case_created_at = _parse_timestamp(incident["created_at"])
+        case_expires_at = case_created_at + timedelta(hours=_CASE_LIFETIME_HOURS)
 
-        active_ids = set(_unique(active_player_ids))
+        active_ids = set(actionable_current_ids)
         source_ids = set(analysis.source_player_ids)
         relay_ids = set(analysis.relay_player_ids)
         target_ids = set(targets)
@@ -838,7 +958,7 @@ class RegulationService:
                 else:
                     duration = timedelta(hours=self.config.plugin_hold_hours)
                 sequence = len(history_90) + 1
-            expires = iso_timestamp(now_datetime + duration)
+            expires = iso_timestamp(min(now_datetime + duration, case_expires_at))
             hold_expires_by_player[player_id] = expires
             hold_type_by_player[player_id] = hold_type
             held_player_ids.append(player_id)
@@ -954,6 +1074,11 @@ class RegulationService:
             now_datetime - timedelta(minutes=self.config.notice_cooldown_minutes)
         )
         async with self.database.transaction() as session:
+            await self._expire_stale_cases(
+                session,
+                now_datetime=now_datetime,
+                now=now,
+            )
             await self.repository.requeue_stale_claimed_notice(
                 session,
                 notice_id=notice_id,
@@ -1015,12 +1140,21 @@ class RegulationService:
         limit: int = 10,
     ) -> tuple[RegulationCaseSummary, ...]:
         now = iso_timestamp(self.clock.now())
+        visible_since = iso_timestamp(
+            self.clock.now() - timedelta(hours=_CASE_LIFETIME_HOURS)
+        )
         async with self.database.transaction() as session:
+            await self._expire_stale_cases(
+                session,
+                now_datetime=_parse_timestamp(now),
+                now=now,
+            )
             await self.repository.expire_holds(session, now=now)
             rows = await self.repository.list_cases(
                 session,
                 scope_id=scope_id,
                 limit=max(1, min(limit, 30)),
+                visible_since=visible_since,
             )
         return tuple(self._summary(row) for row in rows)
 
@@ -1030,11 +1164,23 @@ class RegulationService:
         scope_id: str,
         case_id_prefix: str,
     ) -> RegulationCaseDetail:
-        async with self.database.transaction(immediate=False) as session:
+        now_datetime = self.clock.now()
+        now = iso_timestamp(now_datetime)
+        visible_since = iso_timestamp(
+            now_datetime - timedelta(hours=_CASE_LIFETIME_HOURS)
+        )
+        async with self.database.transaction() as session:
+            await self._expire_stale_cases(
+                session,
+                now_datetime=now_datetime,
+                now=now,
+            )
             rows = await self.repository.case_by_id_prefix(
                 session,
                 scope_id=scope_id,
                 case_id_prefix=case_id_prefix,
+                visible_since=visible_since,
+                active_only=True,
             )
             if not rows:
                 raise ValueError("当前群找不到该监管案件号。")
@@ -1062,6 +1208,9 @@ class RegulationService:
             "case_id_prefix": case_id_prefix.strip(),
             "reason": str(reason or "管理员人工复核解除")[:300],
         }
+        visible_since = iso_timestamp(
+            self.clock.now() - timedelta(hours=_CASE_LIFETIME_HOURS)
+        )
         idempotency_key = MessageKeyFactory.build(
             identity,
             _REGULATION_RELEASE_COMMAND,
@@ -1091,10 +1240,17 @@ class RegulationService:
                 identity=identity,
                 now=now,
             )
+            await self._expire_stale_cases(
+                session,
+                now_datetime=_parse_timestamp(now),
+                now=now,
+            )
             rows = await self.repository.case_by_id_prefix(
                 session,
                 scope_id=identity.scope.value,
                 case_id_prefix=case_id_prefix,
+                visible_since=visible_since,
+                active_only=True,
             )
             if not rows:
                 raise ValueError("当前群找不到该监管案件号。")
@@ -1179,6 +1335,109 @@ class RegulationService:
                 already_closed=not changed,
             )
 
+    async def backup_and_reset_all_state(
+        self,
+        *,
+        data_dir: Path,
+        actor_user_id: str,
+        reason: str,
+        source: str = "operator-cli",
+    ) -> RegulationResetResult:
+        """先在线备份，再撤销全部案件并清零当前监管累计状态。"""
+
+        now_datetime = self.clock.now()
+        now = iso_timestamp(now_datetime)
+        reason_text = str(reason or "自动监管策略调整，全局撤销并清零")[:500]
+        timestamp = now_datetime.strftime("%Y%m%d-%H%M%S-%f")
+        backup_path = (
+            Path(data_dir).resolve()
+            / "backups"
+            / f"pig_catcher-pre-regulation-reset-{timestamp}.sqlite3"
+        ).resolve()
+        await self.database.backup_to(backup_path)
+
+        reset_event_ids: list[str] = []
+        audit_event_ids: list[str] = []
+        async with self.database.transaction() as session:
+            cases = await self.repository.cases_for_reset(session)
+            previously_active = sum(
+                str(row["status"]) not in {"closed", "dismissed"}
+                for row in cases
+            )
+            counts = await self.repository.reset_case_state(
+                session,
+                case_ids=tuple(str(row["case_id"]) for row in cases),
+                now=now,
+                notice_reason="全局监管重置：案件已撤销，不再投递。",
+            )
+            cases_by_scope: dict[str, list[dict[str, object]]] = defaultdict(list)
+            for row in cases:
+                cases_by_scope[str(row["scope_id"])].append(row)
+                event_id = uuid4().hex
+                reset_event_ids.append(event_id)
+                await self.repository.insert_event(
+                    session,
+                    event_id=event_id,
+                    case_id=str(row["case_id"]),
+                    scope_id=str(row["scope_id"]),
+                    player_id=None,
+                    event_type="global-reset",
+                    score=0,
+                    payload_json=json.dumps(
+                        {
+                            "actor_user_id": str(actor_user_id or "local-operator"),
+                            "source": str(source or "operator-cli"),
+                            "reason": reason_text,
+                            "previous_status": str(row["status"]),
+                            "previous_score": int(row["score"]),
+                            "backup_path": str(backup_path),
+                        },
+                        ensure_ascii=False,
+                        sort_keys=True,
+                    ),
+                    now=now,
+                )
+            for scope_id, scope_cases in sorted(cases_by_scope.items()):
+                audit_event_id = uuid4().hex
+                audit_event_ids.append(audit_event_id)
+                await self.repository.insert_admin_audit(
+                    session,
+                    audit_event_id=audit_event_id,
+                    scope_id=scope_id,
+                    actor_user_id=str(actor_user_id or "local-operator"),
+                    case_id=scope_id,
+                    detail_json=json.dumps(
+                        {
+                            "source": str(source or "operator-cli"),
+                            "reason": reason_text,
+                            "case_count": len(scope_cases),
+                            "previously_active_case_count": sum(
+                                str(row["status"]) not in {"closed", "dismissed"}
+                                for row in scope_cases
+                            ),
+                            "backup_path": str(backup_path),
+                            "ruleset_version": RULESET_VERSION,
+                        },
+                        ensure_ascii=False,
+                        sort_keys=True,
+                    ),
+                    now=now,
+                    action="automatic-regulation-bulk-reset",
+                    object_type="anti-abuse-scope",
+                )
+        self._chat_activity_cache.clear()
+        return RegulationResetResult(
+            backup_path=backup_path,
+            created_at=now,
+            case_count=int(counts["cases"]),
+            previously_active_case_count=int(previously_active),
+            reset_member_count=int(counts["members"]),
+            invalidated_notice_count=int(counts["notices"]),
+            released_hold_count=int(counts["holds"]),
+            reset_event_ids=tuple(reset_event_ids),
+            audit_event_ids=tuple(audit_event_ids),
+        )
+
     @staticmethod
     def _summary(row: Mapping[str, Any]) -> RegulationCaseSummary:
         return RegulationCaseSummary(
@@ -1197,5 +1456,6 @@ __all__ = [
     "RegulationNotice",
     "RegulationOutcome",
     "RegulationReleaseResult",
+    "RegulationResetResult",
     "RegulationService",
 ]

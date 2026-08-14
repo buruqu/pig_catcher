@@ -75,6 +75,7 @@ from .regulation import (
     RegulationNotice,
     RegulationOutcome,
     RegulationReleaseResult,
+    RegulationResetResult,
     RegulationService,
 )
 from .restrictions import (
@@ -153,6 +154,7 @@ __all__ = [
     "RegulationNotice",
     "RegulationOutcome",
     "RegulationReleaseResult",
+    "RegulationResetResult",
     "RegulationService",
     "RestrictionAdminService",
     "RestrictionBatchResult",

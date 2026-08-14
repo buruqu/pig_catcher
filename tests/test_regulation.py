@@ -476,6 +476,7 @@ async def test_gift_regulation_warns_then_blocks_and_escalates_idempotently(
         RegulationSection(
             enabled_scope_ids=["qq:100"],
             notice_cooldown_minutes=1,
+            social_hold_hours=1,
         ),
         clock=clock,
     )
@@ -574,7 +575,7 @@ async def test_gift_regulation_warns_then_blocks_and_escalates_idempotently(
     )
     assert [tuple(row) for row in holds] == [("social", "active")]
 
-    clock.value += timedelta(hours=24, minutes=2)
+    clock.value += timedelta(hours=1, minutes=2)
     plugin_restricted = await social.gift(
         _identity(user_id="source-a", message_id="gift-a-5"),
         target("target-7"),
@@ -743,4 +744,217 @@ async def test_unlisted_scope_never_creates_regulation_state(tmp_path: Path) -> 
         assert result.regulation is None
     count = await database.fetch_one("SELECT COUNT(*) AS count FROM anti_abuse_cases")
     assert count is not None and int(count["count"]) == 0
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_admin_transfers_are_fully_excluded_from_current_and_historical_graphs(
+    tmp_path: Path,
+) -> None:
+    database, clock, assets = await _seed_two_source_assets(tmp_path)
+    regulation = RegulationService(
+        database,
+        RegulationSection(enabled_scope_ids=["qq:100"]),
+        admin_user_ids=["qq:source-a"],
+        clock=clock,
+    )
+    social = SocialService(
+        database,
+        TradingSection(),
+        RankingSection(),
+        regulation_service=regulation,
+        clock=clock,
+    )
+    operations = (
+        ("source-a", assets[0].pig.selector, "admin-a-1"),
+        ("source-b", assets[4].pig.selector, "normal-b-1"),
+        ("source-a", assets[1].pig.selector, "admin-a-2"),
+        ("source-b", assets[5].pig.selector, "normal-b-2"),
+    )
+    for sender, selector, message_id in operations:
+        result = await social.gift(
+            _identity(user_id=sender, message_id=message_id),
+            _identity(user_id="main", message_id=f"target-{message_id}"),
+            asset_kind=AssetKind.PIG,
+            selector_text=selector,
+        )
+        assert result.regulation is None
+    case_count = await database.fetch_one(
+        "SELECT COUNT(*) AS count FROM anti_abuse_cases"
+    )
+    event_count = await database.fetch_one(
+        "SELECT COUNT(*) AS count FROM anti_abuse_events"
+    )
+    assert case_count is not None and int(case_count["count"]) == 0
+    assert event_count is not None and int(event_count["count"]) == 0
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_cases_auto_dismiss_after_24_hours_and_disappear_from_admin_views(
+    tmp_path: Path,
+) -> None:
+    database, clock, assets = await _seed_two_source_assets(tmp_path)
+    regulation = RegulationService(
+        database,
+        RegulationSection(enabled_scope_ids=["qq:100"]),
+        clock=clock,
+    )
+    social = SocialService(
+        database,
+        TradingSection(),
+        RankingSection(),
+        regulation_service=regulation,
+        clock=clock,
+    )
+    warning = None
+    for sender, asset_index, suffix in (
+        ("source-a", 0, "a1"),
+        ("source-b", 4, "b1"),
+        ("source-a", 1, "a2"),
+        ("source-b", 5, "b2"),
+    ):
+        warning = await social.gift(
+            _identity(user_id=sender, message_id=f"expiry-{suffix}"),
+            _identity(user_id="main", message_id=f"expiry-target-{suffix}"),
+            asset_kind=AssetKind.PIG,
+            selector_text=assets[asset_index].pig.selector,
+        )
+    assert warning is not None and warning.regulation is not None
+    case_id = warning.regulation.case_id
+    assert len(await regulation.list_cases(scope_id="qq:100")) == 1
+
+    clock.value += timedelta(hours=24, seconds=1)
+    assert await regulation.list_cases(scope_id="qq:100") == ()
+    row = await database.fetch_one(
+        "SELECT status, score FROM anti_abuse_cases WHERE case_id = ?",
+        (case_id,),
+    )
+    assert row is not None and tuple(row) == ("dismissed", 0)
+    expiry_event = await database.fetch_one(
+        """
+        SELECT score FROM anti_abuse_events
+        WHERE case_id = ? AND event_type = 'automatic-expiry'
+        """,
+        (case_id,),
+    )
+    assert expiry_event is not None and int(expiry_event["score"]) == 0
+    with pytest.raises(ValueError, match="找不到"):
+        await regulation.case_detail(
+            scope_id="qq:100",
+            case_id_prefix=case_id[:8],
+        )
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_global_regulation_reset_backs_up_and_clears_current_state(
+    tmp_path: Path,
+) -> None:
+    database, clock, assets = await _seed_two_source_assets(tmp_path)
+    regulation = RegulationService(
+        database,
+        RegulationSection(enabled_scope_ids=["qq:100"]),
+        clock=clock,
+    )
+    social = SocialService(
+        database,
+        TradingSection(),
+        RankingSection(),
+        regulation_service=regulation,
+        clock=clock,
+    )
+    warning = None
+    for sender, asset_index, suffix in (
+        ("source-a", 0, "a1"),
+        ("source-b", 4, "b1"),
+        ("source-a", 1, "a2"),
+        ("source-b", 5, "b2"),
+    ):
+        warning = await social.gift(
+            _identity(user_id=sender, message_id=f"reset-{suffix}"),
+            _identity(user_id="main", message_id=f"reset-target-{suffix}"),
+            asset_kind=AssetKind.PIG,
+            selector_text=assets[asset_index].pig.selector,
+        )
+    assert warning is not None and warning.regulation is not None
+    case_id = warning.regulation.case_id
+    sent_notice_id, pending_notice_id = warning.regulation.notice_ids
+    assert await regulation.claim_notice(sent_notice_id) is not None
+    assert await regulation.mark_notice_sent(sent_notice_id) is True
+
+    now = iso_timestamp(clock.now())
+    source_player_id = _identity(user_id="source-a", message_id="member").player_id
+    async with database.transaction() as session:
+        await session.execute(
+            """
+            UPDATE anti_abuse_case_members
+            SET incident_count = 4, last_incident_at = ?, warning_served_at = ?
+            WHERE case_id = ?
+            """,
+            (now, now, case_id),
+        )
+        await session.execute(
+            """
+            INSERT INTO anti_abuse_holds(
+                hold_id, case_id, player_id, hold_type, sequence_number,
+                status, starts_at, expires_at, reason,
+                created_at, updated_at, released_at
+            )
+            VALUES ('reset-hold', ?, ?, 'social', 99, 'active', ?, ?,
+                    'test', ?, ?, NULL)
+            """,
+            (
+                case_id,
+                source_player_id,
+                now,
+                iso_timestamp(clock.now() + timedelta(hours=12)),
+                now,
+                now,
+            ),
+        )
+
+    result = await regulation.backup_and_reset_all_state(
+        data_dir=tmp_path / "data",
+        actor_user_id="test-operator",
+        reason="专项测试清零",
+        source="pytest",
+    )
+    assert result.backup_path.is_file()
+    assert result.case_count == 1
+    assert result.previously_active_case_count == 1
+    assert result.reset_member_count >= 1
+    assert result.invalidated_notice_count == 1
+    assert result.released_hold_count == 1
+    assert len(result.reset_event_ids) == 1
+    assert len(result.audit_event_ids) == 1
+
+    case = await database.fetch_one(
+        "SELECT status, score FROM anti_abuse_cases WHERE case_id = ?",
+        (case_id,),
+    )
+    member = await database.fetch_one(
+        """
+        SELECT SUM(incident_count) AS incidents,
+               SUM(CASE WHEN warning_served_at IS NOT NULL THEN 1 ELSE 0 END) AS warned
+        FROM anti_abuse_case_members WHERE case_id = ?
+        """,
+        (case_id,),
+    )
+    notices = await database.fetch_all(
+        "SELECT notice_id, status, error_text FROM anti_abuse_notices ORDER BY notice_id"
+    )
+    hold = await database.fetch_one(
+        "SELECT status FROM anti_abuse_holds WHERE hold_id = 'reset-hold'"
+    )
+    assert case is not None and tuple(case) == ("dismissed", 0)
+    assert member is not None and int(member["incidents"] or 0) == 0
+    assert member is not None and int(member["warned"] or 0) == 0
+    notice_by_id = {str(row["notice_id"]): row for row in notices}
+    assert str(notice_by_id[sent_notice_id]["status"]) == "sent"
+    assert str(notice_by_id[pending_notice_id]["status"]) == "failed"
+    assert "全局监管重置" in str(notice_by_id[pending_notice_id]["error_text"])
+    assert hold is not None and str(hold["status"]) == "released"
+    assert await regulation.claim_notice(pending_notice_id) is None
+    assert await regulation.list_cases(scope_id="qq:100") == ()
     await database.close()

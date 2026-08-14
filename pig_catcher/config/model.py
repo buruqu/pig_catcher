@@ -791,7 +791,10 @@ class RegulationSection(PluginConfigBase):
         ge=1,
         le=720,
         description="首次插件临时封禁时长",
-        json_schema_extra=_ui("首次插件封禁", "默认 72 小时；配置管理员不自动封禁"),
+        json_schema_extra=_ui(
+            "首次插件封禁",
+            "最长按配置计算，但监管单满 24 小时自动撤销；配置管理员完全不进入自动监管",
+        ),
     )
     repeat_ban_days: int = Field(
         default=7,
