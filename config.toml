@@ -115,7 +115,6 @@ trade_page_size = 8
 mode = "自动执行"
 enabled_scope_ids = [
     "qq:237716658",
-    "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
 ]
 lookback_days = 7
 warning_score = 40

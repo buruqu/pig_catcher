@@ -177,7 +177,7 @@ class RegulationReleaseResult:
 
 @dataclass(frozen=True, slots=True)
 class RegulationResetResult:
-    """一次全局监管状态清零的备份与审计结果。"""
+    """一次监管状态清零的备份与审计结果。"""
 
     backup_path: Path
     created_at: str
@@ -1345,21 +1345,76 @@ class RegulationService:
     ) -> RegulationResetResult:
         """先在线备份，再撤销全部案件并清零当前监管累计状态。"""
 
+        return await self._backup_and_reset_state(
+            data_dir=data_dir,
+            actor_user_id=actor_user_id,
+            reason=reason,
+            source=source,
+            scope_id=None,
+        )
+
+    async def backup_and_reset_scope_state(
+        self,
+        *,
+        data_dir: Path,
+        scope_id: str,
+        actor_user_id: str,
+        reason: str,
+        source: str = "operator-cli",
+    ) -> RegulationResetResult:
+        """先在线备份，再只撤销指定群的案件与当前监管累计状态。"""
+
+        normalized_scope_id = str(scope_id or "").strip()
+        if not normalized_scope_id:
+            raise ValueError("scope_id 不能为空。")
+        return await self._backup_and_reset_state(
+            data_dir=data_dir,
+            actor_user_id=actor_user_id,
+            reason=reason,
+            source=source,
+            scope_id=normalized_scope_id,
+        )
+
+    async def _backup_and_reset_state(
+        self,
+        *,
+        data_dir: Path,
+        actor_user_id: str,
+        reason: str,
+        source: str,
+        scope_id: str | None,
+    ) -> RegulationResetResult:
+        """执行已限定范围、可备份和可审计的监管状态清零。"""
+
         now_datetime = self.clock.now()
         now = iso_timestamp(now_datetime)
-        reason_text = str(reason or "自动监管策略调整，全局撤销并清零")[:500]
+        global_reset = scope_id is None
+        default_reason = (
+            "自动监管策略调整，全局撤销并清零"
+            if global_reset
+            else "自动监管策略调整，撤销指定群监管并清零"
+        )
+        reason_text = str(reason or default_reason)[:500]
         timestamp = now_datetime.strftime("%Y%m%d-%H%M%S-%f")
+        backup_stem = (
+            "pig_catcher-pre-regulation-reset"
+            if global_reset
+            else "pig_catcher-pre-regulation-scope-reset"
+        )
         backup_path = (
             Path(data_dir).resolve()
             / "backups"
-            / f"pig_catcher-pre-regulation-reset-{timestamp}.sqlite3"
+            / f"{backup_stem}-{timestamp}.sqlite3"
         ).resolve()
         await self.database.backup_to(backup_path)
 
         reset_event_ids: list[str] = []
         audit_event_ids: list[str] = []
         async with self.database.transaction() as session:
-            cases = await self.repository.cases_for_reset(session)
+            cases = await self.repository.cases_for_reset(
+                session,
+                scope_id=scope_id,
+            )
             previously_active = sum(
                 str(row["status"]) not in {"closed", "dismissed"}
                 for row in cases
@@ -1368,7 +1423,11 @@ class RegulationService:
                 session,
                 case_ids=tuple(str(row["case_id"]) for row in cases),
                 now=now,
-                notice_reason="全局监管重置：案件已撤销，不再投递。",
+                notice_reason=(
+                    "全局监管重置：案件已撤销，不再投递。"
+                    if global_reset
+                    else "指定群监管重置：案件已撤销，不再投递。"
+                ),
             )
             cases_by_scope: dict[str, list[dict[str, object]]] = defaultdict(list)
             for row in cases:
@@ -1381,7 +1440,7 @@ class RegulationService:
                     case_id=str(row["case_id"]),
                     scope_id=str(row["scope_id"]),
                     player_id=None,
-                    event_type="global-reset",
+                    event_type="global-reset" if global_reset else "scope-reset",
                     score=0,
                     payload_json=json.dumps(
                         {
@@ -1422,7 +1481,11 @@ class RegulationService:
                         sort_keys=True,
                     ),
                     now=now,
-                    action="automatic-regulation-bulk-reset",
+                    action=(
+                        "automatic-regulation-bulk-reset"
+                        if global_reset
+                        else "automatic-regulation-scope-reset"
+                    ),
                     object_type="anti-abuse-scope",
                 )
         self._chat_activity_cache.clear()

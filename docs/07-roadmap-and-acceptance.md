@@ -1348,3 +1348,18 @@
 - 离线门禁：pytest `273 passed`；Ruff、Python `compileall`、`uv lock --check`、
   `git diff --check` 与 Skill `quick_validate` 全部通过。两套运行中插件 Runner 已分别记录
   `v1.21.0` 加载和注册完成，后续群命令正常执行。
+
+## 59. CEAB3520 官方群监管关闭与按群清零验收
+
+- 验收日期：`2026-08-17`。自动监管配置移除
+  `qq-official:9EA2810F378FBD7DC3219C56CEAB3520`，保留 `qq:237716658`；不会把普通 QQ
+  映射群的开关一并关闭。
+- 生产写入前，该官方群共有 21 张历史案件，其中 2 张仍有效，最高分 145、总分 270；258 条
+  成员记录累计 2 次事件且 16 条已提醒，没有待投递通知或活动限制。
+- 按群事务执行后，21 张案件全部为撤销状态并退出日常监管列表，活动案件、分数、成员累计和
+  已提醒数均为 0；12 条既有失败通知固定为本次撤销原因，已发送历史与不可变审计继续保留。
+- 清零前在线备份为
+  `D:\MaiBotArchives\pig_catcher\runtime-backups\pig_catcher-pre-regulation-scope-reset-20260817-022553-277469.sqlite3`；
+  备份仍含 2 张活动案件与总分 270。生产库追加 21 条 `scope-reset` 事件和 1 条
+  `automatic-regulation-scope-reset` 管理审计；备份与生产库均 `quick_check=ok`、
+  `foreign_key_check=0`。

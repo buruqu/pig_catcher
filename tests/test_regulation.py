@@ -958,3 +958,159 @@ async def test_global_regulation_reset_backs_up_and_clears_current_state(
     assert await regulation.claim_notice(pending_notice_id) is None
     assert await regulation.list_cases(scope_id="qq:100") == ()
     await database.close()
+
+
+@pytest.mark.asyncio
+async def test_scope_regulation_reset_does_not_touch_another_group(
+    tmp_path: Path,
+) -> None:
+    database = await _database_with_social_catalog(tmp_path)
+    clock = MutableClock()
+    now = iso_timestamp(clock.now())
+    expires_at = iso_timestamp(clock.now() + timedelta(hours=12))
+    target = _identity(user_id="target", message_id="scope-reset-target")
+    other = _identity(
+        user_id="other",
+        message_id="scope-reset-other",
+        group_id="200",
+    )
+    async with database.transaction() as session:
+        framework = FrameworkRepository()
+        await framework.touch_identity(session, identity=target, now=now)
+        await framework.touch_identity(session, identity=other, now=now)
+        for identity, case_id, score in (
+            (target, "target-case", 88),
+            (other, "other-case", 91),
+        ):
+            await session.execute(
+                """
+                INSERT INTO anti_abuse_cases(
+                    case_id, scope_id, target_signature, target_player_ids_json,
+                    status, score, ruleset_version, evidence_json,
+                    created_at, updated_at, last_evidence_at, resolved_at
+                )
+                VALUES (?, ?, ?, ?, 'supervised', ?, 1, '{}', ?, ?, ?, NULL)
+                """,
+                (
+                    case_id,
+                    identity.scope.value,
+                    identity.player_id,
+                    f'["{identity.player_id}"]',
+                    score,
+                    now,
+                    now,
+                    now,
+                ),
+            )
+            await session.execute(
+                """
+                INSERT INTO anti_abuse_case_members(
+                    case_id, player_id, role, active_participant,
+                    warning_served_at, incident_count, last_incident_at,
+                    created_at, updated_at
+                )
+                VALUES (?, ?, 'target', 1, ?, 3, ?, ?, ?)
+                """,
+                (case_id, identity.player_id, now, now, now, now),
+            )
+            await session.execute(
+                """
+                INSERT INTO anti_abuse_notices(
+                    notice_id, case_id, player_id, stage, incident_number,
+                    message_text, status, source_operation_key, error_text,
+                    created_at, updated_at, sent_at
+                )
+                VALUES (?, ?, ?, 'supervision', 1, 'test', 'pending', '', '',
+                        ?, ?, NULL)
+                """,
+                (f"{case_id}-notice", case_id, identity.player_id, now, now),
+            )
+            await session.execute(
+                """
+                INSERT INTO anti_abuse_holds(
+                    hold_id, case_id, player_id, hold_type, sequence_number,
+                    status, starts_at, expires_at, reason,
+                    created_at, updated_at, released_at
+                )
+                VALUES (?, ?, ?, 'social', 1, 'active', ?, ?, 'test',
+                        ?, ?, NULL)
+                """,
+                (
+                    f"{case_id}-hold",
+                    case_id,
+                    identity.player_id,
+                    now,
+                    expires_at,
+                    now,
+                    now,
+                ),
+            )
+
+    regulation = RegulationService(database, RegulationSection(), clock=clock)
+    result = await regulation.backup_and_reset_scope_state(
+        data_dir=tmp_path / "data",
+        scope_id=target.scope.value,
+        actor_user_id="test-operator",
+        reason="只撤销目标群",
+        source="pytest",
+    )
+
+    assert result.backup_path.is_file()
+    assert result.case_count == 1
+    assert result.previously_active_case_count == 1
+    assert result.reset_member_count == 1
+    assert result.invalidated_notice_count == 1
+    assert result.released_hold_count == 1
+
+    target_case = await database.fetch_one(
+        "SELECT status, score FROM anti_abuse_cases WHERE case_id = 'target-case'"
+    )
+    other_case = await database.fetch_one(
+        "SELECT status, score FROM anti_abuse_cases WHERE case_id = 'other-case'"
+    )
+    target_member = await database.fetch_one(
+        """
+        SELECT warning_served_at, incident_count, last_incident_at
+        FROM anti_abuse_case_members WHERE case_id = 'target-case'
+        """
+    )
+    other_member = await database.fetch_one(
+        """
+        SELECT warning_served_at, incident_count, last_incident_at
+        FROM anti_abuse_case_members WHERE case_id = 'other-case'
+        """
+    )
+    notices = await database.fetch_all(
+        "SELECT case_id, status, error_text FROM anti_abuse_notices ORDER BY case_id"
+    )
+    holds = await database.fetch_all(
+        "SELECT case_id, status FROM anti_abuse_holds ORDER BY case_id"
+    )
+    events = await database.fetch_all(
+        "SELECT scope_id, event_type FROM anti_abuse_events ORDER BY event_id"
+    )
+    audits = await database.fetch_all(
+        "SELECT scope_id, action FROM audit_events ORDER BY created_at"
+    )
+
+    assert target_case is not None and tuple(target_case) == ("dismissed", 0)
+    assert other_case is not None and tuple(other_case) == ("supervised", 91)
+    assert target_member is not None and tuple(target_member) == (None, 0, None)
+    assert other_member is not None and tuple(other_member) == (now, 3, now)
+    assert [tuple(row) for row in notices] == [
+        ("other-case", "pending", ""),
+        ("target-case", "failed", "指定群监管重置：案件已撤销，不再投递。"),
+    ]
+    assert [tuple(row) for row in holds] == [
+        ("other-case", "active"),
+        ("target-case", "released"),
+    ]
+    assert [tuple(row) for row in events] == [
+        (target.scope.value, "scope-reset")
+    ]
+    assert [tuple(row) for row in audits] == [
+        (target.scope.value, "automatic-regulation-scope-reset")
+    ]
+    assert await regulation.list_cases(scope_id=target.scope.value) == ()
+    assert len(await regulation.list_cases(scope_id=other.scope.value)) == 1
+    await database.close()

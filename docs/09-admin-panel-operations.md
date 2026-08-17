@@ -121,6 +121,17 @@ LIMIT 50;
 清零分数/成员累计、失效未投递提醒并释放活动限制。执行结果必须检查 `quick_check=ok`、
 `foreign_key_check_count=0` 和备份绝对路径。
 
+只取消一个实际群范围时，必须传入完整的 `platform:group_id`，并先预览再执行：
+
+```powershell
+.\.venv\Scripts\python.exe tools\reset_regulation_state.py --scope-id "qq-official:9EA2810F378FBD7DC3219C56CEAB3520"
+.\.venv\Scripts\python.exe tools\reset_regulation_state.py --scope-id "qq-official:9EA2810F378FBD7DC3219C56CEAB3520" --execute --actor local-operator --reason "关闭该群自动监管"
+```
+
+按群执行只修改该精确范围。案件会撤销并立即从群内管理列表隐藏，分数、成员累计、未投递提醒和
+活动限制会清理；已发送通知、案件事件和管理审计继续保留，不做破坏性物理删除。是否继续自动
+建案由 `regulation.enabled_scope_ids` 独立控制，清零案件本身不会自动改配置。
+
 ## 6. 双 Bot 群号对应
 
 当前两组实际群分别对应 `qq:1092931381 ↔ qq-official:…13E3A339` 与

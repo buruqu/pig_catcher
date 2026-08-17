@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### 按群撤销监管
+
+- `tools/reset_regulation_state.py` 新增 `--scope-id`，可以只预览和撤销一个精确
+  `platform:group_id` 范围；在线备份、单事务清零、未投递通知失效和不可变审计规则与全局清零一致。
+- 指定群清零写入独立的 `scope-reset` 案件事件和 `automatic-regulation-scope-reset` 管理审计；
+  其他群的案件、成员累计、通知和限制保持不变。
+
 ## 1.21.0 - 2026-08-14
 
 ### 自动监管降敏与管理员完全豁免

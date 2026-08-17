@@ -200,10 +200,11 @@ Schema 17 新增 `anti_abuse_cases`、`anti_abuse_case_members`、`anti_abuse_no
 累计归零、未发送通知失效、活动限制释放，并追加 `automatic-expiry` 历史事件。列表和案件详情
 只查询未撤销且创建未满 24 小时的记录，因此不存在“界面消失但限制仍生效”的隐形处罚。
 
-全局恢复使用 `tools/reset_regulation_state.py`。默认只读预览；`--execute` 先调用 SQLite 在线
-备份 API，再在一个 `BEGIN IMMEDIATE` 事务中撤销全部案件、清零当前分数/成员累计、失效未投递
-通知并释放限制。每案追加 `global-reset` 事件，每个涉及作用域追加
-`automatic-regulation-bulk-reset` 通用审计；旧事件和已发送通知不删除。
+监管恢复使用 `tools/reset_regulation_state.py`。默认只读预览；`--execute` 先调用 SQLite 在线
+备份 API，再在一个 `BEGIN IMMEDIATE` 事务中撤销案件、清零当前分数/成员累计、失效未投递通知
+并释放限制。留空 `--scope-id` 时全局处理，每案追加 `global-reset` 事件并按涉及作用域追加
+`automatic-regulation-bulk-reset` 通用审计；提供精确 `platform:group_id` 时只处理该群，改写为
+`scope-reset` 事件与 `automatic-regulation-scope-reset` 管理审计。旧事件和已发送通知不删除。
 
 群消息只消费预先生成的中性 `message_text`。内部 `score`、阈值和 `evidence_json` 不进入普通
 回执、管理群回复或图片模型；管理员群命令只显示案件号、状态、相关账号和当前到期限制。

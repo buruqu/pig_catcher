@@ -690,11 +690,15 @@ class RegulationRepository:
         self,
         session: DatabaseSession,
         *,
+        scope_id: str | None = None,
         created_before: str | None = None,
         active_only: bool = False,
     ) -> list[dict[str, object]]:
         clauses: list[str] = []
         parameters: list[object] = []
+        if scope_id is not None:
+            clauses.append("scope_id = ?")
+            parameters.append(scope_id)
         if active_only:
             clauses.append("status NOT IN ('closed', 'dismissed')")
         if created_before is not None:
