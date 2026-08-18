@@ -498,8 +498,34 @@ def resolve_food_effect(
             ),
         )
     if normalized_id == GROUP_NEXT_EXCLUSIVE_HIGH_STAR_CATCH:
-        five_multiplier = _number(raw, "five_star_multiplier", lower=1.01, upper=20.0)
-        six_multiplier = _number(raw, "six_star_multiplier", lower=1.01, upper=20.0)
+        # 可选固定品质分布：存在时替代 5/6 星乘数模式，品质直接按该分布结算。
+        fixed_weights: tuple[float, ...] | None = None
+        if "fixed_weights" in raw:
+            raw_weights = raw["fixed_weights"]
+            if not isinstance(raw_weights, (list, tuple)) or len(raw_weights) != 6:
+                raise FoodEffectError("fixed_weights 必须正好包含六项品质权重。")
+            parsed_weights = [float(value) for value in raw_weights]
+            if any(value < 0.0 for value in parsed_weights):
+                raise FoodEffectError("fixed_weights 不能包含负数。")
+            if sum(parsed_weights) <= 0.0:
+                raise FoodEffectError("fixed_weights 总和必须大于零。")
+            fixed_weights = tuple(parsed_weights)
+        five_multiplier = (
+            _number(raw, "five_star_multiplier", lower=1.01, upper=20.0)
+            if "five_star_multiplier" in raw
+            else 1.0
+        )
+        six_multiplier = (
+            _number(raw, "six_star_multiplier", lower=1.01, upper=20.0)
+            if "six_star_multiplier" in raw
+            else 1.0
+        )
+        if fixed_weights is None and not (
+            "five_star_multiplier" in raw and "six_star_multiplier" in raw
+        ):
+            raise FoodEffectError(
+                "未提供 fixed_weights 时，必须同时提供 five_star_multiplier 与 six_star_multiplier。"
+            )
         uses_per_player = _integer(raw, "uses_per_player", lower=1, upper=3)
         self_coin = _integer(raw, "self_coin", lower=0, upper=1_000_000)
         other_coin = _integer(raw, "other_coin", lower=0, upper=1_000_000)
@@ -508,30 +534,64 @@ def resolve_food_effect(
             if "auto_gift_chance_percent" in raw
             else 0.0
         )
+        # 可选自动赠送品质（缺省仅 6 星，保持旧行为）。
+        auto_gift_rarities: tuple[int, ...] = (6,)
+        if "auto_gift_rarities" in raw:
+            raw_rarities = raw["auto_gift_rarities"]
+            if not isinstance(raw_rarities, (list, tuple)) or not raw_rarities:
+                raise FoodEffectError("auto_gift_rarities 必须是品质列表。")
+            parsed_rarities: list[int] = []
+            for value in raw_rarities:
+                rarity_value = int(value)
+                if not 1 <= rarity_value <= 6:
+                    raise FoodEffectError("auto_gift_rarities 只接受 1 至 6 的品质。")
+                parsed_rarities.append(rarity_value)
+            auto_gift_rarities = tuple(sorted(set(parsed_rarities)))
         params: dict[str, object] = {
-            "five_star_multiplier": five_multiplier,
-            "six_star_multiplier": six_multiplier,
             "uses_per_player": uses_per_player,
             "self_coin": self_coin,
             "other_coin": other_coin,
             "source_label": str(raw.get("source_label") or "神龙化猪七星云海锅").strip(),
         }
+        if fixed_weights is not None:
+            params["fixed_weights"] = list(fixed_weights)
+        else:
+            params["five_star_multiplier"] = five_multiplier
+            params["six_star_multiplier"] = six_multiplier
         if auto_gift_chance:
             params["auto_gift_chance_percent"] = auto_gift_chance
+        if auto_gift_rarities != (6,):
+            params["auto_gift_rarities"] = list(auto_gift_rarities)
         gift_text = (
-            f"；抓到 6 星猪时有 {auto_gift_chance:g}% 概率把该猪自动赠送给本次发动群友"
+            (
+                f"；抓到 {'、'.join(f'{r} 星' for r in auto_gift_rarities)} 猪时有 "
+                f"{auto_gift_chance:g}% 概率把该猪自动赠送给本次发动群友"
+            )
             if auto_gift_chance
             else ""
         )
+        if fixed_weights is not None:
+            distribution_text = "、".join(
+                f"{index} 星 {value:g}%"
+                for index, value in enumerate(fixed_weights, start=1)
+                if value > 0.0
+            )
+            effect_summary = (
+                f"食用者立即获得 {self_coin} 猪币，其余本群已登记玩家各获得 {other_coin} 猪币；"
+                f"有效期内本群每名玩家的下一次抓猪，品质固定为 {distribution_text}，"
+                f"并按六星菜独占规则结算{gift_text}。"
+            )
+        else:
+            effect_summary = (
+                f"食用者立即获得 {self_coin} 猪币，其余本群已登记玩家各获得 {other_coin} 猪币；"
+                f"有效期内本群每名玩家的下一次抓猪，5 星与 6 星相对权重分别 ×{five_multiplier:g} "
+                f"和 ×{six_multiplier:g}，并按六星菜独占规则结算{gift_text}。"
+            )
         return FoodEffectGrant(
             normalized_id,
             params,
             uses_per_player,
-            (
-                f"食用者立即获得 {self_coin} 猪币，其余本群已登记玩家各获得 {other_coin} 猪币；"
-                f"有效期内本群每名玩家的下一次抓猪，5 星与 6 星相对权重分别 ×{five_multiplier:g} "
-                f"和 ×{six_multiplier:g}，并按六星菜独占规则结算{gift_text}。"
-            ),
+            effect_summary,
         )
     if normalized_id == GROUP_WINDOW_HIGH_STAR_BOOST:
         five_multiplier = _number(raw, "five_star_multiplier", lower=1.001, upper=4.0)
@@ -1295,25 +1355,38 @@ def apply_group_catch_effects(
     if exclusive_candidates:
         chosen = exclusive_candidates[0]
         grant = resolve_food_effect(chosen.effect_id, chosen.params)
-        adjusted = apply_monotonic_high_rarity_multipliers(
-            adjusted,
-            (
-                1.0,
-                1.0,
-                1.0,
-                1.0,
-                float(grant.params["five_star_multiplier"]),
-                float(grant.params["six_star_multiplier"]),
-            ),
-        )
+        fixed_weights = grant.params.get("fixed_weights")
         source_label = str(grant.params["source_label"])
         source_display_name = _group_effect_display_name(chosen)
-        summary = (
-            f"{source_label}全群独占（发动群友：{source_display_name}）："
-            "本次 5 星与 6 星相对权重分别 "
-            f"×{float(grant.params['five_star_multiplier']):g} 和 "
-            f"×{float(grant.params['six_star_multiplier']):g}。"
-        )
+        if fixed_weights is not None:
+            adjusted = normalize_weights(fixed_weights)
+            distribution_text = "、".join(
+                f"{index} 星 {value:g}%"
+                for index, value in enumerate(adjusted, start=1)
+                if value > 0.0
+            )
+            summary = (
+                f"{source_label}全群独占（发动群友：{source_display_name}）："
+                f"本次品质固定为 {distribution_text}。"
+            )
+        else:
+            adjusted = apply_monotonic_high_rarity_multipliers(
+                adjusted,
+                (
+                    1.0,
+                    1.0,
+                    1.0,
+                    1.0,
+                    float(grant.params["five_star_multiplier"]),
+                    float(grant.params["six_star_multiplier"]),
+                ),
+            )
+            summary = (
+                f"{source_label}全群独占（发动群友：{source_display_name}）："
+                "本次 5 星与 6 星相对权重分别 "
+                f"×{float(grant.params['five_star_multiplier']):g} 和 "
+                f"×{float(grant.params['six_star_multiplier']):g}。"
+            )
         if chosen.granted_uses_per_player > 1:
             remaining = max(
                 0,

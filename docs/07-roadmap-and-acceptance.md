@@ -1382,3 +1382,23 @@
   目录 hash `28db6bd0…`，运行库 catalog hash `4036f814…`。
 - 自动回归为 pytest `276 passed`（新增达妮娅累计/满层拒绝、阿萨姆自动赠送
   两个端到端测试）；Ruff、Python `compileall` 全部通过。
+## 40. v1.22.1 阿萨姆固定概率池与 5/6 星自动赠送验收
+
+- 验收日期：`2026-08-18`。插件升级为 `local.pig-catcher v1.22.1`，Schema `27`、
+  Ruleset `22`、Asset Manifest `4` 保持不变；无数据迁移。
+- 效果重做：阿萨姆红茶奶雾锅从 5/6 星 ×10 权重加成改为**固定品质分布**
+  `fixed_weights=[0,0,0,50,30,20]`——全群下一次抓猪 4 星 50%、5 星 30%、6 星 20%，
+  1 至 3 星完全不出；自动赠送从"仅 6 星 50%"扩为"5 星与 6 星均 50%"。
+- 实现：`group-next-exclusive-high-star-catch` 效果解析新增可选参数
+  `fixed_weights`（缺省保持 5/6 星乘数模式，神龙化猪七星云海锅等不受影响）与
+  `auto_gift_rarities`（缺省 `[6]` 保持旧行为）；`apply_group_catch_effects` 命中
+  固定分布时直接以该分布结算并展示固定概率文案；catch 自动赠送按参数读取赠送品质
+  列表，摘要文案动态显示品质与来源。AssetManifest `effect_params` 值类型扩展
+  `list[object]` 以承载数组参数。
+- 数据落地：catalog 四群阿萨姆 `effect_params` 同步为新参数；素材包重建导入
+  （239 项，目录 hash `9ce2f317…`）；运行库已激活的 1 个阿萨姆群效果
+  （`0734f248…`，qq-official:5E58…，今日 05:16 触发）参数同步更新，玩家下一次
+  抓猪即按新规则结算。
+- 自动回归为 pytest `277 passed`（新增固定概率池端到端测试：4/5/6 星按 50/30/20
+  落点、5 星赠送、4 星不赠送、1-3 星不出、3 名玩家各消耗 1 次群效果）；Ruff、
+  Python `compileall` 全部通过。

@@ -4004,12 +4004,22 @@
       "group_scope_id": "qq:1092931381",
       "effect_id": "group-next-exclusive-high-star-catch",
       "effect_params": {
-        "five_star_multiplier": 10.0,
-        "six_star_multiplier": 10.0,
+        "fixed_weights": [
+          0,
+          0,
+          0,
+          50,
+          30,
+          20
+        ],
         "uses_per_player": 1,
         "self_coin": 0,
         "other_coin": 0,
         "auto_gift_chance_percent": 50.0,
+        "auto_gift_rarities": [
+          5,
+          6
+        ],
         "source_label": "阿萨姆红茶奶雾锅"
       }
     },
@@ -4076,12 +4086,22 @@
       "group_scope_id": "qq:237716658",
       "effect_id": "group-next-exclusive-high-star-catch",
       "effect_params": {
-        "five_star_multiplier": 10.0,
-        "six_star_multiplier": 10.0,
+        "fixed_weights": [
+          0,
+          0,
+          0,
+          50,
+          30,
+          20
+        ],
         "uses_per_player": 1,
         "self_coin": 0,
         "other_coin": 0,
         "auto_gift_chance_percent": 50.0,
+        "auto_gift_rarities": [
+          5,
+          6
+        ],
         "source_label": "阿萨姆红茶奶雾锅"
       }
     },
@@ -4148,12 +4168,22 @@
       "group_scope_id": "qq-official:5E5854406D0297D6FEAE696A13E3A339",
       "effect_id": "group-next-exclusive-high-star-catch",
       "effect_params": {
-        "five_star_multiplier": 10.0,
-        "six_star_multiplier": 10.0,
+        "fixed_weights": [
+          0,
+          0,
+          0,
+          50,
+          30,
+          20
+        ],
         "uses_per_player": 1,
         "self_coin": 0,
         "other_coin": 0,
         "auto_gift_chance_percent": 50.0,
+        "auto_gift_rarities": [
+          5,
+          6
+        ],
         "source_label": "阿萨姆红茶奶雾锅"
       }
     },
@@ -4220,12 +4250,22 @@
       "group_scope_id": "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
       "effect_id": "group-next-exclusive-high-star-catch",
       "effect_params": {
-        "five_star_multiplier": 10.0,
-        "six_star_multiplier": 10.0,
+        "fixed_weights": [
+          0,
+          0,
+          0,
+          50,
+          30,
+          20
+        ],
         "uses_per_player": 1,
         "self_coin": 0,
         "other_coin": 0,
         "auto_gift_chance_percent": 50.0,
+        "auto_gift_rarities": [
+          5,
+          6
+        ],
         "source_label": "阿萨姆红茶奶雾锅"
       }
     }

@@ -3054,7 +3054,7 @@ async def test_daniya_progress_accumulates_boosts_and_rejects_at_cap(
 async def test_asamu_group_effect_auto_gifts_six_star_pig(
     tmp_path: Path,
 ) -> None:
-    """阿萨姆红茶奶雾锅：全群高星 ×10 独占；抓到六星时 50% 自动赠送给发起人。"""
+    """阿萨姆红茶奶雾锅：固定品质分布（4 星 50%/5 星 30%/6 星 20%）；抓到 5/6 星 50% 自动赠送发起人。"""
 
     database = await _database_with_catalog(
         tmp_path,
@@ -3063,12 +3063,12 @@ async def test_asamu_group_effect_auto_gifts_six_star_pig(
         effect_ids={6: "group-next-exclusive-high-star-catch"},
         effect_params={
             6: {
-                "five_star_multiplier": 10.0,
-                "six_star_multiplier": 10.0,
+                "fixed_weights": [0, 0, 0, 50, 30, 20],
                 "uses_per_player": 1,
                 "self_coin": 0,
                 "other_coin": 0,
                 "auto_gift_chance_percent": 50.0,
+                "auto_gift_rarities": [5, 6],
                 "source_label": "阿萨姆红茶奶雾锅",
             }
         },
@@ -3114,7 +3114,7 @@ async def test_asamu_group_effect_auto_gifts_six_star_pig(
             VALUES ('asamu-1', 'AS000001', 'qq:100', ?, 'food-6-group', 1, NULL, 6,
                     '阿萨姆红茶奶雾锅', 1.0, 'balanced', 25000,
                     'group-next-exclusive-high-star-catch',
-                    '{"auto_gift_chance_percent":50.0,"five_star_multiplier":10.0,"other_coin":0,"self_coin":0,"six_star_multiplier":10.0,"source_label":"阿萨姆红茶奶雾锅","uses_per_player":1}',
+                    '{"auto_gift_chance_percent":50.0,"auto_gift_rarities":[5,6],"fixed_weights":[0,0,0,50,30,20],"other_coin":0,"self_coin":0,"source_label":"阿萨姆红茶奶雾锅","uses_per_player":1}',
                     1, '{"test":true}', 'active', ?, ?)
             """,
             (
@@ -3171,4 +3171,146 @@ async def test_asamu_group_effect_auto_gifts_six_star_pig(
         "SELECT random_snapshot_json FROM pig_instances WHERE pig_instance_id = 'asamu-pig'"
     )
     assert '"auto_gift_target_player_id"' in str(snapshot["random_snapshot_json"])
+    await database.close()
+
+
+
+@pytest.mark.asyncio
+async def test_asamu_fixed_distribution_covers_four_five_six_and_auto_gifts(
+    tmp_path: Path,
+) -> None:
+    """阿萨姆固定概率池：1-3 星不出、4/5/6 星按 50/30/20 分配；5 星与 6 星均 50% 赠送。"""
+
+    database = await _database_with_catalog(
+        tmp_path,
+        pig_rarities=(1, 4, 5, 6),
+        food_rarities=(1, 6),
+        effect_ids={6: "group-next-exclusive-high-star-catch"},
+        effect_params={
+            6: {
+                "fixed_weights": [0, 0, 0, 50, 30, 20],
+                "uses_per_player": 1,
+                "self_coin": 0,
+                "other_coin": 0,
+                "auto_gift_chance_percent": 50.0,
+                "auto_gift_rarities": [5, 6],
+                "source_label": "阿萨姆红茶奶雾锅",
+            }
+        },
+    )
+    clock = FixedClock()
+    economy = EconomyService(
+        database,
+        CookingSection(cook_cooldown_seconds=0),
+        EconomySection(),
+        clock=clock,
+        id_factory=iter(
+            ("asamu-food", "asamu-ledger", "asamu-group-effect", "asamu-eat-ledger")
+        ).__next__,
+        short_code_factory=iter(("AS000001",)).__next__,
+    )
+    activator_identity = _identity(user_id="100", message_id="asamu-seed-fix")
+    async with database.transaction() as session:
+        await session.execute(
+            """
+            INSERT INTO players(
+                player_id, scope_id, platform_user_id, display_name,
+                coin_balance, experience, created_at, updated_at
+            )
+            VALUES (?, 'qq:100', '100', '阿萨姆发动者', 0, 0, ?, ?)
+            """,
+            (
+                activator_identity.player_id,
+                "2026-07-28T04:00:00.000Z",
+                "2026-07-28T04:00:00.000Z",
+            ),
+        )
+        await session.execute(
+            """
+            INSERT INTO food_instances(
+                food_instance_id, short_code, scope_id, owner_player_id,
+                template_id, template_version, source_pig_instance_id,
+                rarity, display_name_snapshot, portion_weight, fat_category,
+                official_value, effect_id, effect_params_json,
+                ruleset_version, random_snapshot_json, state,
+                acquired_at, updated_at
+            )
+            VALUES ('asamu-f1', 'AS000001', 'qq:100', ?, 'food-6-group', 1, NULL, 6,
+                    '阿萨姆红茶奶雾锅', 1.0, 'balanced', 25000,
+                    'group-next-exclusive-high-star-catch',
+                    '{"auto_gift_chance_percent":50.0,"auto_gift_rarities":[5,6],"fixed_weights":[0,0,0,50,30,20],"other_coin":0,"self_coin":0,"source_label":"阿萨姆红茶奶雾锅","uses_per_player":1}',
+                    1, '{"test":true}', 'active', ?, ?)
+            """,
+            (
+                activator_identity.player_id,
+                "2026-07-28T04:00:00.000Z",
+                "2026-07-28T04:00:00.000Z",
+            ),
+        )
+    eaten = await economy.eat(
+        _identity(user_id="100", message_id="asamu-eat-fix"),
+        "阿萨姆红茶奶雾锅#AS000001",
+    )
+    assert eaten.effect.queued_effect_id == "group-next-exclusive-high-star-catch"
+
+    catcher = GameplayService(
+        database,
+        CatchingSection(cooldown_seconds=0),
+        random_source=SequenceRandom(
+            # U300：roll 0.05 -> 4 星（<0.5 区间），4 星不在赠送列表
+            0.05, 0.0, 0.5, 0.5, 0.5, 0.5, 0.5,
+            # U400：roll 0.60 -> 5 星（0.5-0.8），gift 0.1 -> 触发赠送
+            0.60, 0.0, 0.5, 0.5, 0.5, 0.5, 0.5, 0.1,
+            # U500：roll 0.90 -> 6 星（>=0.8），gift 0.9 -> 不赠送
+            0.90, 0.0, 0.5, 0.5, 0.5, 0.5, 0.5, 0.9,
+        ),
+        clock=clock,
+        id_factory=iter(
+            [f"asamu-fix-pig-{i}" for i in range(40)]
+        ).__next__,
+        short_code_factory=iter(
+            [f"AS0FIX{i:02d}" for i in range(40)]
+        ).__next__,
+    )
+    # 1) 4 星：不出低星，也不赠送
+    first = await catcher.catch(
+        _identity(user_id="300", message_id="asamu-fix-catch-1")
+    )
+    assert int(first.pig.rarity) == 4
+    owner = await database.fetch_one(
+        "SELECT owner_player_id FROM pig_instances WHERE short_code = ?",
+        (first.pig.short_code,),
+    )
+    assert owner is not None and owner["owner_player_id"] == "qq:100:300"
+    # 2) 5 星：命中赠送 -> 归发起人
+    second = await catcher.catch(
+        _identity(user_id="400", message_id="asamu-fix-catch-2")
+    )
+    assert int(second.pig.rarity) == 5
+    owner = await database.fetch_one(
+        "SELECT owner_player_id FROM pig_instances WHERE short_code = ?",
+        (second.pig.short_code,),
+    )
+    assert owner is not None and owner["owner_player_id"] == activator_identity.player_id
+    # 3) 6 星：gift roll 0.9 > 0.5 -> 不赠送，留在自己背包
+    third = await catcher.catch(
+        _identity(user_id="500", message_id="asamu-fix-catch-3")
+    )
+    assert int(third.pig.rarity) == 6
+    owner = await database.fetch_one(
+        "SELECT owner_player_id FROM pig_instances WHERE short_code = ?",
+        (third.pig.short_code,),
+    )
+    assert owner is not None and owner["owner_player_id"] == "qq:100:500"
+    # 3 名玩家的群效果使用各消耗 1 次（usage 表每玩家一行）
+    uses = await database.fetch_one(
+        """
+        SELECT COUNT(*) AS c
+        FROM group_food_effect_usage AS usage
+        JOIN group_food_effects AS effect
+          ON effect.group_effect_entry_id = usage.group_effect_entry_id
+        WHERE effect.effect_id = 'group-next-exclusive-high-star-catch'
+        """
+    )
+    assert uses is not None and uses["c"] == 3
     await database.close()

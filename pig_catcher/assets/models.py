@@ -69,7 +69,7 @@ class AssetManifestEntry(BaseModel):
     stature_profile: StatureProfile | None = None
     recipe_tags: list[str] = Field(default_factory=list, max_length=20)
     effect_id: str = Field(default="", max_length=80)
-    effect_params: dict[str, str | int | float | bool] = Field(
+    effect_params: dict[str, str | int | float | bool | list[object]] = Field(
         default_factory=dict,
         max_length=20,
     )

@@ -1244,11 +1244,10 @@ class GameplayService:
                 },
             )
             auto_gift_target_player_id = ""
-            if (
-                rarity is Rarity.SIX
-                and group_effect_application.source_user_id
-            ):
+            if group_effect_application.source_user_id:
                 auto_gift_chance = 0.0
+                auto_gift_rarities: tuple[int, ...] = (6,)
+                auto_gift_source_label = "阿萨姆红茶奶雾锅"
                 for group_effect in active_group_effects:
                     if (
                         group_effect.group_effect_entry_id
@@ -1259,9 +1258,19 @@ class GameplayService:
                         auto_gift_chance = float(
                             group_effect.params.get("auto_gift_chance_percent") or 0.0
                         )
+                        if group_effect.params.get("auto_gift_rarities"):
+                            auto_gift_rarities = tuple(
+                                int(value)
+                                for value in group_effect.params["auto_gift_rarities"]
+                            )
+                        auto_gift_source_label = str(
+                            group_effect.params.get("source_label")
+                            or auto_gift_source_label
+                        )
                         break
                 if (
-                    auto_gift_chance > 0.0
+                    int(rarity) in auto_gift_rarities
+                    and auto_gift_chance > 0.0
                     and self.random_source.random() < auto_gift_chance / 100.0
                 ):
                     activator_player_id = (
@@ -1314,7 +1323,8 @@ class GameplayService:
                                 ),
                             )
                             effect_summaries += (
-                                "阿萨姆红茶奶雾锅：本次抓到的 6 星猪已自动赠送给发动群友。",
+                                f"{auto_gift_source_label}：本次抓到的 {int(rarity)} 星猪"
+                                "已自动赠送给发动群友。",
                             )
             coin_reward = CATCH_COIN_REWARDS[rarity]
             experience_reward = CATCH_EXPERIENCE_REWARDS[rarity]
