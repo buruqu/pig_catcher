@@ -1402,3 +1402,19 @@
 - 自动回归为 pytest `277 passed`（新增固定概率池端到端测试：4/5/6 星按 50/30/20
   落点、5 星赠送、4 星不赠送、1-3 星不出、3 名玩家各消耗 1 次群效果）；Ruff、
   Python `compileall` 全部通过。
+## 41. v1.22.2 阿萨姆 PK 展示与额外抓猪次数验收
+
+- 验收日期：`2026-08-18`。插件升级为 `local.pig-catcher v1.22.2`，Schema `27`、
+  Ruleset `22`、Asset Manifest `4` 保持不变；无数据迁移。
+- PK 展示：自动赠送命中时，抓猪回执完整呈现"原主（抓猪人显示名）抓到了 X 星
+  <猪名>（编号）→ 被效果自动赠送给发动群友 <发动者显示名>"的完整过程；
+  文案由 `GameplayService.catch` 在赠送分支按抓猪人/猪模板/短码/发动者动态拼接。
+- 额外抓猪次数：`group-next-exclusive-high-star-catch` 新增可选参数 `quota_exempt`
+  （缺省 `false`，神龙化猪七星云海锅等乘数模式不受影响）；`GroupCatchEffectApplication`
+  新增 `quota_exempt` 字段，`catch` 的额度豁免条件并入群效果独占结算——阿萨姆发动的
+  这一次抓猪不消耗本时段正常额度（回执显示"专属次数"）。
+- 数据落地：catalog 四群阿萨姆 `effect_params` 增加 `quota_exempt: true`；素材包重建
+  导入（239 项，目录 hash `5ef988f5…`）；运行库已激活的阿萨姆群效果参数同步更新。
+- 自动回归为 pytest `277 passed`（复用并强化 2 个阿萨姆端到端测试：额外次数不扣额度
+  `quota_exempt_catch`/`daily_count` 断言、PK 文案含原主/猪名/赠送对象断言）；Ruff、
+  Python `compileall` 全部通过。

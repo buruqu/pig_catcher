@@ -3069,6 +3069,7 @@ async def test_asamu_group_effect_auto_gifts_six_star_pig(
                 "other_coin": 0,
                 "auto_gift_chance_percent": 50.0,
                 "auto_gift_rarities": [5, 6],
+                "quota_exempt": True,
                 "source_label": "阿萨姆红茶奶雾锅",
             }
         },
@@ -3114,7 +3115,7 @@ async def test_asamu_group_effect_auto_gifts_six_star_pig(
             VALUES ('asamu-1', 'AS000001', 'qq:100', ?, 'food-6-group', 1, NULL, 6,
                     '阿萨姆红茶奶雾锅', 1.0, 'balanced', 25000,
                     'group-next-exclusive-high-star-catch',
-                    '{"auto_gift_chance_percent":50.0,"auto_gift_rarities":[5,6],"fixed_weights":[0,0,0,50,30,20],"other_coin":0,"self_coin":0,"source_label":"阿萨姆红茶奶雾锅","uses_per_player":1}',
+                    '{"auto_gift_chance_percent":50.0,"auto_gift_rarities":[5,6],"fixed_weights":[0,0,0,50,30,20],"other_coin":0,"quota_exempt":true,"self_coin":0,"source_label":"阿萨姆红茶奶雾锅","uses_per_player":1}',
                     1, '{"test":true}', 'active', ?, ?)
             """,
             (
@@ -3194,6 +3195,7 @@ async def test_asamu_fixed_distribution_covers_four_five_six_and_auto_gifts(
                 "other_coin": 0,
                 "auto_gift_chance_percent": 50.0,
                 "auto_gift_rarities": [5, 6],
+                "quota_exempt": True,
                 "source_label": "阿萨姆红茶奶雾锅",
             }
         },
@@ -3238,7 +3240,7 @@ async def test_asamu_fixed_distribution_covers_four_five_six_and_auto_gifts(
             VALUES ('asamu-f1', 'AS000001', 'qq:100', ?, 'food-6-group', 1, NULL, 6,
                     '阿萨姆红茶奶雾锅', 1.0, 'balanced', 25000,
                     'group-next-exclusive-high-star-catch',
-                    '{"auto_gift_chance_percent":50.0,"auto_gift_rarities":[5,6],"fixed_weights":[0,0,0,50,30,20],"other_coin":0,"self_coin":0,"source_label":"阿萨姆红茶奶雾锅","uses_per_player":1}',
+                    '{"auto_gift_chance_percent":50.0,"auto_gift_rarities":[5,6],"fixed_weights":[0,0,0,50,30,20],"other_coin":0,"quota_exempt":true,"self_coin":0,"source_label":"阿萨姆红茶奶雾锅","uses_per_player":1}',
                     1, '{"test":true}', 'active', ?, ?)
             """,
             (
@@ -3302,6 +3304,22 @@ async def test_asamu_fixed_distribution_covers_four_five_six_and_auto_gifts(
         (third.pig.short_code,),
     )
     assert owner is not None and owner["owner_player_id"] == "qq:100:500"
+    # 群效果独占结算的本次抓猪为额外次数：不消耗正常时段额度
+    assert first.quota_exempt_catch is True
+    assert second.quota_exempt_catch is True
+    assert third.quota_exempt_catch is True
+    assert first.daily_count == 0
+    assert second.daily_count == 0
+    assert third.daily_count == 0
+    # PK 展示：回执完整呈现原主（抓猪人）、猪名编号与赠送对象（发动群友）
+    assert second.effect_summaries
+    gift_summary = next(
+        item for item in second.effect_summaries if "抓到了" in item
+    )
+    assert "成员400" in gift_summary
+    assert "5 星 5星测试猪" in gift_summary
+    assert "成员100" in gift_summary
+    assert "自动赠送" in gift_summary
     # 3 名玩家的群效果使用各消耗 1 次（usage 表每玩家一行）
     uses = await database.fetch_one(
         """

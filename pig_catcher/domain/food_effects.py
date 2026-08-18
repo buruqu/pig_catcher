@@ -221,6 +221,8 @@ class GroupCatchEffectApplication:
     hidden_boost_triggered: bool = False
     source_user_id: str = ""
     source_display_name: str = ""
+    # 群效果独占结算的本次抓猪是否豁免正常时段额度（额外抓猪次数）。
+    quota_exempt: bool = False
 
 
 def active_effect_from_row(row: Mapping[str, object]) -> ActiveFoodEffect:
@@ -547,6 +549,22 @@ def resolve_food_effect(
                     raise FoodEffectError("auto_gift_rarities 只接受 1 至 6 的品质。")
                 parsed_rarities.append(rarity_value)
             auto_gift_rarities = tuple(sorted(set(parsed_rarities)))
+        # 可选：群效果独占结算的本次抓猪豁免正常额度（额外抓猪次数）。
+        quota_exempt = False
+        if "quota_exempt" in raw:
+            quota_raw = raw["quota_exempt"]
+            if isinstance(quota_raw, bool):
+                quota_exempt = quota_raw
+            elif isinstance(quota_raw, (int, float)):
+                quota_exempt = bool(quota_raw)
+            else:
+                quota_text_value = str(quota_raw).strip().lower()
+                if quota_text_value in ("1", "true", "yes", "on"):
+                    quota_exempt = True
+                elif quota_text_value in ("0", "false", "no", "off"):
+                    quota_exempt = False
+                else:
+                    raise FoodEffectError("美食效果参数 quota_exempt 必须是布尔值。")
         params: dict[str, object] = {
             "uses_per_player": uses_per_player,
             "self_coin": self_coin,
@@ -562,6 +580,8 @@ def resolve_food_effect(
             params["auto_gift_chance_percent"] = auto_gift_chance
         if auto_gift_rarities != (6,):
             params["auto_gift_rarities"] = list(auto_gift_rarities)
+        if quota_exempt:
+            params["quota_exempt"] = True
         gift_text = (
             (
                 f"；抓到 {'、'.join(f'{r} 星' for r in auto_gift_rarities)} 猪时有 "
@@ -1411,6 +1431,7 @@ def apply_group_catch_effects(
             exclusive=True,
             source_user_id=chosen.source_user_id,
             source_display_name=source_display_name,
+            quota_exempt=bool(grant.params.get("quota_exempt") or False),
         )
 
     ordinary = [

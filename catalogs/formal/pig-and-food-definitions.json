@@ -4020,7 +4020,8 @@
           5,
           6
         ],
-        "source_label": "阿萨姆红茶奶雾锅"
+        "source_label": "阿萨姆红茶奶雾锅",
+        "quota_exempt": true
       }
     },
     {
@@ -4102,7 +4103,8 @@
           5,
           6
         ],
-        "source_label": "阿萨姆红茶奶雾锅"
+        "source_label": "阿萨姆红茶奶雾锅",
+        "quota_exempt": true
       }
     },
     {
@@ -4184,7 +4186,8 @@
           5,
           6
         ],
-        "source_label": "阿萨姆红茶奶雾锅"
+        "source_label": "阿萨姆红茶奶雾锅",
+        "quota_exempt": true
       }
     },
     {
@@ -4266,7 +4269,8 @@
           5,
           6
         ],
-        "source_label": "阿萨姆红茶奶雾锅"
+        "source_label": "阿萨姆红茶奶雾锅",
+        "quota_exempt": true
       }
     }
   ]

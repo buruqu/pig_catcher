@@ -1070,6 +1070,7 @@ class GameplayService:
             quota_exempt_catch = bool(
                 quota_exempt_catch
                 or group_effect_application.dedicated_entry_id
+                or group_effect_application.quota_exempt
             )
             if catch_restriction is not None and total_catch_count >= daily_limit:
                 expiry = str(catch_restriction.get("expires_at") or "")
@@ -1323,8 +1324,10 @@ class GameplayService:
                                 ),
                             )
                             effect_summaries += (
-                                f"{auto_gift_source_label}：本次抓到的 {int(rarity)} 星猪"
-                                "已自动赠送给发动群友。",
+                                f"{auto_gift_source_label}：{identity.display_name} 抓到了 "
+                                f"{int(rarity)} 星 {template['display_name']}（{short_code}），"
+                                "被效果自动赠送给发动群友 "
+                                f"{group_effect_application.source_display_name}！",
                             )
             coin_reward = CATCH_COIN_REWARDS[rarity]
             experience_reward = CATCH_EXPERIENCE_REWARDS[rarity]
