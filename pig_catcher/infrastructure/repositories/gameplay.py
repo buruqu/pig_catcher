@@ -1086,6 +1086,26 @@ class GameplayRepository:
         )
         return str(row["item_id"]), int(row["remaining_uses"])
 
+    async def transfer_pig_owner(
+        self,
+        session: DatabaseSession,
+        *,
+        pig_instance_id: str,
+        owner_player_id: str,
+        now: str,
+    ) -> bool:
+        """Reassign one active pig to another player (system group-effect gift)."""
+
+        cursor = await session.execute(
+            """
+            UPDATE pig_instances
+            SET owner_player_id = ?, updated_at = ?
+            WHERE pig_instance_id = ? AND state = 'active'
+            """,
+            (owner_player_id, now, pig_instance_id),
+        )
+        return cursor.rowcount == 1
+
     async def list_baogian_instances(
         self,
         session: DatabaseSession,

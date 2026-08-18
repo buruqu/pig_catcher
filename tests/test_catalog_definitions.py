@@ -25,11 +25,11 @@ def _entries() -> list[dict[str, object]]:
     return list(payload["entries"])
 
 
-def test_formal_catalog_has_all_223_named_assets_and_stable_ids() -> None:
+def test_formal_catalog_has_all_239_named_assets_and_stable_ids() -> None:
     entries = _entries()
-    assert len(entries) == 223
-    assert len({entry["template_id"] for entry in entries}) == 223
-    assert len({entry["source_path"] for entry in entries}) == 223
+    assert len(entries) == 239
+    assert len({entry["template_id"] for entry in entries}) == 239
+    assert len({entry["source_path"] for entry in entries}) == 239
     assert all(str(entry["description"]).strip() for entry in entries)
     pig_counts = Counter(
         int(entry["rarity"])
@@ -41,8 +41,8 @@ def test_formal_catalog_has_all_223_named_assets_and_stable_ids() -> None:
         for entry in entries
         if entry["kind"] == "food"
     )
-    assert pig_counts == {1: 20, 2: 20, 3: 21, 4: 28, 5: 31, 6: 36}
-    assert food_counts == {1: 3, 2: 6, 3: 7, 4: 8, 5: 7, 6: 36}
+    assert pig_counts == {1: 20, 2: 20, 3: 21, 4: 28, 5: 31, 6: 44}
+    assert food_counts == {1: 3, 2: 6, 3: 7, 4: 8, 5: 7, 6: 44}
 
 
 def test_high_rarity_food_effects_cover_new_gameplay_families() -> None:
@@ -208,7 +208,7 @@ def test_group_custom_assets_are_confined_and_keep_user_text() -> None:
         for entry in entries
         if entry.get("group_scope_id")
     ]
-    assert len(group_entries) == 72
+    assert len(group_entries) == 88
     assert {entry["group_scope_id"] for entry in group_entries} == {
         "qq:1092931381",
         "qq:237716658",
@@ -266,7 +266,7 @@ def test_group_custom_assets_are_confined_and_keep_user_text() -> None:
         for scope in {str(entry["group_scope_id"]) for entry in group_entries}
     }
     baseline = by_scope[PAIRED_GROUP_SCOPES[0][0]]
-    assert len(baseline) == 18
+    assert len(baseline) == 22
     assert all(scope_catalog == baseline for scope_catalog in by_scope.values())
     for qq_scope, official_scope in PAIRED_GROUP_SCOPES:
         assert by_scope[qq_scope] == by_scope[official_scope]

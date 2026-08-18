@@ -1,9 +1,9 @@
 {
   "source_root": "asset_library/current/media",
   "definitions": "catalogs/formal/pig-and-food-definitions.json",
-  "entry_count": 223,
-  "unique_binary_count": 169,
-  "stored_binary_count": 226,
+  "entry_count": 239,
+  "unique_binary_count": 173,
+  "stored_binary_count": 242,
   "duplicate_aliases": [
     {
       "source_path": "猪猪素材库/紫色品质/翻滚猪.jpg",
@@ -1572,6 +1572,118 @@
       "media_path": "media/定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/神龙化猪七星云海锅.png",
       "sha256": "48295dcbd7f81624361e16e6c75d80ba3d0b4fe08041072912368652a7611313",
       "bytes": 2581772
+    },
+    {
+      "template_id": "pig-g1092931381-daniya",
+      "source_path": "定制猪群友库/1092931381/达妮娅猪.png",
+      "media_path": "media/定制猪群友库/1092931381/达妮娅猪.png",
+      "sha256": "f37db801cd3a8ce3c21136432a3e8d122c9e4bd233464bebbf4ab438c2a87db7",
+      "bytes": 2277525
+    },
+    {
+      "template_id": "food-g1092931381-daniya-bubble-jelly",
+      "source_path": "定制美食库/1092931381/达妮娅泡泡云冻.png",
+      "media_path": "media/定制美食库/1092931381/达妮娅泡泡云冻.png",
+      "sha256": "6e16589a76ba5a25dc54dfac6e68e13722956fbd412cb81cdbf5954c87dfe911",
+      "bytes": 2496187
+    },
+    {
+      "template_id": "pig-g1092931381-asamu",
+      "source_path": "定制猪群友库/1092931381/阿萨姆猪.png",
+      "media_path": "media/定制猪群友库/1092931381/阿萨姆猪.png",
+      "sha256": "77acdd3207dd1972eedc139c975336e0502d9166d8024dcf01715838b7b146a2",
+      "bytes": 2103967
+    },
+    {
+      "template_id": "food-g1092931381-asamu-milk-fog-pot",
+      "source_path": "定制美食库/1092931381/阿萨姆猪红茶奶雾锅.png",
+      "media_path": "media/定制美食库/1092931381/阿萨姆猪红茶奶雾锅.png",
+      "sha256": "65ef2eabff54a373091de7209711d135e6bd35897f8715f099018b6510845e9e",
+      "bytes": 2986671
+    },
+    {
+      "template_id": "pig-g237716658-daniya",
+      "source_path": "定制猪群友库/237716658/达妮娅猪.png",
+      "media_path": "media/定制猪群友库/237716658/达妮娅猪.png",
+      "sha256": "f37db801cd3a8ce3c21136432a3e8d122c9e4bd233464bebbf4ab438c2a87db7",
+      "bytes": 2277525
+    },
+    {
+      "template_id": "food-g237716658-daniya-bubble-jelly",
+      "source_path": "定制美食库/237716658/达妮娅泡泡云冻.png",
+      "media_path": "media/定制美食库/237716658/达妮娅泡泡云冻.png",
+      "sha256": "6e16589a76ba5a25dc54dfac6e68e13722956fbd412cb81cdbf5954c87dfe911",
+      "bytes": 2496187
+    },
+    {
+      "template_id": "pig-g237716658-asamu",
+      "source_path": "定制猪群友库/237716658/阿萨姆猪.png",
+      "media_path": "media/定制猪群友库/237716658/阿萨姆猪.png",
+      "sha256": "77acdd3207dd1972eedc139c975336e0502d9166d8024dcf01715838b7b146a2",
+      "bytes": 2103967
+    },
+    {
+      "template_id": "food-g237716658-asamu-milk-fog-pot",
+      "source_path": "定制美食库/237716658/阿萨姆猪红茶奶雾锅.png",
+      "media_path": "media/定制美食库/237716658/阿萨姆猪红茶奶雾锅.png",
+      "sha256": "65ef2eabff54a373091de7209711d135e6bd35897f8715f099018b6510845e9e",
+      "bytes": 2986671
+    },
+    {
+      "template_id": "pig-qo5e5854406d0297d6feae696a13e3a339-daniya",
+      "source_path": "定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/达妮娅猪.png",
+      "media_path": "media/定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/达妮娅猪.png",
+      "sha256": "f37db801cd3a8ce3c21136432a3e8d122c9e4bd233464bebbf4ab438c2a87db7",
+      "bytes": 2277525
+    },
+    {
+      "template_id": "food-qo5e5854406d0297d6feae696a13e3a339-daniya-bubble-jelly",
+      "source_path": "定制美食库/5E5854406D0297D6FEAE696A13E3A339/达妮娅泡泡云冻.png",
+      "media_path": "media/定制美食库/5E5854406D0297D6FEAE696A13E3A339/达妮娅泡泡云冻.png",
+      "sha256": "6e16589a76ba5a25dc54dfac6e68e13722956fbd412cb81cdbf5954c87dfe911",
+      "bytes": 2496187
+    },
+    {
+      "template_id": "pig-qo5e5854406d0297d6feae696a13e3a339-asamu",
+      "source_path": "定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/阿萨姆猪.png",
+      "media_path": "media/定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/阿萨姆猪.png",
+      "sha256": "77acdd3207dd1972eedc139c975336e0502d9166d8024dcf01715838b7b146a2",
+      "bytes": 2103967
+    },
+    {
+      "template_id": "food-qo5e5854406d0297d6feae696a13e3a339-asamu-milk-fog-pot",
+      "source_path": "定制美食库/5E5854406D0297D6FEAE696A13E3A339/阿萨姆猪红茶奶雾锅.png",
+      "media_path": "media/定制美食库/5E5854406D0297D6FEAE696A13E3A339/阿萨姆猪红茶奶雾锅.png",
+      "sha256": "65ef2eabff54a373091de7209711d135e6bd35897f8715f099018b6510845e9e",
+      "bytes": 2986671
+    },
+    {
+      "template_id": "pig-qo9ea2810f378fbd7dc3219c56ceab3520-daniya",
+      "source_path": "定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/达妮娅猪.png",
+      "media_path": "media/定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/达妮娅猪.png",
+      "sha256": "f37db801cd3a8ce3c21136432a3e8d122c9e4bd233464bebbf4ab438c2a87db7",
+      "bytes": 2277525
+    },
+    {
+      "template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-daniya-bubble-jelly",
+      "source_path": "定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/达妮娅泡泡云冻.png",
+      "media_path": "media/定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/达妮娅泡泡云冻.png",
+      "sha256": "6e16589a76ba5a25dc54dfac6e68e13722956fbd412cb81cdbf5954c87dfe911",
+      "bytes": 2496187
+    },
+    {
+      "template_id": "pig-qo9ea2810f378fbd7dc3219c56ceab3520-asamu",
+      "source_path": "定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/阿萨姆猪.png",
+      "media_path": "media/定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/阿萨姆猪.png",
+      "sha256": "77acdd3207dd1972eedc139c975336e0502d9166d8024dcf01715838b7b146a2",
+      "bytes": 2103967
+    },
+    {
+      "template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-asamu-milk-fog-pot",
+      "source_path": "定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/阿萨姆猪红茶奶雾锅.png",
+      "media_path": "media/定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/阿萨姆猪红茶奶雾锅.png",
+      "sha256": "65ef2eabff54a373091de7209711d135e6bd35897f8715f099018b6510845e9e",
+      "bytes": 2986671
     }
   ]
 }

@@ -12,7 +12,7 @@ from uuid import uuid4
 
 from ..config.model import CatchingSection, RankingSection
 from ..domain.economy import level_cooking_higher_rarity_multiplier
-from ..domain.enums import Rarity, RecordType, StatureProfile
+from ..domain.enums import AssetKind, Rarity, RecordType, StatureProfile
 from ..domain.errors import (
     AmbiguousPigSelectorError,
     CatchCooldownError,
@@ -32,6 +32,7 @@ from ..domain.food_effects import (
     apply_catch_effects,
     apply_group_catch_effects,
     apply_group_hidden_boost,
+    apply_six_star_progress,
     group_hidden_boost_chance,
     has_compatible_exclusive_catch_effect,
     has_compatible_exclusive_group_catch_effect,
@@ -85,6 +86,8 @@ from .command_state import (
 from .receipts import request_fingerprint
 
 _CATCH_COMMAND = "pig-catcher.catch"
+# 达妮娅泡泡云冻每层抓猪六星概率加成（百分点），与正式目录效果参数一致。
+_DANIYA_CATCH_BONUS_PER_STACK = 0.2
 _ARM_ITEM_COMMAND = "pig-catcher.arm-item"
 _CANCEL_ITEM_COMMAND = "pig-catcher.cancel-item"
 _FAT_LABELS = {
@@ -1121,6 +1124,26 @@ class GameplayService:
                         effect_summaries[:prefix_length]
                         + group_effect_application.summaries
                     )
+            six_star_progress_stacks = (
+                await self.economy_repository.six_star_progress_stacks(
+                    session,
+                    player_id=identity.player_id,
+                )
+            )
+            if six_star_progress_stacks:
+                progressed_weights = apply_six_star_progress(
+                    weights,
+                    stacks=six_star_progress_stacks,
+                    bonus_per_stack=_DANIYA_CATCH_BONUS_PER_STACK,
+                    action="catch",
+                )
+                if progressed_weights != normalize_weights(weights):
+                    weights = progressed_weights
+                    effect_summaries += (
+                        f"达妮娅泡泡云冻永久加成：6 星概率 "
+                        f"+{_DANIYA_CATCH_BONUS_PER_STACK * six_star_progress_stacks:g} "
+                        f"个百分点（{six_star_progress_stacks} 层）。",
+                    )
             rarity_roll = self.random_source.random()
             rarity = choose_rarity(weights, rarity_roll)
             candidates = candidate_buckets[rarity]
@@ -1148,6 +1171,7 @@ class GameplayService:
             )
             pig_instance_id = self._new_identifier()
             short_code = await self._new_unique_short_code(session)
+            auto_gift_target_player_id = ""
             random_snapshot = {
                 "ruleset_version": RULESET_VERSION,
                 "base_weights": list(self.catching.weights()),
@@ -1176,6 +1200,7 @@ class GameplayService:
                 "group_effect_source_display_name": (
                     group_effect_application.source_display_name
                 ),
+                "auto_gift_target_player_id": auto_gift_target_player_id,
                 "stature_bias": effect_application.stature_bias,
                 "collaboration_only": effect_application.collaboration_only,
                 "giant_template_multiplier": effect_application.giant_template_multiplier,
@@ -1218,6 +1243,79 @@ class GameplayService:
                     "updated_at": now,
                 },
             )
+            auto_gift_target_player_id = ""
+            if (
+                rarity is Rarity.SIX
+                and group_effect_application.source_user_id
+            ):
+                auto_gift_chance = 0.0
+                for group_effect in active_group_effects:
+                    if (
+                        group_effect.group_effect_entry_id
+                        in group_effect_application.consumed_entry_ids
+                        or group_effect.group_effect_entry_id
+                        == group_effect_application.dedicated_entry_id
+                    ):
+                        auto_gift_chance = float(
+                            group_effect.params.get("auto_gift_chance_percent") or 0.0
+                        )
+                        break
+                if (
+                    auto_gift_chance > 0.0
+                    and self.random_source.random() < auto_gift_chance / 100.0
+                ):
+                    activator_player_id = (
+                        f"{identity.scope.value}:{group_effect_application.source_user_id}"
+                    )
+                    if activator_player_id != identity.player_id:
+                        transferred = await self.repository.transfer_pig_owner(
+                            session,
+                            pig_instance_id=pig_instance_id,
+                            owner_player_id=activator_player_id,
+                            now=now,
+                        )
+                        if transferred:
+                            await self.social_repository.insert_transfer_event(
+                                session,
+                                transfer_event_id=self._new_identifier(),
+                                scope_id=identity.scope.value,
+                                asset_kind=AssetKind.PIG,
+                                asset_instance_id=pig_instance_id,
+                                from_player_id=identity.player_id,
+                                to_player_id=activator_player_id,
+                                transfer_type="system-group-effect",
+                                trade_id=None,
+                                now=now,
+                            )
+                            await self.repository.upsert_pig_catalog(
+                                session,
+                                player_id=activator_player_id,
+                                template_id=str(template["template_id"]),
+                                size_value=attributes.size_value,
+                                weight_value=attributes.weight_value,
+                                now=now,
+                            )
+                            auto_gift_target_player_id = activator_player_id
+                            random_snapshot["auto_gift_target_player_id"] = (
+                                activator_player_id
+                            )
+                            await session.execute(
+                                """
+                                UPDATE pig_instances
+                                SET random_snapshot_json = ?, updated_at = ?
+                                WHERE pig_instance_id = ?
+                                """,
+                                (
+                                    self.repository.random_snapshot_json(
+                                        random_snapshot
+                                    ),
+                                    now,
+                                    pig_instance_id,
+                                ),
+                            )
+                            effect_summaries += (
+                                "阿萨姆红茶奶雾锅：本次抓到的 6 星猪已自动赠送给发动群友。",
+                            )
             coin_reward = CATCH_COIN_REWARDS[rarity]
             experience_reward = CATCH_EXPERIENCE_REWARDS[rarity]
             if armed_item is not None and armed_item.item_id == "coin-bounty-tag":

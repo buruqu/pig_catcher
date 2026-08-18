@@ -3457,6 +3457,8 @@
         "coin_per_player": 1004,
         "dedicated_catches": 0,
         "five_star_multiplier": 1.004,
+        "personal_six_star_cook_percent": 60,
+        "personal_six_star_cook_uses": 2,
         "six_star_multiplier": 1.004,
         "source_label": "猪鼻蛋包饭"
       },
@@ -3541,6 +3543,8 @@
         "coin_per_player": 1004,
         "dedicated_catches": 0,
         "five_star_multiplier": 1.004,
+        "personal_six_star_cook_percent": 60,
+        "personal_six_star_cook_uses": 2,
         "six_star_multiplier": 1.004,
         "source_label": "猪鼻蛋包饭"
       },
@@ -4325,7 +4329,8 @@
         "uses": 10,
         "four_star_percent": 60,
         "five_star_percent": 30,
-        "six_star_percent": 10
+        "six_star_percent": 10,
+        "last_use_six_star_percent": 50
       },
       "paired_food_template_id": "",
       "collection": null
@@ -4440,7 +4445,8 @@
         "uses": 10,
         "four_star_percent": 60,
         "five_star_percent": 30,
-        "six_star_percent": 10
+        "six_star_percent": 10,
+        "last_use_six_star_percent": 50
       },
       "paired_food_template_id": "",
       "collection": null
@@ -5083,7 +5089,8 @@
       ],
       "effect_id": "even-catch-distribution",
       "effect_params": {
-        "uses": 10
+        "uses": 10,
+        "last_use_six_star_percent": 50
       },
       "paired_food_template_id": "",
       "collection": null
@@ -5110,7 +5117,8 @@
       ],
       "effect_id": "even-catch-distribution",
       "effect_params": {
-        "uses": 10
+        "uses": 10,
+        "last_use_six_star_percent": 50
       },
       "paired_food_template_id": "",
       "collection": null
@@ -5400,6 +5408,9 @@
         "five_star_multiplier": 1.007,
         "group_coin": 1007,
         "group_dedicated_catches": 10,
+        "hidden_boost_chance_percent": 10,
+        "hidden_five_star_multiplier": 10.04,
+        "hidden_six_star_multiplier": 10.04,
         "six_star_multiplier": 1.007
       },
       "paired_food_template_id": "",
@@ -5430,6 +5441,9 @@
         "five_star_multiplier": 1.007,
         "group_coin": 1007,
         "group_dedicated_catches": 10,
+        "hidden_boost_chance_percent": 10,
+        "hidden_five_star_multiplier": 10.04,
+        "hidden_six_star_multiplier": 10.04,
         "six_star_multiplier": 1.007
       },
       "paired_food_template_id": "",
@@ -5490,6 +5504,9 @@
         "five_star_multiplier": 1.007,
         "group_coin": 1007,
         "group_dedicated_catches": 10,
+        "hidden_boost_chance_percent": 10,
+        "hidden_five_star_multiplier": 10.04,
+        "hidden_six_star_multiplier": 10.04,
         "six_star_multiplier": 1.007
       },
       "paired_food_template_id": "",
@@ -5550,6 +5567,9 @@
         "five_star_multiplier": 1.007,
         "group_coin": 1007,
         "group_dedicated_catches": 10,
+        "hidden_boost_chance_percent": 10,
+        "hidden_five_star_multiplier": 10.04,
+        "hidden_six_star_multiplier": 10.04,
         "six_star_multiplier": 1.007
       },
       "paired_food_template_id": "",
@@ -5815,6 +5835,8 @@
         "coin_per_player": 1004,
         "dedicated_catches": 0,
         "five_star_multiplier": 1.004,
+        "personal_six_star_cook_percent": 60,
+        "personal_six_star_cook_uses": 2,
         "six_star_multiplier": 1.004,
         "source_label": "猪鼻蛋包饭"
       },
@@ -5873,7 +5895,8 @@
         "uses": 10,
         "four_star_percent": 60,
         "five_star_percent": 30,
-        "six_star_percent": 10
+        "six_star_percent": 10,
+        "last_use_six_star_percent": 50
       },
       "paired_food_template_id": "",
       "collection": null
@@ -5953,7 +5976,8 @@
       ],
       "effect_id": "even-catch-distribution",
       "effect_params": {
-        "uses": 10
+        "uses": 10,
+        "last_use_six_star_percent": 50
       },
       "paired_food_template_id": "",
       "collection": null
@@ -6218,6 +6242,8 @@
         "coin_per_player": 1004,
         "dedicated_catches": 0,
         "five_star_multiplier": 1.004,
+        "personal_six_star_cook_percent": 60,
+        "personal_six_star_cook_uses": 2,
         "six_star_multiplier": 1.004,
         "source_label": "猪鼻蛋包饭"
       },
@@ -6276,7 +6302,8 @@
         "uses": 10,
         "four_star_percent": 60,
         "five_star_percent": 30,
-        "six_star_percent": 10
+        "six_star_percent": 10,
+        "last_use_six_star_percent": 50
       },
       "paired_food_template_id": "",
       "collection": null
@@ -6356,7 +6383,8 @@
       ],
       "effect_id": "even-catch-distribution",
       "effect_params": {
-        "uses": 10
+        "uses": 10,
+        "last_use_six_star_percent": 50
       },
       "paired_food_template_id": "",
       "collection": null
@@ -6801,6 +6829,470 @@
         "six_star_multiplier": 8,
         "source_label": "神龙化猪七星云海锅",
         "uses_per_player": 1
+      },
+      "paired_food_template_id": "",
+      "collection": null
+    },
+    {
+      "template_id": "pig-g1092931381-daniya",
+      "kind": "pig",
+      "display_name": "达妮娅猪",
+      "rarity": 6,
+      "scope": "group",
+      "group_scope_id": "qq:1092931381",
+      "description": "粉毛团子一鼓腮就能吹出一整串发光的泡泡；达妮娅猪相信，只要泡泡够多，再糟的心情也会跟着浮上水面。",
+      "image": "media/定制猪群友库/1092931381/达妮娅猪.png",
+      "alternate_image": "",
+      "fit": "contain",
+      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "license": "user-provided-local-use",
+      "consent_status": "granted",
+      "recipe_tags": [
+        "群友定制",
+        "达妮娅猪"
+      ],
+      "effect_id": "",
+      "effect_params": {},
+      "paired_food_template_id": "food-g1092931381-daniya-bubble-jelly",
+      "collection": null,
+      "length_min_cm": 36.0,
+      "length_max_cm": 138.0,
+      "weight_min_kg": 34.0,
+      "weight_max_kg": 450.0,
+      "fat_profile": "balanced",
+      "stature_profile": "standard"
+    },
+    {
+      "template_id": "food-g1092931381-daniya-bubble-jelly",
+      "kind": "food",
+      "display_name": "达妮娅泡泡云冻",
+      "rarity": 6,
+      "scope": "group",
+      "group_scope_id": "qq:1092931381",
+      "description": "把达妮娅吹出的泡泡一颗颗冻进云冻里，入口先是一阵轻盈，接着甜意慢慢散开；据说吃过的人，往后的运气会一点点变好。",
+      "image": "media/定制美食库/1092931381/达妮娅泡泡云冻.png",
+      "alternate_image": "",
+      "fit": "contain",
+      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "license": "user-provided-local-use",
+      "consent_status": "granted",
+      "recipe_tags": [
+        "群友定制",
+        "达妮娅泡泡云冻"
+      ],
+      "effect_id": "permanent-six-star-progress",
+      "effect_params": {
+        "catch_bonus_per_stack": 0.2,
+        "cook_bonus_per_stack": 2.0,
+        "max_stacks": 5
+      },
+      "paired_food_template_id": "",
+      "collection": null
+    },
+    {
+      "template_id": "pig-g1092931381-asamu",
+      "kind": "pig",
+      "display_name": "阿萨姆猪",
+      "rarity": 6,
+      "scope": "group",
+      "group_scope_id": "qq:1092931381",
+      "description": "戴着眼罩慢悠悠嘬一口红茶，阿萨姆猪觉得世界一下子看不清了，心里反倒踏实——反正接下来会发生什么，谁也说不准。",
+      "image": "media/定制猪群友库/1092931381/阿萨姆猪.png",
+      "alternate_image": "",
+      "fit": "contain",
+      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "license": "user-provided-local-use",
+      "consent_status": "granted",
+      "recipe_tags": [
+        "群友定制",
+        "阿萨姆猪"
+      ],
+      "effect_id": "",
+      "effect_params": {},
+      "paired_food_template_id": "food-g1092931381-asamu-milk-fog-pot",
+      "collection": null,
+      "length_min_cm": 36.0,
+      "length_max_cm": 138.0,
+      "weight_min_kg": 34.0,
+      "weight_max_kg": 450.0,
+      "fat_profile": "balanced",
+      "stature_profile": "standard"
+    },
+    {
+      "template_id": "food-g1092931381-asamu-milk-fog-pot",
+      "kind": "food",
+      "display_name": "阿萨姆红茶奶雾锅",
+      "rarity": 6,
+      "scope": "group",
+      "group_scope_id": "qq:1092931381",
+      "description": "红茶的暖雾在锅里打着旋，肉丸沉在奶香深处；整锅端上桌的那一刻，所有人都不由自主屏住呼吸——下一只六星猪，说不定就被这团暖雾送到了谁的手边。",
+      "image": "media/定制美食库/1092931381/阿萨姆猪红茶奶雾锅.png",
+      "alternate_image": "",
+      "fit": "contain",
+      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "license": "user-provided-local-use",
+      "consent_status": "granted",
+      "recipe_tags": [
+        "群友定制",
+        "阿萨姆红茶奶雾锅"
+      ],
+      "effect_id": "group-next-exclusive-high-star-catch",
+      "effect_params": {
+        "five_star_multiplier": 10.0,
+        "six_star_multiplier": 10.0,
+        "uses_per_player": 1,
+        "self_coin": 0,
+        "other_coin": 0,
+        "auto_gift_chance_percent": 50.0,
+        "source_label": "阿萨姆红茶奶雾锅"
+      },
+      "paired_food_template_id": "",
+      "collection": null
+    },
+    {
+      "template_id": "pig-g237716658-daniya",
+      "kind": "pig",
+      "display_name": "达妮娅猪",
+      "rarity": 6,
+      "scope": "group",
+      "group_scope_id": "qq:237716658",
+      "description": "粉毛团子一鼓腮就能吹出一整串发光的泡泡；达妮娅猪相信，只要泡泡够多，再糟的心情也会跟着浮上水面。",
+      "image": "media/定制猪群友库/237716658/达妮娅猪.png",
+      "alternate_image": "",
+      "fit": "contain",
+      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "license": "user-provided-local-use",
+      "consent_status": "granted",
+      "recipe_tags": [
+        "群友定制",
+        "达妮娅猪"
+      ],
+      "effect_id": "",
+      "effect_params": {},
+      "paired_food_template_id": "food-g237716658-daniya-bubble-jelly",
+      "collection": null,
+      "length_min_cm": 36.0,
+      "length_max_cm": 138.0,
+      "weight_min_kg": 34.0,
+      "weight_max_kg": 450.0,
+      "fat_profile": "balanced",
+      "stature_profile": "standard"
+    },
+    {
+      "template_id": "food-g237716658-daniya-bubble-jelly",
+      "kind": "food",
+      "display_name": "达妮娅泡泡云冻",
+      "rarity": 6,
+      "scope": "group",
+      "group_scope_id": "qq:237716658",
+      "description": "把达妮娅吹出的泡泡一颗颗冻进云冻里，入口先是一阵轻盈，接着甜意慢慢散开；据说吃过的人，往后的运气会一点点变好。",
+      "image": "media/定制美食库/237716658/达妮娅泡泡云冻.png",
+      "alternate_image": "",
+      "fit": "contain",
+      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "license": "user-provided-local-use",
+      "consent_status": "granted",
+      "recipe_tags": [
+        "群友定制",
+        "达妮娅泡泡云冻"
+      ],
+      "effect_id": "permanent-six-star-progress",
+      "effect_params": {
+        "catch_bonus_per_stack": 0.2,
+        "cook_bonus_per_stack": 2.0,
+        "max_stacks": 5
+      },
+      "paired_food_template_id": "",
+      "collection": null
+    },
+    {
+      "template_id": "pig-g237716658-asamu",
+      "kind": "pig",
+      "display_name": "阿萨姆猪",
+      "rarity": 6,
+      "scope": "group",
+      "group_scope_id": "qq:237716658",
+      "description": "戴着眼罩慢悠悠嘬一口红茶，阿萨姆猪觉得世界一下子看不清了，心里反倒踏实——反正接下来会发生什么，谁也说不准。",
+      "image": "media/定制猪群友库/237716658/阿萨姆猪.png",
+      "alternate_image": "",
+      "fit": "contain",
+      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "license": "user-provided-local-use",
+      "consent_status": "granted",
+      "recipe_tags": [
+        "群友定制",
+        "阿萨姆猪"
+      ],
+      "effect_id": "",
+      "effect_params": {},
+      "paired_food_template_id": "food-g237716658-asamu-milk-fog-pot",
+      "collection": null,
+      "length_min_cm": 36.0,
+      "length_max_cm": 138.0,
+      "weight_min_kg": 34.0,
+      "weight_max_kg": 450.0,
+      "fat_profile": "balanced",
+      "stature_profile": "standard"
+    },
+    {
+      "template_id": "food-g237716658-asamu-milk-fog-pot",
+      "kind": "food",
+      "display_name": "阿萨姆红茶奶雾锅",
+      "rarity": 6,
+      "scope": "group",
+      "group_scope_id": "qq:237716658",
+      "description": "红茶的暖雾在锅里打着旋，肉丸沉在奶香深处；整锅端上桌的那一刻，所有人都不由自主屏住呼吸——下一只六星猪，说不定就被这团暖雾送到了谁的手边。",
+      "image": "media/定制美食库/237716658/阿萨姆猪红茶奶雾锅.png",
+      "alternate_image": "",
+      "fit": "contain",
+      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "license": "user-provided-local-use",
+      "consent_status": "granted",
+      "recipe_tags": [
+        "群友定制",
+        "阿萨姆红茶奶雾锅"
+      ],
+      "effect_id": "group-next-exclusive-high-star-catch",
+      "effect_params": {
+        "five_star_multiplier": 10.0,
+        "six_star_multiplier": 10.0,
+        "uses_per_player": 1,
+        "self_coin": 0,
+        "other_coin": 0,
+        "auto_gift_chance_percent": 50.0,
+        "source_label": "阿萨姆红茶奶雾锅"
+      },
+      "paired_food_template_id": "",
+      "collection": null
+    },
+    {
+      "template_id": "pig-qo5e5854406d0297d6feae696a13e3a339-daniya",
+      "kind": "pig",
+      "display_name": "达妮娅猪",
+      "rarity": 6,
+      "scope": "group",
+      "group_scope_id": "qq-official:5E5854406D0297D6FEAE696A13E3A339",
+      "description": "粉毛团子一鼓腮就能吹出一整串发光的泡泡；达妮娅猪相信，只要泡泡够多，再糟的心情也会跟着浮上水面。",
+      "image": "media/定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/达妮娅猪.png",
+      "alternate_image": "",
+      "fit": "contain",
+      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "license": "user-provided-local-use",
+      "consent_status": "granted",
+      "recipe_tags": [
+        "群友定制",
+        "达妮娅猪"
+      ],
+      "effect_id": "",
+      "effect_params": {},
+      "paired_food_template_id": "food-qo5e5854406d0297d6feae696a13e3a339-daniya-bubble-jelly",
+      "collection": null,
+      "length_min_cm": 36.0,
+      "length_max_cm": 138.0,
+      "weight_min_kg": 34.0,
+      "weight_max_kg": 450.0,
+      "fat_profile": "balanced",
+      "stature_profile": "standard"
+    },
+    {
+      "template_id": "food-qo5e5854406d0297d6feae696a13e3a339-daniya-bubble-jelly",
+      "kind": "food",
+      "display_name": "达妮娅泡泡云冻",
+      "rarity": 6,
+      "scope": "group",
+      "group_scope_id": "qq-official:5E5854406D0297D6FEAE696A13E3A339",
+      "description": "把达妮娅吹出的泡泡一颗颗冻进云冻里，入口先是一阵轻盈，接着甜意慢慢散开；据说吃过的人，往后的运气会一点点变好。",
+      "image": "media/定制美食库/5E5854406D0297D6FEAE696A13E3A339/达妮娅泡泡云冻.png",
+      "alternate_image": "",
+      "fit": "contain",
+      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "license": "user-provided-local-use",
+      "consent_status": "granted",
+      "recipe_tags": [
+        "群友定制",
+        "达妮娅泡泡云冻"
+      ],
+      "effect_id": "permanent-six-star-progress",
+      "effect_params": {
+        "catch_bonus_per_stack": 0.2,
+        "cook_bonus_per_stack": 2.0,
+        "max_stacks": 5
+      },
+      "paired_food_template_id": "",
+      "collection": null
+    },
+    {
+      "template_id": "pig-qo5e5854406d0297d6feae696a13e3a339-asamu",
+      "kind": "pig",
+      "display_name": "阿萨姆猪",
+      "rarity": 6,
+      "scope": "group",
+      "group_scope_id": "qq-official:5E5854406D0297D6FEAE696A13E3A339",
+      "description": "戴着眼罩慢悠悠嘬一口红茶，阿萨姆猪觉得世界一下子看不清了，心里反倒踏实——反正接下来会发生什么，谁也说不准。",
+      "image": "media/定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/阿萨姆猪.png",
+      "alternate_image": "",
+      "fit": "contain",
+      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "license": "user-provided-local-use",
+      "consent_status": "granted",
+      "recipe_tags": [
+        "群友定制",
+        "阿萨姆猪"
+      ],
+      "effect_id": "",
+      "effect_params": {},
+      "paired_food_template_id": "food-qo5e5854406d0297d6feae696a13e3a339-asamu-milk-fog-pot",
+      "collection": null,
+      "length_min_cm": 36.0,
+      "length_max_cm": 138.0,
+      "weight_min_kg": 34.0,
+      "weight_max_kg": 450.0,
+      "fat_profile": "balanced",
+      "stature_profile": "standard"
+    },
+    {
+      "template_id": "food-qo5e5854406d0297d6feae696a13e3a339-asamu-milk-fog-pot",
+      "kind": "food",
+      "display_name": "阿萨姆红茶奶雾锅",
+      "rarity": 6,
+      "scope": "group",
+      "group_scope_id": "qq-official:5E5854406D0297D6FEAE696A13E3A339",
+      "description": "红茶的暖雾在锅里打着旋，肉丸沉在奶香深处；整锅端上桌的那一刻，所有人都不由自主屏住呼吸——下一只六星猪，说不定就被这团暖雾送到了谁的手边。",
+      "image": "media/定制美食库/5E5854406D0297D6FEAE696A13E3A339/阿萨姆猪红茶奶雾锅.png",
+      "alternate_image": "",
+      "fit": "contain",
+      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "license": "user-provided-local-use",
+      "consent_status": "granted",
+      "recipe_tags": [
+        "群友定制",
+        "阿萨姆红茶奶雾锅"
+      ],
+      "effect_id": "group-next-exclusive-high-star-catch",
+      "effect_params": {
+        "five_star_multiplier": 10.0,
+        "six_star_multiplier": 10.0,
+        "uses_per_player": 1,
+        "self_coin": 0,
+        "other_coin": 0,
+        "auto_gift_chance_percent": 50.0,
+        "source_label": "阿萨姆红茶奶雾锅"
+      },
+      "paired_food_template_id": "",
+      "collection": null
+    },
+    {
+      "template_id": "pig-qo9ea2810f378fbd7dc3219c56ceab3520-daniya",
+      "kind": "pig",
+      "display_name": "达妮娅猪",
+      "rarity": 6,
+      "scope": "group",
+      "group_scope_id": "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
+      "description": "粉毛团子一鼓腮就能吹出一整串发光的泡泡；达妮娅猪相信，只要泡泡够多，再糟的心情也会跟着浮上水面。",
+      "image": "media/定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/达妮娅猪.png",
+      "alternate_image": "",
+      "fit": "contain",
+      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "license": "user-provided-local-use",
+      "consent_status": "granted",
+      "recipe_tags": [
+        "群友定制",
+        "达妮娅猪"
+      ],
+      "effect_id": "",
+      "effect_params": {},
+      "paired_food_template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-daniya-bubble-jelly",
+      "collection": null,
+      "length_min_cm": 36.0,
+      "length_max_cm": 138.0,
+      "weight_min_kg": 34.0,
+      "weight_max_kg": 450.0,
+      "fat_profile": "balanced",
+      "stature_profile": "standard"
+    },
+    {
+      "template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-daniya-bubble-jelly",
+      "kind": "food",
+      "display_name": "达妮娅泡泡云冻",
+      "rarity": 6,
+      "scope": "group",
+      "group_scope_id": "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
+      "description": "把达妮娅吹出的泡泡一颗颗冻进云冻里，入口先是一阵轻盈，接着甜意慢慢散开；据说吃过的人，往后的运气会一点点变好。",
+      "image": "media/定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/达妮娅泡泡云冻.png",
+      "alternate_image": "",
+      "fit": "contain",
+      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "license": "user-provided-local-use",
+      "consent_status": "granted",
+      "recipe_tags": [
+        "群友定制",
+        "达妮娅泡泡云冻"
+      ],
+      "effect_id": "permanent-six-star-progress",
+      "effect_params": {
+        "catch_bonus_per_stack": 0.2,
+        "cook_bonus_per_stack": 2.0,
+        "max_stacks": 5
+      },
+      "paired_food_template_id": "",
+      "collection": null
+    },
+    {
+      "template_id": "pig-qo9ea2810f378fbd7dc3219c56ceab3520-asamu",
+      "kind": "pig",
+      "display_name": "阿萨姆猪",
+      "rarity": 6,
+      "scope": "group",
+      "group_scope_id": "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
+      "description": "戴着眼罩慢悠悠嘬一口红茶，阿萨姆猪觉得世界一下子看不清了，心里反倒踏实——反正接下来会发生什么，谁也说不准。",
+      "image": "media/定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/阿萨姆猪.png",
+      "alternate_image": "",
+      "fit": "contain",
+      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "license": "user-provided-local-use",
+      "consent_status": "granted",
+      "recipe_tags": [
+        "群友定制",
+        "阿萨姆猪"
+      ],
+      "effect_id": "",
+      "effect_params": {},
+      "paired_food_template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-asamu-milk-fog-pot",
+      "collection": null,
+      "length_min_cm": 36.0,
+      "length_max_cm": 138.0,
+      "weight_min_kg": 34.0,
+      "weight_max_kg": 450.0,
+      "fat_profile": "balanced",
+      "stature_profile": "standard"
+    },
+    {
+      "template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-asamu-milk-fog-pot",
+      "kind": "food",
+      "display_name": "阿萨姆红茶奶雾锅",
+      "rarity": 6,
+      "scope": "group",
+      "group_scope_id": "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
+      "description": "红茶的暖雾在锅里打着旋，肉丸沉在奶香深处；整锅端上桌的那一刻，所有人都不由自主屏住呼吸——下一只六星猪，说不定就被这团暖雾送到了谁的手边。",
+      "image": "media/定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/阿萨姆猪红茶奶雾锅.png",
+      "alternate_image": "",
+      "fit": "contain",
+      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "license": "user-provided-local-use",
+      "consent_status": "granted",
+      "recipe_tags": [
+        "群友定制",
+        "阿萨姆红茶奶雾锅"
+      ],
+      "effect_id": "group-next-exclusive-high-star-catch",
+      "effect_params": {
+        "five_star_multiplier": 10.0,
+        "six_star_multiplier": 10.0,
+        "uses_per_player": 1,
+        "self_coin": 0,
+        "other_coin": 0,
+        "auto_gift_chance_percent": 50.0,
+        "source_label": "阿萨姆红茶奶雾锅"
       },
       "paired_food_template_id": "",
       "collection": null

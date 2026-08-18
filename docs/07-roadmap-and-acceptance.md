@@ -1363,3 +1363,22 @@
   备份仍含 2 张活动案件与总分 270。生产库追加 21 条 `scope-reset` 事件和 1 条
   `automatic-regulation-scope-reset` 管理审计；备份与生产库均 `quick_check=ok`、
   `foreign_key_check=0`。
+## 39. v1.22.0 第七期达妮娅/阿萨姆六星内容与永久被动/自动赠送验收
+
+- 验收日期：`2026-08-18`。插件升级为 `local.pig-catcher v1.22.0`，Schema
+  `25 → 26 → 27`，Ruleset `22`，Asset Manifest `4`。
+- 新内容：达妮娅猪 ↔ 达妮娅泡泡云冻（`permanent-six-star-progress`：每层抓猪
+  六星 `+0.2` 百分点、六星猪做菜 `+2` 百分点，上限 5 层，满层拒绝食用保留）；
+  阿萨姆猪 ↔ 阿萨姆红茶奶雾锅（`group-next-exclusive-high-star-catch` 扩展
+  `auto_gift_chance_percent=50`：全群下一次抓猪 5/6 星各 `×10` 独占，抓到六星
+  `50%` 自动赠送给发动者）。四群各新增 2 猪 + 2 菜，模板 223 → 239。
+- Schema 26：`player_six_star_progress` 永久累计层数表（`MIN` 封顶）；Schema 27：
+  `asset_transfer_events` 重建允许 `system-group-effect`（兼容 v9 最小旧库兜底
+  创建，`trade_id` 去掉 `trade_offers` 外键引用）。
+- 结算：达妮娅被动在效果落定后从低档转移百分点、不压高星；阿萨姆自动赠送在
+  六星命中后按 `50%` 判定，写 `system-group-effect` 流转事件（监管
+  `transfer_rows` 排除）、接收方图鉴解锁与快照 `auto_gift_target_player_id`。
+- 素材包重建导入：239 项模板、173 份唯一内容、242 份隔离存储媒体，
+  目录 hash `28db6bd0…`，运行库 catalog hash `4036f814…`。
+- 自动回归为 pytest `276 passed`（新增达妮娅累计/满层拒绝、阿萨姆自动赠送
+  两个端到端测试）；Ruff、Python `compileall` 全部通过。

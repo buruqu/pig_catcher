@@ -47,6 +47,7 @@ class RegulationRepository:
               ON offer.trade_id = event.trade_id
              AND offer.status = 'accepted'
             WHERE event.scope_id = ? AND event.created_at >= ?
+              AND event.transfer_type <> 'system-group-effect'
             ORDER BY event.created_at, event.transfer_event_id
             """,
             (scope_id, since),

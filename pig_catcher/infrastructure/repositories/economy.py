@@ -165,6 +165,60 @@ class EconomyRepository:
         )
         return int(row["permanent_bonus"]) if row is not None else None
 
+    async def six_star_progress_stacks(
+        self,
+        session: DatabaseSession,
+        *,
+        player_id: str,
+    ) -> int:
+        """Return the player's current permanent six-star progress stacks."""
+
+        row = await session.fetch_one(
+            "SELECT stacks FROM player_six_star_progress WHERE player_id = ?",
+            (player_id,),
+        )
+        return int(row["stacks"]) if row is not None else 0
+
+    async def increment_six_star_progress(
+        self,
+        session: DatabaseSession,
+        *,
+        player_id: str,
+        source_food_instance_id: str,
+        max_stacks: int,
+        now: str,
+    ) -> int | None:
+        """Increment one stack, returning the new value; None when already capped."""
+
+        cursor = await session.execute(
+            """
+            INSERT INTO player_six_star_progress(
+                player_id, stacks, source_food_instance_id, created_at, updated_at
+            )
+            VALUES (?, 1, ?, ?, ?)
+            ON CONFLICT(player_id) DO UPDATE SET
+                stacks = MIN(?, player_six_star_progress.stacks + 1),
+                source_food_instance_id = excluded.source_food_instance_id,
+                updated_at = excluded.updated_at
+            WHERE player_six_star_progress.stacks < ?
+            """,
+            (
+                player_id,
+                source_food_instance_id,
+                now,
+                now,
+                max_stacks,
+                max_stacks,
+            ),
+        )
+        if cursor.rowcount != 1:
+            return None
+        row = await session.fetch_one(
+            "SELECT stacks FROM player_six_star_progress WHERE player_id = ?",
+            (player_id,),
+        )
+        return int(row["stacks"]) if row is not None else None
+
     async def get_upgrade_levels(
         self,
         session: DatabaseSession,

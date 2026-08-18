@@ -28,6 +28,8 @@ NEXT_HIGH_STAR_CATCH = "next-high-star-catch"
 NEXT_FIVE_STAR_COOK = "next-five-star-cook"
 EVEN_CATCH_DISTRIBUTION = "even-catch-distribution"
 QUOTA_RESET_CHANCE = "quota-reset"
+# 达妮娅泡泡云冻：永久累计被动，抓猪/做菜六星概率逐层提升（吃菜时立即累计，不进效果队列）。
+PERMANENT_SIX_STAR_PROGRESS = "permanent-six-star-progress"
 CURRENT_WINDOW_CATCHES = "current-window-catches"
 TODAY_WINDOW_CATCHES = "today-window-catches"
 NEXT_SIX_STAR_COOK_BONUS = "next-six-star-cook-bonus"
@@ -90,7 +92,9 @@ COOK_EFFECT_IDS = frozenset(
     }
 )
 QUOTA_EFFECT_IDS = frozenset({CURRENT_WINDOW_CATCHES, TODAY_WINDOW_CATCHES})
-IMMEDIATE_EFFECT_IDS = frozenset({WEEKLY_WINDOW_CATCHES, PERMANENT_WINDOW_CATCH})
+IMMEDIATE_EFFECT_IDS = frozenset(
+    {WEEKLY_WINDOW_CATCHES, PERMANENT_WINDOW_CATCH, PERMANENT_SIX_STAR_PROGRESS}
+)
 GROUP_EFFECT_IDS = frozenset(
     {
         GROUP_NEXT_EXCLUSIVE_HIGH_STAR_CATCH,
@@ -445,6 +449,24 @@ def resolve_food_effect(
             1,
             f"永久增加所有抓猪时段基础额度 +{count} 次，累计上限 +{max_bonus}。",
         )
+    if normalized_id == PERMANENT_SIX_STAR_PROGRESS:
+        catch_bonus = _number(raw, "catch_bonus_per_stack", lower=0.05, upper=2.0)
+        cook_bonus = _number(raw, "cook_bonus_per_stack", lower=0.5, upper=5.0)
+        max_stacks = _integer(raw, "max_stacks", lower=1, upper=5)
+        return FoodEffectGrant(
+            normalized_id,
+            {
+                "catch_bonus_per_stack": catch_bonus,
+                "cook_bonus_per_stack": cook_bonus,
+                "max_stacks": max_stacks,
+            },
+            1,
+            (
+                f"永久累计：每层让抓猪 6 星概率 +{catch_bonus:g} 个百分点、"
+                f"用 6 星猪做菜的 6 星菜概率 +{cook_bonus:g} 个百分点，"
+                f"最多累计 {max_stacks} 层；满层后无法重复食用。"
+            ),
+        )
     if normalized_id in {NEXT_PIG_RARITY, NEXT_FOOD_RARITY}:
         rarity_upper = 6 if normalized_id == NEXT_PIG_RARITY else 5
         rarity = _integer(raw, "rarity", lower=2, upper=rarity_upper)
@@ -481,21 +503,34 @@ def resolve_food_effect(
         uses_per_player = _integer(raw, "uses_per_player", lower=1, upper=3)
         self_coin = _integer(raw, "self_coin", lower=0, upper=1_000_000)
         other_coin = _integer(raw, "other_coin", lower=0, upper=1_000_000)
+        auto_gift_chance = (
+            _number(raw, "auto_gift_chance_percent", lower=0.1, upper=100.0)
+            if "auto_gift_chance_percent" in raw
+            else 0.0
+        )
+        params: dict[str, object] = {
+            "five_star_multiplier": five_multiplier,
+            "six_star_multiplier": six_multiplier,
+            "uses_per_player": uses_per_player,
+            "self_coin": self_coin,
+            "other_coin": other_coin,
+            "source_label": str(raw.get("source_label") or "神龙化猪七星云海锅").strip(),
+        }
+        if auto_gift_chance:
+            params["auto_gift_chance_percent"] = auto_gift_chance
+        gift_text = (
+            f"；抓到 6 星猪时有 {auto_gift_chance:g}% 概率把该猪自动赠送给本次发动群友"
+            if auto_gift_chance
+            else ""
+        )
         return FoodEffectGrant(
             normalized_id,
-            {
-                "five_star_multiplier": five_multiplier,
-                "six_star_multiplier": six_multiplier,
-                "uses_per_player": uses_per_player,
-                "self_coin": self_coin,
-                "other_coin": other_coin,
-                "source_label": str(raw.get("source_label") or "神龙化猪七星云海锅").strip(),
-            },
+            params,
             uses_per_player,
             (
                 f"食用者立即获得 {self_coin} 猪币，其余本群已登记玩家各获得 {other_coin} 猪币；"
                 f"有效期内本群每名玩家的下一次抓猪，5 星与 6 星相对权重分别 ×{five_multiplier:g} "
-                f"和 ×{six_multiplier:g}，并按六星菜独占规则结算。"
+                f"和 ×{six_multiplier:g}，并按六星菜独占规则结算{gift_text}。"
             ),
         )
     if normalized_id == GROUP_WINDOW_HIGH_STAR_BOOST:
@@ -958,6 +993,38 @@ def _lift_five_and_six_by_points(
     adjusted[:3] = [value * donor_scale for value in adjusted[:3]]
     adjusted[4] += five_bonus * funding_scale
     adjusted[5] += six_bonus * funding_scale
+    return normalize_weights(adjusted)
+
+
+def apply_six_star_progress(
+    weights: Sequence[float],
+    *,
+    stacks: int,
+    bonus_per_stack: float,
+    action: str,
+) -> tuple[float, ...]:
+    """Apply the permanent Daniya six-star progress bonus to one action's weights.
+
+    每层为抓猪/做菜六星档提供固定百分点加成，加成只从 1 至 3 星（做菜时从
+    非六星可达档）转移，不压低任何更高星级，也不参与独占或互斥效果队列。
+    """
+
+    normalized_stacks = max(0, min(5, int(stacks)))
+    bonus = normalized_stacks * max(0.0, float(bonus_per_stack))
+    if bonus <= 0.0:
+        return normalize_weights(weights)
+    adjusted = list(normalize_weights(weights))
+    if adjusted[5] <= 0.0:
+        return tuple(adjusted)
+    donor_total = sum(adjusted[:3]) if action == "catch" else sum(adjusted[:5])
+    requested = min(bonus, 100.0 - adjusted[5])
+    if requested <= 0.0 or donor_total <= 0.0:
+        return tuple(adjusted)
+    funded = min(donor_total, requested)
+    donor_scale = (donor_total - funded) / donor_total
+    donor_end = 3 if action == "catch" else 5
+    adjusted[:donor_end] = [value * donor_scale for value in adjusted[:donor_end]]
+    adjusted[5] += funded
     return normalize_weights(adjusted)
 
 

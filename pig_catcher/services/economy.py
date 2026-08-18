@@ -54,12 +54,15 @@ from ..domain.food_effects import (
     GROUP_WINDOW_HIGH_STAR_BOOST,
     NEXT_SIX_STAR_COOK,
     NEXT_STACKABLE_SIX_STAR_COOK_BONUS,
+    PERMANENT_SIX_STAR_PROGRESS,
     PERMANENT_WINDOW_CATCH,
     QUOTA_RESET_CHANCE,
     TODAY_WINDOW_CATCHES,
     WEEKLY_WINDOW_CATCHES,
+    CookingEffectApplication,
     active_effect_from_row,
     apply_cooking_effects,
+    apply_six_star_progress,
     effect_summary,
     has_compatible_exclusive_cook_effect,
     resolve_food_effect,
@@ -97,6 +100,8 @@ from .receipts import request_fingerprint
 
 _COOK_COMMAND = "pig-catcher.cook"
 _BATCH_COOK_COMMAND = "pig-catcher.batch-cook"
+# 达妮娅泡泡云冻每层六星猪做菜概率加成（百分点），与正式目录效果参数一致。
+_DANIYA_COOK_BONUS_PER_STACK = 2.0
 _EAT_COMMAND = "pig-catcher.eat"
 _PURCHASE_COMMAND = "pig-catcher.purchase"
 _UPGRADE_COMMAND = "pig-catcher.upgrade"
@@ -1377,6 +1382,32 @@ class EconomyService:
             source_rarity=source.rarity,
         )
         weights = effect_application.weights
+        six_star_progress_stacks = (
+            await self.repository.six_star_progress_stacks(
+                session,
+                player_id=identity.player_id,
+            )
+        )
+        if six_star_progress_stacks:
+            progressed_weights = apply_six_star_progress(
+                weights,
+                stacks=six_star_progress_stacks,
+                bonus_per_stack=_DANIYA_COOK_BONUS_PER_STACK,
+                action="cook",
+            )
+            if progressed_weights != weights:
+                weights = progressed_weights
+                effect_application = CookingEffectApplication(
+                    weights=weights,
+                    consumed_entry_ids=effect_application.consumed_entry_ids,
+                    summaries=effect_application.summaries
+                    + (
+                        f"达妮娅泡泡云冻永久加成：6 星菜概率 "
+                        f"+{_DANIYA_COOK_BONUS_PER_STACK * six_star_progress_stacks:g} "
+                        f"个百分点（{six_star_progress_stacks} 层）。",
+                    ),
+                    skipped_summaries=effect_application.skipped_summaries,
+                )
         rarity_roll = self.random_source.random()
         output_rarity = choose_rarity(weights, rarity_roll)
         templates = await self.repository.list_drawable_food_templates(
@@ -1849,6 +1880,18 @@ class EconomyService:
                 )
                 if permanent_total is None:
                     raise FoodEffectError("永久抓猪时段额度已经达到 +5 上限；美食未消耗。")
+            elif effect.queued_effect_id == PERMANENT_SIX_STAR_PROGRESS:
+                progress_total = await self.repository.increment_six_star_progress(
+                    session,
+                    player_id=identity.player_id,
+                    source_food_instance_id=food.food_instance_id,
+                    max_stacks=int(effect.queued_effect_params["max_stacks"]),
+                    now=now,
+                )
+                if progress_total is None:
+                    raise FoodEffectError(
+                        "六星概率永久加成已经达到累计上限；美食未消耗。"
+                    )
             elif effect.queued_effect_id == NEXT_STACKABLE_SIX_STAR_COOK_BONUS:
                 active_rows = await self.repository.list_active_food_effects(
                     session,
@@ -1887,6 +1930,7 @@ class EconomyService:
             if effect.queued_effect_id and effect.queued_effect_id not in {
                 WEEKLY_WINDOW_CATCHES,
                 PERMANENT_WINDOW_CATCH,
+                PERMANENT_SIX_STAR_PROGRESS,
                 *GROUP_EFFECT_IDS,
             }:
                 effect_entry_id = self._new_identifier()

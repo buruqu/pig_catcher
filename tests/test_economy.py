@@ -2953,3 +2953,222 @@ async def test_balanced_quota_foods_separate_current_window_from_all_today_windo
         expected_after_advance,
     )
     await database.close()
+
+
+
+@pytest.mark.asyncio
+async def test_daniya_progress_accumulates_boosts_and_rejects_at_cap(
+    tmp_path: Path,
+) -> None:
+    """达妮娅泡泡云冻：永久累计最多 5 层，逐层提升抓猪/做菜六星概率，满层拒绝。"""
+
+    database = await _database_with_catalog(
+        tmp_path,
+        pig_rarities=(1, 6),
+        food_rarities=(1, 6),
+        effect_ids={6: "permanent-six-star-progress"},
+        effect_params={
+            6: {
+                "catch_bonus_per_stack": 0.2,
+                "cook_bonus_per_stack": 2.0,
+                "max_stacks": 5,
+            }
+        },
+    )
+    clock = FixedClock()
+    service = GameplayService(
+        database,
+        CatchingSection(cooldown_seconds=0),
+        random_source=SequenceRandom(0.0, 0.0, 0.5, 0.5, 0.5, 0.5, 0.5),
+        clock=clock,
+        id_factory=iter(("pig-seed", "ledger-seed")).__next__,
+        short_code_factory=iter(("D0000001",)).__next__,
+    )
+    identity = _identity(message_id="daniya-seed")
+    await service.catch(identity)
+    pid = identity.player_id
+    scope = identity.scope.value
+    economy = EconomyService(
+        database,
+        CookingSection(cook_cooldown_seconds=0),
+        EconomySection(),
+        clock=clock,
+        id_factory=iter(("food-1", "ledger-1", "food-2", "ledger-2")).__next__,
+        short_code_factory=iter(("DF000001", "DF000002")).__next__,
+    )
+    # 直接 INSERT 六盒达妮娅泡泡云冻（模板 food-6-group 带达妮娅效果）
+    boxes = (
+        ("daniya-1", "DF000001"),
+        ("daniya-2", "DF000002"),
+        ("daniya-3", "DF000003"),
+        ("daniya-4", "DF000004"),
+        ("daniya-5", "DF000005"),
+        ("daniya-6", "DF000006"),
+    )
+    for fid, code in boxes:
+        async with database.transaction() as session:
+            await session.execute(
+                """
+                INSERT INTO food_instances(
+                    food_instance_id, short_code, scope_id, owner_player_id,
+                    template_id, template_version, source_pig_instance_id,
+                    rarity, display_name_snapshot, portion_weight, fat_category,
+                    official_value, effect_id, effect_params_json,
+                    ruleset_version, random_snapshot_json, state,
+                    acquired_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, 'food-6-group', 1, NULL, 6, '达妮娅泡泡云冻',
+                        1.0, 'balanced', 25000, 'permanent-six-star-progress',
+                        '{"catch_bonus_per_stack":0.2,"cook_bonus_per_stack":2.0,"max_stacks":5}',
+                        1, '{"test":true}', 'active', ?, ?)
+                """,
+                (fid, code, scope, pid, "2026-07-28T04:00:00.000Z", "2026-07-28T04:00:00.000Z"),
+            )
+    # 依次吃 1-5 盒 → stacks 到 5
+    for index, (_, code) in enumerate(boxes[:5]):
+        eaten = await economy.eat(
+            _identity(user_id="200", message_id=f"daniya-eat-{index + 1}"),
+            f"达妮娅泡泡云冻#{code}",
+        )
+        assert eaten.effect.queued_effect_id == "permanent-six-star-progress"
+    row = await database.fetch_one(
+        "SELECT stacks FROM player_six_star_progress WHERE player_id = ?",
+        (pid,),
+    )
+    assert row is not None and row["stacks"] == 5
+    # 满层后吃第 6 盒被拒绝并保留
+    with pytest.raises(FoodEffectError) as excinfo:
+        await economy.eat(
+            _identity(user_id="200", message_id="daniya-eat-6"),
+            "达妮娅泡泡云冻#DF000006",
+        )
+    assert "累计上限" in str(excinfo.value)
+    remaining = await database.fetch_one(
+        "SELECT COUNT(*) AS c FROM food_instances WHERE food_instance_id = 'daniya-6' AND state = 'active'"
+    )
+    assert remaining is not None and remaining["c"] == 1
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_asamu_group_effect_auto_gifts_six_star_pig(
+    tmp_path: Path,
+) -> None:
+    """阿萨姆红茶奶雾锅：全群高星 ×10 独占；抓到六星时 50% 自动赠送给发起人。"""
+
+    database = await _database_with_catalog(
+        tmp_path,
+        pig_rarities=(1, 6),
+        food_rarities=(1, 6),
+        effect_ids={6: "group-next-exclusive-high-star-catch"},
+        effect_params={
+            6: {
+                "five_star_multiplier": 10.0,
+                "six_star_multiplier": 10.0,
+                "uses_per_player": 1,
+                "self_coin": 0,
+                "other_coin": 0,
+                "auto_gift_chance_percent": 50.0,
+                "source_label": "阿萨姆红茶奶雾锅",
+            }
+        },
+    )
+    clock = FixedClock()
+    economy = EconomyService(
+        database,
+        CookingSection(cook_cooldown_seconds=0),
+        EconomySection(),
+        clock=clock,
+        id_factory=iter(
+            ("asamu-food", "asamu-ledger", "asamu-group-effect", "asamu-eat-ledger")
+        ).__next__,
+        short_code_factory=iter(("AS000001",)).__next__,
+    )
+    # 发起人（U100）持有阿萨姆菜并食用创建群效果
+    activator_identity = _identity(user_id="100", message_id="asamu-seed")
+    async with database.transaction() as session:
+        await session.execute(
+            """
+            INSERT INTO players(
+                player_id, scope_id, platform_user_id, display_name,
+                coin_balance, experience, created_at, updated_at
+            )
+            VALUES (?, 'qq:100', '100', '阿萨姆发动者', 0, 0, ?, ?)
+            """,
+            (
+                activator_identity.player_id,
+                "2026-07-28T04:00:00.000Z",
+                "2026-07-28T04:00:00.000Z",
+            ),
+        )
+        await session.execute(
+            """
+            INSERT INTO food_instances(
+                food_instance_id, short_code, scope_id, owner_player_id,
+                template_id, template_version, source_pig_instance_id,
+                rarity, display_name_snapshot, portion_weight, fat_category,
+                official_value, effect_id, effect_params_json,
+                ruleset_version, random_snapshot_json, state,
+                acquired_at, updated_at
+            )
+            VALUES ('asamu-1', 'AS000001', 'qq:100', ?, 'food-6-group', 1, NULL, 6,
+                    '阿萨姆红茶奶雾锅', 1.0, 'balanced', 25000,
+                    'group-next-exclusive-high-star-catch',
+                    '{"auto_gift_chance_percent":50.0,"five_star_multiplier":10.0,"other_coin":0,"self_coin":0,"six_star_multiplier":10.0,"source_label":"阿萨姆红茶奶雾锅","uses_per_player":1}',
+                    1, '{"test":true}', 'active', ?, ?)
+            """,
+            (
+                activator_identity.player_id,
+                "2026-07-28T04:00:00.000Z",
+                "2026-07-28T04:00:00.000Z",
+            ),
+        )
+    eaten = await economy.eat(
+        _identity(user_id="100", message_id="asamu-eat"),
+        "阿萨姆红茶奶雾锅#AS000001",
+    )
+    assert eaten.effect.queued_effect_id == "group-next-exclusive-high-star-catch"
+
+    # 另一玩家（U200）抓六星，gift roll = 0.1 (< 0.5) → 自动赠送给发起人
+    catcher = GameplayService(
+        database,
+        CatchingSection(cooldown_seconds=0),
+        random_source=SequenceRandom(
+            # rarity_roll=0.99 命中六星、template_roll=0.0、属性 0.5×5
+            0.99, 0.0, 0.5, 0.5, 0.5, 0.5, 0.5,
+            # 阿萨姆自动赠送判定 roll = 0.1 → 触发（< 0.5）
+            0.1,
+        ),
+        clock=clock,
+        id_factory=iter(
+            ("asamu-pig", "asamu-pig-ledger", "asamu-transfer", "asamu-snapshot")
+        ).__next__,
+        short_code_factory=iter(("AS00PIG1",)).__next__,
+    )
+    caught = await catcher.catch(
+        _identity(user_id="200", message_id="asamu-catch")
+    )
+    assert caught.pig.rarity == 6
+    # 六星猪转移给发起人
+    owner = await database.fetch_one(
+        "SELECT owner_player_id FROM pig_instances WHERE pig_instance_id = 'asamu-pig'"
+    )
+    assert owner is not None and owner["owner_player_id"] == activator_identity.player_id
+    # transfer_event 以 system 来源写入（不进入自动监管图）
+    transfer = await database.fetch_one(
+        """
+        SELECT transfer_type, from_player_id, to_player_id
+        FROM asset_transfer_events
+        WHERE transfer_type = 'system-group-effect'
+        ORDER BY created_at DESC LIMIT 1
+        """
+    )
+    assert transfer is not None
+    assert transfer["from_player_id"] == "qq:100:200"
+    assert transfer["to_player_id"] == activator_identity.player_id
+    # 快照记录自动赠送目标
+    snapshot = await database.fetch_one(
+        "SELECT random_snapshot_json FROM pig_instances WHERE pig_instance_id = 'asamu-pig'"
+    )
+    assert '"auto_gift_target_player_id"' in str(snapshot["random_snapshot_json"])
+    await database.close()
