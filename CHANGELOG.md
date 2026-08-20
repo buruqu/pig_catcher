@@ -96,7 +96,7 @@
 - 素材包 v1.22.0 已归档并替换 `asset_library/current/`；运行库已迁移
   Schema `27` 并导入新目录（catalog hash `4036f814…`）。
 
-## Unreleased
+## 运维补充 - 2026-08-17
 
 ### 按群撤销监管
 

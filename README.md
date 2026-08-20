@@ -50,7 +50,7 @@ QQ 官方 OpenID；底层稳定身份仍保留用于审计和幂等。
 
 - Manifest v2、SDK 生命周期、配置热更新和简体中文 WebUI 配置模型
 - 群与用户黑白名单，黑名单优先
-- 插件自有 SQLite Schema 25、逐级迁移、外键、WAL、显式事务和在线备份
+- 插件自有 SQLite Schema 28、逐级迁移、外键、WAL、显式事务和在线备份
 - 消息 ID 幂等键与 `pending -> claimed -> sent/failed` 一次发送回执
 - 三类六星盛宴全群大事件共用原业务回执：结算后只公示一次，图片故障仍输出完整事件文字
 - 素材 Manifest、实际媒体格式、逐帧解码、路径、尺寸、重复 ID 和授权校验
@@ -214,9 +214,10 @@ uv run python .\tools\uat_production_recovery.py `
 ```
 
 生成的本地验收图、隔离数据库和报告位于忽略目录 `artifacts/`，不会进入插件发布包。
-可审计的正式清单定义保存在 `catalogs/formal/pig-and-food-definitions.json`；本机当前素材包
-保存在 Git 忽略目录 `asset_library/current/`，历史包归档在 `asset_library/archive/`；运行副本位于 `ctx.paths.data_dir`，避免
-群专属素材进入公共历史。人工查找入口见根目录 [目录导航.md](目录导航.md)。
+可审计的正式清单定义保存在 `catalogs/formal/pig-and-food-definitions.json`；当前正式素材包
+由 `asset_library/current/` 通过 Git LFS 纳入版本发布，历史包归档在忽略目录
+`asset_library/archive/`；运行副本仍位于 `ctx.paths.data_dir`，与仓库发布包分离。人工查找入口见
+根目录 [目录导航.md](目录导航.md)。
 
 ## 设计文档
 
@@ -231,6 +232,7 @@ uv run python .\tools\uat_production_recovery.py `
 - [开发路线、验收与待确认项](docs/07-roadmap-and-acceptance.md)
 - [抓猪额度运维手册](docs/08-catch-quota-operations.md)
 - [运营控制面板手册](docs/09-admin-panel-operations.md)
+- [2026-08-20 GitHub 同步记录](docs/14-github-sync-record-2026-08-20.md)
 
 ## 不变原则
 
