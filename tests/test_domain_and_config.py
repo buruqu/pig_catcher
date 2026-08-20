@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
@@ -494,11 +495,13 @@ def test_group_six_star_catch_effects_are_exclusive_and_show_activator_nickname(
             "five_star_multiplier": 1.004,
             "six_star_multiplier": 1.004,
             "coin_per_player": 1004,
-            "dedicated_catches": 0,
+            "dedicated_catches": 1,
+            "dedicated_only": True,
             "source_label": "猪鼻蛋包饭",
         },
         source_user_id="other-user",
         source_display_name="其他群友",
+        granted_uses=1,
     )
     assert has_compatible_exclusive_group_catch_effect((cloud_pot, weaker))
     applied = apply_group_catch_effects(BASE_CATCH_WEIGHTS, (cloud_pot, weaker))
@@ -530,11 +533,13 @@ def test_group_window_effect_uses_strongest_multiplier_and_dedicated_quota() -> 
             "five_star_multiplier": 1.004,
             "six_star_multiplier": 1.004,
             "coin_per_player": 1004,
-            "dedicated_catches": 0,
+            "dedicated_catches": 1,
+            "dedicated_only": True,
             "source_label": "猪鼻蛋包饭",
         },
         source_user_id="1004",
         source_display_name="猪鼻哥",
+        granted_uses=1,
         created_at="2026-08-11T04:00:00.000Z",
     )
     ribs = _active_group_effect(
@@ -590,6 +595,48 @@ def test_group_window_effect_uses_strongest_multiplier_and_dedicated_quota() -> 
     assert boosted.weights == pytest.approx(direct_hidden)
     assert "隐藏效果爆发" in boosted.summaries[-1]
     assert "×10.04/×10.04" in boosted.summaries[-1]
+
+    exhausted_ribs = replace(ribs, consumed_uses=10)
+    fallback = apply_group_catch_effects(
+        ordinary_food.weights,
+        (omelette, exhausted_ribs),
+    )
+    assert fallback.dedicated_entry_id == "omelette"
+    assert "糖醋排骨全群加成" in fallback.summaries[0]
+    assert "猪鼻蛋包饭全群额外抓猪" in fallback.summaries[1]
+    assert "已由更高的 糖醋排骨群倍率覆盖" in fallback.summaries[1]
+    assert all("猪鼻蛋包饭" not in text for text in fallback.skipped_summaries)
+
+
+def test_pig_nose_group_boost_stops_after_its_extra_catch() -> None:
+    params = {
+        "five_star_multiplier": 1.004,
+        "six_star_multiplier": 1.004,
+        "coin_per_player": 1004,
+        "dedicated_catches": 1,
+        "dedicated_only": True,
+        "source_label": "猪鼻蛋包饭",
+    }
+    available = _active_group_effect(
+        "omelette",
+        "group-window-high-star-boost",
+        params,
+        source_user_id="1004",
+        source_display_name="猪鼻哥",
+        granted_uses=1,
+    )
+    applied = apply_group_catch_effects(BASE_CATCH_WEIGHTS, (available,))
+    assert applied.dedicated_entry_id == "omelette"
+    assert applied.weights[4] > BASE_CATCH_WEIGHTS[4]
+    assert applied.weights[5] > BASE_CATCH_WEIGHTS[5]
+    assert "本次不消耗正常抓猪额度" in applied.summaries[0]
+    assert "额外抓猪机会剩余 0/1 次" in applied.summaries[0]
+
+    consumed = replace(available, consumed_uses=1)
+    exhausted = apply_group_catch_effects(BASE_CATCH_WEIGHTS, (consumed,))
+    assert exhausted.dedicated_entry_id == ""
+    assert exhausted.weights == pytest.approx(BASE_CATCH_WEIGHTS)
+    assert exhausted.summaries == ()
 
 
 def test_targeted_probability_food_only_uses_lower_rarity_as_donor() -> None:

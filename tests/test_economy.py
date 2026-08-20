@@ -2701,7 +2701,8 @@ async def test_pig_nose_omelette_keeps_group_rewards_and_restores_two_cooks(
 ) -> None:
     params = {
         "coin_per_player": 1004,
-        "dedicated_catches": 0,
+        "dedicated_catches": 1,
+        "dedicated_only": True,
         "five_star_multiplier": 1.004,
         "personal_six_star_cook_percent": 60,
         "personal_six_star_cook_uses": 2,
@@ -2759,6 +2760,7 @@ async def test_pig_nose_omelette_keeps_group_rewards_and_restores_two_cooks(
     )
     assert eaten.effect.queued_effect_id == "group-window-high-star-boost"
     assert eaten.effect.coin_bonus == 1004
+    assert "1 次额外抓猪机会" in eaten.effect.summary
     assert "连续 2 次" in eaten.effect.summary
     personal = await database.fetch_one(
         """
@@ -2783,7 +2785,7 @@ async def test_pig_nose_omelette_keeps_group_rewards_and_restores_two_cooks(
     )
     assert group_effect is not None
     assert group_effect["effect_id"] == "group-window-high-star-boost"
-    assert group_effect["granted_uses_per_player"] == 0
+    assert group_effect["granted_uses_per_player"] == 1
     assert json.loads(str(group_effect["params_json"])) == params
     balances = await database.fetch_all(
         "SELECT platform_user_id, coin_balance FROM players ORDER BY platform_user_id"
@@ -2791,6 +2793,51 @@ async def test_pig_nose_omelette_keeps_group_rewards_and_restores_two_cooks(
     assert {str(row["platform_user_id"]): int(row["coin_balance"]) for row in balances}[
         "300"
     ] == 1004
+    receiver_catching = GameplayService(
+        database,
+        CatchingSection(daily_limit=1, cooldown_seconds=0),
+        random_source=SequenceRandom(
+            *(0.0, 0.0, 0.5, 0.5, 0.5, 0.5, 0.5) * 2
+        ),
+        clock=clock,
+        id_factory=iter(
+            (
+                "omelette-extra-pig",
+                "omelette-extra-ledger",
+                "omelette-normal-pig",
+                "omelette-normal-ledger",
+            )
+        ).__next__,
+        short_code_factory=iter(("OMELEXTR", "OMELNORM")).__next__,
+    )
+    extra = await receiver_catching.catch(
+        _identity(user_id="300", message_id="omelette-extra-catch")
+    )
+    assert extra.quota_exempt_catch is True
+    assert (extra.daily_count, extra.daily_limit) == (0, 1)
+    assert any("猪鼻蛋包饭全群加成" in text for text in extra.effect_summaries)
+    assert any("×1.004" in text for text in extra.effect_summaries)
+
+    normal = await receiver_catching.catch(
+        _identity(user_id="300", message_id="omelette-normal-catch")
+    )
+    assert normal.quota_exempt_catch is False
+    assert (normal.daily_count, normal.daily_limit) == (1, 1)
+    assert all("猪鼻蛋包饭" not in text for text in normal.effect_summaries)
+    with pytest.raises(DailyCatchLimitError):
+        await receiver_catching.catch(
+            _identity(user_id="300", message_id="omelette-limit-catch")
+        )
+    usage = await database.fetch_one(
+        """
+        SELECT consumed_uses
+        FROM group_food_effect_usage
+        WHERE group_effect_entry_id = 'omelette-group-effect'
+          AND player_id = ?
+        """,
+        (other.player_id,),
+    )
+    assert usage is not None and int(usage["consumed_uses"]) == 1
     await database.close()
 
 

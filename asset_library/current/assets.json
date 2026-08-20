@@ -3455,7 +3455,8 @@
       "effect_id": "group-window-high-star-boost",
       "effect_params": {
         "coin_per_player": 1004,
-        "dedicated_catches": 0,
+        "dedicated_catches": 1,
+        "dedicated_only": true,
         "five_star_multiplier": 1.004,
         "personal_six_star_cook_percent": 60,
         "personal_six_star_cook_uses": 2,
@@ -3541,7 +3542,8 @@
       "effect_id": "group-window-high-star-boost",
       "effect_params": {
         "coin_per_player": 1004,
-        "dedicated_catches": 0,
+        "dedicated_catches": 1,
+        "dedicated_only": true,
         "five_star_multiplier": 1.004,
         "personal_six_star_cook_percent": 60,
         "personal_six_star_cook_uses": 2,
@@ -5833,7 +5835,8 @@
       "effect_id": "group-window-high-star-boost",
       "effect_params": {
         "coin_per_player": 1004,
-        "dedicated_catches": 0,
+        "dedicated_catches": 1,
+        "dedicated_only": true,
         "five_star_multiplier": 1.004,
         "personal_six_star_cook_percent": 60,
         "personal_six_star_cook_uses": 2,
@@ -6240,7 +6243,8 @@
       "effect_id": "group-window-high-star-boost",
       "effect_params": {
         "coin_per_player": 1004,
-        "dedicated_catches": 0,
+        "dedicated_catches": 1,
+        "dedicated_only": true,
         "five_star_multiplier": 1.004,
         "personal_six_star_cook_percent": 60,
         "personal_six_star_cook_uses": 2,

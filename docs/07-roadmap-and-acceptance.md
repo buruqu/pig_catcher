@@ -1418,3 +1418,19 @@
 - 自动回归为 pytest `277 passed`（复用并强化 2 个阿萨姆端到端测试：额外次数不扣额度
   `quota_exempt_catch`/`daily_count` 断言、PK 文案含原主/猪名/赠送对象断言）；Ruff、
   Python `compileall` 全部通过。
+
+## 42. v1.23.0 猪鼻蛋包饭一次额外抓猪验收
+
+- 验收日期：`2026-08-20`。插件升级为 `local.pig-catcher v1.23.0`，Schema `27 → 28`、
+  Ruleset `22 → 23`，Asset Manifest `4` 保持不变。
+- 规则：食用猪鼻蛋包饭时，本群已登记玩家仍各得 1,004 猪币，食用者仍登记连续 2 次
+  六星猪做菜 `60%`；原全群持续时段 `×1.004` 改为每名玩家 1 次额外抓猪，仅该次
+  五星、六星相对权重 `×1.004` 且不消耗正常额度。机会用完立即退出候选，未使用则到
+  次日同一时段刷新时过期。更强普通群效果还有专属额度时蛋包饭机会保留；只剩时效倍率时，
+  蛋包饭提供额外额度、最终概率继续取更高倍率。
+- Schema 28 同步四作用域模板、可用/锁定实例和尚未过期的旧群效果，不重发猪币、
+  不重复创建个人做菜效果。生产迁移前在线备份为
+  `D:\MaiBotArchives\pig_catcher\runtime-backups\pig_catcher-pre-v1.23.0-20260820-132750.sqlite3`；
+  备份 Schema 27、迁移后生产 Schema 28，二者 `quick_check=ok`。
+- 自动回归为 pytest `278 passed`；新增领域耗尽测试及吃菜→额外抓猪→恢复普通额度的
+  端到端断言。Ruff、Python `compileall`、`uv lock --check` 和正式 JSON 解析全部通过。

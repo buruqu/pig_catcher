@@ -450,7 +450,7 @@ async def test_v23_migrates_food_effects_and_repairs_intermediate_pig_cookie(
     )
     assert migrated["猪鼻蛋包饭"] == (
         "group-window-high-star-boost",
-        '{"coin_per_player":1004,"dedicated_catches":0,'
+        '{"coin_per_player":1004,"dedicated_catches":1,"dedicated_only":true,'
         '"five_star_multiplier":1.004,"personal_six_star_cook_percent":60,'
         '"personal_six_star_cook_uses":2,"six_star_multiplier":1.004,'
         '"source_label":"猪鼻蛋包饭"}',
@@ -551,26 +551,31 @@ async def test_v23_migrates_food_effects_and_repairs_intermediate_pig_cookie(
     )
     group_effect_rows = await database.fetch_all(
         """
-        SELECT group_effect_entry_id, params_json
+        SELECT group_effect_entry_id, params_json, granted_uses_per_player
         FROM group_food_effects
         ORDER BY group_effect_entry_id
         """
     )
     group_effects = {
-        str(row["group_effect_entry_id"]): str(row["params_json"])
+        str(row["group_effect_entry_id"]): (
+            str(row["params_json"]),
+            int(row["granted_uses_per_player"]),
+        )
         for row in group_effect_rows
     }
     assert group_effects["active-ribs-group-effect"] == (
         '{"coin_per_player":1007,"dedicated_catches":10,'
         '"five_star_multiplier":1.007,"hidden_boost_chance_percent":10,'
         '"hidden_five_star_multiplier":10.04,"hidden_six_star_multiplier":10.04,'
-        '"six_star_multiplier":1.007,"source_label":"糖醋排骨"}'
+        '"six_star_multiplier":1.007,"source_label":"糖醋排骨"}',
+        10,
     )
     assert group_effects["active-omelette-group-effect"] == (
-        '{"coin_per_player":1004,"dedicated_catches":0,'
+        '{"coin_per_player":1004,"dedicated_catches":1,"dedicated_only":true,'
         '"five_star_multiplier":1.004,"personal_six_star_cook_percent":60,'
         '"personal_six_star_cook_uses":2,"six_star_multiplier":1.004,'
-        '"source_label":"猪鼻蛋包饭"}'
+        '"source_label":"猪鼻蛋包饭"}',
+        1,
     )
     quota = await database.fetch_one(
         "SELECT weekly_expires_at FROM player_catch_quota_bonuses WHERE player_id = 'qq:100:200'"

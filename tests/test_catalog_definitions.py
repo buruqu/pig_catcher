@@ -121,7 +121,8 @@ def test_high_rarity_food_effects_cover_new_gameplay_families() -> None:
     assert foods["猪鼻蛋包饭"]["effect_id"] == "group-window-high-star-boost"
     assert foods["猪鼻蛋包饭"]["effect_params"] == {
         "coin_per_player": 1004,
-        "dedicated_catches": 0,
+        "dedicated_catches": 1,
+        "dedicated_only": True,
         "five_star_multiplier": 1.004,
         "personal_six_star_cook_percent": 60,
         "personal_six_star_cook_uses": 2,

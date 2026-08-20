@@ -28,6 +28,7 @@ from .v0024_quick_eat_and_item_queue import MIGRATION_0024
 from .v0025_armed_item_last_use import MIGRATION_0025
 from .v0026_six_star_progress import MIGRATION_0026
 from .v0027_transfer_events_system_gift import MIGRATION_0027
+from .v0028_pig_nose_extra_catch import MIGRATION_0028
 
 MIGRATIONS: tuple[Migration, ...] = (
     MIGRATION_0001,
@@ -57,6 +58,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     MIGRATION_0025,
     MIGRATION_0026,
     MIGRATION_0027,
+    MIGRATION_0028,
 )
 
 __all__ = ["MIGRATIONS", "Migration"]
