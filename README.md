@@ -46,6 +46,68 @@ QQ 官方 OpenID；底层稳定身份仍保留用于审计和幂等。
 默认抓猪基础概率为 `40% / 30% / 17% / 8% / 4% / 1%`；无当前群授权六星
 素材时，最后 `1%` 转入五星。
 
+## QQ 官方机器人安装教程
+
+抓猪插件不直接连接 QQ 开放平台；请先安装独立的
+[QQ 官方机器人适配器](https://github.com/buruqu/qq-official-adapter)，再由适配器把 QQ 消息转换为
+MaiBot 标准消息。该接入不需要 NapCat，适配器也能供同一 MaiBot 中的其他标准插件使用。
+
+### 1. 安装适配器与抓猪插件
+
+在 MaiBot 的 `plugins` 目录执行：
+
+```powershell
+git clone https://github.com/buruqu/qq-official-adapter.git qq_official_adapter
+git clone https://github.com/buruqu/pig_catcher.git pig_catcher
+```
+
+重启 MaiBot 后，WebUI 插件列表中应同时出现 `local.qq-official-adapter` 和
+`local.pig-catcher`。适配器要求 MaiBot `>=1.0.12,<2.0.0`、
+`maibot-plugin-sdk >=2.7.0,<3.0.0` 和 Python `>=3.12`。
+
+### 2. 配置 QQ 官方机器人
+
+在 `local.qq-official-adapter` 的 WebUI 配置中打开适配器和主机器人，填写自己的 AppID 与
+ClientSecret。单 Bot 用户关闭第二机器人；双 Bot 用户再填写第二套凭据，并保证两个
+`connection_id` 不同。仓库配置中的两套凭据固定为空，真实凭据不得提交到任一 Git 仓库。
+
+QQ 开放平台侧先把机器人加入测试群并开放群消息事件。只允许接收 @ 消息时，命令格式为
+`@机器人 /抓猪帮助`；开启“接收所有消息”后，才能直接发送 `/抓猪帮助`。首次连接及双 Bot
+配置详见适配器的
+[安装与配置文档](https://github.com/buruqu/qq-official-adapter/blob/main/docs/installation.md)。
+
+### 3. 把官方群接入抓猪插件
+
+先在目标群向机器人发送一条消息。适配器会在自己的 MaiBot 运行数据目录记录
+`last_group.local.json`；第二机器人对应 `last_group.secondary.local.json`。从中取得原始
+`group_openid` 后，在 `local.pig-catcher` 的“访问控制 → 群白名单”中单独占一行填写该值，
+不要填写数字 QQ 群号，也不要添加 `qq-official:` 前缀。
+
+如需插件管理员，从适配器收到的消息身份中取得该成员的 `member_openid`，在“访问控制 →
+插件管理员”中填写：
+
+```text
+qq-official:<member_openid>
+```
+
+OpenID、最近群文件和机器人身份文件都属于本地运行数据，不应公开提交。QQ 官方 OpenID 与
+NapCat 的数字 QQ 号不能可靠互推，所以旧库存、排行榜和管理员配置不会自动迁移；确需迁移时，
+必须先建立人工确认的身份映射并在备份副本中演练。
+
+### 4. 首次验证与双 Bot 边界
+
+1. 在官方群执行 `/抓猪帮助`，确认文字回复来自触发消息所属的 Bot；
+2. 执行 `/抓猪`，确认结果图能正常发送；
+3. 用 `/猪猪赠送` 或 `/美食赠送` @ 一名群友，确认生成 QQ 官方原生提及；
+4. 管理员执行 `/猪管帮助`，确认管理员 OpenID 配置生效；
+5. 普通一至五星素材安装后可用，六星定制素材仍需为精确的
+   `qq-official:<group_openid>` 作用域单独授权和导入。
+
+两个 Bot 在同一个官方群中会形成同一个抓猪群作用域，因此共享该群库存、排行与配置；它们的
+网关连接、凭据和回复路由仍由适配器独立隔离。两个 Bot 位于不同官方群时，各群数据继续隔离。
+主动群公告还需要 QQ 官方主动消息权限并在对应适配器槽位显式开启；否则只能使用最近消息的
+被动回复窗口，平台权限无法由抓猪插件绕过。
+
 ## 已完成功能
 
 - Manifest v2、SDK 生命周期、配置热更新和简体中文 WebUI 配置模型
