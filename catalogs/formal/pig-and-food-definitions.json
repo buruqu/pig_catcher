@@ -4019,7 +4019,7 @@
         "uses_per_player": 1,
         "self_coin": 0,
         "other_coin": 0,
-        "auto_gift_chance_percent": 50.0,
+        "auto_gift_chance_percent": 40.0,
         "auto_gift_rarities": [
           5,
           6
@@ -4102,7 +4102,7 @@
         "uses_per_player": 1,
         "self_coin": 0,
         "other_coin": 0,
-        "auto_gift_chance_percent": 50.0,
+        "auto_gift_chance_percent": 40.0,
         "auto_gift_rarities": [
           5,
           6
@@ -4185,7 +4185,7 @@
         "uses_per_player": 1,
         "self_coin": 0,
         "other_coin": 0,
-        "auto_gift_chance_percent": 50.0,
+        "auto_gift_chance_percent": 40.0,
         "auto_gift_rarities": [
           5,
           6
@@ -4268,7 +4268,7 @@
         "uses_per_player": 1,
         "self_coin": 0,
         "other_coin": 0,
-        "auto_gift_chance_percent": 50.0,
+        "auto_gift_chance_percent": 40.0,
         "auto_gift_rarities": [
           5,
           6
