@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import sqlite3
+import tempfile
 from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -72,25 +74,38 @@ class DatabaseSession:
 
 
 class PigCatcherDatabase:
-    """使用短连接和串行事务保护的 SQLite 管理器。"""
+    """使用串行写事务和有界并发只读事务的 SQLite 管理器。"""
 
-    def __init__(self, path: Path, *, busy_timeout_ms: int = 5000) -> None:
+    def __init__(
+        self,
+        path: Path,
+        *,
+        busy_timeout_ms: int = 5000,
+        max_concurrent_reads: int = 4,
+    ) -> None:
         self.path = Path(path)
         self.busy_timeout_ms = int(busy_timeout_ms)
+        self.max_concurrent_reads = max(1, int(max_concurrent_reads))
         self._lifecycle_lock = asyncio.Lock()
         self._operation_lock = asyncio.Lock()
+        self._backup_lock = asyncio.Lock()
+        self._read_semaphore = asyncio.Semaphore(self.max_concurrent_reads)
+        self._read_condition = asyncio.Condition()
+        self._active_reads = 0
         self._is_open = False
 
     @property
     def is_open(self) -> bool:
         return self._is_open
 
-    async def _connect(self) -> aiosqlite.Connection:
+    async def _connect(self, *, query_only: bool = False) -> aiosqlite.Connection:
         connection = await aiosqlite.connect(self.path, isolation_level=None)
         connection.row_factory = aiosqlite.Row
         await connection.execute("PRAGMA foreign_keys = ON")
         await connection.execute(f"PRAGMA busy_timeout = {self.busy_timeout_ms}")
         await connection.execute("PRAGMA synchronous = NORMAL")
+        if query_only:
+            await connection.execute("PRAGMA query_only = ON")
         return connection
 
     async def open(self) -> None:
@@ -112,13 +127,39 @@ class PigCatcherDatabase:
             self._is_open = True
 
     async def close(self) -> None:
-        """等待活动事务结束并停止接受新事务。"""
+        """停止接受新操作，并依次等待活动备份与事务结束。"""
 
         async with self._lifecycle_lock:
+            self._is_open = False
+            # 固定采用 operation -> backup 的锁序。这样即使未来调用方误在
+            # 写事务上下文中请求备份，关闭流程也不会反向等待该事务。
             async with self._operation_lock:
-                self._is_open = False
+                async with self._backup_lock:
+                    async with self._read_condition:
+                        await self._read_condition.wait_for(
+                            lambda: self._active_reads == 0
+                        )
 
     async def _migrate(self, connection: aiosqlite.Connection) -> None:
+        version_row = await (await connection.execute("PRAGMA user_version")).fetchone()
+        current_version = int(version_row[0]) if version_row is not None else 0
+        if current_version > SCHEMA_VERSION:
+            raise MigrationError(
+                f"数据库版本 {current_version} 高于当前插件支持的 {SCHEMA_VERSION}，拒绝降级打开。"
+            )
+        if current_version == SCHEMA_VERSION:
+            try:
+                migration_row = await (
+                    await connection.execute(
+                        "SELECT COALESCE(MAX(version), 0) FROM schema_migrations"
+                    )
+                ).fetchone()
+            except sqlite3.Error:
+                migration_row = None
+            recorded_version = int(migration_row[0]) if migration_row is not None else -1
+            if recorded_version == SCHEMA_VERSION:
+                return
+
         # SQLite table-rebuild migrations require foreign-key enforcement to be
         # disabled before the transaction begins. Every rebuilt schema is checked
         # again with foreign_key_check before commit, then enforcement is restored.
@@ -177,18 +218,49 @@ class PigCatcherDatabase:
     async def transaction(self, *, immediate: bool = True) -> AsyncIterator[DatabaseSession]:
         """开启由调用方拥有的显式事务。"""
 
-        async with self._operation_lock:
-            self._require_open()
-            connection = await self._connect()
+        if immediate:
+            async with self._operation_lock:
+                self._require_open()
+                async with self._connection_transaction(
+                    immediate=True,
+                    query_only=False,
+                ) as session:
+                    yield session
+            return
+
+        async with self._read_semaphore:
+            async with self._read_condition:
+                self._require_open()
+                self._active_reads += 1
             try:
-                await connection.execute("BEGIN IMMEDIATE" if immediate else "BEGIN")
-                yield DatabaseSession(connection)
-                await connection.commit()
-            except BaseException:
-                await connection.rollback()
-                raise
+                async with self._connection_transaction(
+                    immediate=False,
+                    query_only=True,
+                ) as session:
+                    yield session
             finally:
-                await connection.close()
+                async with self._read_condition:
+                    self._active_reads -= 1
+                    if self._active_reads == 0:
+                        self._read_condition.notify_all()
+
+    @asynccontextmanager
+    async def _connection_transaction(
+        self,
+        *,
+        immediate: bool,
+        query_only: bool,
+    ) -> AsyncIterator[DatabaseSession]:
+        connection = await self._connect(query_only=query_only)
+        try:
+            await connection.execute("BEGIN IMMEDIATE" if immediate else "BEGIN")
+            yield DatabaseSession(connection)
+            await connection.commit()
+        except BaseException:
+            await connection.rollback()
+            raise
+        finally:
+            await connection.close()
 
     async def fetch_one(
         self,
@@ -221,20 +293,56 @@ class PigCatcherDatabase:
         return tuple(str(row[0]) for row in rows)
 
     async def backup_to(self, destination: Path) -> Path:
-        """使用 SQLite 在线备份 API 生成一致副本。"""
+        """在线备份到同目录临时文件，校验后原子替换目标。"""
 
         destination = Path(destination)
-        async with self._operation_lock:
+        if destination.resolve() == self.path.resolve():
+            raise DatabaseError("数据库备份目标不能是正在使用的主数据库。")
+        async with self._backup_lock:
             self._require_open()
             destination.parent.mkdir(parents=True, exist_ok=True)
-            source = await self._connect()
-            target = await aiosqlite.connect(destination)
+            temporary_fd, temporary_name = tempfile.mkstemp(
+                prefix=f".{destination.name}.",
+                suffix=".tmp",
+                dir=destination.parent,
+            )
+            os.close(temporary_fd)
+            temporary_path = Path(temporary_name)
+            source: aiosqlite.Connection | None = None
+            target: aiosqlite.Connection | None = None
             try:
+                source = await self._connect()
+                target = await aiosqlite.connect(temporary_path)
                 await source.backup(target)
                 await target.commit()
-            except sqlite3.Error as exc:
+                await self._verify_backup(target)
+                await target.close()
+                target = None
+                await source.close()
+                source = None
+                os.replace(temporary_path, destination)
+            except DatabaseError:
+                raise
+            except (OSError, sqlite3.Error) as exc:
                 raise DatabaseError(f"数据库备份失败：{exc}") from exc
             finally:
-                await target.close()
-                await source.close()
+                try:
+                    if target is not None:
+                        await target.close()
+                finally:
+                    try:
+                        if source is not None:
+                            await source.close()
+                    finally:
+                        try:
+                            temporary_path.unlink(missing_ok=True)
+                        except OSError:
+                            pass
         return destination
+
+    @staticmethod
+    async def _verify_backup(connection: aiosqlite.Connection) -> None:
+        rows = await (await connection.execute("PRAGMA quick_check")).fetchall()
+        results = tuple(str(row[0]) for row in rows)
+        if results != ("ok",):
+            raise DatabaseError(f"数据库备份完整性检查失败：{results}")

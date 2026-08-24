@@ -327,3 +327,8 @@ PENDING -> EXPIRED
   作用域的猪鼻蛋包饭模板和可用/锁定实例收敛到 `dedicated_catches=1`、
   `dedicated_only=true`；尚未到期的旧群效果同步转换为每名玩家一次机会，不重发猪币、
   不重复创建食用者个人做菜效果，也不改写已经过期的历史结算。
+- Schema 29 将四个作用域的阿萨姆红茶奶雾锅模板、可用/锁定实例和未过期群效果收敛到
+  `auto_gift_chance_percent=40`；已消费菜品、已结束效果和历史回执继续保留原规则快照。
+- Schema 30 为抓猪额度统计增加
+  `command_receipts(player_id, command_name, created_at, catch_quota_cost)` 覆盖索引；迁移只
+  新增索引，不改写回执、资产、账本或玩家统计。

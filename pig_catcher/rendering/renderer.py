@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import binascii
+import hashlib
+import os
+from collections import OrderedDict
 from collections.abc import Mapping
 from io import BytesIO
 from pathlib import Path
+from threading import Lock
 from typing import Any, Protocol
+from uuid import uuid4
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
 from PIL import Image, UnidentifiedImageError
@@ -44,6 +50,8 @@ _PIG_CARD_SLOT = MediaSlot(x=38, y=164, width=480, height=480)
 _FOOD_CARD_SLOT = MediaSlot(x=38, y=164, width=480, height=480)
 _COMPACT_PREVIEW_MAX_SIDE = 256
 _COMPACT_PREVIEW_WEBP_QUALITY = 82
+_SINGLE_PREVIEW_WEBP_QUALITY = 90
+_PREVIEW_CACHE_VERSION = "v1"
 _MAX_HTML_RPC_BYTES = 12 * 1024 * 1024
 
 
@@ -63,6 +71,7 @@ class PigCatcherRenderer:
         options: RenderOptions,
         *,
         templates_root: Path | None = None,
+        preview_cache_root: Path | None = None,
     ) -> None:
         self.capability = capability
         self.options = options
@@ -75,6 +84,19 @@ class PigCatcherRenderer:
             enable_async=False,
         )
         self._theme_css = (self.templates_root / "theme.css").read_text(encoding="utf-8")
+        self.preview_cache_root = (
+            Path(preview_cache_root).resolve()
+            if preview_cache_root is not None
+            else None
+        )
+        self._preview_cache: OrderedDict[tuple[object, ...], str] = OrderedDict()
+        self._preview_cache_size = 0
+        self._preview_cache_lock = asyncio.Lock()
+        self._preview_key_locks: dict[tuple[object, ...], asyncio.Lock] = {}
+        self._preprocess_semaphore = asyncio.Semaphore(
+            max(1, int(self.options.media_preprocess_concurrency))
+        )
+        self._disk_cache_lock = Lock()
 
     async def render_framework_preview(
         self,
@@ -107,7 +129,7 @@ class PigCatcherRenderer:
             )
         except Exception as exc:
             raise RenderError(f"MaiBot HTML 图片渲染失败：{exc}") from exc
-        return self._normalize_result(result)
+        return await asyncio.to_thread(self._normalize_result, result)
 
     async def render_asset_preview_base(
         self,
@@ -141,11 +163,17 @@ class PigCatcherRenderer:
         """把单帧正式素材以内联 data URL 交给禁网 HTML 渲染。"""
 
         template = self._environment.get_template("asset_preview.html")
+        media_data_url = await self._cached_preview_data_url(
+            source_path,
+            is_animated=False,
+            max_side=self.options.single_media_preview_max_side,
+            quality=_SINGLE_PREVIEW_WEBP_QUALITY,
+        )
         html = template.render(
             view=view,
             theme_css=self._theme_css,
             font_family=self.options.font_family,
-            media_data_url=self._source_data_url(source_path),
+            media_data_url=media_data_url,
         )
         return await self._render_asset_html(html)
 
@@ -173,7 +201,12 @@ class PigCatcherRenderer:
         media_data_url = ""
         if view.media_visible:
             if source_path is not None and source_path.is_file():
-                media_data_url = self._source_data_url(source_path)
+                media_data_url = await self._cached_preview_data_url(
+                    source_path,
+                    is_animated=False,
+                    max_side=self.options.single_media_preview_max_side,
+                    quality=_SINGLE_PREVIEW_WEBP_QUALITY,
+                )
         return await self._render_template(
             "pig_card.html",
             view=view,
@@ -192,7 +225,7 @@ class PigCatcherRenderer:
     ) -> RenderedImage:
         """Render one inventory page with deterministic animated-media previews."""
 
-        media_data_urls = self._list_media_data_urls(
+        media_data_urls = await self._list_media_data_urls(
             (
                 (item.key, item.media_visible, item.is_animated)
                 for item in view.items
@@ -212,7 +245,7 @@ class PigCatcherRenderer:
     ) -> RenderedImage:
         """Render one privacy-aware catalog page."""
 
-        media_data_urls = self._list_media_data_urls(
+        media_data_urls = await self._list_media_data_urls(
             (
                 (
                     item.key,
@@ -242,7 +275,7 @@ class PigCatcherRenderer:
         """Render today's current-group size and weight rankings."""
 
         items = (*view.size_items, *view.weight_items)
-        media_data_urls = self._list_media_data_urls(
+        media_data_urls = await self._list_media_data_urls(
             (
                 (item.key, item.media_visible, item.is_animated)
                 for item in items
@@ -287,7 +320,12 @@ class PigCatcherRenderer:
         media_data_url = ""
         if view.media_visible:
             if source_path is not None and source_path.is_file():
-                media_data_url = self._source_data_url(source_path)
+                media_data_url = await self._cached_preview_data_url(
+                    source_path,
+                    is_animated=False,
+                    max_side=self.options.single_media_preview_max_side,
+                    quality=_SINGLE_PREVIEW_WEBP_QUALITY,
+                )
         return await self._render_template(
             "food_card.html",
             view=view,
@@ -301,7 +339,7 @@ class PigCatcherRenderer:
     ) -> RenderedImage:
         """Render one food inventory page."""
 
-        media_data_urls = self._list_media_data_urls(
+        media_data_urls = await self._list_media_data_urls(
             (
                 (item.key, item.media_visible, item.is_animated)
                 for item in view.items
@@ -321,7 +359,7 @@ class PigCatcherRenderer:
     ) -> RenderedImage:
         """Render one privacy-aware food catalog page."""
 
-        media_data_urls = self._list_media_data_urls(
+        media_data_urls = await self._list_media_data_urls(
             (
                 (
                     item.key,
@@ -345,7 +383,7 @@ class PigCatcherRenderer:
     ) -> RenderedImage:
         """Render one batch-cooking grid with all produced foods."""
 
-        media_data_urls = self._list_media_data_urls(
+        media_data_urls = await self._list_media_data_urls(
             (
                 (item.key, item.media_visible, item.is_animated)
                 for item in view.items
@@ -380,9 +418,11 @@ class PigCatcherRenderer:
 
         media_data_url = ""
         if view.media_visible and source_path is not None and source_path.is_file():
-            media_data_url = self._compact_preview_data_url(
+            media_data_url = await self._cached_preview_data_url(
                 source_path,
                 is_animated=view.is_animated,
+                max_side=_COMPACT_PREVIEW_MAX_SIDE,
+                quality=_COMPACT_PREVIEW_WEBP_QUALITY,
             )
         return await self._render_template(
             "group_event.html",
@@ -410,7 +450,7 @@ class PigCatcherRenderer:
     ) -> RenderedImage:
         """Render one group leaderboard with static showcase media."""
 
-        media_data_urls = self._list_media_data_urls(
+        media_data_urls = await self._list_media_data_urls(
             (
                 (item.key, item.media_visible, item.is_animated)
                 for item in view.items
@@ -436,29 +476,215 @@ class PigCatcherRenderer:
         )
         return await self._render_asset_html(html)
 
-    def _list_media_data_urls(
+    async def _list_media_data_urls(
         self,
         items: object,
         media_paths: Mapping[str, Path],
     ) -> dict[str, str]:
-        result: dict[str, str] = {}
-        preview_cache: dict[tuple[Path, bool], str] = {}
+        requested: list[tuple[str, Path, bool]] = []
         for key, media_visible, is_animated in items:
             if not media_visible:
                 continue
             path = media_paths.get(key)
             if path is None or not path.is_file():
                 continue
-            cache_key = (Path(path).resolve(), bool(is_animated))
-            preview = preview_cache.get(cache_key)
-            if preview is None:
-                preview = self._compact_preview_data_url(
+            requested.append((str(key), Path(path), bool(is_animated)))
+        if not requested:
+            return {}
+        previews = await asyncio.gather(
+            *(
+                self._cached_preview_data_url(
                     path,
-                    is_animated=bool(is_animated),
+                    is_animated=is_animated,
+                    max_side=_COMPACT_PREVIEW_MAX_SIDE,
+                    quality=_COMPACT_PREVIEW_WEBP_QUALITY,
                 )
-                preview_cache[cache_key] = preview
-            result[key] = preview
-        return result
+                for _, path, is_animated in requested
+            )
+        )
+        return {
+            key: preview
+            for (key, _, _), preview in zip(requested, previews, strict=True)
+        }
+
+    async def _cached_preview_data_url(
+        self,
+        source_path: Path,
+        *,
+        is_animated: bool,
+        max_side: int,
+        quality: int,
+    ) -> str:
+        path = Path(source_path).resolve()
+        try:
+            stat = path.stat()
+        except OSError as exc:
+            raise RenderError(f"预览素材不存在：{path.name}") from exc
+        if not path.is_file():
+            raise RenderError(f"预览素材不存在：{path.name}")
+        key: tuple[object, ...] = (
+            _PREVIEW_CACHE_VERSION,
+            str(path),
+            int(stat.st_size),
+            int(stat.st_mtime_ns),
+            bool(is_animated),
+            int(max_side),
+            int(quality),
+        )
+        async with self._preview_cache_lock:
+            cached = self._preview_cache.get(key)
+            if cached is not None:
+                self._preview_cache.move_to_end(key)
+                return cached
+            key_lock = self._preview_key_locks.setdefault(key, asyncio.Lock())
+
+        try:
+            async with key_lock:
+                async with self._preview_cache_lock:
+                    cached = self._preview_cache.get(key)
+                    if cached is not None:
+                        self._preview_cache.move_to_end(key)
+                        return cached
+                async with self._preprocess_semaphore:
+                    preview = await asyncio.to_thread(
+                        self._load_or_build_preview_data_url,
+                        key,
+                        path,
+                        is_animated,
+                        int(max_side),
+                        int(quality),
+                    )
+                await self._remember_preview(key, preview)
+                return preview
+        finally:
+            # 单飞锁只服务一次 cache key 构建；素材换版/mtime 变化时不让旧锁
+            # 在长时间运行的机器人进程中缓慢累积。
+            async with self._preview_cache_lock:
+                if (
+                    self._preview_key_locks.get(key) is key_lock
+                    and not key_lock.locked()
+                ):
+                    self._preview_key_locks.pop(key, None)
+
+    async def _remember_preview(self, key: tuple[object, ...], value: str) -> None:
+        value_size = len(value)
+        limit = max(1, int(self.options.media_preview_cache_bytes))
+        async with self._preview_cache_lock:
+            previous = self._preview_cache.pop(key, None)
+            if previous is not None:
+                self._preview_cache_size -= len(previous)
+            if value_size <= limit:
+                self._preview_cache[key] = value
+                self._preview_cache_size += value_size
+            while self._preview_cache and self._preview_cache_size > limit:
+                _, stale_value = self._preview_cache.popitem(last=False)
+                self._preview_cache_size -= len(stale_value)
+
+    def _load_or_build_preview_data_url(
+        self,
+        key: tuple[object, ...],
+        source_path: Path,
+        is_animated: bool,
+        max_side: int,
+        quality: int,
+    ) -> str:
+        payload: bytes | None = None
+        cache_path: Path | None = None
+        if self.preview_cache_root is not None:
+            root = self.preview_cache_root
+            with self._disk_cache_lock:
+                root.mkdir(parents=True, exist_ok=True)
+                digest = hashlib.sha256(repr(key).encode("utf-8")).hexdigest()
+                cache_path = root / f"{digest}.webp"
+                if cache_path.is_file() and not cache_path.is_symlink():
+                    try:
+                        candidate = cache_path.read_bytes()
+                        self._validate_preview_payload(candidate, max_side=max_side)
+                        payload = candidate
+                        os.utime(cache_path, None)
+                    except (OSError, RenderError):
+                        cache_path.unlink(missing_ok=True)
+        if payload is None:
+            payload = self._preview_bytes_sync(
+                source_path,
+                is_animated=is_animated,
+                max_side=max_side,
+                quality=quality,
+            )
+            if cache_path is not None:
+                with self._disk_cache_lock:
+                    temporary = cache_path.with_name(f".{cache_path.name}.{uuid4().hex}.tmp")
+                    try:
+                        temporary.write_bytes(payload)
+                        os.replace(temporary, cache_path)
+                    finally:
+                        temporary.unlink(missing_ok=True)
+                    self._prune_disk_preview_cache()
+        return f"data:image/webp;base64,{base64.b64encode(payload).decode('ascii')}"
+
+    def _prune_disk_preview_cache(self) -> None:
+        root = self.preview_cache_root
+        if root is None or not root.is_dir():
+            return
+        limit = max(1, int(self.options.media_preview_disk_cache_bytes))
+        files = sorted(
+            (
+                path
+                for path in root.glob("*.webp")
+                if path.is_file() and not path.is_symlink() and path.resolve().parent == root
+            ),
+            key=lambda path: path.stat().st_mtime_ns,
+            reverse=True,
+        )
+        total = sum(path.stat().st_size for path in files)
+        for path in reversed(files):
+            if total <= limit:
+                break
+            size = path.stat().st_size
+            path.unlink(missing_ok=True)
+            total -= size
+
+    @staticmethod
+    def _preview_bytes_sync(
+        source_path: Path,
+        *,
+        is_animated: bool,
+        max_side: int,
+        quality: int,
+    ) -> bytes:
+        path = Path(source_path)
+        if not path.is_file():
+            raise RenderError(f"预览素材不存在：{path.name}")
+        try:
+            with Image.open(path) as source:
+                frame_count = int(getattr(source, "n_frames", 1))
+                if is_animated:
+                    source.seek(max(0, frame_count // 2))
+                elif frame_count > 1:
+                    raise RenderError("动画素材必须使用逐帧合成，不能截成静态图片")
+                frame = source.convert("RGBA")
+                frame.thumbnail((max_side, max_side), Image.Resampling.LANCZOS)
+                output = BytesIO()
+                frame.save(output, format="WEBP", quality=quality, method=4)
+                return output.getvalue()
+        except RenderError:
+            raise
+        except (OSError, EOFError, UnidentifiedImageError, Image.DecompressionBombError) as exc:
+            raise RenderError(f"预览素材无法解码：{path.name}") from exc
+
+    @staticmethod
+    def _validate_preview_payload(payload: bytes, *, max_side: int) -> None:
+        try:
+            with Image.open(BytesIO(payload)) as image:
+                if image.format != "WEBP" or int(getattr(image, "n_frames", 1)) != 1:
+                    raise RenderError("预览缓存格式无效")
+                if max(image.size) > max_side:
+                    raise RenderError("预览缓存尺寸超过上限")
+                image.verify()
+        except RenderError:
+            raise
+        except (OSError, UnidentifiedImageError, Image.DecompressionBombError) as exc:
+            raise RenderError("预览缓存无法解码") from exc
 
     @staticmethod
     def _compact_preview_data_url(
@@ -468,35 +694,15 @@ class PigCatcherRenderer:
     ) -> str:
         """为紧凑列表生成有界静态预览，避免原图 Base64 撑破 RPC 帧。"""
 
-        path = Path(source_path)
-        if not path.is_file():
-            raise RenderError(f"紧凑预览素材不存在：{path.name}")
-        try:
-            with Image.open(path) as source:
-                frame_count = int(getattr(source, "n_frames", 1))
-                if is_animated:
-                    source.seek(max(0, frame_count // 2))
-                elif frame_count > 1:
-                    raise RenderError("动画素材必须使用确定性的中间帧预览")
-                frame = source.convert("RGBA")
-                frame.thumbnail(
-                    (_COMPACT_PREVIEW_MAX_SIDE, _COMPACT_PREVIEW_MAX_SIDE),
-                    Image.Resampling.LANCZOS,
-                )
-                payload = BytesIO()
-                frame.save(
-                    payload,
-                    format="WEBP",
-                    quality=_COMPACT_PREVIEW_WEBP_QUALITY,
-                    method=6,
-                )
-        except RenderError:
-            raise
-        except (OSError, EOFError, UnidentifiedImageError, Image.DecompressionBombError) as exc:
-            raise RenderError(f"紧凑预览素材无法解码：{path.name}") from exc
+        payload = PigCatcherRenderer._preview_bytes_sync(
+            source_path,
+            is_animated=is_animated,
+            max_side=_COMPACT_PREVIEW_MAX_SIDE,
+            quality=_COMPACT_PREVIEW_WEBP_QUALITY,
+        )
         return (
             "data:image/webp;base64,"
-            f"{base64.b64encode(payload.getvalue()).decode('ascii')}"
+            f"{base64.b64encode(payload).decode('ascii')}"
         )
 
     @staticmethod
@@ -507,32 +713,6 @@ class PigCatcherRenderer:
             source_path,
             is_animated=True,
         )
-
-    @staticmethod
-    def _source_data_url(source_path: Path) -> str:
-        path = Path(source_path)
-        if not path.is_file():
-            raise RenderError(f"静态素材不存在：{path.name}")
-        try:
-            payload = path.read_bytes()
-            with Image.open(BytesIO(payload)) as source:
-                if int(getattr(source, "n_frames", 1)) > 1:
-                    raise RenderError("动画素材必须使用逐帧合成，不能截成静态图片")
-                image_format = str(source.format or "").upper()
-                source.load()
-        except RenderError:
-            raise
-        except (OSError, UnidentifiedImageError, Image.DecompressionBombError) as exc:
-            raise RenderError(f"静态素材无法解码：{path.name}") from exc
-        mime_type = {
-            "PNG": "image/png",
-            "JPEG": "image/jpeg",
-            "WEBP": "image/webp",
-            "GIF": "image/gif",
-        }.get(image_format)
-        if mime_type is None:
-            raise RenderError(f"静态素材格式不受支持：{image_format or '未知'}")
-        return f"data:{mime_type};base64,{base64.b64encode(payload).decode('ascii')}"
 
     @staticmethod
     def _validate_slot(slot: MediaSlot, image: RenderedImage) -> None:
@@ -565,7 +745,7 @@ class PigCatcherRenderer:
             )
         except Exception as exc:
             raise RenderError(f"MaiBot 素材图片渲染失败：{exc}") from exc
-        return self._normalize_result(result)
+        return await asyncio.to_thread(self._normalize_result, result)
 
     def _normalize_result(self, result: object) -> RenderedImage:
         image_base64 = self._result_value(result, "image_base64", "base64")

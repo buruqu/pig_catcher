@@ -1,6 +1,6 @@
 # 本机素材库
 
-`current/` 保存 `v1.15.0` 当前正式素材导入包，并通过 Git LFS 提交完整图片与动画；
+`current/` 保存当前正式素材导入包，并通过 Git LFS 提交完整图片与动画；
 `archive/` 继续保存本机历史回滚包并被 Git 忽略，整理目录时不得删除。本版不改变媒体
 既有二进制，并新增四群隔离的“神龙化猪 / 神龙化猪七星云海锅”原始素材；
 `current/assets.json` 与 `current/build-report.json` 已按正式定义重建。
@@ -8,15 +8,16 @@
 | 位置 | 内容 |
 | --- | --- |
 | `current/assets.json` | 可供导入工具读取的 Asset Manifest 4 |
-| `current/build-report.json` | 223 项模板、169 份唯一内容、226 份隔离存储媒体的 SHA-256 校验报告 |
+| `current/build-report.json` | 239 项模板（164 猪、75 菜）、173 份唯一内容、242 份隔离存储媒体的 SHA-256 校验报告 |
 | `current/media/猪猪素材库/` | 一至五星公共猪猪素材 |
 | `current/media/美食素材库/` | 公共美食素材 |
 | `current/media/定制猪群友库/` | 按 QQ 群号隔离的六星定制猪 |
 | `current/media/定制美食库/` | 按 QQ 群号隔离的六星定制美食 |
 | `archive/v*/` | 历史版本素材包，仅用于本机核验和回滚 |
 
-该目录中的图片和 GIF 保留原始字节，不做重编码；动画列表页只提取确定性预览帧，
-单项详情仍使用原动画。`current/` 通过 Git LFS 发布，素材权利边界见
+该目录中的图片和 GIF 保留原始字节，不做覆盖重编码；静态单卡和紧凑列表只生成有界、
+可再生的 WebP 衍生预览，动画列表页只提取确定性预览帧，单项详情仍使用原动画。
+`current/` 通过 Git LFS 发布，素材权利边界见
 `asset_library/ASSET_NOTICE.md`；历史 `archive/` 与临时来源仍不进入 Git。
 
 正式名称、描述、品质、概率属性和授权范围维护在

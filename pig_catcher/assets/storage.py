@@ -5,22 +5,59 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import re
 import shutil
 import time
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from uuid import uuid4
 
 from ..domain.errors import AssetImportError
 from .models import StoredCatalog, ValidatedManifest
+
+_CATALOG_HASH_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
 
 def _safe_remove_tree(path: Path, allowed_root: Path) -> None:
     resolved_root = allowed_root.resolve()
     resolved_path = path.resolve()
     if resolved_path == resolved_root or not resolved_path.is_relative_to(resolved_root):
-        raise AssetImportError(f"拒绝清理素材暂存目录之外的路径：{resolved_path}")
+        raise AssetImportError(f"拒绝清理素材根目录之外的路径：{resolved_path}")
     if path.exists():
         shutil.rmtree(path)
+
+
+def _directory_size(path: Path) -> int:
+    """计算目录内普通文件大小，不跟随符号链接。"""
+
+    total = 0
+    for root, directories, files in os.walk(path, followlinks=False):
+        root_path = Path(root)
+        directories[:] = [
+            name for name in directories if not (root_path / name).is_symlink()
+        ]
+        for name in files:
+            candidate = root_path / name
+            try:
+                if candidate.is_file() and not candidate.is_symlink():
+                    total += candidate.stat().st_size
+            except FileNotFoundError:
+                continue
+    return total
+
+
+def _catalog_hash_from_path(relative_path: str) -> str | None:
+    normalized = str(relative_path or "").strip().replace("\\", "/")
+    if not normalized or normalized.startswith("/"):
+        return None
+    parts = PurePosixPath(normalized).parts
+    if (
+        len(parts) < 3
+        or parts[0] != "assets"
+        or parts[1] != "catalogs"
+        or not _CATALOG_HASH_PATTERN.fullmatch(parts[2])
+    ):
+        return None
+    return parts[2]
 
 
 class AssetCatalogStorage:
@@ -126,3 +163,41 @@ class AssetCatalogStorage:
             for candidate in candidates:
                 await asyncio.to_thread(_safe_remove_tree, candidate, self.staging_root)
             return len(candidates)
+
+    async def cleanup_catalogs(
+        self,
+        referenced_paths: tuple[str, ...] | list[str],
+        *,
+        retain_unreferenced: int = 1,
+        minimum_age_hours: int = 24,
+    ) -> tuple[int, int]:
+        """清理未被引用且已度过新发布保护期的旧不可变素材目录。"""
+
+        async with self._lock:
+            self.ensure_layout()
+            cleanup_cutoff = time.time() - max(1, int(minimum_age_hours)) * 3600
+            protected_hashes = {
+                catalog_hash
+                for relative_path in referenced_paths
+                if (catalog_hash := _catalog_hash_from_path(relative_path)) is not None
+            }
+            candidates = [
+                child
+                for child in self.catalogs_root.iterdir()
+                if child.is_dir()
+                and not child.is_symlink()
+                and _CATALOG_HASH_PATTERN.fullmatch(child.name)
+                and child.name not in protected_hashes
+                and child.stat().st_mtime <= cleanup_cutoff
+            ]
+            candidates.sort(key=lambda path: path.stat().st_mtime, reverse=True)
+            stale = candidates[max(0, int(retain_unreferenced)) :]
+            removed_bytes = 0
+            for candidate in stale:
+                removed_bytes += await asyncio.to_thread(_directory_size, candidate)
+                await asyncio.to_thread(
+                    _safe_remove_tree,
+                    candidate,
+                    self.catalogs_root,
+                )
+            return len(stale), removed_bytes

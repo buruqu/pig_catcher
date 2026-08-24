@@ -269,6 +269,16 @@ class StorageSection(PluginConfigBase):
         description="SQLite 等待其他写事务释放锁的毫秒数",
         json_schema_extra=_ui("数据库忙等待", "建议保持 5000 毫秒；并发较高时可适度增加"),
     )
+    sqlite_read_concurrency: int = Field(
+        default=4,
+        ge=1,
+        le=16,
+        description="SQLite 只读查询允许同时使用的短连接数量",
+        json_schema_extra=_ui(
+            "数据库只读并发",
+            "默认 4；写事务仍严格串行，调高会增加少量连接内存",
+        ),
+    )
     auto_backup_enabled: bool = Field(
         default=True,
         description="是否由维护任务定期备份数据库",
@@ -285,8 +295,31 @@ class StorageSection(PluginConfigBase):
         default=7,
         ge=1,
         le=100,
-        description="最多保留的自动备份数量",
-        json_schema_extra=_ui("备份保留数", "超过数量后仅删除本插件 backups 目录中的最旧备份"),
+        description="最多保留的插件数据库备份数量",
+        json_schema_extra=_ui(
+            "备份保留数",
+            "统一保留 backups 目录中最新的自动备份和操作前备份",
+        ),
+    )
+    catalog_rollback_retention_count: int = Field(
+        default=1,
+        ge=0,
+        le=10,
+        description="除正式数据与保留备份引用外额外保留的旧素材目录数量",
+        json_schema_extra=_ui(
+            "旧素材回退保留数",
+            "默认额外保留最新 1 版未引用素材，其他旧版由维护任务安全清理",
+        ),
+    )
+    catalog_cleanup_grace_hours: int = Field(
+        default=24,
+        ge=1,
+        le=720,
+        description="新发布素材目录进入自动清理候选前的保护小时数",
+        json_schema_extra=_ui(
+            "新素材清理保护期",
+            "默认 24 小时，避免外部导入与后台维护并发时误删刚发布素材",
+        ),
     )
 
     @field_validator("database_filename")
@@ -925,6 +958,48 @@ class RenderingSection(PluginConfigBase):
         description="单次 HTML 转图片的超时毫秒数",
         json_schema_extra=_ui("渲染超时", "超时后记录日志并按配置发送文字摘要"),
     )
+    max_concurrent_image_deliveries: int = Field(
+        default=2,
+        ge=1,
+        le=8,
+        description="插件同时生成并发送图片的最大任务数",
+        json_schema_extra=_ui("图片并发数", "建议保持 2；高峰超出队列等待时会及时改发文字"),
+    )
+    image_delivery_queue_timeout_ms: int = Field(
+        default=5000,
+        ge=100,
+        le=30000,
+        description="图片任务等待并发名额的最长毫秒数",
+        json_schema_extra=_ui("图片排队超时", "超时后不再挤压渲染服务，直接使用文字兜底"),
+    )
+    single_media_preview_max_side: int = Field(
+        default=768,
+        ge=256,
+        le=1600,
+        description="单张卡片传给 HTML 渲染器的静态素材最长边",
+        json_schema_extra=_ui("单图预览边长", "只生成临时 WebP 预览，原始素材保持不变"),
+    )
+    media_preview_cache_bytes: int = Field(
+        default=8388608,
+        ge=1048576,
+        le=134217728,
+        description="进程内素材预览 LRU 缓存字节上限",
+        json_schema_extra=_ui("预览内存缓存", "默认 8 MiB；缓存满后自动淘汰最久未使用项"),
+    )
+    media_preview_disk_cache_bytes: int = Field(
+        default=67108864,
+        ge=1048576,
+        le=1073741824,
+        description="插件数据目录内静态 WebP 衍生缓存字节上限",
+        json_schema_extra=_ui("预览磁盘缓存", "默认 64 MiB；跨重启复用并自动按最近使用时间淘汰"),
+    )
+    media_preprocess_concurrency: int = Field(
+        default=2,
+        ge=1,
+        le=8,
+        description="素材解码、缩放与 WebP 编码的最大并发数",
+        json_schema_extra=_ui("素材处理并发", "限制 Pillow 峰值内存；建议保持 2"),
+    )
     max_png_bytes: int = Field(
         default=12582912,
         ge=1024,
@@ -938,6 +1013,20 @@ class RenderingSection(PluginConfigBase):
         le=104857600,
         description="合成后 GIF 动画卡片的最大字节数",
         json_schema_extra=_ui("动画卡片大小上限", "默认 50 MiB；超过后记录失败并走纯文字兜底"),
+    )
+    max_animation_working_memory_bytes: int = Field(
+        default=268435456,
+        ge=33554432,
+        le=1073741824,
+        description="单个动画合成任务允许使用的估算工作内存上限",
+        json_schema_extra=_ui("动画内存预算", "默认 256 MiB；超过预算会在分配大量帧前走文字兜底"),
+    )
+    animation_composition_concurrency: int = Field(
+        default=1,
+        ge=1,
+        le=2,
+        description="同时执行的逐帧动画卡片合成数",
+        json_schema_extra=_ui("动画合成并发", "建议保持 1，避免多帧 GIF 同时占用大量内存"),
     )
     missing_frame_duration_ms: int = Field(
         default=100,
@@ -1186,6 +1275,26 @@ class MaintenanceSection(PluginConfigBase):
         le=1440,
         description="后台维护循环的间隔分钟数",
         json_schema_extra=_ui("维护间隔", "最短 1 分钟；正常使用建议 60 分钟"),
+    )
+    initial_delay_seconds: int = Field(
+        default=120,
+        ge=0,
+        le=3600,
+        description="插件启动后首次执行维护前等待的秒数",
+        json_schema_extra=_ui(
+            "首次维护延迟",
+            "默认等待 120 秒，避免数据库巡检和备份与启动及首批消息争抢资源",
+        ),
+    )
+    full_check_interval_hours: int = Field(
+        default=24,
+        ge=1,
+        le=720,
+        description="SQLite 完整性检查与全账本对账的最短间隔小时数",
+        json_schema_extra=_ui(
+            "完整巡检间隔",
+            "轻量维护仍按维护间隔执行，完整性检查和全账本对账默认每天一次",
+        ),
     )
     run_integrity_check: bool = Field(
         default=True,

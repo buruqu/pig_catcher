@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Awaitable, Callable
+from time import perf_counter
 from typing import Protocol
 
 from .models import RenderedImage
@@ -28,10 +30,15 @@ class RenderDelivery:
         *,
         logger: logging.Logger,
         fallback_to_text: bool,
+        max_concurrent_deliveries: int = 2,
+        queue_timeout_ms: int = 5000,
     ) -> None:
         self.send = send
         self.logger = logger
         self.fallback_to_text = fallback_to_text
+        self.max_concurrent_deliveries = max(1, int(max_concurrent_deliveries))
+        self.queue_timeout_seconds = max(0.1, int(queue_timeout_ms) / 1000)
+        self._delivery_slots = asyncio.Semaphore(self.max_concurrent_deliveries)
 
     async def send_image_or_text(
         self,
@@ -45,19 +52,56 @@ class RenderDelivery:
 
         if not rendering_enabled:
             return await self._send_fallback(stream_id, fallback_text)
+        queued_at = perf_counter()
         try:
-            rendered = await render()
-        except Exception:
-            self.logger.exception("抓猪图片生成失败，准备使用纯文字降级")
+            await asyncio.wait_for(
+                self._delivery_slots.acquire(),
+                timeout=self.queue_timeout_seconds,
+            )
+        except TimeoutError:
+            self.logger.warning(
+                "抓猪图片队列繁忙，等待 %.0f ms 后改用纯文字降级",
+                (perf_counter() - queued_at) * 1000,
+            )
             return await self._send_fallback(stream_id, fallback_text)
+        queue_ms = (perf_counter() - queued_at) * 1000
+        rendered: RenderedImage | None = None
+        sent = False
+        render_ms = 0.0
+        send_ms = 0.0
         try:
-            sent = bool(await self.send.image(rendered.image_base64, stream_id))
-        except Exception:
-            self.logger.exception("抓猪图片发送失败，准备使用纯文字降级")
-            return await self._send_fallback(stream_id, fallback_text)
+            render_started = perf_counter()
+            try:
+                rendered = await render()
+            except Exception:
+                self.logger.exception("抓猪图片生成失败，准备使用纯文字降级")
+            render_ms = (perf_counter() - render_started) * 1000
+            if rendered is not None:
+                send_started = perf_counter()
+                try:
+                    sent = bool(await self.send.image(rendered.image_base64, stream_id))
+                except Exception:
+                    self.logger.exception("抓猪图片发送失败，准备使用纯文字降级")
+                send_ms = (perf_counter() - send_started) * 1000
+        finally:
+            self._delivery_slots.release()
         if sent:
+            assert rendered is not None
+            self.logger.info(
+                "抓猪图片交付完成：排队=%.0fms，渲染=%.0fms，发送=%.0fms，图片=%s字节",
+                queue_ms,
+                render_ms,
+                send_ms,
+                rendered.byte_length,
+            )
             return True
-        self.logger.warning("抓猪图片发送接口返回失败，准备使用纯文字降级")
+        if rendered is not None and send_ms > 0:
+            self.logger.warning(
+                "抓猪图片发送接口返回失败，准备使用纯文字降级：排队=%.0fms，渲染=%.0fms，发送=%.0fms",
+                queue_ms,
+                render_ms,
+                send_ms,
+            )
         return await self._send_fallback(stream_id, fallback_text)
 
     async def _send_fallback(self, stream_id: str, fallback_text: str) -> bool:

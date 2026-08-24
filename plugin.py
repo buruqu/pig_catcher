@@ -299,6 +299,7 @@ class PigCatcherPlugin(MaiBotPlugin):
         database = PigCatcherDatabase(
             database_path,
             busy_timeout_ms=settings.storage.sqlite_busy_timeout_ms,
+            max_concurrent_reads=settings.storage.sqlite_read_concurrency,
         )
         storage = AssetCatalogStorage(data_dir)
         try:
@@ -323,11 +324,18 @@ class PigCatcherPlugin(MaiBotPlugin):
                     max_animation_bytes=settings.rendering.max_animation_bytes,
                     missing_frame_duration_ms=settings.rendering.missing_frame_duration_ms,
                     font_family=settings.rendering.font_family,
+                    single_media_preview_max_side=settings.rendering.single_media_preview_max_side,
+                    media_preview_cache_bytes=settings.rendering.media_preview_cache_bytes,
+                    media_preview_disk_cache_bytes=settings.rendering.media_preview_disk_cache_bytes,
+                    media_preprocess_concurrency=settings.rendering.media_preprocess_concurrency,
                 ),
+                preview_cache_root=data_dir / "cache" / "render-previews-v1",
             )
             animation_composer = AnimatedCardComposer(
                 max_output_bytes=settings.rendering.max_animation_bytes,
                 missing_frame_duration_ms=settings.rendering.missing_frame_duration_ms,
+                max_working_memory_bytes=settings.rendering.max_animation_working_memory_bytes,
+                max_concurrency=settings.rendering.animation_composition_concurrency,
             )
             maintenance = MaintenanceRunner(
                 database,
@@ -335,10 +343,18 @@ class PigCatcherPlugin(MaiBotPlugin):
                 data_dir,
                 MaintenanceOptions(
                     interval_minutes=settings.maintenance.interval_minutes,
+                    initial_delay_seconds=settings.maintenance.initial_delay_seconds,
+                    full_check_interval_hours=settings.maintenance.full_check_interval_hours,
                     run_integrity_check=settings.maintenance.run_integrity_check,
                     auto_backup_enabled=settings.storage.auto_backup_enabled,
                     backup_interval_hours=settings.storage.backup_interval_hours,
                     backup_retention_count=settings.storage.backup_retention_count,
+                    catalog_rollback_retention_count=(
+                        settings.storage.catalog_rollback_retention_count
+                    ),
+                    catalog_cleanup_grace_hours=(
+                        settings.storage.catalog_cleanup_grace_hours
+                    ),
                     staging_max_age_hours=settings.assets.staging_max_age_hours,
                 ),
                 logger=self.ctx.logger,
@@ -393,6 +409,8 @@ class PigCatcherPlugin(MaiBotPlugin):
                 self.ctx.send,
                 logger=self.ctx.logger,
                 fallback_to_text=settings.rendering.fallback_to_text,
+                max_concurrent_deliveries=settings.rendering.max_concurrent_image_deliveries,
+                queue_timeout_ms=settings.rendering.image_delivery_queue_timeout_ms,
             )
             self._maintenance = maintenance
             if settings.maintenance.enabled:

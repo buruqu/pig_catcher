@@ -6,7 +6,7 @@ from ..database import DatabaseSession
 
 
 class OperationsRepository:
-    """读取全库账本一致性与当前启用素材路径，不执行修复。"""
+    """读取全库账本一致性与全部模板素材路径，不执行修复。"""
 
     async def balance_mismatch_count(self, session: DatabaseSession) -> int:
         row = await session.fetch_one(
@@ -24,15 +24,15 @@ class OperationsRepository:
         return int(row["mismatch_count"]) if row is not None else 0
 
     async def active_asset_paths(self, session: DatabaseSession) -> tuple[str, ...]:
+        """返回全部模板引用，避免禁用模板的存量实例失去历史素材。"""
+
         rows = await session.fetch_all(
             """
             SELECT image_relpath
             FROM pig_templates
-            WHERE enabled = 1
             UNION ALL
             SELECT image_relpath
             FROM food_templates
-            WHERE enabled = 1
             ORDER BY image_relpath
             """
         )

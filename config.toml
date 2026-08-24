@@ -1,6 +1,6 @@
 [plugin]
 enabled = true
-config_version = "1.23.1"
+config_version = "1.24.0"
 framework_phase = "6"
 
 [features]
@@ -42,9 +42,12 @@ denied_message = "当前群或账号未启用抓猪插件。"
 [storage]
 database_filename = "pig_catcher.sqlite3"
 sqlite_busy_timeout_ms = 5000
+sqlite_read_concurrency = 4
 auto_backup_enabled = true
 backup_interval_hours = 24
 backup_retention_count = 7
+catalog_rollback_retention_count = 1
+catalog_cleanup_grace_hours = 24
 
 [assets]
 manifest_filename = "assets.json"
@@ -147,8 +150,16 @@ card_width = 1200
 viewport_height = 1600
 device_scale_factor = 1.0
 render_timeout_ms = 15000
+max_concurrent_image_deliveries = 2
+image_delivery_queue_timeout_ms = 5000
+single_media_preview_max_side = 768
+media_preview_cache_bytes = 8388608
+media_preview_disk_cache_bytes = 67108864
+media_preprocess_concurrency = 2
 max_png_bytes = 12582912
 max_animation_bytes = 52428800
+max_animation_working_memory_bytes = 268435456
+animation_composition_concurrency = 1
 missing_frame_duration_ms = 100
 font_family = "\"Noto Sans CJK SC\", \"Microsoft YaHei\", sans-serif"
 
@@ -176,4 +187,6 @@ execute_send = false
 [maintenance]
 enabled = true
 interval_minutes = 60
+initial_delay_seconds = 120
+full_check_interval_hours = 24
 run_integrity_check = true

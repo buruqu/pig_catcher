@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import hashlib
 import logging
+import time
 from dataclasses import replace
 from io import BytesIO
 from pathlib import Path
@@ -45,6 +47,7 @@ from pig_catcher.rendering import (
     RecordItemViewModel,
     RecordsViewModel,
     RenderDelivery,
+    RenderedImage,
     RenderOptions,
     StoreConsumableProbabilityRowViewModel,
     StoreProbabilityRowViewModel,
@@ -489,6 +492,128 @@ async def test_complete_catalog_uses_bounded_compact_previews_for_rpc(
 
 
 @pytest.mark.asyncio
+async def test_preview_cache_is_non_blocking_singleflight_and_reused_after_restart(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = tmp_path / "large-source.png"
+    Image.effect_noise((1024, 1024), 100).convert("RGB").save(source, format="PNG")
+    source_hash = hashlib.sha256(source.read_bytes()).hexdigest()
+    cache_root = tmp_path / "preview-cache"
+    renderer = PigCatcherRenderer(
+        FakeRender(),
+        _options(),
+        preview_cache_root=cache_root,
+    )
+    original = renderer._preview_bytes_sync
+    calls = 0
+
+    def slow_preview(*args: object, **kwargs: object) -> bytes:
+        nonlocal calls
+        calls += 1
+        time.sleep(0.15)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(renderer, "_preview_bytes_sync", slow_preview)
+    loop = asyncio.get_running_loop()
+    started = loop.time()
+
+    async def heartbeat_delay() -> float:
+        await asyncio.sleep(0.01)
+        return loop.time() - started
+
+    first, second, heartbeat = await asyncio.gather(
+        renderer._cached_preview_data_url(
+            source,
+            is_animated=False,
+            max_side=768,
+            quality=90,
+        ),
+        renderer._cached_preview_data_url(
+            source,
+            is_animated=False,
+            max_side=768,
+            quality=90,
+        ),
+        heartbeat_delay(),
+    )
+    assert first == second
+    assert calls == 1
+    assert heartbeat < 0.08
+    assert hashlib.sha256(source.read_bytes()).hexdigest() == source_hash
+    assert len(list(cache_root.glob("*.webp"))) == 1
+    assert renderer._preview_key_locks == {}
+
+    restarted = PigCatcherRenderer(
+        FakeRender(),
+        _options(),
+        preview_cache_root=cache_root,
+    )
+
+    def unexpected_rebuild(*args: object, **kwargs: object) -> bytes:
+        raise AssertionError("warm disk cache should avoid rebuilding the preview")
+
+    monkeypatch.setattr(restarted, "_preview_bytes_sync", unexpected_rebuild)
+    warm = await restarted._cached_preview_data_url(
+        source,
+        is_animated=False,
+        max_side=768,
+        quality=90,
+    )
+    assert warm == first
+    assert restarted._preview_key_locks == {}
+
+
+@pytest.mark.asyncio
+async def test_delivery_queue_overload_falls_back_without_starting_extra_render() -> None:
+    send = FakeSend()
+    delivery = RenderDelivery(
+        send,
+        logger=logging.getLogger("test.render.delivery.queue"),
+        fallback_to_text=True,
+        max_concurrent_deliveries=1,
+        queue_timeout_ms=20,
+    )
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    render_calls = 0
+
+    async def slow_render() -> RenderedImage:
+        nonlocal render_calls
+        render_calls += 1
+        entered.set()
+        await release.wait()
+        return RenderedImage(
+            image_base64=_solid_png_base64(),
+            mime_type="image/png",
+            width=64,
+            height=64,
+            byte_length=64,
+        )
+
+    first = asyncio.create_task(
+        delivery.send_image_or_text(
+            stream_id="first",
+            render=slow_render,
+            fallback_text="first fallback",
+        )
+    )
+    await entered.wait()
+    try:
+        assert await delivery.send_image_or_text(
+            stream_id="second",
+            render=slow_render,
+            fallback_text="queue fallback",
+        )
+    finally:
+        release.set()
+    assert await first
+    assert render_calls == 1
+    assert send.texts == [("second", "queue fallback")]
+    assert len(send.images) == 1
+
+
+@pytest.mark.asyncio
 async def test_renderer_rejects_oversized_html_before_rpc() -> None:
     capability = FakeRender()
     renderer = PigCatcherRenderer(capability, _options())
@@ -555,6 +680,37 @@ async def test_animation_composer_uses_compatibility_timing_only_when_source_omi
 
 
 @pytest.mark.asyncio
+async def test_animation_composer_rejects_over_budget_before_retaining_full_card_frames(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "many-frames.gif"
+    frames = [
+        Image.new("RGBA", (80, 60), (index * 9 % 255, index * 17 % 255, index * 29 % 255, 255))
+        for index in range(24)
+    ]
+    frames[0].save(
+        source,
+        format="GIF",
+        save_all=True,
+        append_images=frames[1:],
+        duration=[50] * len(frames),
+        loop=0,
+        disposal=2,
+    )
+    base = await PigCatcherRenderer(FakeRender(), _options()).render_framework_preview(_view())
+    composer = AnimatedCardComposer(
+        max_output_bytes=10 * 1024 * 1024,
+        max_working_memory_bytes=32 * 1024 * 1024,
+    )
+    with pytest.raises(RenderError, match="估算工作内存"):
+        await composer.compose(
+            base=base,
+            source_path=source,
+            slot=MediaSlot(x=40, y=40, width=160, height=120),
+        )
+
+
+@pytest.mark.asyncio
 async def test_third_round_templates_render_all_business_views(
     tmp_path: Path,
 ) -> None:
@@ -601,7 +757,7 @@ async def test_third_round_templates_render_all_business_views(
     pig_html, _ = capability.calls[-1]
     assert "<script>超长测试猪</script>" not in pig_html
     assert "&lt;script&gt;" in pig_html
-    assert "data:image/png;base64," in pig_html
+    assert "data:image/webp;base64," in pig_html
     assert "体型新纪录" in pig_html
     assert "Lv.4 · 抓猪老手" in pig_html
     assert "+45 EXP · 600/800" in pig_html
@@ -903,7 +1059,7 @@ async def test_fourth_round_templates_render_food_and_economy_views(
     food_html, _ = capability.calls[-1]
     assert "<script>测试美食</script>" not in food_html
     assert "&lt;script&gt;" in food_html
-    assert "data:image/png;base64," in food_html
+    assert "data:image/webp;base64," in food_html
     assert "主厨香料" in food_html
     assert "剩 2 次" in food_html
     assert "本次最终概率" in food_html

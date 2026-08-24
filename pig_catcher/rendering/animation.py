@@ -22,13 +22,20 @@ class AnimatedCardComposer:
         *,
         max_output_bytes: int,
         missing_frame_duration_ms: int = 100,
+        max_working_memory_bytes: int = 256 * 1024 * 1024,
+        max_concurrency: int = 1,
     ) -> None:
         self.max_output_bytes = int(max_output_bytes)
         self.missing_frame_duration_ms = int(missing_frame_duration_ms)
+        self.max_working_memory_bytes = int(max_working_memory_bytes)
+        self.max_concurrency = max(1, int(max_concurrency))
+        self._semaphore = asyncio.Semaphore(self.max_concurrency)
         if self.max_output_bytes < 1024:
             raise ValueError("动画输出大小上限不能低于 1024 字节")
         if not 10 <= self.missing_frame_duration_ms <= 10000:
             raise ValueError("缺失帧时长回退值必须在 10 至 10000 毫秒之间")
+        if self.max_working_memory_bytes < 32 * 1024 * 1024:
+            raise ValueError("动画工作内存预算不能低于 32 MiB")
 
     async def compose(
         self,
@@ -37,12 +44,13 @@ class AnimatedCardComposer:
         source_path: Path,
         slot: MediaSlot,
     ) -> RenderedImage:
-        return await asyncio.to_thread(
-            self._compose_sync,
-            base,
-            Path(source_path),
-            slot,
-        )
+        async with self._semaphore:
+            return await asyncio.to_thread(
+                self._compose_sync,
+                base,
+                Path(source_path),
+                slot,
+            )
 
     def _compose_sync(
         self,
@@ -60,6 +68,18 @@ class AnimatedCardComposer:
                 frame_count = int(getattr(source, "n_frames", 1))
                 if frame_count <= 1:
                     raise RenderError(f"素材不是动画：{source_path.name}")
+                canvas_pixels = base_image.width * base_image.height
+                # 量化帧列表仍会与 GIF 输出缓冲短暂共存；把允许的最大输出也
+                # 计入预算，避免“帧本身没超限、编码阶段却把进程撑爆”。
+                estimated_working_bytes = (
+                    canvas_pixels * (frame_count + 12) + self.max_output_bytes
+                )
+                if estimated_working_bytes > self.max_working_memory_bytes:
+                    raise RenderError(
+                        "动画卡片估算工作内存 "
+                        f"{estimated_working_bytes} 字节超过上限 "
+                        f"{self.max_working_memory_bytes} 字节"
+                    )
                 loop_count = source.info.get("loop")
                 composed_frames: list[Image.Image] = []
                 durations: list[int] = []
@@ -79,7 +99,12 @@ class AnimatedCardComposer:
                         (output_frame.width - 1, output_frame.height - 1),
                         marker,
                     )
-                    composed_frames.append(output_frame)
+                    composed_frames.append(
+                        output_frame.quantize(
+                            colors=256,
+                            method=Image.Quantize.MEDIANCUT,
+                        )
+                    )
         except RenderError:
             raise
         except (OSError, UnidentifiedImageError, Image.DecompressionBombError) as exc:
@@ -96,24 +121,41 @@ class AnimatedCardComposer:
         }
         if loop_count is not None:
             save_options["loop"] = int(loop_count)
-        composed_frames[0].save(output, **save_options)
-        raw = output.getvalue()
+        try:
+            composed_frames[0].save(output, **save_options)
+            raw = output.getvalue()
+        finally:
+            output.close()
+            for composed_frame in composed_frames:
+                composed_frame.close()
+            composed_frames.clear()
+            base_image.close()
         if len(raw) > self.max_output_bytes:
             raise RenderError(
                 f"动画卡片大小 {len(raw)} 字节超过上限 {self.max_output_bytes} 字节"
             )
         self._verify_output(
             raw,
-            expected_size=base_image.size,
-            expected_frames=len(composed_frames),
+            expected_size=(base.width, base.height),
+            expected_frames=frame_count,
         )
+        # Base64 编码会同时保留原始 GIF 与约 4/3 大小的字符串；在真正
+        # 分配编码结果前按实际输出再次检查峰值预算。
+        encoded_peak_bytes = len(raw) + ((len(raw) + 2) // 3) * 4
+        if encoded_peak_bytes > self.max_working_memory_bytes:
+            raise RenderError(
+                "动画卡片 Base64 编码估算内存 "
+                f"{encoded_peak_bytes} 字节超过上限 "
+                f"{self.max_working_memory_bytes} 字节"
+            )
+        encoded = base64.b64encode(raw).decode("ascii")
         return RenderedImage(
-            image_base64=base64.b64encode(raw).decode("ascii"),
+            image_base64=encoded,
             mime_type="image/gif",
-            width=base_image.width,
-            height=base_image.height,
+            width=base.width,
+            height=base.height,
             byte_length=len(raw),
-            frame_count=len(composed_frames),
+            frame_count=frame_count,
             total_duration_ms=sum(durations),
             loop_count=int(loop_count) if loop_count is not None else None,
         )

@@ -284,9 +284,9 @@ async def load_plugin(
         component["type"] == "HOME_CARD"
         for component in components
     )
-    if len(components) != 32 or command_count != 31 or home_card_count != 1:
+    if len(components) != 49 or command_count != 48 or home_card_count != 1:
         raise AssertionError(
-            "MaiBot component registration is not exactly 31 commands and 1 home card."
+            "MaiBot component registration is not exactly 48 commands and 1 home card."
         )
     return plugin
 
@@ -594,7 +594,11 @@ async def run_uat(args: argparse.Namespace) -> dict[str, object]:
                         )
                     )["version"]
                 ),
-                "registered_commands": len(plugin.get_components()),
+                "registered_components": len(plugin.get_components()),
+                "registered_commands": sum(
+                    component["type"] == "COMMAND"
+                    for component in plugin.get_components()
+                ),
                 "command_records": command_records,
                 "deliveries": {
                     "images": collector.images,

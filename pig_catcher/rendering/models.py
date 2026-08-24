@@ -17,6 +17,10 @@ class RenderOptions:
     max_animation_bytes: int
     missing_frame_duration_ms: int
     font_family: str
+    single_media_preview_max_side: int = 768
+    media_preview_cache_bytes: int = 8 * 1024 * 1024
+    media_preview_disk_cache_bytes: int = 64 * 1024 * 1024
+    media_preprocess_concurrency: int = 2
 
 
 @dataclass(frozen=True, slots=True)
