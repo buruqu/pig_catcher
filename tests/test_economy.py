@@ -29,6 +29,7 @@ from pig_catcher.domain.economy import (
 )
 from pig_catcher.domain.enums import AssetKind, Rarity
 from pig_catcher.domain.errors import (
+    AssetStateConflictError,
     CookCooldownError,
     CookingTemplateError,
     DailyCatchLimitError,
@@ -2841,6 +2842,211 @@ async def test_pig_nose_omelette_keeps_group_rewards_and_restores_two_cooks(
         (other.player_id,),
     )
     assert usage is not None and int(usage["consumed_uses"]) == 1
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_favorites_block_destructive_selection_and_named_food_batch_sale(
+    tmp_path: Path,
+) -> None:
+    database = await _database_with_catalog(
+        tmp_path,
+        pig_rarities=(1,),
+        food_rarities=(1,),
+    )
+    clock = FixedClock()
+    _, seed = await _catch_one_star(database, clock=clock, message_id="favorite-seed")
+    player_id = seed.pig.owner_player_id
+    scope_id = seed.pig.scope_id
+    await _insert_pig(
+        database,
+        player_id=player_id,
+        scope_id=scope_id,
+        template_id="pig-1-common",
+        rarity=1,
+        display_name="名称直选猪",
+        official_value=30,
+        short_code="PICKLOW1",
+        instance_id="pig-pick-low",
+    )
+    await _insert_pig(
+        database,
+        player_id=player_id,
+        scope_id=scope_id,
+        template_id="pig-1-common",
+        rarity=1,
+        display_name="名称直选猪",
+        official_value=300,
+        short_code="PICKHIGH",
+        instance_id="pig-pick-high",
+    )
+    for instance_id, short_code, value in (
+        ("food-named-low", "FOODLOW1", 20),
+        ("food-named-mid", "FOODMID1", 40),
+        ("food-named-favorite", "FOODFAV1", 80),
+    ):
+        await _insert_food(
+            database,
+            player_id=player_id,
+            scope_id=scope_id,
+            template_id="food-1-common",
+            display_name="批售测试菜",
+            official_value=value,
+            short_code=short_code,
+            instance_id=instance_id,
+        )
+    await _insert_food(
+        database,
+        player_id=player_id,
+        scope_id=scope_id,
+        template_id="food-1-common",
+        display_name="不应批售的菜",
+        official_value=60,
+        short_code="OTHER001",
+        instance_id="food-other",
+    )
+
+    economy = EconomyService(
+        database,
+        CookingSection(cook_cooldown_seconds=0),
+        EconomySection(),
+        clock=clock,
+    )
+    favorite_pig = await economy.set_favorite(
+        _identity(message_id="favorite-pig"),
+        asset_kind="pig",
+        selector_text="名称直选猪#PICKHIGH",
+        favorite=True,
+    )
+    assert favorite_pig.changed_count == 1
+    cooked = await economy.cook(
+        _identity(message_id="favorite-cook"),
+        "名称直选猪",
+    )
+    assert cooked.source_pig.pig_instance_id == "pig-pick-low"
+    with pytest.raises(AssetStateConflictError, match="收藏保护"):
+        await economy.sell_pig(
+            _identity(message_id="favorite-exact-sale"),
+            "名称直选猪#PICKHIGH",
+        )
+
+    favorite_food = await economy.set_favorite(
+        _identity(message_id="favorite-food"),
+        asset_kind="food",
+        selector_text="批售测试菜#FOODFAV1",
+        favorite=True,
+    )
+    assert favorite_food.target_count == 1
+    sold = await economy.batch_sell_low_rarity(
+        _identity(message_id="favorite-named-batch"),
+        asset_kind="food",
+        max_rarity=5,
+        display_name="批售测试菜",
+    )
+    assert sold.asset_count == 2
+    assert sold.display_name == "批售测试菜"
+    remaining = await database.fetch_all(
+        """
+        SELECT food_instance_id, is_favorite
+        FROM food_instances
+        WHERE owner_player_id = ? AND state = 'active'
+        ORDER BY food_instance_id
+        """,
+        (player_id,),
+    )
+    assert ("food-named-favorite", 1) in [
+        (str(row["food_instance_id"]), int(row["is_favorite"]))
+        for row in remaining
+    ]
+    assert any(str(row["food_instance_id"]) == "food-other" for row in remaining)
+
+    await _insert_food(
+        database,
+        player_id=player_id,
+        scope_id=scope_id,
+        template_id="food-1-common",
+        display_name="收藏不算余量菜",
+        official_value=20,
+        short_code="EATABLE1",
+        instance_id="food-confirm-eligible",
+    )
+    await _insert_food(
+        database,
+        player_id=player_id,
+        scope_id=scope_id,
+        template_id="food-1-common",
+        display_name="收藏不算余量菜",
+        official_value=80,
+        short_code="EATFAV01",
+        instance_id="food-confirm-favorite",
+    )
+    await economy.set_favorite(
+        _identity(message_id="favorite-confirm-food"),
+        asset_kind="food",
+        selector_text="收藏不算余量菜#EATFAV01",
+        favorite=True,
+    )
+    confirmation = await economy.eat_or_confirm(
+        _identity(message_id="favorite-confirm-eat"),
+        "收藏不算余量菜",
+    )
+    assert isinstance(confirmation, EatConfirmationRequest)
+    assert confirmation.food.food_instance_id == "food-confirm-eligible"
+
+    for instance_id, short_code, value in (
+        ("food-keep-low", "KEEPLOW1", 10),
+        ("food-keep-high", "KEEPHI01", 40),
+        ("food-keep-favorite", "KEEPFAV1", 100),
+    ):
+        await _insert_food(
+            database,
+            player_id=player_id,
+            scope_id=scope_id,
+            template_id="food-1-common",
+            display_name="保留排除收藏菜",
+            official_value=value,
+            short_code=short_code,
+            instance_id=instance_id,
+        )
+    await economy.set_favorite(
+        _identity(message_id="favorite-keep-food"),
+        asset_kind="food",
+        selector_text="保留排除收藏菜#KEEPFAV1",
+        favorite=True,
+    )
+    await economy.set_batch_keep_highest(
+        _identity(message_id="favorite-enable-keep"),
+        enabled=True,
+    )
+    kept_batch = await economy.batch_sell_low_rarity(
+        _identity(message_id="favorite-keep-batch"),
+        asset_kind="food",
+        max_rarity=5,
+        display_name="保留排除收藏菜",
+    )
+    assert kept_batch.asset_count == 1
+    protected_rows = await database.fetch_all(
+        """
+        SELECT food_instance_id, is_favorite
+        FROM food_instances
+        WHERE display_name_snapshot = ? AND state = 'active'
+        ORDER BY food_instance_id
+        """,
+        ("保留排除收藏菜",),
+    )
+    assert [(row["food_instance_id"], row["is_favorite"]) for row in protected_rows] == [
+        ("food-keep-favorite", 1),
+        ("food-keep-high", 0),
+    ]
+
+    unprotected = await economy.set_favorite(
+        _identity(message_id="unfavorite-food"),
+        asset_kind="food",
+        selector_text="批售测试菜",
+        favorite=False,
+    )
+    assert unprotected.target_count == 1
+    assert unprotected.changed_count == 1
     await database.close()
 
 

@@ -44,11 +44,13 @@ from ..domain.gameplay import (
     PIG_RARITY_NAMES,
     ItemDefinition,
     LevelProgress,
+    apply_veteran_experience_bonus,
     generate_pig_attributes,
     item_by_id,
     item_by_name,
     level_progress,
     size_label,
+    veteran_benefits,
     weight_label,
 )
 from ..domain.models import CommandIdentity, CommandReceipt
@@ -142,6 +144,7 @@ class PigView:
     paired_food_template_id: str = ""
     display_variant: str = "pig"
     alternate_image_relpath: str = ""
+    is_favorite: bool = False
 
     @property
     def stars(self) -> str:
@@ -231,6 +234,11 @@ class PlayerProfile:
     level_catch_adjusted_high_percent: float = 0.0
     level_cooking_bonus_percent: float = 0.0
     level_bonus_cap_level: int = LEVEL_CATCH_BONUS_CAP_LEVEL
+    veteran_tier: int = 0
+    veteran_catch_coin_bonus: int = 0
+    veteran_cook_coin_bonus: int = 0
+    veteran_experience_bonus_percent: int = 0
+    veteran_next_tier_level: int | None = 21
 
 
 @dataclass(frozen=True, slots=True)
@@ -472,6 +480,7 @@ def pig_view_from_row(
         paired_food_template_id=str(row.get("paired_food_template_id") or ""),
         display_variant=display_variant,
         alternate_image_relpath=alternate_image_relpath,
+        is_favorite=bool(row.get("is_favorite") or False),
     )
 
 
@@ -609,6 +618,11 @@ def format_profile_summary(profile: PlayerProfile) -> str:
         if profile.armed_cooking_item is not None
         else "无"
     )
+    veteran_next = (
+        "已达最高档"
+        if profile.veteran_next_tier_level is None
+        else f"下一档 Lv.{profile.veteran_next_tier_level}"
+    )
     return (
         "【抓猪档案】\n"
         f"玩家：{profile.display_name}\n"
@@ -627,6 +641,9 @@ def format_profile_summary(profile: PlayerProfile) -> str:
         f"{profile.level_catch_adjusted_high_percent:.2f}%；"
         f"普通做菜高档权重 +{profile.level_cooking_bonus_percent:.2f}%"
         f"（Lv.{profile.level_bonus_cap_level} 封顶）\n"
+        f"资深收益：{profile.veteran_tier} 档；抓猪猪币 +{profile.veteran_catch_coin_bonus}，"
+        f"做菜猪币 +{profile.veteran_cook_coin_bonus}，基础经验 +{profile.veteran_experience_bonus_percent}%"
+        f"（{veteran_next}）\n"
         f"本时段抓猪：{profile.daily_count}/{profile.daily_limit}\n"
         f"抓猪冷却：{profile.cooldown_remaining_seconds} 秒\n"
         f"已装备抓猪道具：{armed}\n"
@@ -662,7 +679,7 @@ def format_pig_detail_summary(pig: PigView) -> str:
     return (
         "【猪猪详情】\n"
         f"{pig.stars} {pig.display_name}（{pig.rarity_name}）\n"
-        f"编号：{pig.selector}\n"
+        f"编号：{pig.selector}{'（已收藏保护）' if pig.is_favorite else ''}\n"
         f"{collection}"
         f"体型：{pig.size_value:.1f} cm（{size_label(pig.size_percentile)}）\n"
         f"重量：{pig.weight_value:.2f} kg（{weight_label(pig.weight_percentile)}）\n"
@@ -1334,6 +1351,12 @@ class GameplayService:
             if armed_item is not None and armed_item.item_id == "coin-bounty-tag":
                 coin_reward *= 2
                 experience_reward = (experience_reward * 3 + 1) // 2
+            benefits = veteran_benefits(probability_level)
+            coin_reward += benefits.catch_coin_bonus
+            experience_reward = apply_veteran_experience_bonus(
+                experience_reward,
+                benefits,
+            )
             coin_balance, total_experience = await self.repository.apply_catch_rewards(
                 session,
                 player_id=identity.player_id,
@@ -1767,6 +1790,7 @@ class GameplayService:
             )
         experience = int(row["experience"])
         progress = level_progress(experience)
+        benefits = veteran_benefits(progress.level)
         base_weights = normalize_weights(self.catching.weights())
         level_weights = catch_weights(
             base_weights,
@@ -1816,6 +1840,11 @@ class GameplayService:
             level_catch_base_high_percent=sum(base_weights[3:]),
             level_catch_adjusted_high_percent=sum(level_weights[3:]),
             level_cooking_bonus_percent=(level_cooking_higher_rarity_multiplier(progress.level) - 1.0) * 100.0,
+            veteran_tier=benefits.tier,
+            veteran_catch_coin_bonus=benefits.catch_coin_bonus,
+            veteran_cook_coin_bonus=benefits.cook_coin_bonus,
+            veteran_experience_bonus_percent=benefits.experience_bonus_percent,
+            veteran_next_tier_level=benefits.next_tier_level,
         )
 
     async def pig_detail(self, identity: CommandIdentity, selector_text: str) -> PigView:

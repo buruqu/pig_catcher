@@ -31,6 +31,7 @@ from .v0027_transfer_events_system_gift import MIGRATION_0027
 from .v0028_pig_nose_extra_catch import MIGRATION_0028
 from .v0029_asamu_auto_gift_rebalance import MIGRATION_0029
 from .v0030_catch_quota_covering_index import MIGRATION_0030
+from .v0031_asset_favorites import MIGRATION_0031
 
 MIGRATIONS: tuple[Migration, ...] = (
     MIGRATION_0001,
@@ -63,6 +64,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     MIGRATION_0028,
     MIGRATION_0029,
     MIGRATION_0030,
+    MIGRATION_0031,
 )
 
 __all__ = ["MIGRATIONS", "Migration"]

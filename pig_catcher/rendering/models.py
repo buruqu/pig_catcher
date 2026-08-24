@@ -189,6 +189,11 @@ class ProfileViewModel:
     level_catch_adjusted_high_percent: float = 0.0
     level_cooking_bonus_percent: float = 0.0
     level_bonus_cap_level: int = 21
+    veteran_tier: int = 0
+    veteran_catch_coin_bonus: int = 0
+    veteran_cook_coin_bonus: int = 0
+    veteran_experience_bonus_percent: int = 0
+    veteran_next_tier_level: int | None = 21
 
 
 @dataclass(frozen=True, slots=True)
@@ -207,6 +212,7 @@ class InventoryItemViewModel:
     is_animated: bool
     image_fit: str
     body_label: str = ""
+    is_favorite: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -424,6 +430,7 @@ class FoodInventoryItemViewModel:
     media_visible: bool
     is_animated: bool
     image_fit: str
+    is_favorite: bool = False
 
 
 @dataclass(frozen=True, slots=True)

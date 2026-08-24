@@ -284,6 +284,11 @@ def profile_view(profile: PlayerProfile) -> ProfileViewModel:
         level_catch_adjusted_high_percent=(profile.level_catch_adjusted_high_percent),
         level_cooking_bonus_percent=profile.level_cooking_bonus_percent,
         level_bonus_cap_level=profile.level_bonus_cap_level,
+        veteran_tier=profile.veteran_tier,
+        veteran_catch_coin_bonus=profile.veteran_catch_coin_bonus,
+        veteran_cook_coin_bonus=profile.veteran_cook_coin_bonus,
+        veteran_experience_bonus_percent=profile.veteran_experience_bonus_percent,
+        veteran_next_tier_level=profile.veteran_next_tier_level,
     )
 
 
@@ -311,6 +316,7 @@ def inventory_view(page: InventoryPage) -> InventoryViewModel:
                 is_animated=pig.is_animated,
                 image_fit=pig.image_fit,
                 body_label=pig.body_label,
+                is_favorite=pig.is_favorite,
             )
             for pig in page.pigs
         ),
@@ -533,6 +539,7 @@ def food_inventory_view(page: FoodInventoryPage) -> FoodInventoryViewModel:
                 media_visible=food.media_visible,
                 is_animated=food.is_animated,
                 image_fit=food.image_fit,
+                is_favorite=food.is_favorite,
             )
             for food in page.foods
         ),
@@ -746,7 +753,15 @@ def batch_sale_receipt_view(result: BatchSaleResult) -> EconomyReceiptViewModel:
     """Build one low-rarity batch-sale receipt."""
 
     kind = "猪猪" if result.asset_kind == "pig" else "美食"
-    scope = f"{result.rarity} 星{kind}" if result.rarity is not None else f"1 至 {result.max_rarity} 星{kind}"
+    scope = (
+        f"同名美食“{result.display_name}”"
+        if result.display_name
+        else (
+            f"{result.rarity} 星{kind}"
+            if result.rarity is not None
+            else f"1 至 {result.max_rarity} 星{kind}"
+        )
+    )
     return EconomyReceiptViewModel(
         eyebrow="官方回收 · 原子批量结算",
         title="批量售卖成功",
@@ -758,7 +773,7 @@ def batch_sale_receipt_view(result: BatchSaleResult) -> EconomyReceiptViewModel:
             EconomyReceiptRowViewModel("本次收入", f"{result.total_value} 猪币"),
             EconomyReceiptRowViewModel("处理范围", scope),
         ),
-        note="联动猪与交易锁定资产未被处理；历史图鉴不会减少。",
+        note="收藏保护、联动保留与交易锁定资产未被处理；历史图鉴不会减少。",
     )
 
 

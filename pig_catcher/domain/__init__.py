@@ -37,10 +37,13 @@ from .gameplay import (
     ItemDefinition,
     LevelProgress,
     PigAttributes,
+    VeteranBenefits,
+    apply_veteran_experience_bonus,
     generate_pig_attributes,
     item_by_id,
     item_by_name,
     level_progress,
+    veteran_benefits,
 )
 from .models import AssetSelector, CommandIdentity, ScopeKey
 from .quota import (
@@ -86,6 +89,7 @@ __all__ = [
     "PIG_BASE_VALUES",
     "PIG_RARITY_NAMES",
     "PigAttributes",
+    "VeteranBenefits",
     "Rarity",
     "RANKING_TYPES",
     "ReceiptSendStatus",
@@ -109,6 +113,8 @@ __all__ = [
     "item_by_name",
     "item_product_by_name",
     "level_progress",
+    "apply_veteran_experience_bonus",
+    "veteran_benefits",
     "normalize_ranking_type",
     "normalize_quota_refresh_hours",
     "stack_catch_quota_layers",

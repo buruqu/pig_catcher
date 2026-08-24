@@ -24,7 +24,7 @@
 | `uat_catching_and_collection.py` | 正式素材下的抓取与收藏流程 |
 | `uat_cooking_and_economy.py` | 做菜、道具、商城和经济流程 |
 | `uat_social_and_rankings.py` | 双用户、双群、交易和排行流程 |
-| `uat_production_recovery.py` | 1.24.0 组件/Schema 基线、发送失败、锁库、缺图、备份恢复和重启幂等 |
+| `uat_production_recovery.py` | 当前组件/Schema 基线、发送失败、锁库、缺图、备份恢复和重启幂等 |
 
 ## 本地存储清理
 
@@ -79,9 +79,10 @@ uv lock --check
 git diff --check
 ```
 
-1.24.0 的图片排队背压、WebP 缓存、动画内存预算在 `tests/test_rendering.py` 验证；Schema 30
+1.25.0 继续在 `tests/test_rendering.py` 验证图片排队背压、WebP 缓存和动画内存预算；Schema 30
 查询计划、在线备份并发、统一备份保留、维护节流和旧素材引用保护在
-`tests/test_database_and_receipts.py` 验证。不要把这些单元/集成门禁写成已经完成的真实 QQ 群 UAT。
+`tests/test_database_and_receipts.py` 验证，Schema 31 收藏迁移与名称直选/保护规则由数据库、
+经济和社交测试覆盖。不要把这些单元/集成门禁写成已经完成的真实 QQ 群 UAT。
 
 批量保留相关回归同时覆盖批量售卖、批量做菜、联动猪默认保护、按模板最高价值保留、
 仅开启做菜时的开关命令，以及四个 QQ 群作用域的内容同步。

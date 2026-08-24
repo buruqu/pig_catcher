@@ -57,6 +57,7 @@ class BatchSaleQuery:
 
     asset_kind: AssetKind
     rarity: int | None = None
+    display_name: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -477,7 +478,7 @@ def _optional_rarity(token: str) -> int | None:
 
 
 def parse_batch_sale_query(arguments: str) -> BatchSaleQuery:
-    """解析 `/批量售卖 <猪猪|美食> [一星|二星|三星|四星|五星]`。
+    """解析品质批售，或 `/批量售卖 美食 <菜名>`。
 
     指定品质时只售卖该品质；不指定时按原规则售卖 1 至 3 星。
     """
@@ -498,16 +499,19 @@ def parse_batch_sale_query(arguments: str) -> BatchSaleQuery:
             "格式：/批量售卖 猪猪 或 /批量售卖 美食；"
             "可用品质：一星 至 五星。"
         ) from exc
-    rarity: int | None = None
-    if len(tokens) > 1:
-        rarity = _optional_rarity(tokens[1])
-        if rarity is None:
-            raise DomainValidationError(
-                "批量售卖品质只能是：一星、二星、三星、四星、五星。"
-            )
-    if len(tokens) > 2:
-        raise DomainValidationError(f"无法识别批量售卖参数“{tokens[2]}”。")
-    return BatchSaleQuery(asset_kind=asset_kind, rarity=rarity)
+    if len(tokens) == 1:
+        return BatchSaleQuery(asset_kind=asset_kind)
+    rarity = _optional_rarity(tokens[1]) if len(tokens) == 2 else None
+    if rarity is not None:
+        return BatchSaleQuery(asset_kind=asset_kind, rarity=rarity)
+    if asset_kind is not AssetKind.FOOD:
+        raise DomainValidationError(
+            "猪猪批量售卖只能按品质筛选；特定名称批量售卖目前用于美食。"
+        )
+    display_name = " ".join(tokens[1:]).strip()
+    if not display_name:
+        raise DomainValidationError("请填写要批量售卖的菜名。")
+    return BatchSaleQuery(asset_kind=asset_kind, display_name=display_name)
 
 
 def parse_batch_cook_query(arguments: str) -> BatchCookQuery:

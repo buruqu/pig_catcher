@@ -268,6 +268,7 @@ class SocialRepository:
               AND owner_player_id = ?
               AND state = 'active'
               AND locked_trade_id IS NULL
+              AND is_favorite = 0
             """,
             (
                 to_player_id,
@@ -300,6 +301,7 @@ class SocialRepository:
               AND owner_player_id = ?
               AND state = 'active'
               AND locked_trade_id IS NULL
+              AND is_favorite = 0
             """,
             (trade_id, now, asset_instance_id, scope_id, owner_player_id),
         )

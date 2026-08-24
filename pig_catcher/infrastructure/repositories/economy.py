@@ -537,6 +537,7 @@ class EconomyRepository:
         *,
         player_id: str,
         selector: AssetSelector,
+        prefer_highest: bool = False,
     ) -> list[dict[str, object]]:
         # 精确匹配优先；若未命中再按“去空白 + 忽略英文大小写”的紧凑名兜底。
         compact_name = "".join(selector.name.split())
@@ -545,6 +546,15 @@ class EconomyRepository:
         if selector.short_code is not None:
             short_code_clause = "AND instance.short_code COLLATE NOCASE = ?"
             parameters.append(selector.short_code)
+        order_sql = (
+            "instance.official_value DESC, instance.acquired_at, instance.food_instance_id"
+            if prefer_highest
+            else (
+                "instance.is_favorite, instance.official_value, "
+                "instance.acquired_at, instance.food_instance_id"
+            )
+        )
+        limit = 1 if prefer_highest else 20
         rows = await session.fetch_all(
             f"""
             SELECT instance.food_instance_id
@@ -558,11 +568,8 @@ class EconomyRepository:
                      = ? COLLATE NOCASE
               )
               {short_code_clause}
-            ORDER BY
-                instance.official_value,
-                instance.acquired_at,
-                instance.food_instance_id
-            LIMIT 20
+            ORDER BY {order_sql}
+            LIMIT {limit}
             """,
             parameters,
         )
@@ -685,6 +692,7 @@ class EconomyRepository:
               AND scope_id = ?
               AND state = 'active'
               AND locked_trade_id IS NULL
+              AND is_favorite = 0
               AND rarity <= ?
             ORDER BY official_value, acquired_at, {id_column}
             LIMIT 1
@@ -692,6 +700,83 @@ class EconomyRepository:
             (player_id, scope_id, max_rarity),
         )
         return str(row["asset_id"]) if row is not None else None
+
+    async def favorite_asset_rows(
+        self,
+        session: DatabaseSession,
+        *,
+        player_id: str,
+        scope_id: str,
+        asset_kind: str,
+        selector: AssetSelector,
+    ) -> list[dict[str, object]]:
+        """Return every active unlocked asset matched by a favorite command."""
+
+        if asset_kind not in {"pig", "food"}:
+            raise ValueError("asset_kind must be pig or food")
+        table = "pig_instances" if asset_kind == "pig" else "food_instances"
+        id_column = "pig_instance_id" if asset_kind == "pig" else "food_instance_id"
+        compact_name = "".join(selector.name.split())
+        parameters: list[object] = [player_id, scope_id, selector.name, compact_name]
+        short_code_clause = ""
+        if selector.short_code is not None:
+            short_code_clause = "AND short_code COLLATE NOCASE = ?"
+            parameters.append(selector.short_code)
+        rows = await session.fetch_all(
+            f"""
+            SELECT
+                {id_column} AS asset_id,
+                display_name_snapshot,
+                short_code,
+                is_favorite
+            FROM {table}
+            WHERE owner_player_id = ?
+              AND scope_id = ?
+              AND state = 'active'
+              AND locked_trade_id IS NULL
+              AND (
+                  display_name_snapshot = ?
+                  OR REPLACE(REPLACE(display_name_snapshot, ' ', ''), '　', '')
+                     = ? COLLATE NOCASE
+              )
+              {short_code_clause}
+            ORDER BY official_value DESC, acquired_at, {id_column}
+            """,
+            parameters,
+        )
+        return [dict(row) for row in rows]
+
+    async def set_assets_favorite(
+        self,
+        session: DatabaseSession,
+        *,
+        asset_kind: str,
+        asset_ids: tuple[str, ...],
+        favorite: bool,
+        now: str,
+    ) -> int:
+        """Set favorite state for an exact, pre-resolved asset set."""
+
+        if asset_kind not in {"pig", "food"}:
+            raise ValueError("asset_kind must be pig or food")
+        if not asset_ids:
+            return 0
+        table = "pig_instances" if asset_kind == "pig" else "food_instances"
+        id_column = "pig_instance_id" if asset_kind == "pig" else "food_instance_id"
+        placeholders = ",".join("?" for _ in asset_ids)
+        target = 1 if favorite else 0
+        cursor = await session.execute(
+            f"""
+            UPDATE {table}
+            SET is_favorite = ?, updated_at = ?
+            WHERE {id_column} IN ({placeholders})
+              AND state = 'active'
+              AND locked_trade_id IS NULL
+              AND is_favorite != ?
+            """,
+            (target, now, *asset_ids, target),
+        )
+        return cursor.rowcount
 
     async def batch_sell_low_rarity(
         self,
@@ -704,6 +789,7 @@ class EconomyRepository:
         now: str,
         rarity: int | None = None,
         keep_highest: bool = False,
+        display_name: str = "",
     ) -> tuple[int, int]:
         """Sell all unlocked assets at or below one rarity and return count/value.
 
@@ -720,6 +806,21 @@ class EconomyRepository:
             "AND rarity = ?" if rarity is not None else "AND rarity <= ?"
         )
         rarity_param: object = rarity if rarity is not None else max_rarity
+        normalized_name = str(display_name or "").strip()
+        name_clause = ""
+        name_parameters: tuple[object, ...] = ()
+        if normalized_name:
+            name_clause = """
+              AND (
+                  display_name_snapshot = ?
+                  OR REPLACE(REPLACE(display_name_snapshot, ' ', ''), '　', '')
+                     = ? COLLATE NOCASE
+              )
+            """
+            name_parameters = (
+                normalized_name,
+                "".join(normalized_name.split()),
+            )
         keep_ids = await self._batch_keep_ids(
             session,
             player_id=player_id,
@@ -728,6 +829,7 @@ class EconomyRepository:
             max_rarity=max_rarity,
             rarity=rarity,
             keep_highest=bool(keep_highest),
+            display_name=normalized_name,
         )
         keep_clause = ""
         if keep_ids:
@@ -741,10 +843,12 @@ class EconomyRepository:
               AND scope_id = ?
               AND state = 'active'
               AND locked_trade_id IS NULL
+              AND is_favorite = 0
               {rarity_clause}
+              {name_clause}
               {keep_clause}
             """,
-            (player_id, scope_id, rarity_param, *keep_ids),
+            (player_id, scope_id, rarity_param, *name_parameters, *keep_ids),
         )
         count = int(row["asset_count"]) if row is not None else 0
         total_value = int(row["total_value"]) if row is not None else 0
@@ -758,10 +862,20 @@ class EconomyRepository:
               AND scope_id = ?
               AND state = 'active'
               AND locked_trade_id IS NULL
+              AND is_favorite = 0
               {rarity_clause}
+              {name_clause}
               {keep_clause}
             """,
-            (now, now, player_id, scope_id, rarity_param, *keep_ids),
+            (
+                now,
+                now,
+                player_id,
+                scope_id,
+                rarity_param,
+                *name_parameters,
+                *keep_ids,
+            ),
         )
         if cursor.rowcount != count:
             raise RuntimeError("批量售卖资产数量发生变化，本次操作未结算。")
@@ -781,10 +895,20 @@ class EconomyRepository:
                     AND state = 'sold'
                     AND disposed_at = ?
                     {rarity_clause}
+                    {name_clause}
                     {keep_clause}
               )
             """,
-            (now, player_id, player_id, scope_id, now, rarity_param, *keep_ids),
+            (
+                now,
+                player_id,
+                player_id,
+                scope_id,
+                now,
+                rarity_param,
+                *name_parameters,
+                *keep_ids,
+            ),
         )
         return count, total_value
 
@@ -798,6 +922,7 @@ class EconomyRepository:
         max_rarity: int,
         rarity: int | None,
         keep_highest: bool,
+        display_name: str = "",
     ) -> list[str]:
         """Return instance ids that must be kept from one batch operation.
 
@@ -825,6 +950,7 @@ class EconomyRepository:
                     asset_kind=asset_kind,
                     max_rarity=max_rarity,
                     rarity=rarity,
+                    display_name=display_name,
                 )
             )
         return list(dict.fromkeys(keep_ids))
@@ -922,6 +1048,7 @@ class EconomyRepository:
               AND scope_id = ?
               AND state = 'active'
               AND locked_trade_id IS NULL
+              AND is_favorite = 0
             """,
             (now, now, pig_instance_id, player_id, scope_id),
         )
@@ -947,6 +1074,7 @@ class EconomyRepository:
               AND scope_id = ?
               AND state = 'active'
               AND locked_trade_id IS NULL
+              AND is_favorite = 0
             """,
             (now, now, food_instance_id, player_id, scope_id),
         )
@@ -972,6 +1100,7 @@ class EconomyRepository:
               AND scope_id = ?
               AND state = 'active'
               AND locked_trade_id IS NULL
+              AND is_favorite = 0
             """,
             (now, now, pig_instance_id, player_id, scope_id),
         )
@@ -997,6 +1126,7 @@ class EconomyRepository:
               AND scope_id = ?
               AND state = 'active'
               AND locked_trade_id IS NULL
+              AND is_favorite = 0
             """,
             (now, now, food_instance_id, player_id, scope_id),
         )

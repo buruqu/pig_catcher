@@ -423,6 +423,8 @@ async def test_numeric_level_changes_the_committed_catch_probability(
 
     result = await service.catch(identity)
     assert result.pig.rarity == 2
+    assert result.coin_reward == 6
+    assert result.experience_reward == 11
     snapshot_row = await database.fetch_one(
         """
         SELECT random_snapshot_json
@@ -437,6 +439,11 @@ async def test_numeric_level_changes_the_committed_catch_probability(
 
     profile = await service.profile(_identity(message_id="level-profile"))
     assert profile.level.level == 21
+    assert profile.veteran_tier == 1
+    assert profile.veteran_catch_coin_bonus == 1
+    assert profile.veteran_cook_coin_bonus == 2
+    assert profile.veteran_experience_bonus_percent == 5
+    assert profile.veteran_next_tier_level == 31
     assert (
         profile.level_catch_adjusted_high_percent
         > profile.level_catch_base_high_percent
@@ -446,6 +453,7 @@ async def test_numeric_level_changes_the_committed_catch_probability(
     assert profile_card.level_bonus_cap_level == 21
     assert "等级概率加成：抓猪 4-6 星" in format_profile_summary(profile)
     assert "普通做菜高档权重 +10.00%" in format_profile_summary(profile)
+    assert "资深收益：1 档" in format_profile_summary(profile)
     await database.close()
 
 

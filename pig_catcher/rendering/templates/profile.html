@@ -43,6 +43,16 @@
             · Lv.{{ view.level_bonus_cap_level }} 封顶
           </small>
         </div>
+        <div class="profile-level-bonus">
+          <span>Lv.21+ 资深收益 · {{ view.veteran_tier }} 档</span>
+          <strong>
+            抓猪猪币 +{{ view.veteran_catch_coin_bonus }} · 做菜猪币 +{{ view.veteran_cook_coin_bonus }}
+          </strong>
+          <small>
+            基础经验 +{{ view.veteran_experience_bonus_percent }}%
+            · {% if view.veteran_next_tier_level is none %}已达最高档{% else %}下一档 Lv.{{ view.veteran_next_tier_level }}{% endif %}
+          </small>
+        </div>
       </div>
       <div class="profile-sheet__balance">
         <span>猪币余额</span>
@@ -87,7 +97,7 @@
     </section>
 
     <footer class="game-footer">
-      <span>等级加成公开展示；荣誉称号不改变概率</span>
+      <span>荣誉称号不改变概率；概率收益 Lv.21 封顶，更高等级继续获得非概率资深收益</span>
       <strong>北京时间自然日</strong>
     </footer>
   </main>

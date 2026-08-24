@@ -14,6 +14,7 @@ from pig_catcher.assets import AssetCatalogStorage
 from pig_catcher.config.model import CatchingSection, RankingSection, TradingSection
 from pig_catcher.domain.enums import AssetKind, StatureProfile, TradeStatus
 from pig_catcher.domain.errors import (
+    AssetStateConflictError,
     DailyCatchLimitError,
     InsufficientBalanceError,
     SelfTransferError,
@@ -456,6 +457,70 @@ async def test_gift_and_trade_are_atomic_idempotent_and_history_stable(
             asset_kind=AssetKind.PIG,
             selector_text=caught[2].pig.selector,
         )
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_name_only_social_selection_skips_favorites(tmp_path: Path) -> None:
+    database = await _database_with_social_catalog(tmp_path)
+    clock = MutableClock()
+    caught = await _catch_many(database, clock, count=3)
+    favorite = caught[2].pig
+    async with database.transaction() as session:
+        await session.execute(
+            "UPDATE pig_instances SET is_favorite = 1 WHERE pig_instance_id = ?",
+            (favorite.pig_instance_id,),
+        )
+    service = SocialService(
+        database,
+        TradingSection(),
+        RankingSection(),
+        clock=clock,
+        trade_id_factory=lambda: "FACEBEEF",
+    )
+
+    with pytest.raises(AssetStateConflictError, match="收藏保护"):
+        await service.gift(
+            _identity(user_id="seller", message_id="favorite-exact-gift"),
+            _identity(user_id="buyer", message_id="favorite-target"),
+            asset_kind=AssetKind.PIG,
+            selector_text=favorite.selector,
+        )
+
+    candidates = sorted(
+        (entry.pig.official_value, entry.pig.pig_instance_id)
+        for entry in caught[:2]
+    )
+    gifted = await service.gift(
+        _identity(user_id="seller", message_id="favorite-name-gift"),
+        _identity(user_id="buyer", message_id="favorite-name-target"),
+        asset_kind=AssetKind.PIG,
+        selector_text=caught[0].pig.display_name,
+    )
+    assert gifted.asset.instance_id == candidates[0][1]
+
+    offer = await service.create_trade(
+        _identity(user_id="seller", message_id="favorite-name-trade"),
+        _identity(user_id="third", message_id="favorite-trade-target"),
+        asset_kind=AssetKind.PIG,
+        selector_text=caught[0].pig.display_name,
+        price=1,
+    )
+    assert offer.trade.asset.instance_id == candidates[1][1]
+    protected = await database.fetch_one(
+        """
+        SELECT owner_player_id, state, is_favorite
+        FROM pig_instances
+        WHERE pig_instance_id = ?
+        """,
+        (favorite.pig_instance_id,),
+    )
+    assert protected is not None
+    assert tuple(protected) == (
+        _identity(user_id="seller", message_id="x").player_id,
+        "active",
+        1,
+    )
     await database.close()
 
 

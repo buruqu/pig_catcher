@@ -12,8 +12,6 @@ from uuid import uuid4
 from ..config.model import RankingSection, TradingSection
 from ..domain.enums import AssetKind, ReceiptSendStatus, TradeStatus
 from ..domain.errors import (
-    AmbiguousFoodSelectorError,
-    AmbiguousPigSelectorError,
     AssetStateConflictError,
     FoodNotFoundError,
     InsufficientBalanceError,
@@ -1151,6 +1149,7 @@ class SocialService:
                     identity,
                     asset_kind=asset_kind,
                     selector_text=selector_text,
+                    allow_favorite=True,
                 )
             await self.repository.set_showcase(
                 session,
@@ -1431,6 +1430,7 @@ class SocialService:
         *,
         asset_kind: AssetKind,
         selector_text: str,
+        allow_favorite: bool = False,
     ) -> tuple[SocialAsset, PigView | None, FoodView | None]:
         selector = parse_asset_selector(selector_text)
         if asset_kind is AssetKind.PIG:
@@ -1438,39 +1438,81 @@ class SocialService:
                 session,
                 player_id=identity.player_id,
                 selector=selector,
+                prefer_highest=allow_favorite,
             )
             if not rows:
                 raise PigNotFoundError(
                     f"你的猪猪背包中找不到“{selector_text.strip()}”。"
                 )
-            if len(rows) > 1:
-                candidates = "、".join(
-                    f"{row['display_name_snapshot']}#{row['short_code']}"
-                    for row in rows[:8]
+            if selector.short_code is None:
+                eligible = (
+                    rows
+                    if allow_favorite
+                    else [row for row in rows if not bool(row.get("is_favorite") or False)]
                 )
-                raise AmbiguousPigSelectorError(
-                    f"“{selector.name}”有多只，请带短编号重试：{candidates}"
+                if not eligible:
+                    raise AssetStateConflictError(
+                        f"“{selector.name}”的全部实例都已收藏保护，请先取消收藏。"
+                    )
+                row = (
+                    max(
+                        eligible,
+                        key=lambda item: (
+                            int(item["official_value"]),
+                            str(item["acquired_at"]),
+                            str(item["pig_instance_id"]),
+                        ),
+                    )
+                    if allow_favorite
+                    else eligible[0]
                 )
-            pig = self._pig_view(rows[0])
+            else:
+                row = rows[0]
+            pig = self._pig_view(row)
+            if pig.is_favorite and not allow_favorite:
+                raise AssetStateConflictError(
+                    f"“{pig.selector}”已收藏保护，请先使用 /取消收藏 猪猪 {pig.selector}。"
+                )
             return _social_asset_from_pig(pig), pig, None
         rows = await self.economy_repository.find_active_foods(
             session,
             player_id=identity.player_id,
             selector=selector,
+            prefer_highest=allow_favorite,
         )
         if not rows:
             raise FoodNotFoundError(
                 f"你的美食背包中找不到“{selector_text.strip()}”。"
             )
-        if len(rows) > 1:
-            candidates = "、".join(
-                f"{row['display_name_snapshot']}#{row['short_code']}"
-                for row in rows[:8]
+        if selector.short_code is None:
+            eligible = (
+                rows
+                if allow_favorite
+                else [row for row in rows if not bool(row.get("is_favorite") or False)]
             )
-            raise AmbiguousFoodSelectorError(
-                f"“{selector.name}”有多份，请带短编号重试：{candidates}"
+            if not eligible:
+                raise AssetStateConflictError(
+                    f"“{selector.name}”的全部实例都已收藏保护，请先取消收藏。"
+                )
+            row = (
+                max(
+                    eligible,
+                    key=lambda item: (
+                        int(item["official_value"]),
+                        str(item["acquired_at"]),
+                        str(item["food_instance_id"]),
+                    ),
+                )
+                if allow_favorite
+                else eligible[0]
             )
-        food = food_view_from_row(rows[0])
+        else:
+            row = rows[0]
+        food = food_view_from_row(row)
+        if food.is_favorite and not allow_favorite:
+            raise AssetStateConflictError(
+                f"“{food.selector}”已收藏保护，请先使用 /取消收藏 美食 {food.selector}。"
+            )
         return _social_asset_from_food(food), None, food
 
     async def _asset_views_by_id(

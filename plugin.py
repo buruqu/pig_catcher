@@ -1940,6 +1940,46 @@ class PigCatcherPlugin(MaiBotPlugin):
             )
 
     @Command(
+        "pig_catcher_favorite",
+        description="收藏保护或取消保护当前持有的猪猪和美食",
+        pattern=(
+            r"^/(?P<action>收藏|取消收藏)\s+"
+            r"(?P<kind>猪猪|猪|美食|菜)(?:\s+(?P<selector>.*?))?\s*$"
+        ),
+    )
+    async def handle_favorite(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_command(
+            stream_id,
+            kwargs,
+            feature_enabled=self.settings.features.inventory_enabled,
+            feature_label="收藏保护",
+        )
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            kind = matched_group(kwargs, "kind")
+            result = await cast(EconomyService, self._economy_service).set_favorite(
+                identity,
+                asset_kind=("pig" if kind in {"猪猪", "猪"} else "food"),
+                selector_text=matched_group(kwargs, "selector"),
+                favorite=matched_group(kwargs, "action") == "收藏",
+            )
+            return await self._deliver_text_receipt(
+                stream_id=identity.stream_id,
+                receipt=result.receipt,
+            )
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation="收藏保护",
+                error=exc,
+            )
+
+    @Command(
         "pig_catcher_profile",
         description="查看当前群的个人抓猪档案",
         pattern=r"^/抓猪档案\s*$",
@@ -2833,8 +2873,9 @@ class PigCatcherPlugin(MaiBotPlugin):
             ).batch_sell_low_rarity(
                 identity,
                 asset_kind=query.asset_kind.value,
-                max_rarity=3,
+                max_rarity=(5 if query.display_name else 3),
                 rarity=query.rarity,
+                display_name=query.display_name,
             )
             renderer = cast(PigCatcherRenderer, self._renderer)
             view = batch_sale_receipt_view(result)

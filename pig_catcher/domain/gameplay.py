@@ -51,9 +51,19 @@ LEVEL_THRESHOLDS: tuple[tuple[str, int], ...] = (
     ("抓猪高手", 1800),
     ("抓猪大神", 6000),
     ("抓群友", 20000),
+    ("百猪名捕", 28800),
+    ("猪猪鉴赏家", 42050),
+    ("传奇猪王", 76050),
+    ("猪群守护者", 120050),
+    ("猪界宗师", 174050),
+    ("万猪之王", 312050),
+    ("抓猪永恒传说", 490050),
 )
 
 LEVEL_EXPERIENCE_FACTOR = 50
+VETERAN_BENEFIT_START_LEVEL = 21
+VETERAN_BENEFIT_LEVEL_INTERVAL = 10
+VETERAN_BENEFIT_MAX_TIER = 5
 
 
 @dataclass(frozen=True, slots=True)
@@ -219,6 +229,64 @@ class LevelProgress:
         if span <= 0:
             return 100.0
         return min(100.0, max(0.0, (self.experience - self.current_threshold) * 100.0 / span))
+
+
+@dataclass(frozen=True, slots=True)
+class VeteranBenefits:
+    """Lv.21 后不改变概率的封顶资深收益。"""
+
+    tier: int
+    catch_coin_bonus: int
+    cook_coin_bonus: int
+    experience_bonus_percent: int
+    next_tier_level: int | None
+
+    @property
+    def active(self) -> bool:
+        return self.tier > 0
+
+
+def veteran_benefits(player_level: int) -> VeteranBenefits:
+    """返回等级对应的资深收益，每十级一档且最多五档。"""
+
+    level = int(player_level)
+    if level < 1:
+        raise DomainValidationError("玩家等级必须大于等于 1。")
+    if level < VETERAN_BENEFIT_START_LEVEL:
+        return VeteranBenefits(
+            tier=0,
+            catch_coin_bonus=0,
+            cook_coin_bonus=0,
+            experience_bonus_percent=0,
+            next_tier_level=VETERAN_BENEFIT_START_LEVEL,
+        )
+    tier = min(
+        VETERAN_BENEFIT_MAX_TIER,
+        1 + (level - VETERAN_BENEFIT_START_LEVEL) // VETERAN_BENEFIT_LEVEL_INTERVAL,
+    )
+    next_tier_level = (
+        None
+        if tier >= VETERAN_BENEFIT_MAX_TIER
+        else VETERAN_BENEFIT_START_LEVEL + tier * VETERAN_BENEFIT_LEVEL_INTERVAL
+    )
+    return VeteranBenefits(
+        tier=tier,
+        catch_coin_bonus=tier,
+        cook_coin_bonus=tier * 2,
+        experience_bonus_percent=tier * 5,
+        next_tier_level=next_tier_level,
+    )
+
+
+def apply_veteran_experience_bonus(amount: int, benefits: VeteranBenefits) -> int:
+    """以整数四舍五入方式应用资深经验加成。"""
+
+    normalized = int(amount)
+    if normalized < 0:
+        raise DomainValidationError("经验奖励不能为负数。")
+    return (
+        normalized * (100 + benefits.experience_bonus_percent) + 50
+    ) // 100
 
 
 def _unit(value: float, *, name: str) -> float:

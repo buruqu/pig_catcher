@@ -284,9 +284,9 @@ async def load_plugin(
         component["type"] == "HOME_CARD"
         for component in components
     )
-    if len(components) != 49 or command_count != 48 or home_card_count != 1:
+    if len(components) != 50 or command_count != 49 or home_card_count != 1:
         raise AssertionError(
-            "MaiBot component registration is not exactly 48 commands and 1 home card."
+            "MaiBot component registration is not exactly 49 commands and 1 home card."
         )
     return plugin
 

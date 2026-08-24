@@ -783,11 +783,11 @@ async def test_third_round_templates_render_all_business_views(
     await renderer.render_profile(
         ProfileViewModel(
             display_name="测试成员",
-            level=3,
-            title="抓猪老手",
-            total_experience=600,
-            next_threshold=1800,
-            progress_percent=8.3,
+            level=21,
+            title="抓群友",
+            total_experience=20000,
+            next_threshold=22050,
+            progress_percent=0.0,
             coin_balance=120,
             total_catches=9,
             active_pigs=8,
@@ -805,15 +805,22 @@ async def test_third_round_templates_render_all_business_views(
             level_catch_adjusted_high_percent=13.16,
             level_cooking_bonus_percent=1.0,
             level_bonus_cap_level=21,
+            veteran_tier=1,
+            veteran_catch_coin_bonus=1,
+            veteran_cook_coin_bonus=2,
+            veteran_experience_bonus_percent=5,
+            veteran_next_tier_level=31,
         )
     )
     profile_html = capability.calls[-1][0]
-    assert "Lv.3" in profile_html
+    assert "Lv.21" in profile_html
     assert "Poppin&#39;Party" in profile_html
     assert "等级概率加成" in profile_html
     assert "13.00%" in profile_html
     assert "13.16%" in profile_html
     assert "荣誉称号不改变概率" in profile_html
+    assert "资深收益 · 1 档" in profile_html
+    assert "抓猪猪币 +1" in profile_html
 
     inventory = InventoryViewModel(
         display_name="测试成员",
@@ -835,6 +842,7 @@ async def test_third_round_templates_render_all_business_views(
                 media_visible=True,
                 is_animated=False,
                 image_fit="contain",
+                is_favorite=True,
             ),
             InventoryItemViewModel(
                 key="animated",
@@ -854,6 +862,7 @@ async def test_third_round_templates_render_all_business_views(
     await renderer.render_inventory(inventory, {"static": source})
     inventory_html, _ = capability.calls[-1]
     assert "动态猪猪" in inventory_html
+    assert "♥ 已收藏" in inventory_html
     assert inventory_html.count("data:image/webp;base64,") == 1
 
     catalog = CatalogViewModel(
@@ -1127,6 +1136,7 @@ async def test_fourth_round_templates_render_food_and_economy_views(
                 media_visible=True,
                 is_animated=False,
                 image_fit="contain",
+                is_favorite=True,
             ),
             FoodInventoryItemViewModel(
                 key="animated",
@@ -1145,6 +1155,7 @@ async def test_fourth_round_templates_render_food_and_economy_views(
     await renderer.render_food_inventory(inventory, {"static": source})
     inventory_html, _ = capability.calls[-1]
     assert "动态美食" in inventory_html
+    assert "♥ 已收藏" in inventory_html
     assert inventory_html.count("data:image/webp;base64,") == 1
 
     catalog = FoodCatalogViewModel(

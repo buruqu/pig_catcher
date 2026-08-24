@@ -45,7 +45,7 @@
           {% endif %}
         </div>
         <h2 style="font-size: {% if item.display_name|length > 45 %}12{% elif item.display_name|length > 28 %}15{% elif item.display_name|length > 18 %}18{% else %}21{% endif %}px">{{ item.display_name }}</h2>
-        <div class="inventory-item__code">{{ "★" * item.rarity }} · #{{ item.short_code }}</div>
+        <div class="inventory-item__code">{{ "★" * item.rarity }} · #{{ item.short_code }}{% if item.is_favorite %} · ♥ 已收藏{% endif %}</div>
         <div class="inventory-item__facts">
           <span>{{ "%.2f"|format(item.portion_weight) }} kg</span>
           <span>{{ item.fat_label }}</span>
@@ -59,7 +59,7 @@
     {% endif %}
 
     <footer class="game-footer">
-      <span>吃菜可只填菜名自动选最低价值；最后一份会要求 30 秒确认</span>
+      <span>名称直选会处理最低价值未收藏实例；♥ 收藏资产不会被自动或批量处理</span>
       <strong>{{ view.page }}/{{ view.page_count }}</strong>
     </footer>
   </main>

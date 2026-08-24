@@ -67,7 +67,13 @@ from ..domain.food_effects import (
     has_compatible_exclusive_cook_effect,
     resolve_food_effect,
 )
-from ..domain.gameplay import ItemDefinition, item_by_id, level_progress
+from ..domain.gameplay import (
+    ItemDefinition,
+    apply_veteran_experience_bonus,
+    item_by_id,
+    level_progress,
+    veteran_benefits,
+)
 from ..domain.models import CommandIdentity, CommandReceipt
 from ..domain.ports import Clock, MessageKeyFactory, RandomSource, SystemClock, SystemRandomSource
 from ..domain.quota import catch_quota_window
@@ -109,6 +115,7 @@ _SELL_PIG_COMMAND = "pig-catcher.sell-pig"
 _SELL_FOOD_COMMAND = "pig-catcher.sell-food"
 _BATCH_SELL_PIG_COMMAND = "pig-catcher.batch-sell-pig"
 _BATCH_SELL_FOOD_COMMAND = "pig-catcher.batch-sell-food"
+_FAVORITE_COMMAND = "pig-catcher.favorite"
 _FAT_LABELS = {
     "lean": "偏瘦",
     "balanced": "均衡",
@@ -151,6 +158,7 @@ class FoodView:
     source_pig_name: str
     source_pig_short_code: str
     recipe_tags: tuple[str, ...]
+    is_favorite: bool = False
 
     @property
     def stars(self) -> str:
@@ -360,6 +368,7 @@ class BatchSaleResult:
     total_value: int
     balance_after: int
     rarity: int | None = None
+    display_name: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -380,6 +389,19 @@ class BatchCookingResult:
     effect_use_summaries: tuple[str, ...] = ()
     receipt: CommandReceipt | None = None
     receipt_created: bool = True
+
+
+@dataclass(frozen=True, slots=True)
+class FavoriteResult:
+    """Committed favorite-protection update for one or more same-name assets."""
+
+    receipt: CommandReceipt
+    receipt_created: bool
+    asset_kind: str
+    display_name: str
+    target_count: int
+    changed_count: int
+    favorite: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -489,6 +511,7 @@ def food_view_from_row(row: Mapping[str, object]) -> FoodView:
             row.get("recipe_tags_json"),
             label="美食食谱标签",
         ),
+        is_favorite=bool(row.get("is_favorite") or False),
     )
 
 
@@ -585,7 +608,7 @@ def format_food_detail_summary(food: FoodView) -> str:
     return (
         "【美食详情】\n"
         f"{food.stars} {food.display_name}（{food.rarity_name}）\n"
-        f"编号：{food.selector}\n"
+        f"编号：{food.selector}{'（已收藏保护）' if food.is_favorite else ''}\n"
         f"份量：{food.portion_weight:.2f} kg\n"
         f"肥瘦：{food.fat_label}\n"
         f"官方价值：{food.official_value} 猪币\n"
@@ -852,14 +875,42 @@ def format_batch_sale_summary(result: BatchSaleResult) -> str:
     """Return a complete batch-sale fallback."""
 
     kind = "猪猪" if result.asset_kind == "pig" else "美食"
-    scope = f"{result.rarity} 星{kind}" if result.rarity is not None else f"1 至 {result.max_rarity} 星{kind}"
+    scope = (
+        f"同名美食“{result.display_name}”"
+        if result.display_name
+        else (
+            f"{result.rarity} 星{kind}"
+            if result.rarity is not None
+            else f"1 至 {result.max_rarity} 星{kind}"
+        )
+    )
     return (
         "【批量售卖成功】\n"
         f"范围：{scope}\n"
         f"售出：{result.asset_count} 件\n"
         f"收入：{result.total_value} 猪币\n"
         f"当前余额：{result.balance_after}\n"
-        "联动猪与交易锁定的资产未被处理，已解锁图鉴记录不会减少。"
+        "收藏保护、联动保留与交易锁定的资产未被处理，已解锁图鉴记录不会减少。"
+    )
+
+
+def format_favorite_summary(result: FavoriteResult) -> str:
+    """Return a text receipt for favorite protection changes."""
+
+    kind = "猪猪" if result.asset_kind == "pig" else "美食"
+    action = "加入收藏保护" if result.favorite else "取消收藏保护"
+    unchanged = result.target_count - result.changed_count
+    extra = f"；另有 {unchanged} 件状态未变化" if unchanged else ""
+    protection = (
+        "收藏资产不会被做菜、吃菜、售卖、赠送、交易或任何批量操作选中。"
+        if result.favorite
+        else "这些资产现在可以参与名称直选和批量操作。"
+    )
+    return (
+        f"【{action}】\n"
+        f"{kind}：{result.display_name}\n"
+        f"匹配：{result.target_count} 件；变更：{result.changed_count} 件{extra}\n"
+        f"{protection}"
     )
 
 
@@ -1564,8 +1615,12 @@ class EconomyService:
                 )
             )
 
-        coin_reward = COOK_COIN_REWARDS[output_rarity]
-        experience_reward = COOK_EXPERIENCE_REWARDS[output_rarity]
+        benefits = veteran_benefits(probability_level)
+        coin_reward = COOK_COIN_REWARDS[output_rarity] + benefits.cook_coin_bonus
+        experience_reward = apply_veteran_experience_bonus(
+            COOK_EXPERIENCE_REWARDS[output_rarity],
+            benefits,
+        )
         coin_balance = await self.repository.apply_currency_change(
             session,
             player_id=identity.player_id,
@@ -2012,7 +2067,15 @@ class EconomyService:
                         expires_at=None,
                         now=now,
                     )
-            base_experience = EAT_EXPERIENCE_REWARDS[Rarity(food.rarity)]
+            current_experience = await self.gameplay_repository.get_player_experience(
+                session,
+                player_id=identity.player_id,
+            )
+            benefits = veteran_benefits(level_progress(current_experience).level)
+            base_experience = apply_veteran_experience_bonus(
+                EAT_EXPERIENCE_REWARDS[Rarity(food.rarity)],
+                benefits,
+            )
             total_experience = await self.repository.add_experience(
                 session,
                 player_id=identity.player_id,
@@ -2157,8 +2220,13 @@ class EconomyService:
                 raise FoodNotFoundError(
                     f"你的美食背包中找不到“{normalized_selector}”。"
                 )
-            selected = food_view_from_row(rows[0])
-            if len(rows) == 1:
+            eligible = [row for row in rows if not bool(row.get("is_favorite") or False)]
+            if not eligible:
+                raise AssetStateConflictError(
+                    f"“{selector.name}”的全部实例都已收藏保护，请先取消收藏。"
+                )
+            selected = food_view_from_row(eligible[0])
+            if len(eligible) == 1:
                 expires_at = iso_timestamp(now_datetime + timedelta(seconds=30))
                 await self.repository.upsert_pending_food_confirmation(
                     session,
@@ -2514,6 +2582,7 @@ class EconomyService:
         asset_kind: str,
         max_rarity: int = 3,
         rarity: int | None = None,
+        display_name: str = "",
     ) -> BatchSaleResult:
         """Sell every unlocked low-rarity pig or food in one transaction.
 
@@ -2525,8 +2594,12 @@ class EconomyService:
             raise StoreProductError("批量售卖类型只能是“猪猪”或“美食”。")
         if rarity is not None and not 1 <= int(rarity) <= 5:
             raise StoreProductError("批量售卖指定品质只支持一星至五星。")
+        normalized_name = str(display_name or "").strip()
         if rarity is None and not 1 <= int(max_rarity) <= 3:
-            raise StoreProductError("批量售卖只允许处理 1 至 3 星资产。")
+            if not (asset_kind == "food" and normalized_name and int(max_rarity) == 5):
+                raise StoreProductError("批量售卖只允许处理 1 至 3 星资产。")
+        if normalized_name and asset_kind != "food":
+            raise StoreProductError("按名称批量售卖目前只支持美食。")
         await self._expire_stale_offers()
         command_name = _BATCH_SELL_PIG_COMMAND if asset_kind == "pig" else _BATCH_SELL_FOOD_COMMAND
         request_payload = {
@@ -2571,11 +2644,14 @@ class EconomyService:
                 rarity=rarity,
                 keep_highest=keep_highest,
                 now=now,
+                display_name=normalized_name,
             )
             if count == 0:
                 noun = "猪猪" if asset_kind == "pig" else "美食"
                 if rarity is not None:
                     error = f"背包中没有可批量售卖的 {rarity} 星{noun}；联动猪与交易锁定资产不会被处理。"
+                elif normalized_name:
+                    error = f"背包中没有可批量售卖的“{normalized_name}”；收藏保护与交易锁定资产不会被处理。"
                 else:
                     error = f"背包中没有可批量售卖的 1 至 {max_rarity} 星{noun}；联动猪与交易锁定资产不会被处理。"
                 if asset_kind == "pig":
@@ -2587,9 +2663,21 @@ class EconomyService:
                 scope_id=identity.scope.value,
                 amount=total_value,
                 reason_code=f"batch-sell-{asset_kind}",
-                reason_text="批量售卖低星" + ("猪猪" if asset_kind == "pig" else "美食"),
+                reason_text=(
+                    f"批量售卖同名美食{normalized_name}"
+                    if normalized_name
+                    else "批量售卖低星" + ("猪猪" if asset_kind == "pig" else "美食")
+                ),
                 source_object_type=asset_kind,
-                source_object_id=(f"rarity-{rarity}" if rarity is not None else f"rarity-1-{max_rarity}"),
+                source_object_id=(
+                    f"name-{normalized_name}"
+                    if normalized_name
+                    else (
+                        f"rarity-{rarity}"
+                        if rarity is not None
+                        else f"rarity-1-{max_rarity}"
+                    )
+                ),
                 ledger_entry_id=self._new_identifier(),
                 idempotency_key=f"{idempotency_key}:coin",
                 now=now,
@@ -2601,6 +2689,7 @@ class EconomyService:
                 "asset_count": count,
                 "max_rarity": int(max_rarity),
                 "rarity": rarity,
+                "display_name": normalized_name,
                 "total_value": total_value,
                 "balance_after": balance_after,
             }
@@ -2624,6 +2713,7 @@ class EconomyService:
                 total_value=total_value,
                 balance_after=balance_after,
                 rarity=rarity,
+                display_name=normalized_name,
             )
             receipt = await self._reserve(
                 session,
@@ -2648,6 +2738,7 @@ class EconomyService:
                 total_value=total_value,
                 balance_after=balance_after,
                 rarity=rarity,
+                display_name=normalized_name,
             )
 
     async def ledger(self, identity: CommandIdentity, *, page: int) -> LedgerPage:
@@ -2698,6 +2789,111 @@ class EconomyService:
                 for row in rows
             ),
         )
+
+    async def set_favorite(
+        self,
+        identity: CommandIdentity,
+        *,
+        asset_kind: str,
+        selector_text: str,
+        favorite: bool,
+    ) -> FavoriteResult:
+        """Protect one exact asset or every active same-name copy atomically."""
+
+        if asset_kind not in {"pig", "food"}:
+            raise StoreProductError("收藏类型只能是“猪猪”或“美食”。")
+        selector = parse_asset_selector(selector_text)
+        request_payload = {
+            "command_version": 2,
+            "asset_kind": asset_kind,
+            "name": selector.name,
+            "short_code": selector.short_code or "",
+            "favorite": bool(favorite),
+        }
+        idempotency_key = MessageKeyFactory.build(identity, _FAVORITE_COMMAND)
+        now = iso_timestamp(self.clock.now())
+        async with self.database.transaction() as session:
+            existing = await self.receipt_repository.get_by_key(session, idempotency_key)
+            if existing is not None:
+                validate_existing_receipt(
+                    existing,
+                    identity=identity,
+                    command_name=_FAVORITE_COMMAND,
+                    request_payload=request_payload,
+                )
+                return self._favorite_from_receipt(existing, receipt_created=False)
+            await self.framework_repository.touch_identity(
+                session,
+                identity=identity,
+                now=now,
+            )
+            rows = await self.repository.favorite_asset_rows(
+                session,
+                player_id=identity.player_id,
+                scope_id=identity.scope.value,
+                asset_kind=asset_kind,
+                selector=selector,
+            )
+            if not rows:
+                noun = "猪猪" if asset_kind == "pig" else "美食"
+                error = f"你的{noun}背包中找不到可收藏的“{selector_text.strip()}”。"
+                if asset_kind == "pig":
+                    raise PigNotFoundError(error)
+                raise FoodNotFoundError(error)
+            asset_ids = tuple(str(row["asset_id"]) for row in rows)
+            changed_count = await self.repository.set_assets_favorite(
+                session,
+                asset_kind=asset_kind,
+                asset_ids=asset_ids,
+                favorite=favorite,
+                now=now,
+            )
+            payload = {
+                "asset_kind": asset_kind,
+                "display_name": str(rows[0]["display_name_snapshot"]),
+                "target_count": len(rows),
+                "changed_count": changed_count,
+                "favorite": bool(favorite),
+            }
+            provisional = FavoriteResult(
+                receipt=self._provisional_receipt(
+                    idempotency_key=idempotency_key,
+                    identity=identity,
+                    command_name=_FAVORITE_COMMAND,
+                    request_payload=request_payload,
+                    result_type="favorite-update",
+                    result_object_id=asset_ids[0],
+                    result_payload=payload,
+                    now=now,
+                ),
+                receipt_created=True,
+                asset_kind=asset_kind,
+                display_name=str(payload["display_name"]),
+                target_count=len(rows),
+                changed_count=changed_count,
+                favorite=bool(favorite),
+            )
+            receipt = await self._reserve(
+                session,
+                identity=identity,
+                idempotency_key=idempotency_key,
+                command_name=_FAVORITE_COMMAND,
+                request_payload=request_payload,
+                result_type="favorite-update",
+                result_object_id=asset_ids[0],
+                result_payload=payload,
+                text_summary=format_favorite_summary(provisional),
+                now=now,
+            )
+            return FavoriteResult(
+                receipt=receipt,
+                receipt_created=True,
+                asset_kind=asset_kind,
+                display_name=str(payload["display_name"]),
+                target_count=len(rows),
+                changed_count=changed_count,
+                favorite=bool(favorite),
+            )
 
     async def _sell(
         self,
@@ -2905,7 +3101,35 @@ class EconomyService:
         selector_text: str,
     ) -> PigView:
         if selector_text:
-            return await self._resolve_pig(session, identity, selector_text)
+            selector = parse_asset_selector(selector_text)
+            rows = await self.gameplay_repository.find_active_pigs(
+                session,
+                player_id=identity.player_id,
+                selector=selector,
+            )
+            if not rows:
+                raise PigNotFoundError(f"你的猪猪背包中找不到“{selector_text.strip()}”。")
+            if selector.short_code is not None:
+                pig = pig_view_from_row(rows[0])
+                if pig.is_favorite:
+                    raise AssetStateConflictError(
+                        f"“{pig.selector}”已收藏保护，请先使用 /取消收藏 猪猪 {pig.selector}。"
+                    )
+                return pig
+            eligible = [row for row in rows if not bool(row.get("is_favorite") or False)]
+            if not eligible:
+                raise AssetStateConflictError(
+                    f"“{selector.name}”的全部实例都已收藏保护，请先取消收藏。"
+                )
+            selected = min(
+                eligible,
+                key=lambda row: (
+                    int(row["official_value"]),
+                    str(row["acquired_at"]),
+                    str(row["pig_instance_id"]),
+                ),
+            )
+            return pig_view_from_row(selected)
         pig_instance_id = await self.repository.cheapest_active_asset_id(
             session,
             player_id=identity.player_id,
@@ -2930,7 +3154,27 @@ class EconomyService:
         selector_text: str,
     ) -> FoodView:
         if selector_text:
-            return await self._resolve_food(session, identity, selector_text)
+            selector = parse_asset_selector(selector_text)
+            rows = await self.repository.find_active_foods(
+                session,
+                player_id=identity.player_id,
+                selector=selector,
+            )
+            if not rows:
+                raise FoodNotFoundError(f"你的美食背包中找不到“{selector_text.strip()}”。")
+            if selector.short_code is not None:
+                food = food_view_from_row(rows[0])
+                if food.is_favorite:
+                    raise AssetStateConflictError(
+                        f"“{food.selector}”已收藏保护，请先使用 /取消收藏 美食 {food.selector}。"
+                    )
+                return food
+            eligible = [row for row in rows if not bool(row.get("is_favorite") or False)]
+            if not eligible:
+                raise AssetStateConflictError(
+                    f"“{selector.name}”的全部实例都已收藏保护，请先取消收藏。"
+                )
+            return food_view_from_row(eligible[0])
         food_instance_id = await self.repository.cheapest_active_asset_id(
             session,
             player_id=identity.player_id,
@@ -3154,6 +3398,24 @@ class EconomyService:
             total_value=int(payload["total_value"]),
             balance_after=int(payload["balance_after"]),
             rarity=(int(payload["rarity"]) if payload.get("rarity") is not None else None),
+            display_name=str(payload.get("display_name") or ""),
+        )
+
+    @staticmethod
+    def _favorite_from_receipt(
+        receipt: CommandReceipt,
+        *,
+        receipt_created: bool,
+    ) -> FavoriteResult:
+        payload = receipt_payload(receipt)
+        return FavoriteResult(
+            receipt=receipt,
+            receipt_created=receipt_created,
+            asset_kind=str(payload["asset_kind"]),
+            display_name=str(payload["display_name"]),
+            target_count=int(payload["target_count"]),
+            changed_count=int(payload["changed_count"]),
+            favorite=bool(payload["favorite"]),
         )
 
     async def _sale_from_receipt(

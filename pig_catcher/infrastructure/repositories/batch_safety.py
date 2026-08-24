@@ -48,6 +48,7 @@ async def highest_collaboration_pig_ids_per_template(
               AND candidate.scope_id = ?
               AND candidate.state = 'active'
               AND candidate.locked_trade_id IS NULL
+              AND candidate.is_favorite = 0
               AND template.collection_id IS NOT NULL
               AND template.collection_id != ''
               {rarity_clause}
@@ -68,6 +69,7 @@ async def highest_instance_ids_per_template(
     asset_kind: BatchAssetKind,
     max_rarity: int,
     rarity: int | None,
+    display_name: str = "",
 ) -> list[str]:
     """Select one deterministic highest-value unlocked instance per template.
 
@@ -99,6 +101,19 @@ async def highest_instance_ids_per_template(
         else "AND candidate.rarity <= ?"
     )
     rarity_param = int(rarity) if rarity is not None else int(max_rarity)
+    normalized_name = str(display_name or "").strip()
+    name_clause = ""
+    parameters: list[object] = [player_id, scope_id]
+    if normalized_name:
+        name_clause = """
+              AND (
+                  candidate.display_name_snapshot = ?
+                  OR REPLACE(REPLACE(candidate.display_name_snapshot, ' ', ''), '　', '')
+                     = ? COLLATE NOCASE
+              )
+        """
+        parameters.extend((normalized_name, "".join(normalized_name.split())))
+    parameters.append(rarity_param)
     rows = await session.fetch_all(
         f"""
         SELECT kept.instance_id
@@ -115,12 +130,14 @@ async def highest_instance_ids_per_template(
               AND candidate.scope_id = ?
               AND candidate.state = 'active'
               AND candidate.locked_trade_id IS NULL
+              AND candidate.is_favorite = 0
               {template_filter}
+              {name_clause}
               {rarity_clause}
         ) AS kept
         WHERE kept.keep_rank = 1
         ORDER BY kept.instance_id
         """,
-        (player_id, scope_id, rarity_param),
+        parameters,
     )
     return [str(row["instance_id"]) for row in rows]

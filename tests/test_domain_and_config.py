@@ -42,9 +42,11 @@ from pig_catcher.domain.food_effects import (
 )
 from pig_catcher.domain.gameplay import (
     ITEM_DEFINITIONS,
+    apply_veteran_experience_bonus,
     generate_pig_attributes,
     level_progress,
     size_label,
+    veteran_benefits,
     weight_label,
 )
 from pig_catcher.domain.models import CommandIdentity, ScopeKey
@@ -123,6 +125,12 @@ def test_store_upgrade_and_batch_sale_parsers_match_new_commands() -> None:
     assert parse_upgrade_name("厨具升级") == "厨具"
     assert parse_batch_sale_query("猪猪").asset_kind.value == "pig"
     assert parse_batch_sale_query("美食").asset_kind.value == "food"
+    named = parse_batch_sale_query("美食 猪寿司拼盘")
+    assert named.asset_kind.value == "food"
+    assert named.display_name == "猪寿司拼盘"
+    assert named.rarity is None
+    with pytest.raises(DomainValidationError, match="特定名称"):
+        parse_batch_sale_query("猪猪 地球猪")
 
 
 @pytest.mark.parametrize(
@@ -1071,8 +1079,26 @@ def test_numeric_level_and_honor_title_remain_separate_progress_tracks() -> None
     assert level_progress(50).title == "被猪拱"
     assert level_progress(100).title == "抓猪萌新"
     assert level_progress(200).next_threshold == 450
+    assert level_progress(28800).title == "百猪名捕"
+    assert level_progress(490050).title == "抓猪永恒传说"
     huge_level = 10**100
     assert level_progress(50 * huge_level**2).level == huge_level + 1
+
+
+def test_veteran_benefits_start_after_probability_cap_and_are_bounded() -> None:
+    assert veteran_benefits(20).tier == 0
+    first = veteran_benefits(21)
+    assert first.catch_coin_bonus == 1
+    assert first.cook_coin_bonus == 2
+    assert first.experience_bonus_percent == 5
+    assert first.next_tier_level == 31
+    assert apply_veteran_experience_bonus(45, first) == 47
+    maximum = veteran_benefits(100)
+    assert maximum.tier == 5
+    assert maximum.catch_coin_bonus == 5
+    assert maximum.cook_coin_bonus == 10
+    assert maximum.experience_bonus_percent == 25
+    assert maximum.next_tier_level is None
 
 
 def test_pig_attribute_labels_are_plain_language() -> None:
@@ -1263,7 +1289,7 @@ def test_config_rejects_unsafe_paths_and_css_controls() -> None:
 
 def test_help_is_copyable_concise_text() -> None:
     text = format_help("做菜")
-    assert "/做菜 [猪名#短编号]" in text
+    assert "/做菜 [猪名[#短编号]]" in text
     assert "/升级 <猪饲料|厨具>" in format_help("商城")
     assert "/批量售卖 <猪猪|美食>" in format_help("商城")
     assert "【做菜指令】" in text

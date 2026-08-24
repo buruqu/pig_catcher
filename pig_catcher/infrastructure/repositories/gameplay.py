@@ -499,6 +499,7 @@ class GameplayRepository:
         *,
         player_id: str,
         selector: AssetSelector,
+        prefer_highest: bool = False,
     ) -> list[dict[str, object]]:
         # 精确匹配优先；若未命中再按“去空白 + 忽略英文大小写”的紧凑名兜底，
         # 以兼容名称中含空格或英文大小写差异（如“白吃 Token 的猪”）。
@@ -508,6 +509,15 @@ class GameplayRepository:
         if selector.short_code is not None:
             short_code_clause = "AND instance.short_code COLLATE NOCASE = ?"
             parameters.append(selector.short_code)
+        order_sql = (
+            "instance.official_value DESC, instance.acquired_at, instance.pig_instance_id"
+            if prefer_highest
+            else (
+                "instance.is_favorite, instance.official_value, "
+                "instance.acquired_at, instance.pig_instance_id"
+            )
+        )
+        limit = 1 if prefer_highest else 20
         rows = await session.fetch_all(
             f"""
             SELECT instance.pig_instance_id
@@ -520,8 +530,8 @@ class GameplayRepository:
                      = ? COLLATE NOCASE
               )
               {short_code_clause}
-            ORDER BY instance.acquired_at DESC
-            LIMIT 20
+            ORDER BY {order_sql}
+            LIMIT {limit}
             """,
             parameters,
         )
@@ -579,6 +589,7 @@ class GameplayRepository:
               AND instance.scope_id = ?
               AND instance.state = 'active'
               AND instance.locked_trade_id IS NULL
+              AND instance.is_favorite = 0
               {rarity_clause}
               {keep_clause}
             ORDER BY
