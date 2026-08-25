@@ -1795,6 +1795,10 @@ async def test_blue_red_pair_unlocks_purple_and_grants_five_six_star_pigs(
             )
         )
         assert result.pig.owner_player_id == activator.player_id
+        assert result.technique_resolution is not None
+        assert result.technique_resolution.technique_id == TECHNIQUE_LAPSE_BLUE
+        assert result.technique_resolution.target_display_name == "苍赫发动者"
+        assert result.technique_resolution.remaining_uses == 4 - index
         assert f"本群术式剩余 {4 - index} 次" in result.receipt.text_summary
 
     red = await activation.activate_group_technique(
@@ -1906,15 +1910,25 @@ async def test_malevolent_kitchen_auto_cooks_and_duplicates_six_star_food(
         technique_id=TECHNIQUE_MALEVOLENT_KITCHEN,
     )
     assert activated.total_uses == 10
-    caught = await service.catch(
-        _identity(
-            user_id="200",
-            message_id="domain-catch",
-            display_name="领域抓猪者",
-        )
+    catch_identity = _identity(
+        user_id="200",
+        message_id="domain-catch",
+        display_name="领域抓猪者",
     )
+    caught = await service.catch(catch_identity)
     assert "六星菜概率固定为 25%" in activated.summary
     assert "发动者与抓猪者各获得一份" in caught.receipt.text_summary
+    assert caught.technique_resolution is not None
+    assert caught.technique_resolution.technique_id == TECHNIQUE_MALEVOLENT_KITCHEN
+    assert caught.technique_resolution.remaining_uses == 9
+    assert len(caught.technique_resolution.generated_foods) == 2
+    assert {
+        food.owner_display_name
+        for food in caught.technique_resolution.generated_foods
+    } == {"领域发动者", "领域抓猪者"}
+    replayed = await service.catch(catch_identity)
+    assert replayed.receipt_created is False
+    assert replayed.technique_resolution == caught.technique_resolution
     source = await database.fetch_one(
         "SELECT state FROM pig_instances WHERE pig_instance_id = ?",
         (caught.pig.pig_instance_id,),

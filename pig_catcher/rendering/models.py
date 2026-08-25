@@ -361,6 +361,13 @@ class GroupEventViewModel:
     media_visible: bool = False
     is_animated: bool = False
     image_fit: str = "contain"
+    seal_top: str = "全群"
+    seal_bottom: str = "通告"
+    actor_label: str = "发动群友"
+    group_label: str = "生效群聊"
+    time_label: str = "发动时间"
+    committed_note: str = "本次事件已经提交；重复消息不会重复结算或通告"
+    pending_note: str = "本次只取得发动资格；奖励将在正式发动时原子结算"
 
 
 @dataclass(frozen=True, slots=True)

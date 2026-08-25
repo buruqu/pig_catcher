@@ -31,7 +31,9 @@ class RenderDelivery:
         logger: logging.Logger,
         fallback_to_text: bool,
         max_concurrent_deliveries: int = 3,
+        max_concurrent_image_sends: int = 4,
         queue_timeout_ms: int = 8000,
+        image_send_queue_timeout_ms: int = 12000,
         render_timeout_ms: int = 15000,
         image_send_timeout_ms: int = 20000,
         text_send_timeout_ms: int = 5000,
@@ -40,11 +42,22 @@ class RenderDelivery:
         self.logger = logger
         self.fallback_to_text = fallback_to_text
         self.max_concurrent_deliveries = max(1, int(max_concurrent_deliveries))
+        self.max_concurrent_image_sends = max(
+            1,
+            int(max_concurrent_image_sends),
+        )
         self.queue_timeout_seconds = max(0.1, int(queue_timeout_ms) / 1000)
+        self.image_send_queue_timeout_seconds = max(
+            0.1,
+            int(image_send_queue_timeout_ms) / 1000,
+        )
         self.render_timeout_seconds = max(0.1, int(render_timeout_ms) / 1000)
         self.image_send_timeout_seconds = max(0.1, int(image_send_timeout_ms) / 1000)
         self.text_send_timeout_seconds = max(0.1, int(text_send_timeout_ms) / 1000)
-        self._delivery_slots = asyncio.Semaphore(self.max_concurrent_deliveries)
+        self._render_slots = asyncio.Semaphore(self.max_concurrent_deliveries)
+        self._image_send_slots = asyncio.Semaphore(
+            self.max_concurrent_image_sends
+        )
 
     async def send_image_or_text(
         self,
@@ -61,7 +74,7 @@ class RenderDelivery:
         queued_at = perf_counter()
         try:
             await asyncio.wait_for(
-                self._delivery_slots.acquire(),
+                self._render_slots.acquire(),
                 timeout=self.queue_timeout_seconds,
             )
         except TimeoutError:
@@ -91,7 +104,23 @@ class RenderDelivery:
             except Exception:
                 self.logger.exception("抓猪图片生成失败，准备使用纯文字降级")
             render_ms = (perf_counter() - render_started) * 1000
-            if rendered is not None:
+        finally:
+            self._render_slots.release()
+        send_queue_ms = 0.0
+        if rendered is not None:
+            send_queued_at = perf_counter()
+            try:
+                await asyncio.wait_for(
+                    self._image_send_slots.acquire(),
+                    timeout=self.image_send_queue_timeout_seconds,
+                )
+            except TimeoutError:
+                self.logger.warning(
+                    "抓猪图片已生成，但发送队列繁忙（等待 %.0f ms），准备使用纯文字降级",
+                    (perf_counter() - send_queued_at) * 1000,
+                )
+            else:
+                send_queue_ms = (perf_counter() - send_queued_at) * 1000
                 send_started = perf_counter()
                 try:
                     sent = bool(
@@ -109,15 +138,16 @@ class RenderDelivery:
                     )
                 except Exception:
                     self.logger.exception("抓猪图片发送失败，准备使用纯文字降级")
-                send_ms = (perf_counter() - send_started) * 1000
-        finally:
-            self._delivery_slots.release()
+                finally:
+                    send_ms = (perf_counter() - send_started) * 1000
+                    self._image_send_slots.release()
         if sent:
             assert rendered is not None
             self.logger.info(
-                "抓猪图片交付完成：排队=%.0fms，渲染=%.0fms，发送=%.0fms，图片=%s字节",
+                "抓猪图片交付完成：渲染排队=%.0fms，渲染=%.0fms，发送排队=%.0fms，发送=%.0fms，图片=%s字节",
                 queue_ms,
                 render_ms,
+                send_queue_ms,
                 send_ms,
                 rendered.byte_length,
             )
@@ -126,9 +156,10 @@ class RenderDelivery:
             return False
         if rendered is not None and send_ms > 0:
             self.logger.warning(
-                "抓猪图片发送接口返回失败，准备使用纯文字降级：排队=%.0fms，渲染=%.0fms，发送=%.0fms",
+                "抓猪图片发送接口返回失败，准备使用纯文字降级：渲染排队=%.0fms，渲染=%.0fms，发送排队=%.0fms，发送=%.0fms",
                 queue_ms,
                 render_ms,
+                send_queue_ms,
                 send_ms,
             )
         return await self._send_fallback(stream_id, fallback_text)

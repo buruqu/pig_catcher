@@ -12,13 +12,23 @@ from ..domain.economy import (
 )
 from ..domain.errors import RenderError
 from ..domain.food_effects import (
+    GROUP_COIN_TRIBUTE,
     GROUP_NEXT_EXCLUSIVE_HIGH_STAR_CATCH,
     QUOTA_RESET_CHANCE,
+    ROULETTE_CHANCES,
+    TECHNIQUE_PERMIT,
     effect_summary,
 )
 from ..domain.gameplay import level_progress, size_label, weight_label
 from ..domain.rules import catch_weights, cooking_weights
 from ..domain.social import TRADE_STATUS_LABELS
+from ..domain.special_content import (
+    TECHNIQUE_DISPLAY_NAMES,
+    TECHNIQUE_HOLLOW_PURPLE,
+    TECHNIQUE_LAPSE_BLUE,
+    TECHNIQUE_MALEVOLENT_KITCHEN,
+    TECHNIQUE_REVERSAL_RED,
+)
 from ..services.economy import (
     BatchCookingResult,
     BatchSaleResult,
@@ -29,6 +39,7 @@ from ..services.economy import (
     FoodView,
     LedgerPage,
     PurchaseResult,
+    RouletteResult,
     SaleResult,
     StorePage,
 )
@@ -42,6 +53,7 @@ from ..services.gameplay import (
     PigView,
     PlayerProfile,
     RecordsPage,
+    TechniqueActivationResult,
 )
 from ..services.quota import CatchQuotaResetResult
 from ..services.social import (
@@ -953,6 +965,391 @@ def group_event_eat_view(
             image_fit=result.food.image_fit,
         )
     raise ValueError("该美食不属于全群大事件通告。")
+
+
+_TECHNIQUE_COMMANDS = {
+    TECHNIQUE_MALEVOLENT_KITCHEN: "/领域展开 伏魔御厨子",
+    TECHNIQUE_LAPSE_BLUE: "/术式顺转 苍",
+    TECHNIQUE_REVERSAL_RED: "/术式反转 赫",
+}
+
+
+def is_special_event_food(result: EatResult) -> bool:
+    """Return whether eating should use the recent-mechanic event card."""
+
+    return result.effect.queued_effect_id in {
+        GROUP_COIN_TRIBUTE,
+        ROULETTE_CHANCES,
+        TECHNIQUE_PERMIT,
+    }
+
+
+def special_event_eat_view(
+    result: EatResult,
+    *,
+    group_name: str,
+) -> GroupEventViewModel:
+    """Build an image-first receipt for recent exclusive food mechanics."""
+
+    actor = _public_actor_name(
+        display_name=result.food.owner_display_name,
+        stable_id=result.food.owner_player_id,
+    )
+    event_time = _display_time(result.receipt.created_at)
+    effect_id = result.effect.queued_effect_id
+    if effect_id == GROUP_COIN_TRIBUTE:
+        unit = int(result.effect.queued_effect_params.get("coin_per_player") or 0)
+        return GroupEventViewModel(
+            tone="tribute",
+            eyebrow="疯狂星期四 · 全群猪币结算",
+            title="炸猪全家桶开席",
+            subtitle="群友已经逐笔支付，食用者一次收齐",
+            actor_name=actor,
+            group_name=group_name or "当前群",
+            event_time=event_time,
+            hero_label="本次实际收到",
+            hero_value=f"{result.group_coin_total:,} 猪币",
+            rows=(
+                GroupEventRowViewModel(
+                    "参与群友",
+                    f"{result.group_rewarded_players} 人",
+                    "仅统计当前群已登记的其他玩家",
+                ),
+                GroupEventRowViewModel(
+                    "单人支付上限",
+                    f"{unit} 猪币",
+                    "余额不足者按现有余额支付，不会产生负债",
+                ),
+                GroupEventRowViewModel(
+                    "食用者余额",
+                    f"{result.coin_balance:,} 猪币",
+                    "所有扣款与入账已在同一事务完成",
+                ),
+            ),
+            note=(
+                f"{result.food.selector} 已消耗；本次从 "
+                f"{result.group_rewarded_players} 名群友处实际汇总 "
+                f"{result.group_coin_total:,} 猪币。"
+            ),
+            footer="全家桶猪币往来已原子结算",
+            media_visible=result.food.media_visible,
+            is_animated=result.food.is_animated,
+            image_fit=result.food.image_fit,
+            seal_top="猪币",
+            seal_bottom="结算",
+            committed_note="扣款、汇总与入账已经提交；重复消息不会重复收取",
+        )
+    if effect_id == TECHNIQUE_PERMIT:
+        technique_id = str(
+            result.effect.queued_effect_params.get("technique_id") or ""
+        )
+        technique_name = TECHNIQUE_DISPLAY_NAMES.get(technique_id, "未知术式")
+        command = _TECHNIQUE_COMMANDS.get(technique_id, "请查看效果说明")
+        return GroupEventViewModel(
+            tone="technique",
+            eyebrow="专属美食 · 术式资格入账",
+            title=f"{technique_name}资格已取得",
+            subtitle="专属菜已消耗，发动指令已经解锁",
+            actor_name=actor,
+            group_name=group_name or "当前群",
+            event_time=event_time,
+            hero_label="可使用指令",
+            hero_value=command,
+            rows=(
+                GroupEventRowViewModel(
+                    "当前资格",
+                    f"{result.available_effect_uses} 次",
+                    "发动成功后才会消耗一份资格",
+                ),
+                GroupEventRowViewModel(
+                    "品鉴经验",
+                    f"+{result.base_experience + result.effect.experience_bonus}",
+                    f"累计经验 {result.total_experience:,}",
+                ),
+                GroupEventRowViewModel(
+                    "当前猪币",
+                    f"{result.coin_balance:,}",
+                    "本次专属菜效果已经持久化",
+                ),
+            ),
+            note=result.effect.summary,
+            footer="术式资格已入账，可在当前群发动",
+            media_visible=result.food.media_visible,
+            is_animated=result.food.is_animated,
+            image_fit=result.food.image_fit,
+            seal_top="术式",
+            seal_bottom="资格",
+        )
+    if effect_id == ROULETTE_CHANCES:
+        return GroupEventViewModel(
+            tone="roulette",
+            eyebrow="六星美食 · 轮盘机会入账",
+            title="猪保千轮盘已开启",
+            subtitle="三次基础机会已经登记，可立即抽取",
+            actor_name=actor,
+            group_name=group_name or "当前群",
+            event_time=event_time,
+            hero_label="当前可转次数",
+            hero_value=f"{result.available_effect_uses} 次",
+            rows=(
+                GroupEventRowViewModel("使用指令", "/转轮盘", "每次只消耗一份机会"),
+                GroupEventRowViewModel(
+                    "奖面数量",
+                    "6 种等概率",
+                    "奖励在抽取事务中即时落账",
+                ),
+                GroupEventRowViewModel(
+                    "当前猪币",
+                    f"{result.coin_balance:,}",
+                    "转到猪币奖励时会直接更新",
+                ),
+            ),
+            note=result.effect.summary,
+            footer="轮盘机会已持久化，重启不会丢失",
+            media_visible=result.food.media_visible,
+            is_animated=result.food.is_animated,
+            image_fit=result.food.image_fit,
+            seal_top="轮盘",
+            seal_bottom="开启",
+        )
+    raise ValueError("该美食不属于专属图片事件。")
+
+
+def roulette_event_view(
+    result: RouletteResult,
+    *,
+    actor_name: str,
+    actor_player_id: str,
+    group_name: str,
+) -> GroupEventViewModel:
+    """Build one verifiable image receipt for a roulette settlement."""
+
+    actor = _public_actor_name(
+        display_name=actor_name,
+        stable_id=actor_player_id,
+    )
+    return GroupEventViewModel(
+        tone="roulette",
+        eyebrow="猪保千猪排轮盘 · 奖励已落账",
+        title=f"轮盘停在第 {result.outcome} 面",
+        subtitle="本次抽取已经提交，不会因图片故障重复结算",
+        actor_name=actor,
+        group_name=group_name or "当前群",
+        event_time=_display_time(result.receipt.created_at),
+        hero_label="本次奖励",
+        hero_value=result.outcome_summary,
+        rows=(
+            GroupEventRowViewModel(
+                "轮盘点数",
+                str(result.outcome),
+                "六个结果使用等概率抽取",
+            ),
+            GroupEventRowViewModel(
+                "剩余机会",
+                f"{result.remaining_spins} 次",
+                "第 2 面会把额外机会立即计入",
+            ),
+            GroupEventRowViewModel(
+                "当前猪币",
+                f"{result.coin_balance:,}",
+                "猪币奖励已同步到账本",
+            ),
+        ),
+        note=result.outcome_summary,
+        footer="轮盘结算完成",
+        seal_top="转轮",
+        seal_bottom="结算",
+        actor_label="转轮群友",
+        committed_note="本次轮盘奖励已经提交；重复消息不会重复抽取",
+    )
+
+
+def technique_activation_view(
+    result: TechniqueActivationResult,
+    *,
+    actor_name: str,
+    actor_player_id: str,
+    group_name: str,
+) -> GroupEventViewModel:
+    """Build a public activation or Hollow Purple settlement card."""
+
+    actor = _public_actor_name(
+        display_name=actor_name,
+        stable_id=actor_player_id,
+    )
+    if result.technique_id == TECHNIQUE_HOLLOW_PURPLE:
+        selectors = "、".join(pig.selector for pig in result.granted_pigs)
+        preview_pig = result.granted_pigs[0] if result.granted_pigs else None
+        return GroupEventViewModel(
+            tone="technique",
+            eyebrow="苍赫相合 · 虚式结算",
+            title="虚式·茈发动",
+            subtitle="五只六星猪已经同时写入背包",
+            actor_name=actor,
+            group_name=group_name or "当前群",
+            event_time=_display_time(result.receipt.created_at),
+            hero_label="本次获得",
+            hero_value=f"{len(result.granted_pigs)} 只六星猪",
+            rows=tuple(
+                GroupEventRowViewModel(
+                    f"六星猪 {index + 1}",
+                    pig.selector,
+                    f"价值 {pig.official_value:,} 猪币",
+                )
+                for index, pig in enumerate(result.granted_pigs[:3])
+            ),
+            note=(
+                f"完整资产编号：{selectors}。"
+                f"剩余虚式资格 {result.remaining_permits} 次。"
+            ),
+            footer="虚式奖励已原子发放",
+            seal_top="虚式",
+            seal_bottom="结算",
+            media_visible=bool(
+                preview_pig is not None and preview_pig.media_visible
+            ),
+            is_animated=bool(
+                preview_pig is not None and preview_pig.is_animated
+            ),
+            image_fit=(preview_pig.image_fit if preview_pig is not None else "contain"),
+        )
+    technique_name = TECHNIQUE_DISPLAY_NAMES.get(
+        result.technique_id,
+        result.technique_id,
+    )
+    detail = {
+        TECHNIQUE_MALEVOLENT_KITCHEN: "后续抓猪会即时做成双份美食",
+        TECHNIQUE_LAPSE_BLUE: "后续抓到的猪会被吸引给发动者",
+        TECHNIQUE_REVERSAL_RED: "后续抓到的猪会随机分配给群友",
+    }.get(result.technique_id, "群体术式已经发动")
+    rows = [
+        GroupEventRowViewModel("接管次数", f"{result.total_uses} 次", detail),
+        GroupEventRowViewModel(
+            "同类资格剩余",
+            f"{result.remaining_permits} 次",
+            "当前术式结束前不能发动另一种群体术式",
+        ),
+    ]
+    if result.purple_unlocked:
+        rows.append(
+            GroupEventRowViewModel(
+                "苍赫组合",
+                f"+{result.purple_unlocked} 次虚式",
+                "可使用 /虚式 茈",
+            )
+        )
+    return GroupEventViewModel(
+        tone="technique",
+        eyebrow="群体术式 · 正式发动",
+        title=f"{technique_name}展开",
+        subtitle=detail,
+        actor_name=actor,
+        group_name=group_name or "当前群",
+        event_time=_display_time(result.receipt.created_at),
+        hero_label="本群接管范围",
+        hero_value=f"后续 {result.total_uses} 次抓猪",
+        rows=tuple(rows),
+        note=result.summary,
+        footer="术式状态已经持久化，逐次结算会单独出图",
+        seal_top="术式",
+        seal_bottom="发动",
+    )
+
+
+def technique_catch_event_view(
+    result: CatchResult,
+    *,
+    catcher_name: str,
+    catcher_player_id: str,
+    group_name: str,
+) -> GroupEventViewModel:
+    """Build the single public card for one technique-intercepted catch."""
+
+    resolution = result.technique_resolution
+    if resolution is None:
+        raise ValueError("本次抓猪没有群体术式结算。")
+    catcher = _public_actor_name(
+        display_name=catcher_name,
+        stable_id=catcher_player_id,
+    )
+    if resolution.technique_id == TECHNIQUE_MALEVOLENT_KITCHEN:
+        foods = resolution.generated_foods
+        preview_food = foods[0] if foods else None
+        food_name = foods[0].display_name if foods else "未知美食"
+        food_rarity = foods[0].rarity if foods else 0
+        owner_summary = "、".join(
+            f"{food.owner_display_name}：{food.selector}" for food in foods
+        )
+        return GroupEventViewModel(
+            tone="technique",
+            eyebrow="伏魔御厨子 · 自动出餐结算",
+            title=f"{result.pig.display_name}已化为{food_name}",
+            subtitle="抓猪、消耗原料、做菜与双份发放已在同一事务完成",
+            actor_name=resolution.source_display_name,
+            group_name=group_name or "当前群",
+            event_time=_display_time(result.receipt.created_at),
+            hero_label="本次出餐品质",
+            hero_value=f"{food_rarity} 星 · 双份",
+            rows=(
+                GroupEventRowViewModel("抓猪群友", catcher, result.pig.selector),
+                GroupEventRowViewModel(
+                    "双份美食",
+                    f"{len(foods)} 份",
+                    owner_summary,
+                ),
+                GroupEventRowViewModel(
+                    "领域剩余",
+                    f"{resolution.remaining_uses} 次",
+                    "每有一名群友成功抓猪就消耗一次",
+                ),
+            ),
+            note=resolution.summary,
+            footer="伏魔御厨子本轮出餐完成",
+            seal_top="领域",
+            seal_bottom="出餐",
+            actor_label="领域发动者",
+            media_visible=bool(
+                preview_food is not None and preview_food.media_visible
+            ),
+            is_animated=bool(
+                preview_food is not None and preview_food.is_animated
+            ),
+            image_fit=(
+                preview_food.image_fit if preview_food is not None else "contain"
+            ),
+        )
+    return GroupEventViewModel(
+        tone="technique",
+        eyebrow=f"{resolution.technique_name} · 抓猪归属结算",
+        title=f"{result.pig.display_name}归属已改写",
+        subtitle="猪猪已经直接进入最终归属者的背包",
+        actor_name=resolution.source_display_name,
+        group_name=group_name or "当前群",
+        event_time=_display_time(result.receipt.created_at),
+        hero_label="最终获得者",
+        hero_value=resolution.target_display_name,
+        rows=(
+            GroupEventRowViewModel("抓猪群友", catcher, "本次抓猪的指令发起者"),
+            GroupEventRowViewModel(
+                "获得猪猪",
+                result.pig.selector,
+                f"{result.pig.rarity} 星，价值 {result.pig.official_value:,} 猪币",
+            ),
+            GroupEventRowViewModel(
+                "术式剩余",
+                f"{resolution.remaining_uses} 次",
+                "成功抓猪后才会递减",
+            ),
+        ),
+        note=resolution.summary,
+        footer=f"{resolution.technique_name}本轮结算完成",
+        seal_top="术式",
+        seal_bottom="结算",
+        actor_label="术式发动者",
+        media_visible=result.pig.media_visible,
+        is_animated=result.pig.is_animated,
+        image_fit=result.pig.image_fit,
+    )
 
 
 def group_event_quota_reset_view(

@@ -11,7 +11,7 @@
 <body>
   <main class="game-sheet group-event group-event--{{ view.tone }}" data-pig-catcher-root data-render-ready="true">
     <header class="group-event__header">
-      <div class="group-event__seal">全群<br>通告</div>
+      <div class="group-event__seal">{{ view.seal_top }}<br>{{ view.seal_bottom }}</div>
       <div class="group-event__heading">
         <p>{{ view.eyebrow }}</p>
         <h1 style="font-size:{% if view.title|length > 24 %}36{% elif view.title|length > 16 %}44{% else %}54{% endif %}px">{{ view.title }}</h1>
@@ -21,9 +21,9 @@
     </header>
 
     <section class="group-event__identity">
-      <div><span>发动群友</span><strong style="font-size:{% if view.actor_name|length > 32 %}18{% elif view.actor_name|length > 20 %}22{% else %}28{% endif %}px">{{ view.actor_name }}</strong></div>
-      <div><span>生效群聊</span><strong style="font-size:{% if view.group_name|length > 38 %}17{% elif view.group_name|length > 24 %}21{% else %}26{% endif %}px">{{ view.group_name }}</strong></div>
-      <div><span>发动时间</span><strong>{{ view.event_time }}</strong></div>
+      <div><span>{{ view.actor_label }}</span><strong style="font-size:{% if view.actor_name|length > 32 %}18{% elif view.actor_name|length > 20 %}22{% else %}28{% endif %}px">{{ view.actor_name }}</strong></div>
+      <div><span>{{ view.group_label }}</span><strong style="font-size:{% if view.group_name|length > 38 %}17{% elif view.group_name|length > 24 %}21{% else %}26{% endif %}px">{{ view.group_name }}</strong></div>
+      <div><span>{{ view.time_label }}</span><strong>{{ view.event_time }}</strong></div>
     </section>
 
     <section class="group-event__hero">
@@ -39,7 +39,7 @@
       <div class="group-event__hero-copy">
         <span>{{ view.hero_label }}</span>
         <strong style="font-size:{% if view.hero_value|length > 24 %}34{% elif view.hero_value|length > 16 %}42{% else %}50{% endif %}px">{{ view.hero_value }}</strong>
-        <small>{% if view.settlement_committed %}本次事件已经提交；重复消息不会重复结算或通告{% else %}本次只取得发动资格；奖励将在正式发动时原子结算{% endif %}</small>
+        <small>{% if view.settlement_committed %}{{ view.committed_note }}{% else %}{{ view.pending_note }}{% endif %}</small>
       </div>
     </section>
 

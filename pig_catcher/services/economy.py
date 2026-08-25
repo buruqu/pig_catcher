@@ -318,6 +318,7 @@ class EatResult:
     coin_balance: int
     group_rewarded_players: int = 0
     group_coin_total: int = 0
+    available_effect_uses: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -2220,6 +2221,7 @@ class EconomyService:
             effect_entry_id = ""
             personal_effect_entry_id = ""
             roulette_available_spins = 0
+            available_effect_uses = 0
             if effect.queued_effect_id and effect.queued_effect_id not in {
                 WEEKLY_WINDOW_CATCHES,
                 PERMANENT_WINDOW_CATCH,
@@ -2316,6 +2318,7 @@ class EconomyService:
                     count=int(effect.queued_effect_params["count"]),
                     now=now,
                 )
+                available_effect_uses = roulette_available_spins
                 effect = replace(
                     effect,
                     summary=(
@@ -2334,6 +2337,7 @@ class EconomyService:
                     uses=1,
                     now=now,
                 )
+                available_effect_uses = available
                 effect = replace(
                     effect,
                     summary=(
@@ -2420,6 +2424,7 @@ class EconomyService:
                 "effect_granted_uses": effect.granted_uses,
                 "effect_expires_at": effect_expires_at,
                 "roulette_available_spins": roulette_available_spins,
+                "available_effect_uses": available_effect_uses,
                 "group_rewarded_players": group_rewarded_players,
                 "group_coin_total": group_coin_total,
                 "total_experience": total_experience,
@@ -2444,6 +2449,7 @@ class EconomyService:
                 coin_balance=coin_balance,
                 group_rewarded_players=group_rewarded_players,
                 group_coin_total=group_coin_total,
+                available_effect_uses=available_effect_uses,
             )
             receipt = await self._reserve(
                 session,
@@ -2471,6 +2477,7 @@ class EconomyService:
                 coin_balance=coin_balance,
                 group_rewarded_players=group_rewarded_players,
                 group_coin_total=group_coin_total,
+                available_effect_uses=available_effect_uses,
             )
 
     async def spin_roulette(self, identity: CommandIdentity) -> RouletteResult:
@@ -3788,6 +3795,11 @@ class EconomyService:
             coin_balance=int(payload["coin_balance"]),
             group_rewarded_players=int(payload.get("group_rewarded_players") or 0),
             group_coin_total=int(payload.get("group_coin_total") or 0),
+            available_effect_uses=int(
+                payload.get("available_effect_uses")
+                or payload.get("roulette_available_spins")
+                or 0
+            ),
         )
 
     def _purchase_from_receipt(

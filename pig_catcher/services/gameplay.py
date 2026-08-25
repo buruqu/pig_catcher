@@ -223,6 +223,43 @@ class CatchResult:
     global_size_record: bool = False
     global_weight_record: bool = False
     giant_sighting: bool = False
+    technique_resolution: TechniqueCatchResolution | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class TechniqueFoodView:
+    """One food serving created by a group technique."""
+
+    food_instance_id: str
+    short_code: str
+    owner_player_id: str
+    owner_display_name: str
+    rarity: int
+    display_name: str
+    image_relpath: str
+    image_fit: str
+    media_format: str
+    is_animated: bool
+    media_visible: bool
+
+    @property
+    def selector(self) -> str:
+        return f"{self.display_name}#{self.short_code}"
+
+
+@dataclass(frozen=True, slots=True)
+class TechniqueCatchResolution:
+    """Structured public settlement for a catch intercepted by a technique."""
+
+    technique_id: str
+    technique_name: str
+    source_player_id: str
+    source_display_name: str
+    target_player_id: str
+    target_display_name: str
+    remaining_uses: int
+    summary: str
+    generated_foods: tuple[TechniqueFoodView, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -1411,9 +1448,9 @@ class GameplayService:
                         "updated_at": now,
                     },
                 )
+            technique_resolution: TechniqueCatchResolution | None = None
             if active_group_technique is not None:
-                technique_summary, technique_remaining = (
-                    await self._apply_group_technique_to_catch(
+                technique_resolution = await self._apply_group_technique_to_catch(
                         session,
                         identity=identity,
                         active_effect=active_group_technique,
@@ -1424,12 +1461,11 @@ class GameplayService:
                         attributes=attributes,
                         now=now,
                     )
-                )
                 random_snapshot["group_technique_remaining_uses"] = (
-                    technique_remaining
+                    technique_resolution.remaining_uses
                 )
                 random_snapshot["food_effect_summaries"] = list(
-                    (*effect_summaries, technique_summary)
+                    (*effect_summaries, technique_resolution.summary)
                 )
                 await session.execute(
                     """
@@ -1443,7 +1479,7 @@ class GameplayService:
                         pig_instance_id,
                     ),
                 )
-                effect_summaries += (technique_summary,)
+                effect_summaries += (technique_resolution.summary,)
             auto_gift_target_player_id = ""
             if (
                 active_group_technique is None
@@ -1704,6 +1740,11 @@ class GameplayService:
                 "duplication_triggered": duplication_triggered,
                 "duplicated_pig_instance_id": duplicated_pig_instance_id,
                 "duplicated_short_code": duplicated_short_code,
+                "technique_resolution": (
+                    self._technique_resolution_payload(technique_resolution)
+                    if technique_resolution is not None
+                    else None
+                ),
             }
             provisional_receipt = CommandReceipt(
                 receipt_id="",
@@ -1747,6 +1788,7 @@ class GameplayService:
                 global_size_record=global_size_record,
                 global_weight_record=global_weight_record,
                 giant_sighting=giant_sighting,
+                technique_resolution=technique_resolution,
             )
             summary = format_catch_summary(provisional)
             reservation = await self.receipt_repository.reserve(
@@ -1795,6 +1837,7 @@ class GameplayService:
                 global_size_record=global_size_record,
                 global_weight_record=global_weight_record,
                 giant_sighting=giant_sighting,
+                technique_resolution=technique_resolution,
             )
 
     async def activate_group_technique(
@@ -2146,13 +2189,13 @@ class GameplayService:
         rarity: Rarity,
         attributes: PigAttributes,
         now: str,
-    ) -> tuple[str, int]:
+    ) -> TechniqueCatchResolution:
         technique_id = str(active_effect["technique_id"])
         source_player_id = str(active_effect["source_player_id"])
         source_name = str(active_effect.get("source_display_name") or "").strip()
         source_name = source_name or "未命名群友"
         if technique_id == TECHNIQUE_MALEVOLENT_KITCHEN:
-            food_summary = await self._domain_auto_cook(
+            generated_foods = await self._domain_auto_cook(
                 session,
                 identity=identity,
                 source_player_id=source_player_id,
@@ -2162,12 +2205,16 @@ class GameplayService:
                 attributes=attributes,
                 now=now,
             )
+            food_summary = "、".join(food.selector for food in generated_foods)
             action = (
                 f"{TECHNIQUE_DISPLAY_NAMES[technique_id]}由 {source_name} 接管："
                 f"{template['display_name']}#{short_code} 已立即做成 {food_summary}，"
                 "发动者与抓猪者各获得一份"
             )
+            target_player_id = ""
+            target_name = ""
         else:
+            generated_foods = ()
             players = sorted(
                 await self.economy_repository.players_in_scope(
                     session,
@@ -2226,7 +2273,18 @@ class GameplayService:
             effect_entry_id=str(active_effect["effect_entry_id"]),
             now=now,
         )
-        return f"{action}（本群术式剩余 {remaining} 次）", remaining
+        summary = f"{action}（本群术式剩余 {remaining} 次）"
+        return TechniqueCatchResolution(
+            technique_id=technique_id,
+            technique_name=TECHNIQUE_DISPLAY_NAMES[technique_id],
+            source_player_id=source_player_id,
+            source_display_name=source_name,
+            target_player_id=target_player_id,
+            target_display_name=target_name,
+            remaining_uses=remaining,
+            summary=summary,
+            generated_foods=generated_foods,
+        )
 
     async def _domain_auto_cook(
         self,
@@ -2239,7 +2297,7 @@ class GameplayService:
         rarity: Rarity,
         attributes: PigAttributes,
         now: str,
-    ) -> str:
+    ) -> tuple[TechniqueFoodView, ...]:
         """Consume a just-caught pig and create one serving for each beneficiary."""
 
         if str(template["template_id"]) == GOJO_PIG_TEMPLATE_ID:
@@ -2389,11 +2447,16 @@ class GameplayService:
             field="total_cooks",
             now=now,
         )
-        selectors = "、".join(
-            f"{food_template['display_name']}#{short_code}"
-            for short_code in short_codes
-        )
-        return f"{int(output_rarity)} 星 {selectors}"
+        foods: list[TechniqueFoodView] = []
+        for food_id in food_ids:
+            row = await self.economy_repository.get_food_by_instance_id(
+                session,
+                food_instance_id=food_id,
+            )
+            if row is None:
+                raise RuntimeError("领域出餐后无法读取美食实例。")
+            foods.append(self._technique_food_view(row))
+        return tuple(foods)
 
     async def toggle_baogian(
         self,
@@ -3162,7 +3225,85 @@ class GameplayService:
             global_size_record=bool(payload.get("global_size_record") or False),
             global_weight_record=bool(payload.get("global_weight_record") or False),
             giant_sighting=bool(payload.get("giant_sighting") or False),
+            technique_resolution=self._technique_resolution_from_payload(
+                payload.get("technique_resolution")
+            ),
         )
+
+    @staticmethod
+    def _technique_food_view(row: Mapping[str, object]) -> TechniqueFoodView:
+        return TechniqueFoodView(
+            food_instance_id=str(row["food_instance_id"]),
+            short_code=str(row["short_code"]),
+            owner_player_id=str(row["owner_player_id"]),
+            owner_display_name=(
+                str(row.get("owner_display_name") or "").strip()
+                or "未命名群友"
+            ),
+            rarity=int(row["rarity"]),
+            display_name=str(row["display_name_snapshot"]),
+            image_relpath=str(row.get("image_relpath") or ""),
+            image_fit=str(row.get("image_fit") or "contain"),
+            media_format=str(row.get("media_format") or "PNG"),
+            is_animated=bool(row.get("is_animated") or False),
+            media_visible=bool(row.get("media_visible") or False),
+        )
+
+    @classmethod
+    def _technique_resolution_from_payload(
+        cls,
+        raw: object,
+    ) -> TechniqueCatchResolution | None:
+        if not isinstance(raw, Mapping):
+            return None
+        raw_foods = raw.get("generated_foods")
+        foods: list[TechniqueFoodView] = []
+        if isinstance(raw_foods, list):
+            for item in raw_foods:
+                if isinstance(item, Mapping):
+                    foods.append(cls._technique_food_view(item))
+        return TechniqueCatchResolution(
+            technique_id=str(raw.get("technique_id") or ""),
+            technique_name=str(raw.get("technique_name") or ""),
+            source_player_id=str(raw.get("source_player_id") or ""),
+            source_display_name=str(raw.get("source_display_name") or "未命名群友"),
+            target_player_id=str(raw.get("target_player_id") or ""),
+            target_display_name=str(raw.get("target_display_name") or ""),
+            remaining_uses=int(raw.get("remaining_uses") or 0),
+            summary=str(raw.get("summary") or ""),
+            generated_foods=tuple(foods),
+        )
+
+    @staticmethod
+    def _technique_resolution_payload(
+        resolution: TechniqueCatchResolution,
+    ) -> dict[str, object]:
+        return {
+            "technique_id": resolution.technique_id,
+            "technique_name": resolution.technique_name,
+            "source_player_id": resolution.source_player_id,
+            "source_display_name": resolution.source_display_name,
+            "target_player_id": resolution.target_player_id,
+            "target_display_name": resolution.target_display_name,
+            "remaining_uses": resolution.remaining_uses,
+            "summary": resolution.summary,
+            "generated_foods": [
+                {
+                    "food_instance_id": food.food_instance_id,
+                    "short_code": food.short_code,
+                    "owner_player_id": food.owner_player_id,
+                    "owner_display_name": food.owner_display_name,
+                    "rarity": food.rarity,
+                    "display_name_snapshot": food.display_name,
+                    "image_relpath": food.image_relpath,
+                    "image_fit": food.image_fit,
+                    "media_format": food.media_format,
+                    "is_animated": food.is_animated,
+                    "media_visible": food.media_visible,
+                }
+                for food in resolution.generated_foods
+            ],
+        }
 
     def _pig_view(self, row: Mapping[str, object]) -> PigView:
         return pig_view_from_row(

@@ -89,6 +89,7 @@ from .pig_catcher.rendering import (
     group_event_quota_reset_view,
     inventory_media_paths,
     inventory_view,
+    is_special_event_food,
     item_receipt_view,
     ledger_view,
     media_path,
@@ -99,9 +100,13 @@ from .pig_catcher.rendering import (
     ranking_media_paths,
     ranking_view,
     records_view,
+    roulette_event_view,
     sale_receipt_view,
     showcase_receipt_view,
+    special_event_eat_view,
     store_view,
+    technique_activation_view,
+    technique_catch_event_view,
     trade_list_view,
     trade_receipt_view,
 )
@@ -416,7 +421,9 @@ class PigCatcherPlugin(MaiBotPlugin):
                 logger=self.ctx.logger,
                 fallback_to_text=settings.rendering.fallback_to_text,
                 max_concurrent_deliveries=settings.rendering.max_concurrent_image_deliveries,
+                max_concurrent_image_sends=settings.rendering.max_concurrent_image_sends,
                 queue_timeout_ms=settings.rendering.image_delivery_queue_timeout_ms,
+                image_send_queue_timeout_ms=settings.rendering.image_send_queue_timeout_ms,
                 render_timeout_ms=settings.rendering.render_timeout_ms,
                 image_send_timeout_ms=settings.rendering.image_send_timeout_ms,
                 text_send_timeout_ms=settings.rendering.text_send_timeout_ms,
@@ -1875,11 +1882,36 @@ class PigCatcherPlugin(MaiBotPlugin):
             fallback = result.receipt.text_summary or format_catch_summary(result)
             if (
                 result.receipt_created
+                and result.technique_resolution is None
                 and result.pig.alternate_image_relpath
             ):
                 await self._send_image_file(
                     identity.stream_id,
                     result.pig.alternate_image_relpath,
+                )
+            if result.technique_resolution is not None:
+                view = technique_catch_event_view(
+                    result,
+                    catcher_name=identity.display_name,
+                    catcher_player_id=identity.player_id,
+                    group_name=identity.group_name,
+                )
+                data_dir = Path(self.ctx.paths.data_dir).resolve()
+                if result.technique_resolution.generated_foods:
+                    source_path = food_media_path(
+                        data_dir,
+                        result.technique_resolution.generated_foods[0],
+                    )
+                else:
+                    source_path = pig_media_path(data_dir, result.pig)
+                return await self._deliver_receipt(
+                    stream_id=identity.stream_id,
+                    receipt=result.receipt,
+                    render=lambda: cast(
+                        PigCatcherRenderer,
+                        self._renderer,
+                    ).render_group_event(view, source_path),
+                    fallback_text=fallback,
                 )
             return await self._deliver_receipt(
                 stream_id=identity.stream_id,
@@ -1999,9 +2031,20 @@ class PigCatcherPlugin(MaiBotPlugin):
                 identity,
                 technique_id=technique_id,
             )
-            return await self._deliver_text_receipt(
+            view = technique_activation_view(
+                result,
+                actor_name=identity.display_name,
+                actor_player_id=identity.player_id,
+                group_name=identity.group_name,
+            )
+            return await self._deliver_receipt(
                 stream_id=identity.stream_id,
                 receipt=result.receipt,
+                render=lambda: cast(
+                    PigCatcherRenderer,
+                    self._renderer,
+                ).render_group_event(view),
+                fallback_text=result.receipt.text_summary,
             )
         except Exception as exc:
             return await self._command_error(
@@ -2084,9 +2127,26 @@ class PigCatcherPlugin(MaiBotPlugin):
                 GameplayService,
                 self._gameplay_service,
             ).activate_hollow_purple(identity)
-            return await self._deliver_text_receipt(
+            view = technique_activation_view(
+                result,
+                actor_name=identity.display_name,
+                actor_player_id=identity.player_id,
+                group_name=identity.group_name,
+            )
+            data_dir = Path(self.ctx.paths.data_dir).resolve()
+            source_path = (
+                pig_media_path(data_dir, result.granted_pigs[0])
+                if result.granted_pigs
+                else None
+            )
+            return await self._deliver_receipt(
                 stream_id=identity.stream_id,
                 receipt=result.receipt,
+                render=lambda: cast(
+                    PigCatcherRenderer,
+                    self._renderer,
+                ).render_group_event(view, source_path),
+                fallback_text=result.receipt.text_summary,
             )
         except Exception as exc:
             return await self._command_error(
@@ -2766,9 +2826,20 @@ class PigCatcherPlugin(MaiBotPlugin):
                 EconomyService,
                 self._economy_service,
             ).spin_roulette(identity)
-            return await self._deliver_text_receipt(
+            view = roulette_event_view(
+                result,
+                actor_name=identity.display_name,
+                actor_player_id=identity.player_id,
+                group_name=identity.group_name,
+            )
+            return await self._deliver_receipt(
                 stream_id=identity.stream_id,
                 receipt=result.receipt,
+                render=lambda: cast(
+                    PigCatcherRenderer,
+                    self._renderer,
+                ).render_group_event(view),
+                fallback_text=result.receipt.text_summary,
             )
         except Exception as exc:
             return await self._command_error(
@@ -2873,6 +2944,23 @@ class PigCatcherPlugin(MaiBotPlugin):
                 result.receipt.text_summary
                 or format_group_event_eat_summary(result)
             )
+            return await self._deliver_receipt(
+                stream_id=identity.stream_id,
+                receipt=result.receipt,
+                render=lambda: renderer.render_group_event(
+                    event_view,
+                    source_path,
+                ),
+                fallback_text=fallback,
+            )
+        if is_special_event_food(result):
+            event_view = special_event_eat_view(
+                result,
+                group_name=identity.group_name,
+            )
+            data_dir = Path(self.ctx.paths.data_dir).resolve()
+            source_path = food_media_path(data_dir, result.food)
+            fallback = result.receipt.text_summary or format_eat_summary(result)
             return await self._deliver_receipt(
                 stream_id=identity.stream_id,
                 receipt=result.receipt,

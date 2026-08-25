@@ -614,6 +614,67 @@ async def test_delivery_queue_overload_falls_back_without_starting_extra_render(
 
 
 @pytest.mark.asyncio
+async def test_slow_qq_image_send_does_not_occupy_render_slot() -> None:
+    class GatedImageSend(FakeSend):
+        def __init__(self) -> None:
+            super().__init__()
+            self.first_send_started = asyncio.Event()
+            self.release_first_send = asyncio.Event()
+
+        async def image(self, image_base64: str, stream_id: str) -> bool:
+            self.images.append((stream_id, image_base64))
+            if stream_id == "first":
+                self.first_send_started.set()
+                await self.release_first_send.wait()
+            return True
+
+    send = GatedImageSend()
+    delivery = RenderDelivery(
+        send,
+        logger=logging.getLogger("test.render.delivery.split-slots"),
+        fallback_to_text=True,
+        max_concurrent_deliveries=1,
+        max_concurrent_image_sends=1,
+        queue_timeout_ms=100,
+        image_send_queue_timeout_ms=1000,
+    )
+    second_rendered = asyncio.Event()
+
+    async def render(stream_id: str) -> RenderedImage:
+        if stream_id == "second":
+            second_rendered.set()
+        return RenderedImage(
+            image_base64=_solid_png_base64(),
+            mime_type="image/png",
+            width=64,
+            height=64,
+            byte_length=64,
+        )
+
+    first = asyncio.create_task(
+        delivery.send_image_or_text(
+            stream_id="first",
+            render=lambda: render("first"),
+            fallback_text="first fallback",
+        )
+    )
+    await send.first_send_started.wait()
+    second = asyncio.create_task(
+        delivery.send_image_or_text(
+            stream_id="second",
+            render=lambda: render("second"),
+            fallback_text="second fallback",
+        )
+    )
+    await asyncio.wait_for(second_rendered.wait(), timeout=0.2)
+    send.release_first_send.set()
+    assert await first
+    assert await second
+    assert [stream_id for stream_id, _ in send.images] == ["first", "second"]
+    assert send.texts == []
+
+
+@pytest.mark.asyncio
 async def test_delivery_bounds_render_and_text_fallback_time() -> None:
     class SlowTextSend(FakeSend):
         async def text(self, text: str, stream_id: str) -> bool:

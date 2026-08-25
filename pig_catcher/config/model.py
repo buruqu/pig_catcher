@@ -959,18 +959,32 @@ class RenderingSection(PluginConfigBase):
         json_schema_extra=_ui("渲染超时", "超时后记录日志并按配置发送文字摘要"),
     )
     max_concurrent_image_deliveries: int = Field(
-        default=3,
+        default=2,
         ge=1,
         le=8,
-        description="插件同时生成并发送图片的最大任务数",
-        json_schema_extra=_ui("图片并发数", "默认 3；兼顾高峰吞吐和动画内存占用"),
+        description="插件同时生成图片的最大任务数",
+        json_schema_extra=_ui("图片渲染并发数", "默认 2；限制浏览器截图的瞬时内存占用"),
+    )
+    max_concurrent_image_sends: int = Field(
+        default=4,
+        ge=1,
+        le=8,
+        description="插件同时等待 QQ 图片发送完成的最大任务数",
+        json_schema_extra=_ui("图片发送并发数", "默认 4；慢发送不再占用渲染名额"),
     )
     image_delivery_queue_timeout_ms: int = Field(
-        default=8000,
+        default=12000,
         ge=100,
         le=30000,
         description="图片任务等待并发名额的最长毫秒数",
-        json_schema_extra=_ui("图片排队超时", "超时后不再挤压渲染服务，直接使用文字兜底"),
+        json_schema_extra=_ui("图片渲染排队超时", "默认等待 12 秒，优先保留图片回执"),
+    )
+    image_send_queue_timeout_ms: int = Field(
+        default=12000,
+        ge=100,
+        le=30000,
+        description="图片生成后等待发送名额的最长毫秒数",
+        json_schema_extra=_ui("图片发送排队超时", "发送慢时不会反向堵住新的图片渲染"),
     )
     image_send_timeout_ms: int = Field(
         default=20000,

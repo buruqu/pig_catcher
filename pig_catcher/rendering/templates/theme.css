@@ -2211,6 +2211,30 @@ footer strong {
     #fffaf8;
 }
 
+.group-event--technique {
+  background:
+    radial-gradient(circle at 12% 14%, rgba(127, 92, 196, 0.2), transparent 34%),
+    linear-gradient(315deg, rgba(255, 213, 223, 0.82), transparent 42%),
+    #fffafd;
+  border-color: #8a68b0;
+}
+
+.group-event--roulette {
+  background:
+    linear-gradient(135deg, rgba(255, 228, 174, 0.86), transparent 38%),
+    linear-gradient(315deg, rgba(255, 211, 231, 0.8), transparent 42%),
+    #fffdf8;
+  border-color: #d59a4d;
+}
+
+.group-event--tribute {
+  background:
+    linear-gradient(135deg, rgba(225, 47, 57, 0.13), transparent 38%),
+    linear-gradient(315deg, rgba(255, 216, 77, 0.28), transparent 42%),
+    #fffdf7;
+  border-color: #c63f48;
+}
+
 .group-event__header {
   min-height: 226px;
   padding: 34px 42px;
@@ -2226,6 +2250,17 @@ footer strong {
 .group-event--cloud .group-event__header {
   background: rgba(241, 240, 255, 0.9);
   border-bottom-color: #c6b5df;
+}
+
+.group-event--technique .group-event__header {
+  background: rgba(243, 236, 255, 0.92);
+  border-bottom-color: #aa8ccc;
+}
+
+.group-event--roulette .group-event__header,
+.group-event--tribute .group-event__header {
+  background: rgba(255, 244, 218, 0.92);
+  border-bottom-color: #e4b469;
 }
 
 .group-event__seal {
@@ -2252,6 +2287,21 @@ footer strong {
 .group-event--reset .group-event__seal {
   background: #a05231;
   border-color: #ffe1a9;
+}
+
+.group-event--technique .group-event__seal {
+  background: #533b81;
+  border-color: #dfd0ff;
+}
+
+.group-event--roulette .group-event__seal {
+  background: #b56b1f;
+  border-color: #ffe3a7;
+}
+
+.group-event--tribute .group-event__seal {
+  background: #b52231;
+  border-color: #ffe07b;
 }
 
 .group-event__heading p,
