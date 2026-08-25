@@ -959,18 +959,32 @@ class RenderingSection(PluginConfigBase):
         json_schema_extra=_ui("渲染超时", "超时后记录日志并按配置发送文字摘要"),
     )
     max_concurrent_image_deliveries: int = Field(
-        default=2,
+        default=3,
         ge=1,
         le=8,
         description="插件同时生成并发送图片的最大任务数",
-        json_schema_extra=_ui("图片并发数", "建议保持 2；高峰超出队列等待时会及时改发文字"),
+        json_schema_extra=_ui("图片并发数", "默认 3；兼顾高峰吞吐和动画内存占用"),
     )
     image_delivery_queue_timeout_ms: int = Field(
-        default=5000,
+        default=8000,
         ge=100,
         le=30000,
         description="图片任务等待并发名额的最长毫秒数",
         json_schema_extra=_ui("图片排队超时", "超时后不再挤压渲染服务，直接使用文字兜底"),
+    )
+    image_send_timeout_ms: int = Field(
+        default=20000,
+        ge=1000,
+        le=30000,
+        description="单次图片发送等待宿主返回的最长毫秒数",
+        json_schema_extra=_ui("图片发送超时", "超时后释放并发名额并尝试文字兜底"),
+    )
+    text_send_timeout_ms: int = Field(
+        default=5000,
+        ge=500,
+        le=15000,
+        description="单次纯文字发送等待宿主返回的最长毫秒数",
+        json_schema_extra=_ui("文字发送超时", "限制降级和错误回复占用命令 RPC 的时间"),
     )
     single_media_preview_max_side: int = Field(
         default=768,

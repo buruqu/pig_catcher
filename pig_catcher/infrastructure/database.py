@@ -158,6 +158,7 @@ class PigCatcherDatabase:
                 migration_row = None
             recorded_version = int(migration_row[0]) if migration_row is not None else -1
             if recorded_version == SCHEMA_VERSION:
+                await self._validate_current_schema(connection)
                 return
 
         # SQLite table-rebuild migrations require foreign-key enforcement to be
@@ -195,6 +196,7 @@ class PigCatcherDatabase:
                 user_version = migration.version
             if user_version != SCHEMA_VERSION:
                 raise MigrationError(f"迁移结束版本 {user_version} 与代码版本 {SCHEMA_VERSION} 不一致。")
+            await self._validate_current_schema(connection)
             foreign_key_rows = await (
                 await connection.execute("PRAGMA foreign_key_check")
             ).fetchall()
@@ -209,6 +211,47 @@ class PigCatcherDatabase:
             raise
         finally:
             await connection.execute("PRAGMA foreign_keys = ON")
+
+    @staticmethod
+    async def _validate_current_schema(connection: aiosqlite.Connection) -> None:
+        """Reject a stamped database whose critical v34 structures did not converge."""
+
+        required_tables = {"player_food_effects", "player_roulette_state"}
+        table_rows = await (
+            await connection.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name IN (?, ?)",
+                tuple(sorted(required_tables)),
+            )
+        ).fetchall()
+        present_tables = {str(row[0]) for row in table_rows}
+        missing_tables = required_tables - present_tables
+        if missing_tables:
+            raise MigrationError(
+                "数据库版本已是当前版，但缺少关键表："
+                + "、".join(sorted(missing_tables))
+            )
+
+        index_rows = await (
+            await connection.execute("PRAGMA index_list(player_food_effects)")
+        ).fetchall()
+        source_index_found = False
+        for row in index_rows:
+            index_name = str(row[1])
+            is_unique = bool(row[2])
+            escaped_name = index_name.replace('"', '""')
+            column_rows = await (
+                await connection.execute(f'PRAGMA index_info("{escaped_name}")')
+            ).fetchall()
+            columns = tuple(str(column[2]) for column in column_rows)
+            if "source_food_instance_id" in columns and is_unique:
+                raise MigrationError(
+                    "player_food_effects.source_food_instance_id 仍带 UNIQUE 约束，"
+                    "会导致轮盘多奖励结算失败。"
+                )
+            if columns and columns[0] == "source_food_instance_id" and not is_unique:
+                source_index_found = True
+        if not source_index_found:
+            raise MigrationError("player_food_effects 缺少来源查询索引。")
 
     def _require_open(self) -> None:
         if not self._is_open:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import os
 from collections.abc import Awaitable, Callable, Mapping, Sequence
@@ -416,6 +417,9 @@ class PigCatcherPlugin(MaiBotPlugin):
                 fallback_to_text=settings.rendering.fallback_to_text,
                 max_concurrent_deliveries=settings.rendering.max_concurrent_image_deliveries,
                 queue_timeout_ms=settings.rendering.image_delivery_queue_timeout_ms,
+                render_timeout_ms=settings.rendering.render_timeout_ms,
+                image_send_timeout_ms=settings.rendering.image_send_timeout_ms,
+                text_send_timeout_ms=settings.rendering.text_send_timeout_ms,
             )
             self._maintenance = maintenance
             if settings.maintenance.enabled:
@@ -582,7 +586,7 @@ class PigCatcherPlugin(MaiBotPlugin):
                 self.ctx.logger.exception("控制面板群公告认领失败；触发开关已关闭，不会自动重试")
                 return
             try:
-                sent = bool(await self.ctx.send.text(claim.content, claim.stream_id))
+                sent = await self._send_text_capability(claim.content, claim.stream_id)
             except Exception as exc:
                 try:
                     await service.record_result(claim, success=False, error=str(exc))
@@ -815,8 +819,32 @@ class PigCatcherPlugin(MaiBotPlugin):
         *,
         success: bool,
     ) -> tuple[bool, str, int]:
-        sent = bool(await self.ctx.send.text(text, stream_id)) if stream_id else False
-        return sent and success, text, 2 if success else 1
+        if not stream_id:
+            return False, text, 1
+        try:
+            sent = await self._send_text_capability(text, stream_id)
+        except TimeoutError:
+            self.ctx.logger.warning(
+                "抓猪纯文字回复超时（%s ms）：stream=%s",
+                self.settings.rendering.text_send_timeout_ms,
+                stream_id,
+            )
+            sent = False
+        except Exception:
+            self.ctx.logger.exception("抓猪纯文字回复失败：stream=%s", stream_id)
+            sent = False
+        delivered = sent and success
+        return delivered, text, 2 if delivered else 1
+
+    async def _send_text_capability(self, text: str, stream_id: str) -> bool:
+        """Bound one host text capability call so a command stays below Runner RPC timeout."""
+
+        return bool(
+            await asyncio.wait_for(
+                self.ctx.send.text(text, stream_id),
+                timeout=self.settings.rendering.text_send_timeout_ms / 1000,
+            )
+        )
 
     async def _prepare_command(
         self,
@@ -923,7 +951,11 @@ class PigCatcherPlugin(MaiBotPlugin):
         if not await receipts.claim_send(receipt.receipt_id):
             return True, "该消息已处理，不重复公示。", 0
         if self._delivery is None:
-            sent = bool(await self.ctx.send.text(fallback_text, stream_id))
+            try:
+                sent = await self._send_text_capability(fallback_text, stream_id)
+            except Exception:
+                sent = False
+                self.ctx.logger.exception("抓猪回执纯文字发送失败")
         else:
             sent = await self._delivery.send_image_or_text(
                 stream_id=stream_id,
@@ -959,7 +991,7 @@ class PigCatcherPlugin(MaiBotPlugin):
         if not await receipts.claim_send(receipt.receipt_id):
             return True, "该消息已处理，不重复公示。", 0
         try:
-            sent = bool(await self.ctx.send.text(receipt.text_summary, stream_id))
+            sent = await self._send_text_capability(receipt.text_summary, stream_id)
         except Exception as exc:
             await receipts.mark_failed(receipt.receipt_id, str(exc))
             raise
@@ -990,7 +1022,7 @@ class PigCatcherPlugin(MaiBotPlugin):
             if notice is None:
                 continue
             try:
-                sent = bool(await self.ctx.send.text(notice.message_text, stream_id))
+                sent = await self._send_text_capability(notice.message_text, stream_id)
             except Exception as exc:
                 await service.mark_notice_failed(notice.notice_id, str(exc))
                 self.ctx.logger.exception(
@@ -1057,7 +1089,19 @@ class PigCatcherPlugin(MaiBotPlugin):
         try:
             payload = source_path.read_bytes()
             encoded = base64.b64encode(payload).decode("ascii")
-            return bool(await self.ctx.send.image(encoded, stream_id))
+            return bool(
+                await asyncio.wait_for(
+                    self.ctx.send.image(encoded, stream_id),
+                    timeout=self.settings.rendering.image_send_timeout_ms / 1000,
+                )
+            )
+        except TimeoutError:
+            self.ctx.logger.warning(
+                "备用图片独立发送等待超时（%s ms）；发送结果不确定，不再重试：%s",
+                self.settings.rendering.image_send_timeout_ms,
+                relative_path,
+            )
+            return False
         except Exception:
             self.ctx.logger.exception("备用图片独立发送失败：%s", relative_path)
             return False

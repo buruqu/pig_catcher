@@ -30,14 +30,20 @@ class RenderDelivery:
         *,
         logger: logging.Logger,
         fallback_to_text: bool,
-        max_concurrent_deliveries: int = 2,
-        queue_timeout_ms: int = 5000,
+        max_concurrent_deliveries: int = 3,
+        queue_timeout_ms: int = 8000,
+        render_timeout_ms: int = 15000,
+        image_send_timeout_ms: int = 20000,
+        text_send_timeout_ms: int = 5000,
     ) -> None:
         self.send = send
         self.logger = logger
         self.fallback_to_text = fallback_to_text
         self.max_concurrent_deliveries = max(1, int(max_concurrent_deliveries))
         self.queue_timeout_seconds = max(0.1, int(queue_timeout_ms) / 1000)
+        self.render_timeout_seconds = max(0.1, int(render_timeout_ms) / 1000)
+        self.image_send_timeout_seconds = max(0.1, int(image_send_timeout_ms) / 1000)
+        self.text_send_timeout_seconds = max(0.1, int(text_send_timeout_ms) / 1000)
         self._delivery_slots = asyncio.Semaphore(self.max_concurrent_deliveries)
 
     async def send_image_or_text(
@@ -67,19 +73,40 @@ class RenderDelivery:
         queue_ms = (perf_counter() - queued_at) * 1000
         rendered: RenderedImage | None = None
         sent = False
+        image_send_timed_out = False
         render_ms = 0.0
         send_ms = 0.0
         try:
             render_started = perf_counter()
             try:
-                rendered = await render()
+                rendered = await asyncio.wait_for(
+                    render(),
+                    timeout=self.render_timeout_seconds,
+                )
+            except TimeoutError:
+                self.logger.warning(
+                    "抓猪图片生成超时（%.0f ms），准备使用纯文字降级",
+                    self.render_timeout_seconds * 1000,
+                )
             except Exception:
                 self.logger.exception("抓猪图片生成失败，准备使用纯文字降级")
             render_ms = (perf_counter() - render_started) * 1000
             if rendered is not None:
                 send_started = perf_counter()
                 try:
-                    sent = bool(await self.send.image(rendered.image_base64, stream_id))
+                    sent = bool(
+                        await asyncio.wait_for(
+                            self.send.image(rendered.image_base64, stream_id),
+                            timeout=self.image_send_timeout_seconds,
+                        )
+                    )
+                except TimeoutError:
+                    image_send_timed_out = True
+                    self.logger.warning(
+                        "抓猪图片发送等待超时（%.0f ms）；发送结果不确定，"
+                        "为避免重复公示，本次不再补发文字",
+                        self.image_send_timeout_seconds * 1000,
+                    )
                 except Exception:
                     self.logger.exception("抓猪图片发送失败，准备使用纯文字降级")
                 send_ms = (perf_counter() - send_started) * 1000
@@ -95,6 +122,8 @@ class RenderDelivery:
                 rendered.byte_length,
             )
             return True
+        if image_send_timed_out:
+            return False
         if rendered is not None and send_ms > 0:
             self.logger.warning(
                 "抓猪图片发送接口返回失败，准备使用纯文字降级：排队=%.0fms，渲染=%.0fms，发送=%.0fms",
@@ -108,7 +137,18 @@ class RenderDelivery:
         if not self.fallback_to_text:
             return False
         try:
-            return bool(await self.send.text(fallback_text, stream_id))
+            return bool(
+                await asyncio.wait_for(
+                    self.send.text(fallback_text, stream_id),
+                    timeout=self.text_send_timeout_seconds,
+                )
+            )
+        except TimeoutError:
+            self.logger.warning(
+                "抓猪纯文字降级发送超时（%.0f ms）",
+                self.text_send_timeout_seconds * 1000,
+            )
+            return False
         except Exception:
             self.logger.exception("抓猪纯文字降级发送失败")
             return False

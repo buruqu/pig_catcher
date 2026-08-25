@@ -1548,3 +1548,26 @@
   `git diff --check`、JSON/TOML 解析和全新严格目录导入通过。四组生产数据克隆 UAT 全部通过：
   抓猪/图鉴、做菜/经济、社交/七类排行及 12 步故障恢复；恢复库账本差异 0、最终表计数一致、
   `quick_check=ok`。真实 QQ 群只发送版本公告，不使用玩家资产做破坏性自动测试。
+
+## 48. v1.27.1 生产兼容与高峰交付修复验收
+
+- 验收日期：`2026-08-25`。插件升级为 `local.pig-catcher v1.27.1`，Schema `33 → 34`；
+  Ruleset `27`、Asset Manifest `4` 和 55 个显式命令保持不变，不调整玩法数值或玩家资产。
+- 真实根因：一套已标记 Schema 33 的生产库仍保留
+  `player_food_effects.source_food_instance_id UNIQUE`。玩家 `/转轮盘` 从同一道菜抽到第二个
+  效果奖励时会触发唯一键异常。Schema 34 无损重建效果表并恢复普通来源索引；启动快速路径
+  新增关键表和索引结构校验，防止“版本正确、结构错误”再次静默进入业务。
+- 高峰交付：图片交付并发调整为 3、排队上限 8 秒，渲染/图片/文字调用分别限制为
+  15/20/5 秒。确定失败继续完整文字降级；图片超时但平台发送结果不确定时不补发，避免重复
+  公示；猪猪第二立绘的独立发送同样受 20 秒边界保护。
+- 发布保护点：
+  `D:\MaiBotArchives\pig_catcher\release-snapshots\pig-catcher-pre-full-audit-20260825-121502.sqlite3`，
+  大小 567,504,896 字节，Schema 33、`quick_check=ok`、外键异常 0。生产热加载后为
+  Schema 34，来源唯一约束已移除，`quick_check=ok`、外键异常 0、账本差异 0；最新版稳定
+  运行日志未发现新的 warning/error。
+- 四组正式数据隔离克隆 UAT 全部通过，证据目录为
+  `D:\MaiBotArchives\pig_catcher\release-snapshots\uat-full-audit-20260825-123126`。覆盖抓猪/图鉴、
+  做菜/经济、赠送/交易/七类排行及 12 步故障恢复；恢复演练唯一失败是主动注入的 SQLite
+  写锁，恢复后账本差异 0、最终表计数一致、`quick_check=ok`。
+- 最终自动门禁：pytest `315 passed`；Ruff、Python `compileall`、`uv lock --check --offline`、
+  JSON/TOML 解析和 `git diff --check` 全部通过。未在真实群消耗任何玩家资产。

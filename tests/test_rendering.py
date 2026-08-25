@@ -614,6 +614,71 @@ async def test_delivery_queue_overload_falls_back_without_starting_extra_render(
 
 
 @pytest.mark.asyncio
+async def test_delivery_bounds_render_and_text_fallback_time() -> None:
+    class SlowTextSend(FakeSend):
+        async def text(self, text: str, stream_id: str) -> bool:
+            self.texts.append((stream_id, text))
+            await asyncio.Event().wait()
+            return True
+
+    send = SlowTextSend()
+    delivery = RenderDelivery(
+        send,
+        logger=logging.getLogger("test.render.delivery.deadline"),
+        fallback_to_text=True,
+        render_timeout_ms=20,
+        text_send_timeout_ms=20,
+    )
+
+    async def stalled_render() -> RenderedImage:
+        await asyncio.Event().wait()
+        raise AssertionError("unreachable")
+
+    started = time.monotonic()
+    assert not await delivery.send_image_or_text(
+        stream_id="stream",
+        render=stalled_render,
+        fallback_text="bounded fallback",
+    )
+    assert time.monotonic() - started < 0.5
+    assert send.texts == [("stream", "bounded fallback")]
+
+
+@pytest.mark.asyncio
+async def test_delivery_does_not_double_send_after_ambiguous_image_timeout() -> None:
+    class SlowImageSend(FakeSend):
+        async def image(self, image_base64: str, stream_id: str) -> bool:
+            self.images.append((stream_id, image_base64))
+            await asyncio.Event().wait()
+            return True
+
+    send = SlowImageSend()
+    delivery = RenderDelivery(
+        send,
+        logger=logging.getLogger("test.render.delivery.image-timeout"),
+        fallback_to_text=True,
+        image_send_timeout_ms=20,
+    )
+
+    async def render() -> RenderedImage:
+        return RenderedImage(
+            image_base64=_solid_png_base64(),
+            mime_type="image/png",
+            width=64,
+            height=64,
+            byte_length=64,
+        )
+
+    assert not await delivery.send_image_or_text(
+        stream_id="stream",
+        render=render,
+        fallback_text="must not duplicate",
+    )
+    assert len(send.images) == 1
+    assert send.texts == []
+
+
+@pytest.mark.asyncio
 async def test_renderer_rejects_oversized_html_before_rpc() -> None:
     capability = FakeRender()
     renderer = PigCatcherRenderer(capability, _options())

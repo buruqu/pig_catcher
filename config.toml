@@ -1,6 +1,6 @@
 [plugin]
 enabled = true
-config_version = "1.27.0"
+config_version = "1.27.1"
 framework_phase = "6"
 
 [features]
@@ -122,8 +122,10 @@ card_width = 1200
 viewport_height = 1600
 device_scale_factor = 1.0
 render_timeout_ms = 15000
-max_concurrent_image_deliveries = 2
-image_delivery_queue_timeout_ms = 5000
+max_concurrent_image_deliveries = 3
+image_delivery_queue_timeout_ms = 8000
+image_send_timeout_ms = 20000
+text_send_timeout_ms = 5000
 single_media_preview_max_side = 768
 media_preview_cache_bytes = 8388608
 media_preview_disk_cache_bytes = 67108864

@@ -980,6 +980,116 @@ async def test_legacy_v9_social_ban_splits_into_two_permanent_blacklists(
 
 
 @pytest.mark.asyncio
+async def test_released_v33_source_unique_constraint_is_repaired(tmp_path: Path) -> None:
+    """Some live v33 databases were stamped before the table rebuild was shipped."""
+
+    path = tmp_path / "released-v33.sqlite3"
+    connection = sqlite3.connect(path)
+    connection.executescript(
+        """
+        CREATE TABLE schema_migrations(
+            version INTEGER PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE,
+            applied_at TEXT NOT NULL
+        );
+        INSERT INTO schema_migrations(version, name, applied_at)
+        VALUES (33, 'food-roulette-rebalance', '2026-08-24T17:46:47.946Z');
+        CREATE TABLE players(player_id TEXT PRIMARY KEY);
+        CREATE TABLE food_instances(food_instance_id TEXT PRIMARY KEY);
+        INSERT INTO players(player_id) VALUES ('qq:100:200');
+        INSERT INTO food_instances(food_instance_id) VALUES ('roulette-source');
+        CREATE TABLE player_roulette_state(
+            player_id TEXT PRIMARY KEY REFERENCES players(player_id),
+            available_spins INTEGER NOT NULL DEFAULT 0 CHECK (available_spins >= 0),
+            source_food_instance_id TEXT NOT NULL REFERENCES food_instances(food_instance_id),
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE TABLE player_food_effects (
+            effect_entry_id TEXT PRIMARY KEY,
+            player_id TEXT NOT NULL REFERENCES players(player_id) ON DELETE CASCADE,
+            source_food_instance_id TEXT NOT NULL UNIQUE
+                REFERENCES food_instances(food_instance_id),
+            effect_id TEXT NOT NULL,
+            params_json TEXT NOT NULL DEFAULT '{}',
+            granted_uses INTEGER NOT NULL CHECK (granted_uses >= 1),
+            consumed_uses INTEGER NOT NULL DEFAULT 0 CHECK (
+                consumed_uses >= 0 AND consumed_uses <= granted_uses
+            ),
+            expires_at TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE INDEX idx_player_food_effects_active
+        ON player_food_effects(
+            player_id, effect_id, consumed_uses, expires_at, created_at
+        );
+        INSERT INTO player_food_effects(
+            effect_entry_id, player_id, source_food_instance_id,
+            effect_id, granted_uses, created_at, updated_at
+        ) VALUES (
+            'existing-effect', 'qq:100:200', 'roulette-source',
+            'next-six-star-cook-bonus', 1, 'now', 'now'
+        );
+        PRAGMA user_version = 33;
+        """
+    )
+    connection.commit()
+    connection.close()
+
+    database = PigCatcherDatabase(path)
+    await database.open()
+    assert await database.schema_version() == SCHEMA_VERSION
+    table = await database.fetch_one(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='player_food_effects'"
+    )
+    assert table is not None
+    assert "source_food_instance_id TEXT NOT NULL UNIQUE" not in str(table["sql"])
+    async with database.transaction() as session:
+        await session.execute(
+            """
+            INSERT INTO player_food_effects(
+                effect_entry_id, player_id, source_food_instance_id,
+                effect_id, granted_uses, created_at, updated_at
+            ) VALUES (
+                'second-effect', 'qq:100:200', 'roulette-source',
+                'next-guaranteed-six-star-catch', 1, 'now', 'now'
+            )
+            """
+        )
+    rows = await database.fetch_all(
+        "SELECT effect_id FROM player_food_effects ORDER BY effect_entry_id"
+    )
+    assert [str(row["effect_id"]) for row in rows] == [
+        "next-six-star-cook-bonus",
+        "next-guaranteed-six-star-catch",
+    ]
+    assert await database.integrity_check() == ("ok",)
+    assert await database.fetch_all("PRAGMA foreign_key_check") == []
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_current_schema_rejects_reintroduced_source_unique_index(tmp_path: Path) -> None:
+    path = tmp_path / "malformed-current.sqlite3"
+    database = PigCatcherDatabase(path)
+    await database.open()
+    await database.close()
+
+    connection = sqlite3.connect(path)
+    connection.execute(
+        "CREATE UNIQUE INDEX broken_source_unique "
+        "ON player_food_effects(source_food_instance_id)"
+    )
+    connection.commit()
+    connection.close()
+
+    malformed = PigCatcherDatabase(path)
+    with pytest.raises(MigrationError, match="仍带 UNIQUE 约束"):
+        await malformed.open()
+
+
+@pytest.mark.asyncio
 async def test_transaction_rolls_back_on_failure(tmp_path: Path) -> None:
     database = PigCatcherDatabase(tmp_path / "pig.sqlite3")
     await database.open()
