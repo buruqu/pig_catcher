@@ -80,7 +80,7 @@ uv lock --check
 git diff --check
 ```
 
-1.28.0 继续在 `tests/test_rendering.py` 验证渲染/平台发送分级背压、WebP 缓存和动画内存预算；Schema 30
+1.29.0 继续在 `tests/test_rendering.py` 验证渲染/平台发送分级背压、WebP 缓存、动画内存预算和猪币里程碑卡片；Schema 30
 查询计划、在线备份并发、统一备份保留、维护节流和旧素材引用保护在
 `tests/test_database_and_receipts.py` 验证，Schema 31 收藏迁移与名称直选/保护规则由数据库、
 经济和社交测试覆盖；Schema 32 及周四限定、专属做菜、群体术式、虚式幂等和群猪币转账由

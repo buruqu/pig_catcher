@@ -44,13 +44,13 @@
           </small>
         </div>
         <div class="profile-level-bonus">
-          <span>Lv.21+ 资深收益 · {{ view.veteran_tier }} 档</span>
+          <span>Lv.21+ 猪币里程碑 · {{ view.veteran_tier }}/5 档</span>
           <strong>
-            抓猪猪币 +{{ view.veteran_catch_coin_bonus }} · 做菜猪币 +{{ view.veteran_cook_coin_bonus }}
+            本档 +{{ view.veteran_milestone_coin_reward }} · 累计 +{{ view.veteran_cumulative_coin_reward }} 猪币
           </strong>
           <small>
-            基础经验 +{{ view.veteran_experience_bonus_percent }}%
-            · {% if view.veteran_next_tier_level is none %}已达最高档{% else %}下一档 Lv.{{ view.veteran_next_tier_level }}{% endif %}
+            {% if view.veteran_claimed_tier >= view.veteran_tier %}已领取当前全部奖励{% else %}已达成奖励将在下次获得经验时自动补发{% endif %}
+            · {% if view.veteran_next_tier_level is none %}已达最高档{% else %}下一档 Lv.{{ view.veteran_next_tier_level }}：+{{ view.veteran_next_tier_coin_reward }} 猪币{% endif %}
           </small>
         </div>
       </div>
@@ -97,7 +97,7 @@
     </section>
 
     <footer class="game-footer">
-      <span>荣誉称号不改变概率；概率收益 Lv.21 封顶，更高等级继续获得非概率资深收益</span>
+      <span>荣誉称号不改变概率；概率收益 Lv.21 封顶，更高等级改为一次性猪币里程碑</span>
       <strong>北京时间自然日</strong>
     </footer>
   </main>

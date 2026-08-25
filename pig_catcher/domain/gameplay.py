@@ -64,6 +64,13 @@ LEVEL_EXPERIENCE_FACTOR = 50
 VETERAN_BENEFIT_START_LEVEL = 21
 VETERAN_BENEFIT_LEVEL_INTERVAL = 10
 VETERAN_BENEFIT_MAX_TIER = 5
+VETERAN_MILESTONE_COIN_REWARDS: tuple[int, ...] = (
+    1_000,
+    2_000,
+    3_000,
+    4_000,
+    5_000,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -240,13 +247,16 @@ class LevelProgress:
 
 @dataclass(frozen=True, slots=True)
 class VeteranBenefits:
-    """Lv.21 后不改变概率的封顶资深收益。"""
+    """Lv.21 后不改变概率的一次性猪币里程碑。"""
 
     tier: int
     catch_coin_bonus: int
     cook_coin_bonus: int
     experience_bonus_percent: int
+    milestone_coin_reward: int
+    cumulative_coin_reward: int
     next_tier_level: int | None
+    next_tier_coin_reward: int | None
 
     @property
     def active(self) -> bool:
@@ -254,7 +264,7 @@ class VeteranBenefits:
 
 
 def veteran_benefits(player_level: int) -> VeteranBenefits:
-    """返回等级对应的资深收益，每十级一档且最多五档。"""
+    """返回等级对应的资深里程碑，每十级一档且最多五档。"""
 
     level = int(player_level)
     if level < 1:
@@ -265,7 +275,10 @@ def veteran_benefits(player_level: int) -> VeteranBenefits:
             catch_coin_bonus=0,
             cook_coin_bonus=0,
             experience_bonus_percent=0,
+            milestone_coin_reward=0,
+            cumulative_coin_reward=0,
             next_tier_level=VETERAN_BENEFIT_START_LEVEL,
+            next_tier_coin_reward=VETERAN_MILESTONE_COIN_REWARDS[0],
         )
     tier = min(
         VETERAN_BENEFIT_MAX_TIER,
@@ -278,15 +291,42 @@ def veteran_benefits(player_level: int) -> VeteranBenefits:
     )
     return VeteranBenefits(
         tier=tier,
-        catch_coin_bonus=tier,
-        cook_coin_bonus=tier * 2,
-        experience_bonus_percent=tier * 5,
+        catch_coin_bonus=0,
+        cook_coin_bonus=0,
+        experience_bonus_percent=0,
+        milestone_coin_reward=VETERAN_MILESTONE_COIN_REWARDS[tier - 1],
+        cumulative_coin_reward=sum(VETERAN_MILESTONE_COIN_REWARDS[:tier]),
         next_tier_level=next_tier_level,
+        next_tier_coin_reward=(
+            None
+            if tier >= VETERAN_BENEFIT_MAX_TIER
+            else VETERAN_MILESTONE_COIN_REWARDS[tier]
+        ),
     )
 
 
+def veteran_milestone_level(tier: int) -> int:
+    """返回指定资深档位对应的等级门槛。"""
+
+    normalized = int(tier)
+    if not 1 <= normalized <= VETERAN_BENEFIT_MAX_TIER:
+        raise DomainValidationError("资深收益档位必须位于 1 至 5。")
+    return VETERAN_BENEFIT_START_LEVEL + (
+        normalized - 1
+    ) * VETERAN_BENEFIT_LEVEL_INTERVAL
+
+
+def veteran_milestone_coin_reward(tier: int) -> int:
+    """返回指定资深档位仅可领取一次的猪币奖励。"""
+
+    normalized = int(tier)
+    if not 1 <= normalized <= VETERAN_BENEFIT_MAX_TIER:
+        raise DomainValidationError("资深收益档位必须位于 1 至 5。")
+    return VETERAN_MILESTONE_COIN_REWARDS[normalized - 1]
+
+
 def apply_veteran_experience_bonus(amount: int, benefits: VeteranBenefits) -> int:
-    """以整数四舍五入方式应用资深经验加成。"""
+    """保留旧调用接口；Ruleset 28 起资深档位不再增加经验。"""
 
     normalized = int(amount)
     if normalized < 0:

@@ -33,7 +33,11 @@ from pig_catcher.infrastructure.repositories import (
     FrameworkRepository,
     TechniqueRepository,
 )
-from pig_catcher.rendering import pig_card_view, profile_view
+from pig_catcher.rendering import (
+    pig_card_view,
+    profile_view,
+    technique_activation_view,
+)
 from pig_catcher.services import (
     AssetCatalogService,
     FrameworkService,
@@ -439,8 +443,10 @@ async def test_numeric_level_changes_the_committed_catch_probability(
 
     result = await service.catch(identity)
     assert result.pig.rarity == 2
-    assert result.coin_reward == 6
-    assert result.experience_reward == 11
+    assert result.coin_reward == 5
+    assert result.experience_reward == 10
+    assert result.veteran_coin_reward == 1_000
+    assert result.veteran_reward_levels == (21,)
     snapshot_row = await database.fetch_one(
         """
         SELECT random_snapshot_json
@@ -456,10 +462,14 @@ async def test_numeric_level_changes_the_committed_catch_probability(
     profile = await service.profile(_identity(message_id="level-profile"))
     assert profile.level.level == 21
     assert profile.veteran_tier == 1
-    assert profile.veteran_catch_coin_bonus == 1
-    assert profile.veteran_cook_coin_bonus == 2
-    assert profile.veteran_experience_bonus_percent == 5
+    assert profile.veteran_catch_coin_bonus == 0
+    assert profile.veteran_cook_coin_bonus == 0
+    assert profile.veteran_experience_bonus_percent == 0
+    assert profile.veteran_milestone_coin_reward == 1_000
+    assert profile.veteran_cumulative_coin_reward == 1_000
+    assert profile.veteran_claimed_tier == 1
     assert profile.veteran_next_tier_level == 31
+    assert profile.veteran_next_tier_coin_reward == 2_000
     assert (
         profile.level_catch_adjusted_high_percent
         > profile.level_catch_base_high_percent
@@ -469,7 +479,69 @@ async def test_numeric_level_changes_the_committed_catch_probability(
     assert profile_card.level_bonus_cap_level == 21
     assert "等级概率加成：抓猪 4-6 星" in format_profile_summary(profile)
     assert "普通做菜高档权重 +10.00%" in format_profile_summary(profile)
-    assert "资深收益：1 档" in format_profile_summary(profile)
+    assert "资深里程碑：1/5 档" in format_profile_summary(profile)
+    assert "本档一次性奖励 1,000 猪币" in format_profile_summary(profile)
+    ledger_rows = await database.fetch_all(
+        """
+        SELECT amount, reason_code, source_object_id
+        FROM currency_ledger
+        WHERE player_id = ? AND reason_code = 'veteran-level-reward'
+        """,
+        (identity.player_id,),
+    )
+    assert [tuple(row) for row in ledger_rows] == [(1_000, "veteran-level-reward", "1")]
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_existing_high_level_player_receives_all_unclaimed_milestones_once(
+    tmp_path: Path,
+) -> None:
+    database = await _database_with_catalog(
+        tmp_path,
+        [_pig_entry("one-pig", rarity=1)],
+    )
+    identity = _identity(message_id="veteran-backfill")
+    await FrameworkService(database).touch_identity(identity)
+    async with database.transaction() as session:
+        await session.execute(
+            "UPDATE players SET experience = 180000 WHERE player_id = ?",
+            (identity.player_id,),
+        )
+    service = GameplayService(
+        database,
+        CatchingSection(cooldown_seconds=0),
+        random_source=SequenceRandom(*_catch_rolls(rarity_roll=0.0)),
+        short_code_factory=lambda: "VETERAN1",
+    )
+
+    result = await service.catch(identity)
+    replay = await service.catch(identity)
+
+    assert result.veteran_coin_reward == 15_000
+    assert result.veteran_reward_levels == (21, 31, 41, 51, 61)
+    assert replay.receipt_created is False
+    assert replay.veteran_coin_reward == 15_000
+    ledger_rows = await database.fetch_all(
+        """
+        SELECT amount, source_object_id
+        FROM currency_ledger
+        WHERE player_id = ? AND reason_code = 'veteran-level-reward'
+        ORDER BY CAST(source_object_id AS INTEGER)
+        """,
+        (identity.player_id,),
+    )
+    assert [tuple(row) for row in ledger_rows] == [
+        (1_000, "1"),
+        (2_000, "2"),
+        (3_000, "3"),
+        (4_000, "4"),
+        (5_000, "5"),
+    ]
+    profile = await service.profile(_identity(message_id="veteran-profile"))
+    assert profile.veteran_tier == 5
+    assert profile.veteran_claimed_tier == 5
+    assert profile.veteran_next_tier_level is None
     await database.close()
 
 
@@ -1827,6 +1899,17 @@ async def test_blue_red_pair_unlocks_purple_and_grants_five_six_star_pigs(
     assert len(purple.granted_pigs) == 5
     assert all(pig.rarity == 6 for pig in purple.granted_pigs)
     assert purple.remaining_permits == 0
+    purple_view = technique_activation_view(
+        purple,
+        actor_name="术式使用者",
+        actor_player_id=activator.player_id,
+        group_name="测试群100",
+    )
+    assert purple_view.title == "虚式·茈发动"
+    assert purple_view.hero_value == "5 只六星猪"
+    assert len(purple_view.rows) == 3
+    assert all(pig.selector in purple_view.note for pig in purple.granted_pigs)
+    assert purple_view.media_visible is True
     await database.close()
 
 

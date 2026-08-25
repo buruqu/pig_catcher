@@ -113,6 +113,8 @@ class PigCardViewModel:
     character_name: str = ""
     coin_reward: int | None = None
     experience_reward: int | None = None
+    veteran_coin_reward: int = 0
+    veteran_reward_levels: tuple[int, ...] = ()
     coin_balance: int | None = None
     total_experience: int | None = None
     player_level: int | None = None
@@ -193,7 +195,11 @@ class ProfileViewModel:
     veteran_catch_coin_bonus: int = 0
     veteran_cook_coin_bonus: int = 0
     veteran_experience_bonus_percent: int = 0
+    veteran_milestone_coin_reward: int = 0
+    veteran_cumulative_coin_reward: int = 0
+    veteran_claimed_tier: int = 0
     veteran_next_tier_level: int | None = 21
+    veteran_next_tier_coin_reward: int | None = 1_000
 
 
 @dataclass(frozen=True, slots=True)
@@ -405,6 +411,8 @@ class FoodCardViewModel:
     media_format: str
     coin_reward: int | None = None
     experience_reward: int | None = None
+    veteran_coin_reward: int = 0
+    veteran_reward_levels: tuple[int, ...] = ()
     coin_balance: int | None = None
     total_experience: int | None = None
     player_level: int | None = None
@@ -508,6 +516,8 @@ class BatchCookingViewModel:
     food_count: int
     coin_reward: int
     experience_reward: int
+    veteran_coin_reward: int
+    veteran_reward_levels: tuple[int, ...]
     catalog_new_count: int
     rarity: int | None
     items: tuple[BatchCookingItemViewModel, ...]

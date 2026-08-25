@@ -131,6 +131,15 @@ def _paired_star_multiplier(*, five_star: float, six_star: float) -> str:
     return f"5★ ×{five_star:g} / 6★ ×{six_star:g}"
 
 
+def _veteran_reward_note(result: CatchResult | EatResult) -> str:
+    """Build one compact milestone note for special event cards."""
+
+    if not result.veteran_coin_reward:
+        return ""
+    levels = "、".join(f"Lv.{level}" for level in result.veteran_reward_levels)
+    return f"；资深里程碑 {levels} 已一次性发放 +{result.veteran_coin_reward:,} 猪币"
+
+
 def _collection_view(collection: object) -> CollectionProgressViewModel:
     return CollectionProgressViewModel(
         collection_name=str(collection.collection_name),
@@ -217,6 +226,10 @@ def pig_card_view(
         character_name=pig.character_name,
         coin_reward=catch.coin_reward if catch is not None else None,
         experience_reward=catch.experience_reward if catch is not None else None,
+        veteran_coin_reward=(catch.veteran_coin_reward if catch is not None else 0),
+        veteran_reward_levels=(
+            catch.veteran_reward_levels if catch is not None else ()
+        ),
         coin_balance=catch.coin_balance if catch is not None else None,
         total_experience=catch.total_experience if catch is not None else None,
         player_level=progress.level if progress is not None else None,
@@ -300,7 +313,11 @@ def profile_view(profile: PlayerProfile) -> ProfileViewModel:
         veteran_catch_coin_bonus=profile.veteran_catch_coin_bonus,
         veteran_cook_coin_bonus=profile.veteran_cook_coin_bonus,
         veteran_experience_bonus_percent=profile.veteran_experience_bonus_percent,
+        veteran_milestone_coin_reward=profile.veteran_milestone_coin_reward,
+        veteran_cumulative_coin_reward=profile.veteran_cumulative_coin_reward,
+        veteran_claimed_tier=profile.veteran_claimed_tier,
         veteran_next_tier_level=profile.veteran_next_tier_level,
+        veteran_next_tier_coin_reward=profile.veteran_next_tier_coin_reward,
     )
 
 
@@ -497,6 +514,12 @@ def food_card_view(
         media_format=food.media_format,
         coin_reward=cooking.coin_reward if cooking is not None else None,
         experience_reward=(cooking.experience_reward if cooking is not None else None),
+        veteran_coin_reward=(
+            cooking.veteran_coin_reward if cooking is not None else 0
+        ),
+        veteran_reward_levels=(
+            cooking.veteran_reward_levels if cooking is not None else ()
+        ),
         coin_balance=cooking.coin_balance if cooking is not None else None,
         total_experience=(cooking.total_experience if cooking is not None else None),
         player_level=progress.level if progress is not None else None,
@@ -813,6 +836,8 @@ def batch_cook_view(result: BatchCookingResult) -> BatchCookingViewModel:
         food_count=result.food_count,
         coin_reward=result.coin_reward,
         experience_reward=result.experience_reward,
+        veteran_coin_reward=result.veteran_coin_reward,
+        veteran_reward_levels=result.veteran_reward_levels,
         catalog_new_count=result.catalog_new_count,
         rarity=result.rarity,
         items=items,
@@ -831,6 +856,14 @@ def eat_receipt_view(result: EatResult) -> EconomyReceiptViewModel:
     ]
     if result.effect.coin_bonus:
         rows.append(EconomyReceiptRowViewModel("额外猪币", f"+{result.effect.coin_bonus}"))
+    if result.veteran_coin_reward:
+        levels = "、".join(f"Lv.{level}" for level in result.veteran_reward_levels)
+        rows.append(
+            EconomyReceiptRowViewModel(
+                "资深里程碑",
+                f"{levels} · +{result.veteran_coin_reward:,} 猪币",
+            )
+        )
     if result.effect.granted_uses > 1:
         rows.append(
             EconomyReceiptRowViewModel(
@@ -904,6 +937,7 @@ def group_event_eat_view(
             note=(
                 "本次食用只取得发动资格，尚未重置任何额度。"
                 "请由食用者在本群发送 /重置额度，届时将再次发布正式发动通告。"
+                + _veteran_reward_note(result)
             ),
             footer="全群事件将在真正发动时原子结算",
             settlement_committed=False,
@@ -958,6 +992,7 @@ def group_event_eat_view(
             note=(
                 "全群效果从当前抓猪时段开始，到次日同一时段刷新时清除；"
                 "每名玩家的下一次兼容抓猪独立消费自己的加成。"
+                + _veteran_reward_note(result)
             ),
             footer="神龙赐福已在本群完成结算",
             media_visible=result.food.media_visible,
@@ -1030,6 +1065,7 @@ def special_event_eat_view(
                 f"{result.food.selector} 已消耗；本次从 "
                 f"{result.group_rewarded_players} 名群友处实际汇总 "
                 f"{result.group_coin_total:,} 猪币。"
+                + _veteran_reward_note(result)
             ),
             footer="全家桶猪币往来已原子结算",
             media_visible=result.food.media_visible,
@@ -1072,7 +1108,7 @@ def special_event_eat_view(
                     "本次专属菜效果已经持久化",
                 ),
             ),
-            note=result.effect.summary,
+            note=result.effect.summary + _veteran_reward_note(result),
             footer="术式资格已入账，可在当前群发动",
             media_visible=result.food.media_visible,
             is_animated=result.food.is_animated,
@@ -1104,7 +1140,7 @@ def special_event_eat_view(
                     "转到猪币奖励时会直接更新",
                 ),
             ),
-            note=result.effect.summary,
+            note=result.effect.summary + _veteran_reward_note(result),
             footer="轮盘机会已持久化，重启不会丢失",
             media_visible=result.food.media_visible,
             is_animated=result.food.is_animated,
@@ -1303,7 +1339,7 @@ def technique_catch_event_view(
                     "每有一名群友成功抓猪就消耗一次",
                 ),
             ),
-            note=resolution.summary,
+            note=resolution.summary + _veteran_reward_note(result),
             footer="伏魔御厨子本轮出餐完成",
             seal_top="领域",
             seal_bottom="出餐",
@@ -1341,7 +1377,7 @@ def technique_catch_event_view(
                 "成功抓猪后才会递减",
             ),
         ),
-        note=resolution.summary,
+        note=resolution.summary + _veteran_reward_note(result),
         footer=f"{resolution.technique_name}本轮结算完成",
         seal_top="术式",
         seal_bottom="结算",

@@ -1292,6 +1292,29 @@ class EconomyRepository:
         )
         return balance
 
+    async def claimed_veteran_reward_tiers(
+        self,
+        session: DatabaseSession,
+        *,
+        player_id: str,
+    ) -> frozenset[int]:
+        """Return every already-ledgered Lv.21+ milestone tier."""
+
+        rows = await session.fetch_all(
+            """
+            SELECT source_object_id
+            FROM currency_ledger
+            WHERE player_id = ?
+              AND reason_code = 'veteran-level-reward'
+            """,
+            (player_id,),
+        )
+        return frozenset(
+            int(row["source_object_id"])
+            for row in rows
+            if str(row["source_object_id"]).isdigit()
+        )
+
     async def add_experience(
         self,
         session: DatabaseSession,

@@ -50,7 +50,6 @@ from ..domain.gameplay import (
     ItemDefinition,
     LevelProgress,
     PigAttributes,
-    apply_veteran_experience_bonus,
     generate_pig_attributes,
     item_by_id,
     item_by_name,
@@ -110,6 +109,7 @@ from .command_state import (
     validate_existing_receipt,
 )
 from .receipts import request_fingerprint
+from .veteran_rewards import settle_veteran_rewards
 
 _CATCH_COMMAND = "pig-catcher.catch"
 # 达妮娅泡泡云冻每层抓猪六星概率加成（百分点），与正式目录效果参数一致。
@@ -224,6 +224,8 @@ class CatchResult:
     global_weight_record: bool = False
     giant_sighting: bool = False
     technique_resolution: TechniqueCatchResolution | None = None
+    veteran_coin_reward: int = 0
+    veteran_reward_levels: tuple[int, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -299,7 +301,11 @@ class PlayerProfile:
     veteran_catch_coin_bonus: int = 0
     veteran_cook_coin_bonus: int = 0
     veteran_experience_bonus_percent: int = 0
+    veteran_milestone_coin_reward: int = 0
+    veteran_cumulative_coin_reward: int = 0
+    veteran_claimed_tier: int = 0
     veteran_next_tier_level: int | None = 21
+    veteran_next_tier_coin_reward: int | None = 1_000
 
 
 @dataclass(frozen=True, slots=True)
@@ -633,6 +639,13 @@ def format_catch_summary(result: CatchResult) -> str:
     effect_text = f"\n美食加成：{'；'.join(result.effect_summaries)}" if result.effect_summaries else ""
     excluded_text = f"\n互斥未叠加：{'；'.join(result.excluded_summaries)}" if result.excluded_summaries else ""
     quota_text = "\n专属次数：本次未消耗正常抓猪额度" if result.quota_exempt_catch else ""
+    veteran_text = (
+        "\n资深里程碑："
+        + "、".join(f"Lv.{level}" for level in result.veteran_reward_levels)
+        + f" 一次性发放 +{result.veteran_coin_reward:,} 猪币"
+        if result.veteran_coin_reward
+        else ""
+    )
     probability_line = " ".join(
         f"{index + 1}★{_format_probability(value)}%"
         for index, value in enumerate(result.weights)
@@ -670,7 +683,7 @@ def format_catch_summary(result: CatchResult) -> str:
         f"本次道具：{item_text}\n"
         f"本次最终概率：{probability_line}\n"
         f"概率来源：{probability_sources}\n"
-        f"群纪录：{record_text}{effect_text}{excluded_text}{quota_text}"
+        f"群纪录：{record_text}{effect_text}{excluded_text}{quota_text}{veteran_text}"
     )
 
 
@@ -696,7 +709,15 @@ def format_profile_summary(profile: PlayerProfile) -> str:
     veteran_next = (
         "已达最高档"
         if profile.veteran_next_tier_level is None
-        else f"下一档 Lv.{profile.veteran_next_tier_level}"
+        else (
+            f"下一档 Lv.{profile.veteran_next_tier_level}"
+            f" 奖励 {profile.veteran_next_tier_coin_reward:,} 猪币"
+        )
+    )
+    veteran_claim = (
+        "全部已领取"
+        if profile.veteran_claimed_tier >= profile.veteran_tier
+        else "有已达成奖励待在下次获得经验时补领"
     )
     return (
         "【抓猪档案】\n"
@@ -716,9 +737,9 @@ def format_profile_summary(profile: PlayerProfile) -> str:
         f"{profile.level_catch_adjusted_high_percent:.2f}%；"
         f"普通做菜高档权重 +{profile.level_cooking_bonus_percent:.2f}%"
         f"（Lv.{profile.level_bonus_cap_level} 封顶）\n"
-        f"资深收益：{profile.veteran_tier} 档；抓猪猪币 +{profile.veteran_catch_coin_bonus}，"
-        f"做菜猪币 +{profile.veteran_cook_coin_bonus}，基础经验 +{profile.veteran_experience_bonus_percent}%"
-        f"（{veteran_next}）\n"
+        f"资深里程碑：{profile.veteran_tier}/5 档；本档一次性奖励 "
+        f"{profile.veteran_milestone_coin_reward:,} 猪币，累计可得 "
+        f"{profile.veteran_cumulative_coin_reward:,} 猪币；{veteran_claim}（{veteran_next}）\n"
         f"本时段抓猪：{profile.daily_count}/{profile.daily_limit}\n"
         f"抓猪冷却：{profile.cooldown_remaining_seconds} 秒\n"
         f"已装备抓猪道具：{armed}\n"
@@ -1573,12 +1594,6 @@ class GameplayService:
             if armed_item is not None and armed_item.item_id == "coin-bounty-tag":
                 coin_reward *= 2
                 experience_reward = (experience_reward * 3 + 1) // 2
-            benefits = veteran_benefits(probability_level)
-            coin_reward += benefits.catch_coin_bonus
-            experience_reward = apply_veteran_experience_bonus(
-                experience_reward,
-                benefits,
-            )
             coin_balance, total_experience = await self.repository.apply_catch_rewards(
                 session,
                 player_id=identity.player_id,
@@ -1590,6 +1605,17 @@ class GameplayService:
                 idempotency_key=idempotency_key,
                 now=now,
             )
+            veteran_reward = await settle_veteran_rewards(
+                self.economy_repository,
+                session,
+                player_id=identity.player_id,
+                scope_id=identity.scope.value,
+                player_level=level_progress(total_experience).level,
+                current_balance=coin_balance,
+                id_factory=self._new_identifier,
+                now=now,
+            )
+            coin_balance = veteran_reward.balance_after
             catalog_new = await self.repository.upsert_pig_catalog(
                 session,
                 player_id=identity.player_id,
@@ -1711,6 +1737,8 @@ class GameplayService:
                 "experience_reward": experience_reward,
                 "coin_balance": coin_balance,
                 "total_experience": total_experience,
+                "veteran_coin_reward": veteran_reward.coin_reward,
+                "veteran_reward_levels": list(veteran_reward.rewarded_levels),
                 "catalog_new": catalog_new,
                 "size_record": size_record,
                 "weight_record": weight_record,
@@ -1789,6 +1817,8 @@ class GameplayService:
                 global_weight_record=global_weight_record,
                 giant_sighting=giant_sighting,
                 technique_resolution=technique_resolution,
+                veteran_coin_reward=veteran_reward.coin_reward,
+                veteran_reward_levels=veteran_reward.rewarded_levels,
             )
             summary = format_catch_summary(provisional)
             reservation = await self.receipt_repository.reserve(
@@ -1838,6 +1868,8 @@ class GameplayService:
                 global_weight_record=global_weight_record,
                 giant_sighting=giant_sighting,
                 technique_resolution=technique_resolution,
+                veteran_coin_reward=veteran_reward.coin_reward,
+                veteran_reward_levels=veteran_reward.rewarded_levels,
             )
 
     async def activate_group_technique(
@@ -2335,7 +2367,7 @@ class GameplayService:
                 ]
             elif source_template_id == SUKUNA_PIG_TEMPLATE_ID:
                 special_roll = self.random_source.random()
-                if special_roll < (1.0 / 3.0):
+                if special_roll < 0.20:
                     special_template_id = SUKUNA_FOOD_TEMPLATE_ID
             elif source_template_id == KFC_PIG_TEMPLATE_ID:
                 special_roll = self.random_source.random()
@@ -2645,6 +2677,12 @@ class GameplayService:
             )
             if economy_row is None:
                 raise RuntimeError("玩家经济档案初始化后无法读取。")
+            claimed_veteran_tiers = (
+                await self.economy_repository.claimed_veteran_reward_tiers(
+                    session,
+                    player_id=identity.player_id,
+                )
+            )
             food_collected, food_total = (
                 await self.economy_repository.visible_food_catalog_counts(
                     session,
@@ -2721,7 +2759,11 @@ class GameplayService:
             veteran_catch_coin_bonus=benefits.catch_coin_bonus,
             veteran_cook_coin_bonus=benefits.cook_coin_bonus,
             veteran_experience_bonus_percent=benefits.experience_bonus_percent,
+            veteran_milestone_coin_reward=benefits.milestone_coin_reward,
+            veteran_cumulative_coin_reward=benefits.cumulative_coin_reward,
+            veteran_claimed_tier=max(claimed_veteran_tiers, default=0),
             veteran_next_tier_level=benefits.next_tier_level,
+            veteran_next_tier_coin_reward=benefits.next_tier_coin_reward,
         )
 
     async def pig_detail(self, identity: CommandIdentity, selector_text: str) -> PigView:
@@ -3227,6 +3269,11 @@ class GameplayService:
             giant_sighting=bool(payload.get("giant_sighting") or False),
             technique_resolution=self._technique_resolution_from_payload(
                 payload.get("technique_resolution")
+            ),
+            veteran_coin_reward=int(payload.get("veteran_coin_reward") or 0),
+            veteran_reward_levels=tuple(
+                int(value)
+                for value in payload.get("veteran_reward_levels", [])
             ),
         )
 

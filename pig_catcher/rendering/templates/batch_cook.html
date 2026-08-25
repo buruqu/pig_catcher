@@ -42,6 +42,7 @@
     <section style="display:flex;gap:12px;padding:0 38px 18px;flex-wrap:wrap">
       <div style="flex:1;min-width:140px;background:rgba(255,105,180,0.08);border:1px solid rgba(255,105,180,0.25);border-radius:12px;padding:12px 16px;display:flex;flex-direction:column;gap:4px"><span style="font-size:12px;color:#888">猪币</span><strong style="font-size:20px;color:#e91e63">+{{ view.coin_reward }}</strong></div>
       <div style="flex:1;min-width:140px;background:rgba(63,81,181,0.08);border:1px solid rgba(63,81,181,0.25);border-radius:12px;padding:12px 16px;display:flex;flex-direction:column;gap:4px"><span style="font-size:12px;color:#888">经验</span><strong style="font-size:20px;color:#3f51b5">+{{ view.experience_reward }}</strong></div>
+      {% if view.veteran_coin_reward %}<div style="flex:1;min-width:140px;background:rgba(255,193,7,0.10);border:1px solid rgba(255,193,7,0.35);border-radius:12px;padding:12px 16px;display:flex;flex-direction:column;gap:4px"><span style="font-size:12px;color:#888">资深里程碑</span><strong style="font-size:20px;color:#b77900">+{{ view.veteran_coin_reward }} 猪币</strong><small>Lv.{{ view.veteran_reward_levels | join(" / Lv.") }}</small></div>{% endif %}
       <div style="flex:1;min-width:140px;background:rgba(0,150,136,0.08);border:1px solid rgba(0,150,136,0.25);border-radius:12px;padding:12px 16px;display:flex;flex-direction:column;gap:4px"><span style="font-size:12px;color:#888">新图鉴</span><strong style="font-size:20px;color:#009688">{{ view.catalog_new_count }}</strong></div>
     </section>
 

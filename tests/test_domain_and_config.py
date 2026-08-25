@@ -1199,19 +1199,28 @@ def test_numeric_level_and_honor_title_remain_separate_progress_tracks() -> None
 
 
 def test_veteran_benefits_start_after_probability_cap_and_are_bounded() -> None:
-    assert veteran_benefits(20).tier == 0
+    before = veteran_benefits(20)
+    assert before.tier == 0
+    assert before.next_tier_level == 21
+    assert before.next_tier_coin_reward == 1_000
     first = veteran_benefits(21)
-    assert first.catch_coin_bonus == 1
-    assert first.cook_coin_bonus == 2
-    assert first.experience_bonus_percent == 5
+    assert first.catch_coin_bonus == 0
+    assert first.cook_coin_bonus == 0
+    assert first.experience_bonus_percent == 0
+    assert first.milestone_coin_reward == 1_000
+    assert first.cumulative_coin_reward == 1_000
     assert first.next_tier_level == 31
-    assert apply_veteran_experience_bonus(45, first) == 47
+    assert first.next_tier_coin_reward == 2_000
+    assert apply_veteran_experience_bonus(45, first) == 45
     maximum = veteran_benefits(100)
     assert maximum.tier == 5
-    assert maximum.catch_coin_bonus == 5
-    assert maximum.cook_coin_bonus == 10
-    assert maximum.experience_bonus_percent == 25
+    assert maximum.catch_coin_bonus == 0
+    assert maximum.cook_coin_bonus == 0
+    assert maximum.experience_bonus_percent == 0
+    assert maximum.milestone_coin_reward == 5_000
+    assert maximum.cumulative_coin_reward == 15_000
     assert maximum.next_tier_level is None
+    assert maximum.next_tier_coin_reward is None
 
 
 def test_pig_attribute_labels_are_plain_language() -> None:

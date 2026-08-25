@@ -68,6 +68,7 @@
       <div class="pig-card__receipt-item">
         <span>本次奖励</span>
         <strong>+{{ view.coin_reward }} 猪币</strong>
+        {% if view.veteran_coin_reward %}<small>资深里程碑 +{{ view.veteran_coin_reward }} 猪币 · Lv.{{ view.veteran_reward_levels | join(" / Lv.") }}</small>{% endif %}
       </div>
       <div class="pig-card__receipt-item">
         {% if view.player_level is not none %}

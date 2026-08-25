@@ -78,10 +78,8 @@ from ..domain.food_effects import (
 )
 from ..domain.gameplay import (
     ItemDefinition,
-    apply_veteran_experience_bonus,
     item_by_id,
     level_progress,
-    veteran_benefits,
 )
 from ..domain.models import CommandIdentity, CommandReceipt
 from ..domain.ports import Clock, MessageKeyFactory, RandomSource, SystemClock, SystemRandomSource
@@ -124,6 +122,7 @@ from .command_state import (
 )
 from .gameplay import PigView, _cooldown_remaining, _safe_datetime, pig_view_from_row
 from .receipts import request_fingerprint
+from .veteran_rewards import settle_veteran_rewards
 
 _COOK_COMMAND = "pig-catcher.cook"
 _BATCH_COOK_COMMAND = "pig-catcher.batch-cook"
@@ -245,6 +244,8 @@ class CookingResult:
     item_remaining_uses: int = 0
     excluded_summaries: tuple[str, ...] = ()
     exclusive_effect_active: bool = False
+    veteran_coin_reward: int = 0
+    veteran_reward_levels: tuple[int, ...] = ()
 
     @property
     def probability_summary(self) -> str:
@@ -319,6 +320,8 @@ class EatResult:
     group_rewarded_players: int = 0
     group_coin_total: int = 0
     available_effect_uses: int = 0
+    veteran_coin_reward: int = 0
+    veteran_reward_levels: tuple[int, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -423,6 +426,8 @@ class BatchCookingResult:
     rarity: int | None = None
     item_use_summaries: tuple[str, ...] = ()
     effect_use_summaries: tuple[str, ...] = ()
+    veteran_coin_reward: int = 0
+    veteran_reward_levels: tuple[int, ...] = ()
     receipt: CommandReceipt | None = None
     receipt_created: bool = True
 
@@ -462,6 +467,8 @@ class _CookOutcome:
     exclusive_effect_active: bool
     item_remaining_uses: int = 0
     effect_entry_ids: tuple[str, ...] = ()
+    veteran_coin_reward: int = 0
+    veteran_reward_levels: tuple[int, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -591,6 +598,13 @@ def format_cooking_summary(result: CookingResult) -> str:
         item += f"（连续使用队列剩余 {result.item_remaining_uses} 次）"
     effect_text = f"\n美食加成：{'；'.join(result.effect_summaries)}" if result.effect_summaries else ""
     excluded_text = f"\n互斥未叠加：{'；'.join(result.excluded_summaries)}" if result.excluded_summaries else ""
+    veteran_text = (
+        "\n资深里程碑："
+        + "、".join(f"Lv.{level}" for level in result.veteran_reward_levels)
+        + f" 一次性发放 +{result.veteran_coin_reward:,} 猪币"
+        if result.veteran_coin_reward
+        else ""
+    )
     probability_line = " ".join(f"{index + 1}★{value:.1f}%" for index, value in enumerate(result.weights) if value > 0)
     probability_source_parts = [
         f"等级 Lv.{progress.level}",
@@ -617,7 +631,7 @@ def format_cooking_summary(result: CookingResult) -> str:
         f"当前余额：{result.coin_balance} 猪币\n"
         f"厨具：Lv.{result.cookware_level}；本次道具：{item}\n"
         f"本次最终概率：{probability_line}\n"
-        f"概率来源：{probability_sources}{effect_text}{excluded_text}"
+        f"概率来源：{probability_sources}{effect_text}{excluded_text}{veteran_text}"
     )
 
 
@@ -630,6 +644,11 @@ def format_batch_cooking_summary(result: BatchCookingResult) -> str:
         f"奖励：+{result.coin_reward} 猪币 / +{result.experience_reward} 经验。",
         f"当前余额：{result.coin_balance} 猪币；累计经验：{result.total_experience}。",
     ]
+    if result.veteran_coin_reward:
+        levels = "、".join(f"Lv.{level}" for level in result.veteran_reward_levels)
+        lines.append(
+            f"资深里程碑：{levels} 一次性发放 +{result.veteran_coin_reward:,} 猪币。"
+        )
     if result.item_use_summaries:
         lines.append("道具结算：" + "；".join(result.item_use_summaries))
     if result.effect_use_summaries:
@@ -719,12 +738,19 @@ def format_eat_summary(result: EatResult) -> str:
         if result.effect.granted_uses > 1
         else ""
     )
+    veteran = (
+        "\n资深里程碑："
+        + "、".join(f"Lv.{level}" for level in result.veteran_reward_levels)
+        + f" 一次性发放 +{result.veteran_coin_reward:,} 猪币"
+        if result.veteran_coin_reward
+        else ""
+    )
     return (
         "【美食品鉴】\n"
         f"已吃掉 {result.food.stars} {result.food.selector}\n"
         f"获得经验：+{experience}{coin}\n"
         f"当前累计经验：{result.total_experience}；猪币：{result.coin_balance}\n"
-        f"效果：{result.effect.summary}{uses}"
+        f"效果：{result.effect.summary}{uses}{veteran}"
     )
 
 
@@ -771,6 +797,13 @@ def _paired_multiplier_text(*, five_star: float, six_star: float) -> str:
 def format_group_event_eat_summary(result: EatResult) -> str:
     """Return the public group-wide announcement fallback for a major dish."""
 
+    veteran = (
+        "\n资深里程碑："
+        + "、".join(f"Lv.{level}" for level in result.veteran_reward_levels)
+        + f" 一次性发放 +{result.veteran_coin_reward:,} 猪币。"
+        if result.veteran_coin_reward
+        else ""
+    )
     actor = _public_actor_name(
         display_name=result.food.owner_display_name,
         player_id=result.food.owner_player_id,
@@ -797,6 +830,7 @@ def format_group_event_eat_summary(result: EatResult) -> str:
             f"{_paired_multiplier_text(five_star=five_multiplier, six_star=six_multiplier)}；"
             f"每次专属抓猪还有 {hidden_chance:g}% 概率爆发为 ×{hidden_multiplier:g}。\n"
             "这次只是取得发动资格，尚未重置额度；请由食用者发送 /重置额度。"
+            f"{veteran}"
         )
     if result.effect.queued_effect_id == GROUP_NEXT_EXCLUSIVE_HIGH_STAR_CATCH:
         params = result.effect.queued_effect_params
@@ -815,6 +849,7 @@ def format_group_event_eat_summary(result: EatResult) -> str:
             f"{_paired_multiplier_text(five_star=five_multiplier, six_star=six_multiplier)}，"
             "按六星菜独占规则结算，"
             "不与其他道具或菜品叠加。"
+            f"{veteran}"
         )
     return format_eat_summary(result)
 
@@ -1097,6 +1132,8 @@ class EconomyService:
                 "experience_reward": outcome.experience_reward,
                 "coin_balance": outcome.coin_balance,
                 "total_experience": outcome.total_experience,
+                "veteran_coin_reward": outcome.veteran_coin_reward,
+                "veteran_reward_levels": list(outcome.veteran_reward_levels),
                 "catalog_new_count": outcome.catalog_new_count,
                 "cookware_level": outcome.cookware_level,
                 "item_id": outcome.item_id,
@@ -1136,6 +1173,8 @@ class EconomyService:
                 item_remaining_uses=outcome.item_remaining_uses,
                 excluded_summaries=outcome.excluded_summaries,
                 exclusive_effect_active=outcome.exclusive_effect_active,
+                veteran_coin_reward=outcome.veteran_coin_reward,
+                veteran_reward_levels=outcome.veteran_reward_levels,
             )
             reservation = await self._reserve(
                 session,
@@ -1168,6 +1207,8 @@ class EconomyService:
                 item_remaining_uses=outcome.item_remaining_uses,
                 excluded_summaries=outcome.excluded_summaries,
                 exclusive_effect_active=outcome.exclusive_effect_active,
+                veteran_coin_reward=outcome.veteran_coin_reward,
+                veteran_reward_levels=outcome.veteran_reward_levels,
             )
 
     async def _ensure_cook_cooldown(
@@ -1281,6 +1322,8 @@ class EconomyService:
             foods: list[FoodView] = []
             coin_reward = 0
             experience_reward = 0
+            veteran_coin_reward = 0
+            veteran_reward_levels: list[int] = []
             catalog_new_count = 0
             last_coin_balance = 0
             last_total_experience = 0
@@ -1300,6 +1343,8 @@ class EconomyService:
                 foods.extend(outcome.foods)
                 coin_reward += outcome.coin_reward
                 experience_reward += outcome.experience_reward
+                veteran_coin_reward += outcome.veteran_coin_reward
+                veteran_reward_levels.extend(outcome.veteran_reward_levels)
                 catalog_new_count += outcome.catalog_new_count
                 last_coin_balance = outcome.coin_balance
                 last_total_experience = outcome.total_experience
@@ -1339,6 +1384,8 @@ class EconomyService:
                 "food_count": len(foods),
                 "coin_reward": coin_reward,
                 "experience_reward": experience_reward,
+                "veteran_coin_reward": veteran_coin_reward,
+                "veteran_reward_levels": veteran_reward_levels,
                 "coin_balance": last_coin_balance,
                 "total_experience": last_total_experience,
                 "catalog_new_count": catalog_new_count,
@@ -1359,6 +1406,8 @@ class EconomyService:
                 rarity=rarity,
                 item_use_summaries=item_use_summaries,
                 effect_use_summaries=effect_use_summaries,
+                veteran_coin_reward=veteran_coin_reward,
+                veteran_reward_levels=tuple(veteran_reward_levels),
             )
             receipt = await self._reserve(
                 session,
@@ -1385,6 +1434,8 @@ class EconomyService:
                 rarity=rarity,
                 item_use_summaries=item_use_summaries,
                 effect_use_summaries=effect_use_summaries,
+                veteran_coin_reward=veteran_coin_reward,
+                veteran_reward_levels=tuple(veteran_reward_levels),
                 receipt=receipt,
                 receipt_created=True,
             )
@@ -1644,7 +1695,7 @@ class EconomyService:
                         special_template_id = KFC_FOOD_TEMPLATE_ID
                 elif source.template_id == SUKUNA_PIG_TEMPLATE_ID:
                     special_food_roll = self.random_source.random()
-                    if special_food_roll < (1.0 / 3.0):
+                    if special_food_roll < 0.20:
                         special_template_id = SUKUNA_FOOD_TEMPLATE_ID
                 elif source.template_id == GOJO_PIG_TEMPLATE_ID:
                     special_food_roll = self.random_source.random()
@@ -1658,9 +1709,9 @@ class EconomyService:
                                 len(GOJO_EXCLUSIVE_FOOD_TEMPLATE_IDS) - 1,
                             )
                         ]
-                    elif special_food_roll < (1.0 / 3.0):
+                    elif special_food_roll < 0.20:
                         special_template_id = GOJO_EXCLUSIVE_FOOD_TEMPLATE_IDS[
-                            0 if special_food_roll < (1.0 / 6.0) else 1
+                            0 if special_food_roll < 0.10 else 1
                         ]
             ordinary_templates = [
                 candidate
@@ -1834,12 +1885,8 @@ class EconomyService:
                 )
             )
 
-        benefits = veteran_benefits(probability_level)
-        coin_reward = COOK_COIN_REWARDS[output_rarity] + benefits.cook_coin_bonus
-        experience_reward = apply_veteran_experience_bonus(
-            COOK_EXPERIENCE_REWARDS[output_rarity],
-            benefits,
-        )
+        coin_reward = COOK_COIN_REWARDS[output_rarity]
+        experience_reward = COOK_EXPERIENCE_REWARDS[output_rarity]
         coin_balance = await self.repository.apply_currency_change(
             session,
             player_id=identity.player_id,
@@ -1861,6 +1908,17 @@ class EconomyService:
             experience=experience_reward,
             now=now,
         )
+        veteran_reward = await settle_veteran_rewards(
+            self.repository,
+            session,
+            player_id=identity.player_id,
+            scope_id=identity.scope.value,
+            player_level=level_progress(total_experience).level,
+            current_balance=coin_balance,
+            id_factory=self._new_identifier,
+            now=now,
+        )
+        coin_balance = veteran_reward.balance_after
         await self.social_repository.increment_statistic(
             session,
             player_id=identity.player_id,
@@ -1915,6 +1973,8 @@ class EconomyService:
                 max(0, armed_uses - 1) if applied_item is not None else 0
             ),
             effect_entry_ids=tuple(consumed_effect_entry_ids),
+            veteran_coin_reward=veteran_reward.coin_reward,
+            veteran_reward_levels=veteran_reward.rewarded_levels,
         )
 
     async def _batch_cook_from_receipt(
@@ -1971,6 +2031,11 @@ class EconomyService:
             ),
             item_use_summaries=tuple(str(value) for value in item_summaries),
             effect_use_summaries=tuple(str(value) for value in effect_summaries),
+            veteran_coin_reward=int(payload.get("veteran_coin_reward") or 0),
+            veteran_reward_levels=tuple(
+                int(value)
+                for value in payload.get("veteran_reward_levels", [])
+            ),
             receipt=receipt,
             receipt_created=receipt_created,
         )
@@ -2344,15 +2409,7 @@ class EconomyService:
                         f"{effect.summary} 当前未发动资格共 {available} 次。"
                     ),
                 )
-            current_experience = await self.gameplay_repository.get_player_experience(
-                session,
-                player_id=identity.player_id,
-            )
-            benefits = veteran_benefits(level_progress(current_experience).level)
-            base_experience = apply_veteran_experience_bonus(
-                EAT_EXPERIENCE_REWARDS[Rarity(food.rarity)],
-                benefits,
-            )
+            base_experience = EAT_EXPERIENCE_REWARDS[Rarity(food.rarity)]
             total_experience = await self.repository.add_experience(
                 session,
                 player_id=identity.player_id,
@@ -2411,6 +2468,17 @@ class EconomyService:
                 if row is None:
                     raise RuntimeError("品鉴后无法读取玩家余额。")
                 coin_balance = int(row["coin_balance"])
+            veteran_reward = await settle_veteran_rewards(
+                self.repository,
+                session,
+                player_id=identity.player_id,
+                scope_id=identity.scope.value,
+                player_level=level_progress(total_experience).level,
+                current_balance=coin_balance,
+                id_factory=self._new_identifier,
+                now=now,
+            )
+            coin_balance = veteran_reward.balance_after
             payload = {
                 "food_instance_id": food.food_instance_id,
                 "base_experience": base_experience,
@@ -2429,6 +2497,8 @@ class EconomyService:
                 "group_coin_total": group_coin_total,
                 "total_experience": total_experience,
                 "coin_balance": coin_balance,
+                "veteran_coin_reward": veteran_reward.coin_reward,
+                "veteran_reward_levels": list(veteran_reward.rewarded_levels),
             }
             provisional = EatResult(
                 food=food,
@@ -2450,6 +2520,8 @@ class EconomyService:
                 group_rewarded_players=group_rewarded_players,
                 group_coin_total=group_coin_total,
                 available_effect_uses=available_effect_uses,
+                veteran_coin_reward=veteran_reward.coin_reward,
+                veteran_reward_levels=veteran_reward.rewarded_levels,
             )
             receipt = await self._reserve(
                 session,
@@ -2478,6 +2550,8 @@ class EconomyService:
                 group_rewarded_players=group_rewarded_players,
                 group_coin_total=group_coin_total,
                 available_effect_uses=available_effect_uses,
+                veteran_coin_reward=veteran_reward.coin_reward,
+                veteran_reward_levels=veteran_reward.rewarded_levels,
             )
 
     async def spin_roulette(self, identity: CommandIdentity) -> RouletteResult:
@@ -3759,6 +3833,11 @@ class EconomyService:
                 str(value) for value in payload.get("excluded_summaries", []) if str(value).strip()
             ),
             exclusive_effect_active=bool(payload.get("exclusive_effect_active") or False),
+            veteran_coin_reward=int(payload.get("veteran_coin_reward") or 0),
+            veteran_reward_levels=tuple(
+                int(value)
+                for value in payload.get("veteran_reward_levels", [])
+            ),
         )
 
     async def _eat_from_receipt(
@@ -3799,6 +3878,11 @@ class EconomyService:
                 payload.get("available_effect_uses")
                 or payload.get("roulette_available_spins")
                 or 0
+            ),
+            veteran_coin_reward=int(payload.get("veteran_coin_reward") or 0),
+            veteran_reward_levels=tuple(
+                int(value)
+                for value in payload.get("veteran_reward_levels", [])
             ),
         )
 

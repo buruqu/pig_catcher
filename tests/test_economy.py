@@ -40,6 +40,7 @@ from pig_catcher.domain.errors import (
 from pig_catcher.domain.models import CommandIdentity, ScopeKey
 from pig_catcher.domain.special_content import (
     GOJO_BLUE_FOOD_TEMPLATE_ID,
+    GOJO_EXCLUSIVE_FOOD_TEMPLATE_IDS,
     GOJO_PIG_TEMPLATE_ID,
     GOJO_RED_FOOD_TEMPLATE_ID,
     KFC_FOOD_TEMPLATE_ID,
@@ -527,6 +528,14 @@ async def test_numeric_level_changes_the_committed_cooking_probability(
 
     result = await service.cook(identity, caught.pig.selector)
     assert result.foods[0].rarity == 2
+    assert result.veteran_coin_reward == 1_000
+    assert result.veteran_reward_levels == (21,)
+    assert result.coin_reward == COOK_COIN_REWARDS[Rarity.TWO]
+    assert result.experience_reward == COOK_EXPERIENCE_REWARDS[Rarity.TWO]
+    assert "资深里程碑：Lv.21" in result.receipt.text_summary
+    card = food_card_view(result.foods[0], mode_label="做菜成功", cooking=result)
+    assert card.veteran_coin_reward == 1_000
+    assert card.veteran_reward_levels == (21,)
     snapshot_row = await database.fetch_one(
         """
         SELECT random_snapshot_json
@@ -788,17 +797,27 @@ async def test_eating_unknown_effect_does_not_consume_then_blank_effect_is_idemp
         EconomySection(),
         random_source=SequenceRandom(0.0, 0.0, 0.5),
         clock=clock,
-        id_factory=iter(("food-blank", "ledger-blank")).__next__,
+        id_factory=iter(
+            ("food-blank", "ledger-blank", "veteran-ledger-blank")
+        ).__next__,
         short_code_factory=lambda: "D19F2C3D",
     )
     cooked = await service.cook(
         _identity(message_id="cook-blank"),
         caught.pig.selector,
     )
+    async with database.transaction() as session:
+        await session.execute(
+            "UPDATE players SET experience = 20000 WHERE player_id = ?",
+            (_identity(message_id="eat-blank").player_id,),
+        )
     eat_identity = _identity(message_id="eat-blank")
     first = await service.eat(eat_identity, cooked.foods[0].selector)
     duplicate = await service.eat(eat_identity, cooked.foods[0].selector)
     assert first.base_experience == 8
+    assert first.veteran_coin_reward == 1_000
+    assert first.veteran_reward_levels == (21,)
+    assert "资深里程碑：Lv.21" in first.receipt.text_summary
     assert duplicate.receipt_created is False
     state = await database.fetch_one(
         "SELECT state FROM food_instances WHERE food_instance_id = 'food-blank'"
@@ -4157,7 +4176,7 @@ async def test_kfc_five_star_special_food_collects_group_tribute(
         CookingSection(cook_cooldown_seconds=0),
         EconomySection(),
         clock=FixedClock(),
-        random_source=SequenceRandom(0.50, 0.32, 0.0, 0.5),
+        random_source=SequenceRandom(0.50, 0.19, 0.0, 0.5),
         id_factory=next_id,
         short_code_factory=next_code,
     )
@@ -4166,6 +4185,31 @@ async def test_kfc_five_star_special_food_collects_group_tribute(
         "宿傩猪#SUKUNA01",
     )
     assert sukuna_result.foods[0].template_id == SUKUNA_FOOD_TEMPLATE_ID
+
+    await _insert_pig(
+        database,
+        player_id=eater.player_id,
+        scope_id=eater.scope.value,
+        template_id=SUKUNA_PIG_TEMPLATE_ID,
+        rarity=5,
+        display_name="宿傩猪",
+        official_value=1000,
+        short_code="SUKUNA02",
+        instance_id="sukuna-boundary-instance",
+    )
+    sukuna_boundary = await EconomyService(
+        database,
+        CookingSection(cook_cooldown_seconds=0),
+        EconomySection(),
+        clock=FixedClock(),
+        random_source=SequenceRandom(0.50, 0.20, 0.0, 0.5),
+        id_factory=next_id,
+        short_code_factory=next_code,
+    ).cook(
+        _identity(user_id="100", message_id="cook-sukuna-boundary"),
+        "宿傩猪#SUKUNA02",
+    )
+    assert sukuna_boundary.foods[0].template_id != SUKUNA_FOOD_TEMPLATE_ID
 
     await _insert_pig(
         database,
@@ -4320,6 +4364,99 @@ async def test_gojo_requires_spear_or_domain_bypass_and_yields_exclusive_food(
             player_id=identity.player_id,
             technique_id=TECHNIQUE_LAPSE_BLUE,
         ) == 1
+
+    await _insert_pig(
+        database,
+        player_id=identity.player_id,
+        scope_id=identity.scope.value,
+        template_id=GOJO_PIG_TEMPLATE_ID,
+        rarity=5,
+        display_name="五条猪",
+        official_value=1000,
+        short_code="GOJO0003",
+        instance_id="gojo-red-boundary",
+    )
+    async with database.transaction() as session:
+        await session.execute(
+            """
+            INSERT INTO item_inventory(player_id, item_id, quantity, updated_at)
+            VALUES (?, 'inverted-spear-of-heaven', 1,
+                    '2026-07-28T04:00:00.000Z')
+            ON CONFLICT(player_id, item_id) DO UPDATE SET
+                quantity = item_inventory.quantity + 1,
+                updated_at = excluded.updated_at
+            """,
+            (identity.player_id,),
+        )
+        await session.execute(
+            """
+            INSERT INTO armed_items(player_id, action_type, item_id, armed_at)
+            VALUES (?, 'cooking', 'inverted-spear-of-heaven',
+                    '2026-07-28T04:00:00.000Z')
+            """,
+            (identity.player_id,),
+        )
+    red_boundary = await EconomyService(
+        database,
+        CookingSection(cook_cooldown_seconds=0),
+        EconomySection(),
+        clock=FixedClock(),
+        random_source=SequenceRandom(0.50, 0.10, 0.0, 0.5),
+        id_factory=next_id,
+        short_code_factory=next_code,
+    ).cook(
+        _identity(user_id="100", message_id="gojo-red-boundary"),
+        "五条猪#GOJO0003",
+    )
+    assert red_boundary.foods[0].template_id == GOJO_RED_FOOD_TEMPLATE_ID
+
+    await _insert_pig(
+        database,
+        player_id=identity.player_id,
+        scope_id=identity.scope.value,
+        template_id=GOJO_PIG_TEMPLATE_ID,
+        rarity=5,
+        display_name="五条猪",
+        official_value=1000,
+        short_code="GOJO0004",
+        instance_id="gojo-miss-boundary",
+    )
+    async with database.transaction() as session:
+        await session.execute(
+            """
+            INSERT INTO item_inventory(player_id, item_id, quantity, updated_at)
+            VALUES (?, 'inverted-spear-of-heaven', 1,
+                    '2026-07-28T04:00:00.000Z')
+            ON CONFLICT(player_id, item_id) DO UPDATE SET
+                quantity = item_inventory.quantity + 1,
+                updated_at = excluded.updated_at
+            """,
+            (identity.player_id,),
+        )
+        await session.execute(
+            """
+            INSERT INTO armed_items(player_id, action_type, item_id, armed_at)
+            VALUES (?, 'cooking', 'inverted-spear-of-heaven',
+                    '2026-07-28T04:00:00.000Z')
+            """,
+            (identity.player_id,),
+        )
+    miss_boundary = await EconomyService(
+        database,
+        CookingSection(cook_cooldown_seconds=0),
+        EconomySection(),
+        clock=FixedClock(),
+        random_source=SequenceRandom(0.50, 0.20, 0.0, 0.5),
+        id_factory=next_id,
+        short_code_factory=next_code,
+    ).cook(
+        _identity(user_id="100", message_id="gojo-miss-boundary"),
+        "五条猪#GOJO0004",
+    )
+    assert (
+        miss_boundary.foods[0].template_id
+        not in GOJO_EXCLUSIVE_FOOD_TEMPLATE_IDS
+    )
 
     await _insert_pig(
         database,

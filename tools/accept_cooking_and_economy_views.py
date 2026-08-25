@@ -149,6 +149,8 @@ def long_effect_cooking_card(row: Mapping[str, object]) -> FoodCardViewModel:
         cookware_level=5,
         item_name="超级主厨香料",
         item_remaining_uses=6,
+        veteran_coin_reward=1_000,
+        veteran_reward_levels=(21,),
         bonus_selector="",
         probability_line="5★ 64.0% · 6★ 36.0%",
         probability_sources=(
@@ -312,11 +314,11 @@ def ledger_view() -> LedgerViewModel:
 def profile_view() -> ProfileViewModel:
     return ProfileViewModel(
         display_name="第四轮档案完整字段验收成员",
-        level=4,
-        title="抓猪高手",
-        total_experience=2200,
-        next_threshold=6000,
-        progress_percent=10.5,
+        level=41,
+        title="猪猪鉴赏家",
+        total_experience=80_000,
+        next_threshold=84_050,
+        progress_percent=0.0,
         coin_balance=17808,
         total_catches=38,
         active_pigs=21,
@@ -340,6 +342,12 @@ def profile_view() -> ProfileViewModel:
         level_catch_adjusted_high_percent=13.20,
         level_cooking_bonus_percent=0.75,
         level_bonus_cap_level=21,
+        veteran_tier=3,
+        veteran_milestone_coin_reward=3_000,
+        veteran_cumulative_coin_reward=6_000,
+        veteran_claimed_tier=2,
+        veteran_next_tier_level=51,
+        veteran_next_tier_coin_reward=4_000,
     )
 
 
@@ -578,6 +586,8 @@ async def run(args: argparse.Namespace) -> dict[str, object]:
                     food_count=3,
                     coin_reward=180,
                     experience_reward=210,
+                    veteran_coin_reward=1_000,
+                    veteran_reward_levels=(21,),
                     catalog_new_count=2,
                     rarity=None,
                     items=tuple(

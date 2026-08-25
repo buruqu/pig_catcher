@@ -932,10 +932,11 @@ async def test_third_round_templates_render_all_business_views(
             level_cooking_bonus_percent=1.0,
             level_bonus_cap_level=21,
             veteran_tier=1,
-            veteran_catch_coin_bonus=1,
-            veteran_cook_coin_bonus=2,
-            veteran_experience_bonus_percent=5,
+            veteran_milestone_coin_reward=1_000,
+            veteran_cumulative_coin_reward=1_000,
+            veteran_claimed_tier=1,
             veteran_next_tier_level=31,
+            veteran_next_tier_coin_reward=2_000,
         )
     )
     profile_html = capability.calls[-1][0]
@@ -945,8 +946,9 @@ async def test_third_round_templates_render_all_business_views(
     assert "13.00%" in profile_html
     assert "13.16%" in profile_html
     assert "荣誉称号不改变概率" in profile_html
-    assert "资深收益 · 1 档" in profile_html
-    assert "抓猪猪币 +1" in profile_html
+    assert "猪币里程碑 · 1/5 档" in profile_html
+    assert "本档 +1000 · 累计 +1000 猪币" in profile_html
+    assert "下一档 Lv.31：+2000 猪币" in profile_html
 
     inventory = InventoryViewModel(
         display_name="测试成员",
