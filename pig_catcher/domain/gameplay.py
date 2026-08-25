@@ -185,6 +185,13 @@ ITEM_DEFINITIONS: tuple[ItemDefinition, ...] = (
         460,
         "下一次普通做菜的所有成品份量与价值额外 +25%",
     ),
+    ItemDefinition(
+        "inverted-spear-of-heaven",
+        "天逆鉾",
+        "cooking",
+        1000,
+        "解除术式",
+    ),
 )
 
 ITEMS_BY_ID = {item.item_id: item for item in ITEM_DEFINITIONS}

@@ -137,6 +137,10 @@ class FoodEffectError(GameplayError):
     """美食声明了当前规则版本无法安全应用的效果。"""
 
 
+class TechniqueError(GameplayError):
+    """术式资格、群体占用或发动条件不满足。"""
+
+
 class LedgerReconciliationError(GameplayError):
     """玩家余额与不可变流水无法对账。"""
 

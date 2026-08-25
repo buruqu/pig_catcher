@@ -236,13 +236,13 @@ async def test_group_reset_command_rejects_unconfigured_user_before_backup(
 def test_plugin_registers_only_explicit_production_commands() -> None:
     plugin = create_plugin()
     components = plugin.get_components()
-    assert len(components) == 50
+    assert len(components) == 56
     commands = {
         component["name"]
         for component in components
         if component["type"] == "COMMAND"
     }
-    assert len(commands) == 49
+    assert len(commands) == 55
     assert commands == {
         "pig_catcher_help",
         "pig_catcher_reset_quota",
@@ -274,6 +274,7 @@ def test_plugin_registers_only_explicit_production_commands() -> None:
         "pig_catcher_food_catalog",
         "pig_catcher_eat",
         "pig_catcher_eat_confirmation",
+        "pig_catcher_roulette",
         "pig_catcher_store",
         "pig_catcher_purchase",
         "pig_catcher_upgrade",
@@ -290,6 +291,11 @@ def test_plugin_registers_only_explicit_production_commands() -> None:
         "pig_catcher_showcase",
         "pig_catcher_ranking",
         "pig_catcher_toggle_baogian",
+        "pig_catcher_toggle_uika",
+        "pig_catcher_domain_expansion",
+        "pig_catcher_lapse_blue",
+        "pig_catcher_reversal_red",
+        "pig_catcher_hollow_purple",
         "pig_catcher_enable_batch_keep",
         "pig_catcher_disable_batch_keep",
         "pig_catcher_favorite",
@@ -454,6 +460,7 @@ async def test_help_command_sends_copyable_text_without_rendering(tmp_path: Path
     assert "/抓猪档案" not in text
     assert "/抓猪详情" not in text
     assert "/猪猪详情 <猪名#短编号>" in text
+    assert "/转轮盘" in text
     assert context.send.texts == [("stream-10001", text)]
     assert context.send.images == []
     assert context.render.calls == []

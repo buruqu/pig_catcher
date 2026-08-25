@@ -1129,6 +1129,21 @@ class GameplayRepository:
         官方双群）的所有保千猪模板副本。
         """
 
+        return await self.list_switchable_pig_instances(
+            session,
+            player_id=player_id,
+            display_name="保千猪",
+        )
+
+    async def list_switchable_pig_instances(
+        self,
+        session: DatabaseSession,
+        *,
+        player_id: str,
+        display_name: str,
+    ) -> list[dict[str, object]]:
+        """List active owned pigs of one name that provide alternate artwork."""
+
         rows = await session.fetch_all(
             """
             SELECT instance.pig_instance_id, instance.short_code,
@@ -1138,12 +1153,12 @@ class GameplayRepository:
               ON template.template_id = instance.template_id
             WHERE instance.owner_player_id = ?
               AND instance.state = 'active'
-              AND instance.display_name_snapshot = '保千猪'
+              AND instance.display_name_snapshot = ?
               AND template.alternate_image_relpath IS NOT NULL
               AND template.alternate_image_relpath != ''
             ORDER BY instance.acquired_at ASC, instance.pig_instance_id ASC
             """,
-            (player_id,),
+            (player_id, str(display_name)),
         )
         return [dict(row) for row in rows]
 
@@ -1159,6 +1174,23 @@ class GameplayRepository:
 
         Returns (updated_count, new_variant).
         """
+
+        return await self.toggle_pig_instances(
+            session,
+            player_id=player_id,
+            instance_ids=instance_ids,
+            now=now,
+        )
+
+    async def toggle_pig_instances(
+        self,
+        session: DatabaseSession,
+        *,
+        player_id: str,
+        instance_ids: Sequence[str],
+        now: str,
+    ) -> tuple[int, str]:
+        """Toggle default/alternate art for validated owned pig instances."""
 
         normalized = tuple(dict.fromkeys(instance_ids))
         if not normalized:

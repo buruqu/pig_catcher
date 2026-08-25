@@ -11,6 +11,7 @@ from .receipts import ReceiptRepository
 from .regulation import RegulationRepository
 from .restrictions import RestrictionRepository
 from .social import SocialRepository
+from .techniques import TechniqueRepository
 
 __all__ = [
     "AssetRepository",
@@ -24,4 +25,5 @@ __all__ = [
     "ReceiptRepository",
     "RestrictionRepository",
     "SocialRepository",
+    "TechniqueRepository",
 ]

@@ -38,11 +38,27 @@ from pig_catcher.domain.errors import (
     InsufficientBalanceError,
 )
 from pig_catcher.domain.models import CommandIdentity, ScopeKey
+from pig_catcher.domain.special_content import (
+    GOJO_BLUE_FOOD_TEMPLATE_ID,
+    GOJO_PIG_TEMPLATE_ID,
+    GOJO_RED_FOOD_TEMPLATE_ID,
+    KFC_FOOD_TEMPLATE_ID,
+    KFC_PIG_TEMPLATE_ID,
+    SOURCE_EXCLUSIVE_FOOD_TEMPLATE_IDS,
+    SUKUNA_FOOD_TEMPLATE_ID,
+    SUKUNA_PIG_TEMPLATE_ID,
+    TECHNIQUE_DOMAIN_GOJO_BYPASS,
+    TECHNIQUE_LAPSE_BLUE,
+)
 from pig_catcher.infrastructure import PigCatcherDatabase
 from pig_catcher.infrastructure.migrations.v0029_asamu_auto_gift_rebalance import (
     MIGRATION_0029,
 )
-from pig_catcher.infrastructure.repositories import EconomyRepository, FrameworkRepository
+from pig_catcher.infrastructure.repositories import (
+    EconomyRepository,
+    FrameworkRepository,
+    TechniqueRepository,
+)
 from pig_catcher.rendering import food_card_view, group_event_eat_view, store_view
 from pig_catcher.services import (
     AssetCatalogService,
@@ -1328,7 +1344,7 @@ async def test_store_purchase_upgrade_insufficient_balance_and_ledger(
     )
     store = await service.store(seed_identity, page=1, category="全部")
     assert store.coin_balance == 2000
-    assert len(store.products) == 17
+    assert len(store.products) == 18
     products = {product.display_name: product for product in store.products}
     assert products["超级幸运猪哨"].unit_price == 1320
     assert products["超级主厨香料"].unit_price == 1180
@@ -2223,8 +2239,17 @@ async def _insert_food(
     official_value: int,
     short_code: str,
     instance_id: str,
+    rarity: int = 1,
+    effect_id: str = "",
+    effect_params: dict[str, object] | None = None,
     now: str = "2026-07-28T04:00:00.000Z",
 ) -> None:
+    params_json = json.dumps(
+        effect_params or {},
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
     async with database.transaction() as session:
         await session.execute(
             """
@@ -2236,7 +2261,7 @@ async def _insert_food(
                 ruleset_version, random_snapshot_json, state,
                 acquired_at, updated_at
             )
-            VALUES (?, ?, ?, ?, ?, 1, NULL, 1, ?, 1.0, 'balanced', ?, '', '{}',
+            VALUES (?, ?, ?, ?, ?, 1, NULL, ?, ?, 1.0, 'balanced', ?, ?, ?,
                     1, '{"test":true}', 'active', ?, ?)
             """,
             (
@@ -2245,8 +2270,11 @@ async def _insert_food(
                 scope_id,
                 player_id,
                 template_id,
+                rarity,
                 display_name,
                 official_value,
+                effect_id,
+                params_json,
                 now,
                 now,
             ),
@@ -2911,6 +2939,7 @@ async def test_favorites_block_destructive_selection_and_named_food_batch_sale(
         CookingSection(cook_cooldown_seconds=0),
         EconomySection(),
         clock=clock,
+        random_source=SequenceRandom(0.0, 0.0, 0.5),
     )
     favorite_pig = await economy.set_favorite(
         _identity(message_id="favorite-pig"),
@@ -3698,4 +3727,637 @@ async def test_asamu_rebalance_migrates_playable_inventory_and_active_group_effe
     assert json.loads(str(active["effect_params_json"]))["auto_gift_chance_percent"] == 40.0
     assert json.loads(str(historical["effect_params_json"]))["auto_gift_chance_percent"] == 50.0
     assert json.loads(str(group_effect["params_json"]))["auto_gift_chance_percent"] == 40.0
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_mist_daifuku_expires_at_current_quota_window_end(
+    tmp_path: Path,
+) -> None:
+    mist_food = _food_entry(
+        6,
+        group_id="100",
+        effect_id="next-high-star-catch",
+        effect_params={
+            "uses": 5,
+            "four_star_percent": 61.5385,
+            "five_star_percent": 30.7692,
+            "six_star_percent": 7.6923,
+            "current_window_only": True,
+        },
+        template_suffix="mist-current-window",
+    )
+    mist_food["display_name"] = "雾蓝键盘大福"
+    database = await _database_with_catalog(
+        tmp_path,
+        pig_rarities=(),
+        food_rarities=(),
+        extra_entries=(mist_food,),
+    )
+    owner = _identity(message_id="mist-owner")
+    await FrameworkService(database).touch_identity(owner)
+    await _insert_food(
+        database,
+        player_id=owner.player_id,
+        scope_id=owner.scope.value,
+        template_id=str(mist_food["template_id"]),
+        display_name="雾蓝键盘大福",
+        official_value=25_000,
+        short_code="MIST0001",
+        instance_id="mist-food",
+        rarity=6,
+        effect_id="next-high-star-catch",
+        effect_params=dict(mist_food["effect_params"]),
+    )
+    service = EconomyService(
+        database,
+        CookingSection(cook_cooldown_seconds=0),
+        EconomySection(),
+        clock=FixedClock(),
+    )
+    eaten = await service.eat(
+        _identity(message_id="eat-mist"),
+        "雾蓝键盘大福#MIST0001",
+    )
+    assert eaten.effect.granted_uses == 5
+    effect = await database.fetch_one(
+        """
+        SELECT granted_uses, consumed_uses, expires_at
+        FROM player_food_effects
+        WHERE source_food_instance_id = 'mist-food'
+        """
+    )
+    assert effect is not None
+    assert tuple(effect) == (5, 0, "2026-07-28T11:00:00.000Z")
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_pork_cutlet_roulette_settles_all_six_outcomes_idempotently(
+    tmp_path: Path,
+) -> None:
+    roulette_food = _food_entry(
+        6,
+        group_id="100",
+        effect_id="roulette-chances",
+        effect_params={"count": 3},
+        template_suffix="roulette",
+    )
+    roulette_food["display_name"] = "猪保千猪排轮盘"
+    database = await _database_with_catalog(
+        tmp_path,
+        pig_rarities=(),
+        food_rarities=(),
+        extra_entries=(roulette_food,),
+    )
+    owner = _identity(message_id="roulette-owner")
+    await FrameworkService(database).touch_identity(owner)
+    for index in (1, 2):
+        await _insert_food(
+            database,
+            player_id=owner.player_id,
+            scope_id=owner.scope.value,
+            template_id=str(roulette_food["template_id"]),
+            display_name="猪保千猪排轮盘",
+            official_value=25_000,
+            short_code=f"ROULET0{index}",
+            instance_id=f"roulette-food-{index}",
+            rarity=6,
+            effect_id="roulette-chances",
+            effect_params={"count": 3},
+        )
+    service = EconomyService(
+        database,
+        CookingSection(cook_cooldown_seconds=0),
+        EconomySection(),
+        clock=FixedClock(),
+        random_source=SequenceRandom(0.0, 0.20, 0.34, 0.51, 0.68, 0.99),
+    )
+    for index in (1, 2):
+        eaten = await service.eat(
+            _identity(message_id=f"eat-roulette-{index}"),
+            f"猪保千猪排轮盘#ROULET0{index}",
+        )
+        assert "未使用机会" in eaten.effect.summary
+
+    results = []
+    first_identity = _identity(message_id="roulette-spin-1")
+    first = await service.spin_roulette(first_identity)
+    duplicate = await service.spin_roulette(first_identity)
+    assert duplicate.receipt_created is False
+    assert duplicate.receipt.receipt_id == first.receipt.receipt_id
+    results.append(first)
+    for index in range(2, 7):
+        results.append(
+            await service.spin_roulette(
+                _identity(message_id=f"roulette-spin-{index}")
+            )
+        )
+    assert [result.outcome for result in results] == [1, 2, 3, 4, 5, 6]
+    assert results[0].coin_balance == 10_000
+    assert results[-1].remaining_spins == 2
+
+    state = await database.fetch_one(
+        "SELECT available_spins FROM player_roulette_state WHERE player_id = ?",
+        (owner.player_id,),
+    )
+    assert state is not None and int(state["available_spins"]) == 2
+    effects = await database.fetch_all(
+        """
+        SELECT effect_id, params_json, granted_uses, expires_at
+        FROM player_food_effects
+        WHERE player_id = ? AND consumed_uses < granted_uses
+        ORDER BY effect_id
+        """,
+        (owner.player_id,),
+    )
+    by_effect = {str(row["effect_id"]): row for row in effects}
+    assert json.loads(by_effect["next-six-star-cook-bonus"]["params_json"]) == {
+        "bonus_percent": 30.0
+    }
+    assert json.loads(by_effect["rolling-day-window-catches"]["params_json"]) == {
+        "count": 4
+    }
+    assert by_effect["rolling-day-window-catches"]["expires_at"] == (
+        "2026-07-29T04:00:00.000Z"
+    )
+    assert int(by_effect["even-catch-distribution"]["granted_uses"]) == 5
+    assert int(by_effect["next-guaranteed-six-star-catch"]["granted_uses"]) == 1
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_aya_mousse_returns_failed_six_star_pig_without_consuming_success(
+    tmp_path: Path,
+) -> None:
+    paired_food_id = "food-six-paired"
+    source_template = _pig_entry(
+        6,
+        group_id="100",
+        template_suffix="aya-source",
+        paired_food_template_id=paired_food_id,
+    )
+    ordinary_five = _food_entry(5, template_suffix="ordinary-five-output")
+    paired_six = _food_entry(
+        6,
+        group_id="100",
+        template_suffix="paired-six-output",
+    )
+    paired_six["template_id"] = paired_food_id
+    repair_food = _food_entry(
+        6,
+        group_id="100",
+        effect_id="six-star-cook-failure-return",
+        effect_params={"uses": 3, "return_chance_percent": 75},
+        template_suffix="aya-repair-effect",
+    )
+    repair_food["display_name"] = "彩彩修车猪慕斯"
+    database = await _database_with_catalog(
+        tmp_path,
+        pig_rarities=(),
+        food_rarities=(),
+        extra_entries=(source_template, ordinary_five, paired_six, repair_food),
+    )
+    owner = _identity(message_id="aya-owner")
+    await FrameworkService(database).touch_identity(owner)
+    await _insert_pig(
+        database,
+        player_id=owner.player_id,
+        scope_id=owner.scope.value,
+        template_id=str(source_template["template_id"]),
+        rarity=6,
+        display_name=str(source_template["display_name"]),
+        official_value=25_000,
+        short_code="AYAPIG01",
+        instance_id="aya-source-pig",
+    )
+    await _insert_food(
+        database,
+        player_id=owner.player_id,
+        scope_id=owner.scope.value,
+        template_id=str(repair_food["template_id"]),
+        display_name="彩彩修车猪慕斯",
+        official_value=25_000,
+        short_code="AYAMOUS1",
+        instance_id="aya-repair-food",
+        rarity=6,
+        effect_id="six-star-cook-failure-return",
+        effect_params={"uses": 3, "return_chance_percent": 75},
+    )
+    service = EconomyService(
+        database,
+        CookingSection(cook_cooldown_seconds=0),
+        EconomySection(),
+        clock=FixedClock(),
+        random_source=SequenceRandom(
+            0.0,
+            0.50,
+            0.0,
+            0.5,
+            0.95,
+            0.0,
+            0.5,
+        ),
+    )
+    eaten = await service.eat(
+        _identity(message_id="eat-aya-mousse"),
+        "彩彩修车猪慕斯#AYAMOUS1",
+    )
+    assert eaten.effect.granted_uses == 3
+
+    failed = await service.cook(
+        _identity(message_id="aya-failed-cook"),
+        "6星测试猪#AYAPIG01",
+    )
+    assert failed.foods[0].rarity == 5
+    assert any("返还原料猪成功" in text for text in failed.effect_summaries)
+    source_after_failure = await database.fetch_one(
+        "SELECT state FROM pig_instances WHERE pig_instance_id = 'aya-source-pig'"
+    )
+    assert source_after_failure is not None
+    assert source_after_failure["state"] == "active"
+    effect_after_failure = await database.fetch_one(
+        """
+        SELECT granted_uses, consumed_uses
+        FROM player_food_effects
+        WHERE source_food_instance_id = 'aya-repair-food'
+        """
+    )
+    assert effect_after_failure is not None
+    assert tuple(effect_after_failure) == (3, 1)
+
+    succeeded = await service.cook(
+        _identity(message_id="aya-successful-cook"),
+        "6星测试猪#AYAPIG01",
+    )
+    assert succeeded.foods[0].rarity == 6
+    assert any("保护次数不消耗" in text for text in succeeded.effect_summaries)
+    source_after_success = await database.fetch_one(
+        "SELECT state FROM pig_instances WHERE pig_instance_id = 'aya-source-pig'"
+    )
+    assert source_after_success is not None
+    assert source_after_success["state"] == "consumed-for-cooking"
+    effect_after_success = await database.fetch_one(
+        """
+        SELECT granted_uses, consumed_uses
+        FROM player_food_effects
+        WHERE source_food_instance_id = 'aya-repair-food'
+        """
+    )
+    assert effect_after_success is not None
+    assert tuple(effect_after_success) == (3, 1)
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_kfc_five_star_special_food_collects_group_tribute(
+    tmp_path: Path,
+) -> None:
+    kfc_pig = _pig_entry(4, template_suffix="kfc")
+    kfc_pig.update(template_id=KFC_PIG_TEMPLATE_ID, display_name="KFC猪")
+    kfc_food = _food_entry(
+        5,
+        effect_id="group-coin-tribute",
+        effect_params={"coin_per_player": 50},
+        template_suffix="kfc-bucket",
+    )
+    kfc_food.update(
+        template_id=KFC_FOOD_TEMPLATE_ID,
+        display_name="炸猪全家桶",
+    )
+    sukuna_pig = _pig_entry(5, template_suffix="sukuna")
+    sukuna_pig.update(template_id=SUKUNA_PIG_TEMPLATE_ID, display_name="宿傩猪")
+    sukuna_food = _food_entry(
+        5,
+        effect_id="technique-permit",
+        effect_params={"technique_id": "malevolent-kitchen"},
+        template_suffix="sukuna-domain",
+    )
+    sukuna_food.update(
+        template_id=SUKUNA_FOOD_TEMPLATE_ID,
+        display_name="伏魔朱焰咒纹猪蹄饭",
+    )
+    gojo_blue_food = _food_entry(
+        5,
+        effect_id="technique-permit",
+        effect_params={"technique_id": "lapse-blue"},
+        template_suffix="gojo-blue-exclusive",
+    )
+    gojo_blue_food.update(
+        template_id=GOJO_BLUE_FOOD_TEMPLATE_ID,
+        display_name="五条猪无量苍蓝雪山",
+    )
+    gojo_red_food = _food_entry(
+        5,
+        effect_id="technique-permit",
+        effect_params={"technique_id": "reversal-red"},
+        template_suffix="gojo-red-exclusive",
+    )
+    gojo_red_food.update(
+        template_id=GOJO_RED_FOOD_TEMPLATE_ID,
+        display_name="五条猪无量赫焰雪山",
+    )
+    ordinary_pig = _pig_entry(5, template_suffix="ordinary-five")
+    database = await _database_with_catalog(
+        tmp_path,
+        pig_rarities=(),
+        food_rarities=(5,),
+        extra_entries=(
+            kfc_pig,
+            kfc_food,
+            sukuna_pig,
+            sukuna_food,
+            gojo_blue_food,
+            gojo_red_food,
+            ordinary_pig,
+        ),
+    )
+    eater = _identity(user_id="100", message_id="kfc-eater")
+    await FrameworkService(database).touch_identity(eater)
+    await _insert_pig(
+        database,
+        player_id=eater.player_id,
+        scope_id=eater.scope.value,
+        template_id=KFC_PIG_TEMPLATE_ID,
+        rarity=4,
+        display_name="KFC猪",
+        official_value=400,
+        short_code="KFCPIG01",
+        instance_id="kfc-pig-instance",
+    )
+    counters = {"id": 0, "code": 0}
+
+    def next_id() -> str:
+        counters["id"] += 1
+        return f"kfc-object-{counters['id']}"
+
+    def next_code() -> str:
+        counters["code"] += 1
+        return f"KFC{counters['code']:05d}"
+
+    service = EconomyService(
+        database,
+        CookingSection(cook_cooldown_seconds=0),
+        EconomySection(),
+        clock=FixedClock(),
+        random_source=SequenceRandom(0.95, 0.49, 0.0, 0.5),
+        id_factory=next_id,
+        short_code_factory=next_code,
+    )
+    cooked = await service.cook(
+        _identity(user_id="100", message_id="cook-kfc"),
+        "KFC猪#KFCPIG01",
+    )
+    assert cooked.foods[0].template_id == KFC_FOOD_TEMPLATE_ID
+    assert cooked.foods[0].display_name == "炸猪全家桶"
+
+    payer_full = _identity(user_id="201", message_id="payer-full")
+    payer_partial = _identity(user_id="202", message_id="payer-partial")
+    await _grant_coins(database, payer_full, 100)
+    await _grant_coins(database, payer_partial, 30)
+    eater_before = await database.fetch_one(
+        "SELECT coin_balance FROM players WHERE player_id = ?",
+        (eater.player_id,),
+    )
+    assert eater_before is not None
+    eaten = await service.eat(
+        _identity(user_id="100", message_id="eat-kfc"),
+        cooked.foods[0].selector,
+    )
+    assert eaten.group_rewarded_players == 2
+    assert eaten.group_coin_total == 80
+    assert eaten.coin_balance == int(eater_before["coin_balance"]) + 80
+    balances = await database.fetch_all(
+        """
+        SELECT platform_user_id, coin_balance
+        FROM players
+        WHERE player_id IN (?, ?)
+        ORDER BY platform_user_id
+        """,
+        (payer_full.player_id, payer_partial.player_id),
+    )
+    assert [(row["platform_user_id"], row["coin_balance"]) for row in balances] == [
+        ("201", 50),
+        ("202", 0),
+    ]
+
+    await _insert_pig(
+        database,
+        player_id=eater.player_id,
+        scope_id=eater.scope.value,
+        template_id=SUKUNA_PIG_TEMPLATE_ID,
+        rarity=5,
+        display_name="宿傩猪",
+        official_value=1000,
+        short_code="SUKUNA01",
+        instance_id="sukuna-pig-instance",
+    )
+    sukuna_service = EconomyService(
+        database,
+        CookingSection(cook_cooldown_seconds=0),
+        EconomySection(),
+        clock=FixedClock(),
+        random_source=SequenceRandom(0.50, 0.32, 0.0, 0.5),
+        id_factory=next_id,
+        short_code_factory=next_code,
+    )
+    sukuna_result = await sukuna_service.cook(
+        _identity(user_id="100", message_id="cook-sukuna"),
+        "宿傩猪#SUKUNA01",
+    )
+    assert sukuna_result.foods[0].template_id == SUKUNA_FOOD_TEMPLATE_ID
+
+    await _insert_pig(
+        database,
+        player_id=eater.player_id,
+        scope_id=eater.scope.value,
+        template_id=str(ordinary_pig["template_id"]),
+        rarity=5,
+        display_name=str(ordinary_pig["display_name"]),
+        official_value=1000,
+        short_code="NORMAL01",
+        instance_id="ordinary-five-pig-instance",
+    )
+    ordinary_result = await EconomyService(
+        database,
+        CookingSection(cook_cooldown_seconds=0),
+        EconomySection(),
+        clock=FixedClock(),
+        random_source=SequenceRandom(0.50, 0.999, 0.5),
+        id_factory=next_id,
+        short_code_factory=next_code,
+    ).cook(
+        _identity(user_id="100", message_id="cook-ordinary-five"),
+        f"{ordinary_pig['display_name']}#NORMAL01",
+    )
+    assert (
+        ordinary_result.foods[0].template_id
+        not in SOURCE_EXCLUSIVE_FOOD_TEMPLATE_IDS
+    )
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_gojo_requires_spear_or_domain_bypass_and_yields_exclusive_food(
+    tmp_path: Path,
+) -> None:
+    gojo = _pig_entry(5, template_suffix="gojo")
+    gojo.update(template_id=GOJO_PIG_TEMPLATE_ID, display_name="五条猪")
+    blue = _food_entry(
+        5,
+        effect_id="technique-permit",
+        effect_params={"technique_id": "lapse-blue"},
+        template_suffix="gojo-blue",
+    )
+    blue.update(
+        template_id=GOJO_BLUE_FOOD_TEMPLATE_ID,
+        display_name="五条猪无量苍蓝雪山",
+    )
+    red = _food_entry(
+        5,
+        effect_id="technique-permit",
+        effect_params={"technique_id": "reversal-red"},
+        template_suffix="gojo-red",
+    )
+    red.update(
+        template_id=GOJO_RED_FOOD_TEMPLATE_ID,
+        display_name="五条猪无量赫焰雪山",
+    )
+    database = await _database_with_catalog(
+        tmp_path,
+        pig_rarities=(),
+        food_rarities=(5,),
+        extra_entries=(gojo, blue, red),
+    )
+    identity = _identity(user_id="100", message_id="gojo-owner")
+    await FrameworkService(database).touch_identity(identity)
+    await _insert_pig(
+        database,
+        player_id=identity.player_id,
+        scope_id=identity.scope.value,
+        template_id=GOJO_PIG_TEMPLATE_ID,
+        rarity=5,
+        display_name="五条猪",
+        official_value=1000,
+        short_code="GOJO0001",
+        instance_id="gojo-one",
+    )
+    blocked = EconomyService(
+        database,
+        CookingSection(cook_cooldown_seconds=0),
+        EconomySection(),
+        clock=FixedClock(),
+        random_source=SequenceRandom(),
+    )
+    with pytest.raises(CookingTemplateError, match="无下限术式"):
+        await blocked.cook(
+            _identity(user_id="100", message_id="gojo-blocked"),
+            "五条猪#GOJO0001",
+        )
+    state = await database.fetch_one(
+        "SELECT state FROM pig_instances WHERE pig_instance_id = 'gojo-one'"
+    )
+    assert state is not None and state["state"] == "active"
+
+    async with database.transaction() as session:
+        await session.execute(
+            """
+            INSERT INTO item_inventory(player_id, item_id, quantity, updated_at)
+            VALUES (?, 'inverted-spear-of-heaven', 1, '2026-07-28T04:00:00.000Z')
+            """,
+            (identity.player_id,),
+        )
+        await session.execute(
+            """
+            INSERT INTO armed_items(player_id, action_type, item_id, armed_at)
+            VALUES (?, 'cooking', 'inverted-spear-of-heaven',
+                    '2026-07-28T04:00:00.000Z')
+            """,
+            (identity.player_id,),
+        )
+    counters = {"id": 0, "code": 0}
+
+    def next_id() -> str:
+        counters["id"] += 1
+        return f"gojo-object-{counters['id']}"
+
+    def next_code() -> str:
+        counters["code"] += 1
+        return f"GJ{counters['code']:06d}"
+
+    spear_service = EconomyService(
+        database,
+        CookingSection(cook_cooldown_seconds=0),
+        EconomySection(),
+        clock=FixedClock(),
+        random_source=SequenceRandom(0.50, 0.0, 0.0, 0.5),
+        id_factory=next_id,
+        short_code_factory=next_code,
+    )
+    spear_result = await spear_service.cook(
+        _identity(user_id="100", message_id="gojo-spear"),
+        "五条猪#GOJO0001",
+    )
+    assert spear_result.item_id == "inverted-spear-of-heaven"
+    assert spear_result.foods[0].template_id == GOJO_BLUE_FOOD_TEMPLATE_ID
+    assert await database.fetch_one(
+        """
+        SELECT 1 FROM armed_items
+        WHERE player_id = ? AND action_type = 'cooking'
+        """,
+        (identity.player_id,),
+    ) is None
+
+    eaten_blue = await spear_service.eat(
+        _identity(user_id="100", message_id="eat-gojo-blue"),
+        spear_result.foods[0].selector,
+    )
+    assert eaten_blue.effect.queued_effect_id == "technique-permit"
+    techniques = TechniqueRepository()
+    async with database.transaction() as session:
+        assert await techniques.available_permits(
+            session,
+            player_id=identity.player_id,
+            technique_id=TECHNIQUE_LAPSE_BLUE,
+        ) == 1
+
+    await _insert_pig(
+        database,
+        player_id=identity.player_id,
+        scope_id=identity.scope.value,
+        template_id=GOJO_PIG_TEMPLATE_ID,
+        rarity=5,
+        display_name="五条猪",
+        official_value=1000,
+        short_code="GOJO0002",
+        instance_id="gojo-two",
+    )
+    async with database.transaction() as session:
+        await techniques.grant_permit(
+            session,
+            player_id=identity.player_id,
+            technique_id=TECHNIQUE_DOMAIN_GOJO_BYPASS,
+            uses=1,
+            now="2026-07-28T04:00:00.000Z",
+        )
+    bypass_service = EconomyService(
+        database,
+        CookingSection(cook_cooldown_seconds=0),
+        EconomySection(),
+        clock=FixedClock(),
+        random_source=SequenceRandom(0.20, 0.90, 0.0, 0.5),
+        id_factory=next_id,
+        short_code_factory=next_code,
+    )
+    bypass_result = await bypass_service.cook(
+        _identity(user_id="100", message_id="gojo-domain-bypass"),
+        "五条猪#GOJO0002",
+    )
+    assert bypass_result.foods[0].template_id == GOJO_RED_FOOD_TEMPLATE_ID
+    async with database.transaction() as session:
+        assert await techniques.available_permits(
+            session,
+            player_id=identity.player_id,
+            technique_id=TECHNIQUE_DOMAIN_GOJO_BYPASS,
+        ) == 0
     await database.close()

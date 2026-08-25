@@ -216,7 +216,7 @@ async def run(args: argparse.Namespace) -> dict[str, object]:
         home_card_count = sum(
             component["type"] == "HOME_CARD" for component in components
         )
-        if len(components) != 50 or command_count != 49 or home_card_count != 1:
+        if len(components) != 56 or command_count != 55 or home_card_count != 1:
             raise AssertionError(
                 "正式版必须注册 49 个显式命令和 1 个运营首页卡片，"
                 f"实际为 {len(components)} 个组件。"
@@ -628,7 +628,7 @@ async def run(args: argparse.Namespace) -> dict[str, object]:
         "status": "passed",
         "plugin_version": PLUGIN_VERSION,
         "schema_version": SCHEMA_VERSION,
-        "component_count": 49,
+        "component_count": 55,
         "commands": records,
         "command_count": len(records),
         "deliveries": {

@@ -1,14 +1,14 @@
 # 本机素材库
 
 `current/` 保存当前正式素材导入包，并通过 Git LFS 提交完整图片与动画；
-`archive/` 继续保存本机历史回滚包并被 Git 忽略，整理目录时不得删除。本版不改变媒体
-既有二进制，并新增四群隔离的“神龙化猪 / 神龙化猪七星云海锅”原始素材；
+`archive/` 继续保存本机历史回滚包并被 Git 忽略，整理目录时不得删除。本版保留既有媒体
+字节，并新增 Ave Mujica、KFC 与咒术回战共 14 份公共原始素材（含初华猪备用立绘）；
 `current/assets.json` 与 `current/build-report.json` 已按正式定义重建。
 
 | 位置 | 内容 |
 | --- | --- |
 | `current/assets.json` | 可供导入工具读取的 Asset Manifest 4 |
-| `current/build-report.json` | 239 项模板（164 猪、75 菜）、173 份唯一内容、242 份隔离存储媒体的 SHA-256 校验报告 |
+| `current/build-report.json` | 252 项模板（173 猪、79 菜）、187 份唯一内容、256 份隔离存储媒体的 SHA-256 校验报告 |
 | `current/media/猪猪素材库/` | 一至五星公共猪猪素材 |
 | `current/media/美食素材库/` | 公共美食素材 |
 | `current/media/定制猪群友库/` | 按 QQ 群号隔离的六星定制猪 |

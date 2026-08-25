@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable, Collection, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import uuid4
@@ -48,15 +48,24 @@ from ..domain.errors import (
 from ..domain.food_effects import (
     COOK_EFFECT_IDS,
     CURRENT_WINDOW_CATCHES,
+    EVEN_CATCH_DISTRIBUTION,
     EXTRA_CATCHES,
+    GROUP_COIN_TRIBUTE,
     GROUP_EFFECT_IDS,
     GROUP_NEXT_EXCLUSIVE_HIGH_STAR_CATCH,
     GROUP_WINDOW_HIGH_STAR_BOOST,
+    NEXT_GUARANTEED_SIX_STAR_CATCH,
+    NEXT_HIGH_STAR_CATCH,
     NEXT_SIX_STAR_COOK,
+    NEXT_SIX_STAR_COOK_BONUS,
     NEXT_STACKABLE_SIX_STAR_COOK_BONUS,
     PERMANENT_SIX_STAR_PROGRESS,
     PERMANENT_WINDOW_CATCH,
     QUOTA_RESET_CHANCE,
+    ROLLING_DAY_WINDOW_CATCHES,
+    ROULETTE_CHANCES,
+    SIX_STAR_COOK_FAILURE_RETURN,
+    TECHNIQUE_PERMIT,
     TODAY_WINDOW_CATCHES,
     WEEKLY_WINDOW_CATCHES,
     CookingEffectApplication,
@@ -86,6 +95,17 @@ from ..domain.rules import (
 )
 from ..domain.selectors import parse_asset_selector
 from ..domain.short_codes import is_valid_short_code, new_short_code
+from ..domain.special_content import (
+    GOJO_EXCLUSIVE_FOOD_TEMPLATE_IDS,
+    GOJO_PIG_TEMPLATE_ID,
+    INVERTED_SPEAR_ITEM_ID,
+    KFC_FOOD_TEMPLATE_ID,
+    KFC_PIG_TEMPLATE_ID,
+    SOURCE_EXCLUSIVE_FOOD_TEMPLATE_IDS,
+    SUKUNA_FOOD_TEMPLATE_ID,
+    SUKUNA_PIG_TEMPLATE_ID,
+    TECHNIQUE_DOMAIN_GOJO_BYPASS,
+)
 from ..infrastructure.database import DatabaseSession, PigCatcherDatabase
 from ..infrastructure.repositories import (
     EconomyRepository,
@@ -93,6 +113,7 @@ from ..infrastructure.repositories import (
     GameplayRepository,
     ReceiptRepository,
     SocialRepository,
+    TechniqueRepository,
 )
 from ..version import RULESET_VERSION
 from .command_state import (
@@ -106,6 +127,7 @@ from .receipts import request_fingerprint
 
 _COOK_COMMAND = "pig-catcher.cook"
 _BATCH_COOK_COMMAND = "pig-catcher.batch-cook"
+_ROULETTE_COMMAND = "pig-catcher.roulette"
 # 达妮娅泡泡云冻每层六星猪做菜概率加成（百分点），与正式目录效果参数一致。
 _DANIYA_COOK_BONUS_PER_STACK = 2.0
 _EAT_COMMAND = "pig-catcher.eat"
@@ -295,6 +317,19 @@ class EatResult:
     total_experience: int
     coin_balance: int
     group_rewarded_players: int = 0
+    group_coin_total: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class RouletteResult:
+    """One committed six-outcome pork-cutlet roulette spin."""
+
+    receipt: CommandReceipt
+    receipt_created: bool
+    outcome: int
+    outcome_summary: str
+    remaining_spins: int
+    coin_balance: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -671,7 +706,13 @@ def format_eat_summary(result: EatResult) -> str:
     """Return a complete food-consumption fallback."""
 
     experience = result.base_experience + result.effect.experience_bonus
-    coin = f"；额外 +{result.effect.coin_bonus} 猪币" if result.effect.coin_bonus else ""
+    if result.effect.queued_effect_id == GROUP_COIN_TRIBUTE:
+        coin = (
+            f"；从 {result.group_rewarded_players} 名群友处共收到 "
+            f"{result.group_coin_total} 猪币"
+        )
+    else:
+        coin = f"；额外 +{result.effect.coin_bonus} 猪币" if result.effect.coin_bonus else ""
     uses = (
         f"\n效果可用次数：{result.effect.granted_uses} 次"
         if result.effect.granted_uses > 1
@@ -683,6 +724,18 @@ def format_eat_summary(result: EatResult) -> str:
         f"获得经验：+{experience}{coin}\n"
         f"当前累计经验：{result.total_experience}；猪币：{result.coin_balance}\n"
         f"效果：{result.effect.summary}{uses}"
+    )
+
+
+def format_roulette_summary(result: RouletteResult) -> str:
+    """Return the complete text receipt for one roulette spin."""
+
+    return (
+        "【猪保千猪排轮盘】\n"
+        f"转轮结果：{result.outcome}\n"
+        f"奖励：{result.outcome_summary}\n"
+        f"剩余转轮机会：{result.remaining_spins} 次\n"
+        f"当前猪币：{result.coin_balance}"
     )
 
 
@@ -948,6 +1001,7 @@ class EconomyService:
         framework_repository: FrameworkRepository | None = None,
         receipt_repository: ReceiptRepository | None = None,
         social_repository: SocialRepository | None = None,
+        technique_repository: TechniqueRepository | None = None,
         random_source: RandomSource | None = None,
         clock: Clock | None = None,
         id_factory: Callable[[], str] | None = None,
@@ -965,6 +1019,7 @@ class EconomyService:
         self.framework_repository = framework_repository or FrameworkRepository()
         self.receipt_repository = receipt_repository or ReceiptRepository()
         self.social_repository = social_repository or SocialRepository()
+        self.technique_repository = technique_repository or TechniqueRepository()
         self.random_source = random_source or SystemRandomSource()
         self.clock = clock or SystemClock()
         self.id_factory = id_factory or (lambda: uuid4().hex)
@@ -1369,12 +1424,13 @@ class EconomyService:
                 now=now,
             )
         )
+        is_gojo_pig = source.template_id == GOJO_PIG_TEMPLATE_ID
         # 六星菜独占效果：回到未受属性、等级、厨具、道具和普通菜影响的基础层。
         exclusive_effect_active = has_compatible_exclusive_cook_effect(
             active_effects,
             source_rarity=source.rarity,
         )
-        if apply_armed_item and exclusive_effect_active:
+        if apply_armed_item and exclusive_effect_active and not is_gojo_pig:
             apply_armed_item = False
         armed_row = (
             await self.gameplay_repository.get_armed_item(
@@ -1386,6 +1442,22 @@ class EconomyService:
             else None
         )
         armed_item, armed_uses = self._armed_item(armed_row)
+        domain_gojo_bypass = False
+        if is_gojo_pig and (
+            armed_item is None or armed_item.item_id != INVERTED_SPEAR_ITEM_ID
+        ):
+            domain_gojo_bypass = (
+                await self.technique_repository.available_permits(
+                    session,
+                    player_id=identity.player_id,
+                    technique_id=TECHNIQUE_DOMAIN_GOJO_BYPASS,
+                )
+                > 0
+            )
+            if not domain_gojo_bypass:
+                raise CookingTemplateError(
+                    "无下限术式挡住了厨具，五条猪毫发无伤；原料猪与已装备道具均未消耗。"
+                )
         item_compatible = bool(
             armed_item is not None
             and (
@@ -1409,29 +1481,44 @@ class EconomyService:
                     source.rarity == 6
                     and armed_item.item_id == "super-chef-spice"
                 )
+                or (
+                    is_gojo_pig
+                    and armed_item.item_id == INVERTED_SPEAR_ITEM_ID
+                )
             )
         )
         applied_item = armed_item if item_compatible else None
-        weights = (
-            cooking_weights(source.rarity)
-            if exclusive_effect_active
-            else adjusted_cooking_weights(
-                source.rarity,
-                size_percentile=source.size_percentile,
-                weight_percentile=source.weight_percentile,
-                cookware_level=cookware_level,
-                player_level=probability_level,
-                chef_spice=False,
-                item_id=(
-                    applied_item.item_id if applied_item is not None else ""
-                ),
+        if domain_gojo_bypass:
+            # 隐藏彩蛋：领域展开留下的一次许可直接突破无下限，并保证本次
+            # 五星结果进入五条猪专属菜池；其他道具与菜品队列均保留。
+            applied_item = None
+            weights = normalize_weights((0, 0, 0, 0, 100, 0))
+            effect_application = apply_cooking_effects(
+                weights,
+                (),
+                source_rarity=source.rarity,
             )
-        )
-        effect_application = apply_cooking_effects(
-            weights,
-            active_effects,
-            source_rarity=source.rarity,
-        )
+        else:
+            weights = (
+                cooking_weights(source.rarity)
+                if exclusive_effect_active
+                else adjusted_cooking_weights(
+                    source.rarity,
+                    size_percentile=source.size_percentile,
+                    weight_percentile=source.weight_percentile,
+                    cookware_level=cookware_level,
+                    player_level=probability_level,
+                    chef_spice=False,
+                    item_id=(
+                        applied_item.item_id if applied_item is not None else ""
+                    ),
+                )
+            )
+            effect_application = apply_cooking_effects(
+                weights,
+                active_effects,
+                source_rarity=source.rarity,
+            )
         weights = effect_application.weights
         six_star_progress_stacks = (
             await self.repository.six_star_progress_stacks(
@@ -1439,7 +1526,9 @@ class EconomyService:
                 player_id=identity.player_id,
             )
         )
-        if six_star_progress_stacks:
+        if six_star_progress_stacks and not (
+            exclusive_effect_active or domain_gojo_bypass
+        ):
             progressed_weights = apply_six_star_progress(
                 weights,
                 stacks=six_star_progress_stacks,
@@ -1459,8 +1548,77 @@ class EconomyService:
                     ),
                     skipped_summaries=effect_application.skipped_summaries,
                 )
+        elif six_star_progress_stacks:
+            effect_application = replace(
+                effect_application,
+                skipped_summaries=effect_application.skipped_summaries
+                + (
+                    "达妮娅泡泡云冻永久概率加成本次受六星菜独占规则影响，未参与结算。",
+                ),
+            )
         rarity_roll = self.random_source.random()
         output_rarity = choose_rarity(weights, rarity_roll)
+        failure_return_effect = None
+        if (
+            exclusive_effect_active
+            and not effect_application.consumed_entry_ids
+            and source.rarity == 6
+        ):
+            failure_return_effect = next(
+                (
+                    effect
+                    for effect in sorted(
+                        active_effects,
+                        key=lambda candidate: (
+                            candidate.created_at,
+                            candidate.effect_entry_id,
+                        ),
+                    )
+                    if effect.effect_id == SIX_STAR_COOK_FAILURE_RETURN
+                ),
+                None,
+            )
+        consumed_effect_entry_ids = list(
+            effect_application.consumed_entry_ids
+        )
+        cook_effect_summaries = list(effect_application.summaries)
+        failure_return_roll: float | None = None
+        failure_return_triggered = False
+        failure_return_remaining = 0
+        if failure_return_effect is not None:
+            remaining_before = (
+                failure_return_effect.granted_uses
+                - failure_return_effect.consumed_uses
+            )
+            if int(output_rarity) == 6:
+                failure_return_remaining = remaining_before
+                cook_effect_summaries.append(
+                    "彩彩修车猪慕斯：本次成功做出六星菜，"
+                    f"保护次数不消耗，仍剩 {remaining_before}/"
+                    f"{failure_return_effect.granted_uses} 次。"
+                )
+            else:
+                chance = float(
+                    failure_return_effect.params["return_chance_percent"]
+                )
+                failure_return_roll = self.random_source.random()
+                failure_return_triggered = (
+                    failure_return_roll < chance / 100.0
+                )
+                failure_return_remaining = max(0, remaining_before - 1)
+                consumed_effect_entry_ids.append(
+                    failure_return_effect.effect_entry_id
+                )
+                result_text = (
+                    "返还原料猪成功"
+                    if failure_return_triggered
+                    else "本次未触发返还"
+                )
+                cook_effect_summaries.append(
+                    f"彩彩修车猪慕斯：六星做菜失败，{result_text}；"
+                    f"保护次数剩余 {failure_return_remaining}/"
+                    f"{failure_return_effect.granted_uses} 次。"
+                )
         templates = await self.repository.list_drawable_food_templates(
             session,
             scope_id=identity.scope.value,
@@ -1469,6 +1627,8 @@ class EconomyService:
         if not templates:
             raise CookingTemplateError(f"当前群没有可用的 {int(output_rarity)} 星美食模板，原料猪未消耗。")
         desired_affinity = source.fat_category
+        special_food_roll: float | None = None
+        special_template_id = ""
         if source.rarity == 6 and int(output_rarity) == 6:
             paired_template_id = source.paired_food_template_id
             candidates = [candidate for candidate in templates if str(candidate["template_id"]) == paired_template_id]
@@ -1476,11 +1636,60 @@ class EconomyService:
                 raise CookingTemplateError("这只六星猪没有当前群可用的对应定制六星菜，原料猪未消耗。")
         else:
             paired_template_id = ""
+            if int(output_rarity) == 5:
+                if source.template_id == KFC_PIG_TEMPLATE_ID:
+                    special_food_roll = self.random_source.random()
+                    if special_food_roll < 0.50:
+                        special_template_id = KFC_FOOD_TEMPLATE_ID
+                elif source.template_id == SUKUNA_PIG_TEMPLATE_ID:
+                    special_food_roll = self.random_source.random()
+                    if special_food_roll < (1.0 / 3.0):
+                        special_template_id = SUKUNA_FOOD_TEMPLATE_ID
+                elif source.template_id == GOJO_PIG_TEMPLATE_ID:
+                    special_food_roll = self.random_source.random()
+                    if domain_gojo_bypass:
+                        special_template_id = GOJO_EXCLUSIVE_FOOD_TEMPLATE_IDS[
+                            min(
+                                int(
+                                    special_food_roll
+                                    * len(GOJO_EXCLUSIVE_FOOD_TEMPLATE_IDS)
+                                ),
+                                len(GOJO_EXCLUSIVE_FOOD_TEMPLATE_IDS) - 1,
+                            )
+                        ]
+                    elif special_food_roll < (1.0 / 3.0):
+                        special_template_id = GOJO_EXCLUSIVE_FOOD_TEMPLATE_IDS[
+                            0 if special_food_roll < (1.0 / 6.0) else 1
+                        ]
+            ordinary_templates = [
+                candidate
+                for candidate in templates
+                if str(candidate["template_id"])
+                not in SOURCE_EXCLUSIVE_FOOD_TEMPLATE_IDS
+            ]
             if applied_item is not None and applied_item.item_id == "precision-knife":
                 desired_affinity = "lean"
             elif applied_item is not None and applied_item.item_id == "slow-cook-seasoning":
                 desired_affinity = "fatty"
-            candidates = self._affinity_candidates(templates, desired_affinity)
+            if special_template_id:
+                candidates = [
+                    candidate
+                    for candidate in templates
+                    if str(candidate["template_id"]) == special_template_id
+                ]
+                if not candidates:
+                    raise CookingTemplateError(
+                        "专属菜模板尚未在当前素材目录启用，原料猪未消耗。"
+                    )
+            else:
+                candidates = self._affinity_candidates(
+                    ordinary_templates,
+                    desired_affinity,
+                )
+                if not candidates:
+                    raise CookingTemplateError(
+                        "当前群缺少可用的普通五星菜模板，原料猪未消耗。"
+                    )
         template_roll = self.random_source.random()
         template = candidates[min(int(template_roll * len(candidates)), len(candidates) - 1)]
         portion_roll = self.random_source.random()
@@ -1539,22 +1748,25 @@ class EconomyService:
                 reserved=short_codes,
             )
             short_codes.append(short_code)
-        consumed = await self.repository.consume_pig_for_cooking(
-            session,
-            pig_instance_id=source.pig_instance_id,
-            player_id=identity.player_id,
-            scope_id=identity.scope.value,
-            now=now,
-        )
-        if not consumed:
-            raise AssetStateConflictError("原料猪已不在有效背包中，本次做菜未结算。")
-        await self.social_repository.clear_showcase_asset(
-            session,
-            player_id=identity.player_id,
-            asset_kind=AssetKind.PIG,
-            asset_instance_id=source.pig_instance_id,
-            now=now,
-        )
+        if not failure_return_triggered:
+            consumed = await self.repository.consume_pig_for_cooking(
+                session,
+                pig_instance_id=source.pig_instance_id,
+                player_id=identity.player_id,
+                scope_id=identity.scope.value,
+                now=now,
+            )
+            if not consumed:
+                raise AssetStateConflictError(
+                    "原料猪已不在有效背包中，本次做菜未结算。"
+                )
+            await self.social_repository.clear_showcase_asset(
+                session,
+                player_id=identity.player_id,
+                asset_kind=AssetKind.PIG,
+                asset_instance_id=source.pig_instance_id,
+                now=now,
+            )
 
         snapshot_base = {
             "ruleset_version": RULESET_VERSION,
@@ -1568,11 +1780,17 @@ class EconomyService:
             "template_roll": template_roll,
             "desired_affinity": desired_affinity,
             "paired_food_template_id": paired_template_id,
+            "special_food_roll": special_food_roll,
+            "special_food_template_id": special_template_id,
+            "domain_gojo_bypass": domain_gojo_bypass,
             "bonus_roll": bonus_roll,
             "bonus_serving": bonus_serving,
-            "food_effect_entry_ids": list(effect_application.consumed_entry_ids),
-            "food_effect_summaries": list(effect_application.summaries),
+            "food_effect_entry_ids": consumed_effect_entry_ids,
+            "food_effect_summaries": cook_effect_summaries,
             "exclusive_effect_active": exclusive_effect_active,
+            "failure_return_roll": failure_return_roll,
+            "failure_return_triggered": failure_return_triggered,
+            "failure_return_remaining": failure_return_remaining,
         }
         catalog_new_count = 0
         for index, (food_id, short_code, attributes) in enumerate(zip(food_ids, short_codes, food_specs, strict=True)):
@@ -1658,13 +1876,22 @@ class EconomyService:
             )
             if not item_consumed:
                 raise ItemInventoryError(f"已装备的“{applied_item.display_name}”库存不足，本次做菜未结算。")
-        if effect_application.consumed_entry_ids:
+        if consumed_effect_entry_ids:
             await self.repository.consume_food_effects(
                 session,
                 player_id=identity.player_id,
-                effect_entry_ids=effect_application.consumed_entry_ids,
+                effect_entry_ids=tuple(consumed_effect_entry_ids),
                 now=now,
             )
+        if domain_gojo_bypass:
+            consumed_bypass = await self.technique_repository.consume_permit(
+                session,
+                player_id=identity.player_id,
+                technique_id=TECHNIQUE_DOMAIN_GOJO_BYPASS,
+                now=now,
+            )
+            if not consumed_bypass:
+                raise RuntimeError("领域内术式解除资格已被其他结算消耗。")
         foods = tuple([await self._food_by_id(session, food_id) for food_id in food_ids])
         return _CookOutcome(
             source=source,
@@ -1680,13 +1907,13 @@ class EconomyService:
             item_name=applied_item.display_name if applied_item is not None else "",
             weights=weights,
             bonus_serving=bonus_serving,
-            effect_summaries=effect_application.summaries,
+            effect_summaries=tuple(cook_effect_summaries),
             excluded_summaries=effect_application.skipped_summaries,
             exclusive_effect_active=exclusive_effect_active,
             item_remaining_uses=(
                 max(0, armed_uses - 1) if applied_item is not None else 0
             ),
-            effect_entry_ids=effect_application.consumed_entry_ids,
+            effect_entry_ids=tuple(consumed_effect_entry_ids),
         )
 
     async def _batch_cook_from_receipt(
@@ -1912,6 +2139,16 @@ class EconomyService:
                     effect_expires_at = iso_timestamp(window.end)
                 else:
                     effect_expires_at = self._daily_effect_expiry(now_datetime)
+            elif (
+                effect.queued_effect_id == NEXT_HIGH_STAR_CATCH
+                and bool(effect.queued_effect_params.get("current_window_only"))
+            ):
+                window = catch_quota_window(
+                    now_datetime,
+                    refresh_hours=self.quota_refresh_hours,
+                    timezone_name=self.quota_timezone_name,
+                )
+                effect_expires_at = iso_timestamp(window.end)
             elif effect.queued_effect_id == WEEKLY_WINDOW_CATCHES:
                 effect_expires_at = self._rolling_seven_day_effect_expiry(now_datetime)
                 granted = await self.repository.grant_weekly_catch_bonus(
@@ -1982,10 +2219,14 @@ class EconomyService:
             )
             effect_entry_id = ""
             personal_effect_entry_id = ""
+            roulette_available_spins = 0
             if effect.queued_effect_id and effect.queued_effect_id not in {
                 WEEKLY_WINDOW_CATCHES,
                 PERMANENT_WINDOW_CATCH,
                 PERMANENT_SIX_STAR_PROGRESS,
+                GROUP_COIN_TRIBUTE,
+                ROULETTE_CHANCES,
+                TECHNIQUE_PERMIT,
                 *GROUP_EFFECT_IDS,
             }:
                 effect_entry_id = self._new_identifier()
@@ -2067,6 +2308,38 @@ class EconomyService:
                         expires_at=None,
                         now=now,
                     )
+            elif effect.queued_effect_id == ROULETTE_CHANCES:
+                roulette_available_spins = await self.repository.grant_roulette_spins(
+                    session,
+                    player_id=identity.player_id,
+                    source_food_instance_id=food.food_instance_id,
+                    count=int(effect.queued_effect_params["count"]),
+                    now=now,
+                )
+                effect = replace(
+                    effect,
+                    summary=(
+                        f"{effect.summary} 当前未使用机会共 "
+                        f"{roulette_available_spins} 次。"
+                    ),
+                )
+            elif effect.queued_effect_id == TECHNIQUE_PERMIT:
+                technique_id = str(
+                    effect.queued_effect_params.get("technique_id") or ""
+                )
+                available = await self.technique_repository.grant_permit(
+                    session,
+                    player_id=identity.player_id,
+                    technique_id=technique_id,
+                    uses=1,
+                    now=now,
+                )
+                effect = replace(
+                    effect,
+                    summary=(
+                        f"{effect.summary} 当前未发动资格共 {available} 次。"
+                    ),
+                )
             current_experience = await self.gameplay_repository.get_player_experience(
                 session,
                 player_id=identity.player_id,
@@ -2083,6 +2356,7 @@ class EconomyService:
                 now=now,
             )
             group_rewarded_players = 0
+            group_coin_total = 0
             if effect.queued_effect_id in GROUP_EFFECT_IDS:
                 coin_balance, group_rewarded_players = (
                     await self._apply_group_food_coin_rewards(
@@ -2093,6 +2367,21 @@ class EconomyService:
                         idempotency_key=idempotency_key,
                         now=now,
                     )
+                )
+            elif effect.queued_effect_id == GROUP_COIN_TRIBUTE:
+                (
+                    coin_balance,
+                    group_rewarded_players,
+                    group_coin_total,
+                ) = await self._apply_group_coin_tribute(
+                    session,
+                    identity=identity,
+                    food=food,
+                    coin_per_player=int(
+                        effect.queued_effect_params["coin_per_player"]
+                    ),
+                    idempotency_key=idempotency_key,
+                    now=now,
                 )
             elif effect.coin_bonus:
                 coin_balance = await self.repository.apply_currency_change(
@@ -2130,7 +2419,9 @@ class EconomyService:
                 "queued_effect_params": dict(effect.queued_effect_params),
                 "effect_granted_uses": effect.granted_uses,
                 "effect_expires_at": effect_expires_at,
+                "roulette_available_spins": roulette_available_spins,
                 "group_rewarded_players": group_rewarded_players,
+                "group_coin_total": group_coin_total,
                 "total_experience": total_experience,
                 "coin_balance": coin_balance,
             }
@@ -2152,6 +2443,7 @@ class EconomyService:
                 total_experience=total_experience,
                 coin_balance=coin_balance,
                 group_rewarded_players=group_rewarded_players,
+                group_coin_total=group_coin_total,
             )
             receipt = await self._reserve(
                 session,
@@ -2178,6 +2470,174 @@ class EconomyService:
                 total_experience=total_experience,
                 coin_balance=coin_balance,
                 group_rewarded_players=group_rewarded_players,
+                group_coin_total=group_coin_total,
+            )
+
+    async def spin_roulette(self, identity: CommandIdentity) -> RouletteResult:
+        """Consume one durable roulette chance and settle one uniform outcome."""
+
+        request_payload = {"command_version": 1}
+        idempotency_key = MessageKeyFactory.build(identity, _ROULETTE_COMMAND)
+        now_datetime = _safe_datetime(self.clock.now())
+        now = iso_timestamp(now_datetime)
+        async with self.database.transaction() as session:
+            existing = await self.receipt_repository.get_by_key(
+                session,
+                idempotency_key,
+            )
+            if existing is not None:
+                validate_existing_receipt(
+                    existing,
+                    identity=identity,
+                    command_name=_ROULETTE_COMMAND,
+                    request_payload=request_payload,
+                )
+                return self._roulette_from_receipt(
+                    existing,
+                    receipt_created=False,
+                )
+            await self.framework_repository.touch_identity(
+                session,
+                identity=identity,
+                now=now,
+            )
+            state = await self.repository.roulette_state(
+                session,
+                player_id=identity.player_id,
+            )
+            if state is None or int(state["available_spins"]) <= 0:
+                raise FoodEffectError(
+                    "没有可用的猪保千猪排轮盘机会；请先食用猪保千猪排轮盘。"
+                )
+            source_food_instance_id = str(state["source_food_instance_id"])
+            remaining_spins = await self.repository.consume_roulette_spin(
+                session,
+                player_id=identity.player_id,
+                now=now,
+            )
+            outcome_roll = self.random_source.random()
+            outcome = min(int(outcome_roll * 6), 5) + 1
+            outcome_summary = ""
+
+            if outcome == 1:
+                coin_balance = await self.repository.apply_currency_change(
+                    session,
+                    player_id=identity.player_id,
+                    scope_id=identity.scope.value,
+                    amount=10_000,
+                    reason_code="roulette-reward",
+                    reason_text="猪保千猪排轮盘奖励",
+                    source_object_type="food",
+                    source_object_id=source_food_instance_id,
+                    ledger_entry_id=self._new_identifier(),
+                    idempotency_key=f"{idempotency_key}:coin",
+                    now=now,
+                )
+                if coin_balance is None:
+                    raise RuntimeError("轮盘猪币奖励无法写入玩家余额。")
+                outcome_summary = "获得 10000 猪币。"
+            else:
+                profile = await self.repository.economy_profile_row(
+                    session,
+                    player_id=identity.player_id,
+                )
+                if profile is None:
+                    raise RuntimeError("轮盘结算后无法读取玩家余额。")
+                coin_balance = int(profile["coin_balance"])
+
+            if outcome == 2:
+                remaining_spins = await self.repository.grant_roulette_spins(
+                    session,
+                    player_id=identity.player_id,
+                    source_food_instance_id=source_food_instance_id,
+                    count=2,
+                    now=now,
+                )
+                outcome_summary = "额外获得 2 次转轮盘机会。"
+            elif outcome in {3, 4, 5, 6}:
+                if outcome == 3:
+                    grant = resolve_food_effect(
+                        NEXT_SIX_STAR_COOK_BONUS,
+                        {"bonus_percent": 30},
+                    )
+                    expires_at = None
+                elif outcome == 4:
+                    grant = resolve_food_effect(
+                        ROLLING_DAY_WINDOW_CATCHES,
+                        {"count": 4},
+                    )
+                    expires_at = self._next_same_window_effect_expiry(
+                        now_datetime
+                    )
+                elif outcome == 5:
+                    grant = resolve_food_effect(
+                        EVEN_CATCH_DISTRIBUTION,
+                        {"uses": 5},
+                    )
+                    expires_at = None
+                else:
+                    grant = resolve_food_effect(
+                        NEXT_GUARANTEED_SIX_STAR_CATCH,
+                        {},
+                    )
+                    expires_at = None
+                await self.repository.insert_food_effect(
+                    session,
+                    effect_entry_id=self._new_identifier(),
+                    player_id=identity.player_id,
+                    source_food_instance_id=source_food_instance_id,
+                    effect_id=grant.effect_id,
+                    params_json=json.dumps(
+                        grant.params,
+                        ensure_ascii=False,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    ),
+                    granted_uses=grant.granted_uses,
+                    expires_at=expires_at,
+                    now=now,
+                )
+                outcome_summary = grant.summary
+
+            payload = {
+                "outcome_roll": outcome_roll,
+                "outcome": outcome,
+                "outcome_summary": outcome_summary,
+                "remaining_spins": remaining_spins,
+                "coin_balance": coin_balance,
+            }
+            provisional = RouletteResult(
+                receipt=self._provisional_receipt(
+                    idempotency_key=idempotency_key,
+                    identity=identity,
+                    command_name=_ROULETTE_COMMAND,
+                    request_payload=request_payload,
+                    result_type="roulette-spin",
+                    result_object_id=source_food_instance_id,
+                    result_payload=payload,
+                    now=now,
+                ),
+                receipt_created=True,
+                outcome=outcome,
+                outcome_summary=outcome_summary,
+                remaining_spins=remaining_spins,
+                coin_balance=coin_balance,
+            )
+            receipt = await self._reserve(
+                session,
+                identity=identity,
+                idempotency_key=idempotency_key,
+                command_name=_ROULETTE_COMMAND,
+                request_payload=request_payload,
+                result_type="roulette-spin",
+                result_object_id=source_food_instance_id,
+                result_payload=payload,
+                text_summary=format_roulette_summary(provisional),
+                now=now,
+            )
+            return replace(
+                provisional,
+                receipt=receipt,
             )
 
     async def eat_or_confirm(
@@ -2242,6 +2702,22 @@ class EconomyService:
                 )
         assert selected is not None
         return await self.eat(identity, selected.selector)
+
+    @staticmethod
+    def _roulette_from_receipt(
+        receipt: CommandReceipt,
+        *,
+        receipt_created: bool,
+    ) -> RouletteResult:
+        payload = receipt_payload(receipt)
+        return RouletteResult(
+            receipt=receipt,
+            receipt_created=receipt_created,
+            outcome=int(payload["outcome"]),
+            outcome_summary=str(payload["outcome_summary"]),
+            remaining_spins=int(payload["remaining_spins"]),
+            coin_balance=int(payload["coin_balance"]),
+        )
 
     async def confirm_eat(
         self,
@@ -3311,6 +3787,7 @@ class EconomyService:
             total_experience=int(payload["total_experience"]),
             coin_balance=int(payload["coin_balance"]),
             group_rewarded_players=int(payload.get("group_rewarded_players") or 0),
+            group_coin_total=int(payload.get("group_coin_total") or 0),
         )
 
     def _purchase_from_receipt(
@@ -3613,6 +4090,72 @@ class EconomyService:
         if eater_balance is None:
             raise RuntimeError("六星菜食用者不在当前群玩家清单中。")
         return eater_balance, rewarded
+
+    async def _apply_group_coin_tribute(
+        self,
+        session: DatabaseSession,
+        *,
+        identity: CommandIdentity,
+        food: FoodView,
+        coin_per_player: int,
+        idempotency_key: str,
+        now: str,
+    ) -> tuple[int, int, int]:
+        """Transfer up to a fixed amount from every other registered player."""
+
+        players = await self.repository.players_in_scope(
+            session,
+            scope_id=identity.scope.value,
+        )
+        transferred_total = 0
+        payer_count = 0
+        eater_balance: int | None = None
+        for index, player in enumerate(players):
+            player_id = str(player["player_id"])
+            balance_before = int(player["coin_balance"])
+            if player_id == identity.player_id:
+                eater_balance = balance_before
+                continue
+            payment = min(max(0, int(coin_per_player)), balance_before)
+            if payment <= 0:
+                continue
+            balance = await self.repository.apply_currency_change(
+                session,
+                player_id=player_id,
+                scope_id=identity.scope.value,
+                amount=-payment,
+                reason_code="group-food-tribute",
+                reason_text=f"向{food.display_name}食用者支付猪币",
+                source_object_type="food",
+                source_object_id=food.food_instance_id,
+                ledger_entry_id=self._new_identifier(),
+                idempotency_key=f"{idempotency_key}:tribute:{index}",
+                now=now,
+            )
+            if balance is None:
+                raise RuntimeError("群友猪币支付并发失败。")
+            transferred_total += payment
+            payer_count += 1
+        if eater_balance is None:
+            raise RuntimeError("炸猪全家桶食用者不在当前群玩家清单中。")
+        if transferred_total:
+            credited = await self.repository.apply_currency_change(
+                session,
+                player_id=identity.player_id,
+                scope_id=identity.scope.value,
+                amount=transferred_total,
+                reason_code="group-food-tribute",
+                reason_text=f"食用{food.display_name}收到群友猪币",
+                source_object_type="food",
+                source_object_id=food.food_instance_id,
+                ledger_entry_id=self._new_identifier(),
+                idempotency_key=f"{idempotency_key}:tribute:eater",
+                now=now,
+            )
+            if credited is None:
+                raise RuntimeError("炸猪全家桶猪币归集失败。")
+            eater_balance = credited
+        return eater_balance, payer_count, transferred_total
 
     @staticmethod
     def _daily_effect_expiry(now: datetime) -> str:

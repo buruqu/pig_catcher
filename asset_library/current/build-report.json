@@ -1,9 +1,9 @@
 {
   "source_root": "asset_library/current/media",
   "definitions": "catalogs/formal/pig-and-food-definitions.json",
-  "entry_count": 239,
-  "unique_binary_count": 173,
-  "stored_binary_count": 242,
+  "entry_count": 252,
+  "unique_binary_count": 187,
+  "stored_binary_count": 256,
   "duplicate_aliases": [
     {
       "source_path": "猪猪素材库/紫色品质/翻滚猪.jpg",
@@ -1684,6 +1684,97 @@
       "media_path": "media/定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/阿萨姆猪红茶奶雾锅.png",
       "sha256": "65ef2eabff54a373091de7209711d135e6bd35897f8715f099018b6510845e9e",
       "bytes": 2986671
+    },
+    {
+      "template_id": "pig-bandori-avemujica-sakiko",
+      "source_path": "猪猪素材库/金色品质/saki猪.png",
+      "media_path": "media/猪猪素材库/金色品质/saki猪.png",
+      "sha256": "68ab780b373a21fde1eb231d2387cf7fcb4e36206180bcded07e9eb273aed9aa",
+      "bytes": 2057417
+    },
+    {
+      "template_id": "pig-bandori-avemujica-uika",
+      "source_path": "猪猪素材库/金色品质/初华猪.png",
+      "media_path": "media/猪猪素材库/金色品质/初华猪.png",
+      "sha256": "040e19d39e5ca7ccfdbc802d7c3056307b56a245764cdf63bf3ae1a2448e0829",
+      "bytes": 1887999
+    },
+    {
+      "template_id": "pig-bandori-avemujica-umiri",
+      "source_path": "猪猪素材库/金色品质/贝斯佣兵猪.png",
+      "media_path": "media/猪猪素材库/金色品质/贝斯佣兵猪.png",
+      "sha256": "1ec4ffc3926e0c9574cad14af79b569e83da9f069e40dffd2cea73f442d44d92",
+      "bytes": 1473585
+    },
+    {
+      "template_id": "pig-bandori-avemujica-mutsumi",
+      "source_path": "猪猪素材库/金色品质/黄瓜猪.png",
+      "media_path": "media/猪猪素材库/金色品质/黄瓜猪.png",
+      "sha256": "e17cfcbfeeb438ba63c2879d2d7427af2df3531b33f30abed086bff990ca6786",
+      "bytes": 1591931
+    },
+    {
+      "template_id": "pig-bandori-avemujica-mortis",
+      "source_path": "猪猪素材库/金色品质/墨提斯猪.png",
+      "media_path": "media/猪猪素材库/金色品质/墨提斯猪.png",
+      "sha256": "3152bae5b76d83578465e255388e220659c3e503de5f5c34c8f883c347ec1fab",
+      "bytes": 1898692
+    },
+    {
+      "template_id": "pig-bandori-avemujica-nyamu",
+      "source_path": "猪猪素材库/金色品质/喵梦猪.png",
+      "media_path": "media/猪猪素材库/金色品质/喵梦猪.png",
+      "sha256": "9d5e802fe2ed02f0c8a103975207737d7e590e97053b8b9f54c3977c44ed38f0",
+      "bytes": 1548393
+    },
+    {
+      "template_id": "pig-kfc-crazy-thursday",
+      "source_path": "猪猪素材库/紫色品质/KFC猪.png",
+      "media_path": "media/猪猪素材库/紫色品质/KFC猪.png",
+      "sha256": "9e83350f26837358f5c6b8e14b62ca4a01609bf1eb9e634365ce8c1f667262c8",
+      "bytes": 1965361
+    },
+    {
+      "template_id": "food-kfc-family-bucket",
+      "source_path": "美食素材库/炸猪全家桶.png",
+      "media_path": "media/美食素材库/炸猪全家桶.png",
+      "sha256": "0042e589b1df47cb5ce97dba69de227b51352ccf8339723c16c95510298d927e",
+      "bytes": 2193635
+    },
+    {
+      "template_id": "pig-jjk-gojo",
+      "source_path": "猪猪素材库/金色品质/五条猪.png",
+      "media_path": "media/猪猪素材库/金色品质/五条猪.png",
+      "sha256": "726afffadfa8b0513cc21556cbe817b8d3ed64a640c9ce2429584963a7c61fee",
+      "bytes": 1955552
+    },
+    {
+      "template_id": "pig-jjk-sukuna",
+      "source_path": "猪猪素材库/金色品质/宿傩猪.png",
+      "media_path": "media/猪猪素材库/金色品质/宿傩猪.png",
+      "sha256": "a599ff4b6f81a5683bd1e50c43aeaf2126b7d7eb6b324e0df5d3067e088d3ef3",
+      "bytes": 2065947
+    },
+    {
+      "template_id": "food-jjk-malevolent-kitchen",
+      "source_path": "美食素材库/伏魔朱焰咒纹猪蹄饭.png",
+      "media_path": "media/美食素材库/伏魔朱焰咒纹猪蹄饭.png",
+      "sha256": "453bde4b824d71567c52108def7a97bedd5567eec5cbeb44a9ea5c5286b1a898",
+      "bytes": 2688853
+    },
+    {
+      "template_id": "food-jjk-limitless-blue",
+      "source_path": "美食素材库/五条猪无量苍蓝雪山.png",
+      "media_path": "media/美食素材库/五条猪无量苍蓝雪山.png",
+      "sha256": "7d8ffa20c517e3b02994ab3037ad71d95f9043947349e222d131ff8f244a3263",
+      "bytes": 2561372
+    },
+    {
+      "template_id": "food-jjk-limitless-red",
+      "source_path": "美食素材库/五条猪无量赫焰雪山.png",
+      "media_path": "media/美食素材库/五条猪无量赫焰雪山.png",
+      "sha256": "9cf1e0cee9718f50cabd1b2f8c9e5063d692e046b9ddcd6ed11debb15e300e5b",
+      "bytes": 2884148
     }
   ]
 }

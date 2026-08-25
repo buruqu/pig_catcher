@@ -11,7 +11,10 @@ from typing import Any
 from uuid import uuid4
 
 from ..config.model import CatchingSection, RankingSection
-from ..domain.economy import level_cooking_higher_rarity_multiplier
+from ..domain.economy import (
+    generate_food_attributes,
+    level_cooking_higher_rarity_multiplier,
+)
 from ..domain.enums import AssetKind, Rarity, RecordType, StatureProfile
 from ..domain.errors import (
     AmbiguousPigSelectorError,
@@ -22,8 +25,10 @@ from ..domain.errors import (
     NoDrawableTemplateError,
     PigNotFoundError,
     ReceiptConflictError,
+    TechniqueError,
 )
 from ..domain.food_effects import (
+    CATCH_DUPLICATION_CHANCE,
     CATCH_EFFECT_IDS,
     QUOTA_EXEMPT_CATCH_EFFECTS,
     active_effect_from_row,
@@ -44,6 +49,7 @@ from ..domain.gameplay import (
     PIG_RARITY_NAMES,
     ItemDefinition,
     LevelProgress,
+    PigAttributes,
     apply_veteran_experience_bonus,
     generate_pig_attributes,
     item_by_id,
@@ -65,6 +71,23 @@ from ..domain.rules import (
 from ..domain.selectors import parse_asset_selector
 from ..domain.short_codes import is_valid_short_code, new_short_code
 from ..domain.social import describe_body_scale
+from ..domain.special_content import (
+    GOJO_EXCLUSIVE_FOOD_TEMPLATE_IDS,
+    GOJO_PIG_TEMPLATE_ID,
+    KFC_FOOD_TEMPLATE_ID,
+    KFC_PIG_TEMPLATE_ID,
+    SOURCE_EXCLUSIVE_FOOD_TEMPLATE_IDS,
+    SUKUNA_FOOD_TEMPLATE_ID,
+    SUKUNA_PIG_TEMPLATE_ID,
+    TECHNIQUE_DISPLAY_NAMES,
+    TECHNIQUE_DOMAIN_GOJO_BYPASS,
+    TECHNIQUE_HOLLOW_PURPLE,
+    TECHNIQUE_LAPSE_BLUE,
+    TECHNIQUE_MALEVOLENT_KITCHEN,
+    TECHNIQUE_REVERSAL_RED,
+    domain_cooking_weights,
+    is_crazy_thursday,
+)
 from ..infrastructure.database import DatabaseSession, PigCatcherDatabase
 from ..infrastructure.repositories import (
     AssetRepository,
@@ -75,6 +98,7 @@ from ..infrastructure.repositories import (
     ReceiptRepository,
     RestrictionRepository,
     SocialRepository,
+    TechniqueRepository,
 )
 from ..infrastructure.repositories.restrictions import CATCH_WINDOW_LIMIT
 from ..version import RULESET_VERSION
@@ -388,6 +412,20 @@ class ItemActionResult:
     item: ItemDefinition
     quantity: int
     armed_uses: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class TechniqueActivationResult:
+    """One idempotent group-technique activation or immediate Hollow Purple."""
+
+    receipt: CommandReceipt
+    receipt_created: bool
+    technique_id: str
+    summary: str
+    total_uses: int = 0
+    remaining_permits: int = 0
+    purple_unlocked: int = 0
+    granted_pigs: tuple[PigView, ...] = ()
 
 
 def _safe_datetime(value: datetime) -> datetime:
@@ -839,6 +877,7 @@ class GameplayService:
         social_repository: SocialRepository | None = None,
         restriction_repository: RestrictionRepository | None = None,
         quota_repository: QuotaRepository | None = None,
+        technique_repository: TechniqueRepository | None = None,
         random_source: RandomSource | None = None,
         clock: Clock | None = None,
         id_factory: Callable[[], str] | None = None,
@@ -855,6 +894,7 @@ class GameplayService:
         self.social_repository = social_repository or SocialRepository()
         self.restriction_repository = restriction_repository or RestrictionRepository()
         self.quota_repository = quota_repository or QuotaRepository()
+        self.technique_repository = technique_repository or TechniqueRepository()
         self.random_source = random_source or SystemRandomSource()
         self.clock = clock or SystemClock()
         self.id_factory = id_factory or (lambda: uuid4().hex)
@@ -971,8 +1011,33 @@ class GameplayService:
                 session,
                 scope_id=identity.scope.value,
             )
+            if not is_crazy_thursday(
+                now_datetime,
+                timezone_name=self.catching.daily_reset_timezone,
+            ):
+                templates = [
+                    template
+                    for template in templates
+                    if str(template["template_id"]) != KFC_PIG_TEMPLATE_ID
+                ]
             if not templates:
                 raise NoDrawableTemplateError("当前群没有可用猪猪素材，请联系管理员导入并启用素材。")
+            active_group_technique = (
+                await self.technique_repository.active_group_effect(
+                    session,
+                    scope_id=identity.scope.value,
+                )
+            )
+            deferred_duplication_effects = tuple(
+                effect
+                for effect in active_effects
+                if effect.effect_id == CATCH_DUPLICATION_CHANCE
+            ) if active_group_technique is not None else ()
+            applicable_active_effects = tuple(
+                effect
+                for effect in active_effects
+                if effect.effect_id != CATCH_DUPLICATION_CHANCE
+            ) if deferred_duplication_effects else active_effects
             buckets = self._template_buckets(templates)
             feed_level = await self.repository.get_feed_level(
                 session,
@@ -996,7 +1061,7 @@ class GameplayService:
             personal_exclusive_effect_active = (
                 not group_exclusive_effect_active
                 and has_compatible_exclusive_catch_effect(
-                    active_effects,
+                    applicable_active_effects,
                     six_star_available=bool(buckets[Rarity.SIX]),
                 )
             )
@@ -1033,7 +1098,10 @@ class GameplayService:
                         "本次未生效且未消耗。",
                     )
             else:
-                effect_application = apply_catch_effects(weights, active_effects)
+                effect_application = apply_catch_effects(
+                    weights,
+                    applicable_active_effects,
+                )
                 weights = effect_application.weights
                 effect_summaries = effect_application.summaries
                 excluded_summaries = effect_application.skipped_summaries
@@ -1057,6 +1125,12 @@ class GameplayService:
                     weights = group_effect_application.weights
                     effect_summaries += group_effect_application.summaries
                     excluded_summaries += group_effect_application.skipped_summaries
+            if deferred_duplication_effects and not exclusive_effect_active:
+                excluded_summaries += tuple(
+                    resolve_food_effect(effect.effect_id, effect.params).summary
+                    + "（当前由群体术式接管猪猪归属，复制效果保留未消耗）"
+                    for effect in deferred_duplication_effects
+                )
             candidate_buckets = buckets
             if effect_application.collaboration_only:
                 collaboration_templates = [
@@ -1148,7 +1222,7 @@ class GameplayService:
                     player_id=identity.player_id,
                 )
             )
-            if six_star_progress_stacks:
+            if six_star_progress_stacks and not exclusive_effect_active:
                 progressed_weights = apply_six_star_progress(
                     weights,
                     stacks=six_star_progress_stacks,
@@ -1162,6 +1236,10 @@ class GameplayService:
                         f"+{_DANIYA_CATCH_BONUS_PER_STACK * six_star_progress_stacks:g} "
                         f"个百分点（{six_star_progress_stacks} 层）。",
                     )
+            elif six_star_progress_stacks:
+                excluded_summaries += (
+                    "达妮娅泡泡云冻永久概率加成本次受六星菜独占规则影响，未参与结算。",
+                )
             rarity_roll = self.random_source.random()
             rarity = choose_rarity(weights, rarity_roll)
             candidates = candidate_buckets[rarity]
@@ -1189,6 +1267,30 @@ class GameplayService:
             )
             pig_instance_id = self._new_identifier()
             short_code = await self._new_unique_short_code(session)
+            duplication_roll: float | None = None
+            duplication_triggered = False
+            duplicated_pig_instance_id = ""
+            duplicated_short_code = ""
+            if effect_application.duplicate_chance_percent > 0.0:
+                duplication_roll = self.random_source.random()
+                duplication_triggered = duplication_roll < (
+                    effect_application.duplicate_chance_percent / 100.0
+                )
+                if duplication_triggered:
+                    duplicated_pig_instance_id = self._new_identifier()
+                    duplicated_short_code = await self._new_unique_short_code(
+                        session,
+                        reserved=(short_code,),
+                    )
+                    effect_summaries += (
+                        "珍猪奶茶复制成功：额外获得一只完全相同的 "
+                        f"{template['display_name']}#{duplicated_short_code}；"
+                        "复制品不重复发放抓猪奖励。",
+                    )
+                else:
+                    effect_summaries += (
+                        "珍猪奶茶本次未触发复制。",
+                    )
             auto_gift_target_player_id = ""
             random_snapshot = {
                 "ruleset_version": RULESET_VERSION,
@@ -1237,6 +1339,20 @@ class GameplayService:
                     str(catch_restriction.get("expires_at") or "") if catch_restriction is not None else ""
                 ),
                 "quota_window_boost_limit": (int(window_boost["limit_value"]) if window_boost is not None else 0),
+                "group_technique_id": (
+                    str(active_group_technique["technique_id"])
+                    if active_group_technique is not None
+                    else ""
+                ),
+                "group_technique_source_player_id": (
+                    str(active_group_technique["source_player_id"])
+                    if active_group_technique is not None
+                    else ""
+                ),
+                "duplication_roll": duplication_roll,
+                "duplication_triggered": duplication_triggered,
+                "duplicated_pig_instance_id": duplicated_pig_instance_id,
+                "duplicated_short_code": duplicated_short_code,
             }
             await self.repository.insert_pig_instance(
                 session,
@@ -1261,8 +1377,78 @@ class GameplayService:
                     "updated_at": now,
                 },
             )
+            if duplication_triggered:
+                duplicate_snapshot = {
+                    **random_snapshot,
+                    "source": CATCH_DUPLICATION_CHANCE,
+                    "duplicated_from_pig_instance_id": pig_instance_id,
+                    "duplicate_reward_granted": False,
+                }
+                await self.repository.insert_pig_instance(
+                    session,
+                    values={
+                        "pig_instance_id": duplicated_pig_instance_id,
+                        "short_code": duplicated_short_code,
+                        "scope_id": identity.scope.value,
+                        "owner_player_id": identity.player_id,
+                        "template_id": str(template["template_id"]),
+                        "template_version": int(template["template_version"]),
+                        "rarity": int(rarity),
+                        "display_name_snapshot": str(template["display_name"]),
+                        "size_value": attributes.size_value,
+                        "size_percentile": attributes.size_percentile,
+                        "weight_value": attributes.weight_value,
+                        "weight_percentile": attributes.weight_percentile,
+                        "fat_ratio": attributes.fat_ratio,
+                        "official_value": attributes.official_value,
+                        "ruleset_version": RULESET_VERSION,
+                        "random_snapshot_json": (
+                            self.repository.random_snapshot_json(
+                                duplicate_snapshot
+                            )
+                        ),
+                        "acquired_at": now,
+                        "updated_at": now,
+                    },
+                )
+            if active_group_technique is not None:
+                technique_summary, technique_remaining = (
+                    await self._apply_group_technique_to_catch(
+                        session,
+                        identity=identity,
+                        active_effect=active_group_technique,
+                        pig_instance_id=pig_instance_id,
+                        short_code=short_code,
+                        template=template,
+                        rarity=rarity,
+                        attributes=attributes,
+                        now=now,
+                    )
+                )
+                random_snapshot["group_technique_remaining_uses"] = (
+                    technique_remaining
+                )
+                random_snapshot["food_effect_summaries"] = list(
+                    (*effect_summaries, technique_summary)
+                )
+                await session.execute(
+                    """
+                    UPDATE pig_instances
+                    SET random_snapshot_json = ?, updated_at = ?
+                    WHERE pig_instance_id = ?
+                    """,
+                    (
+                        self.repository.random_snapshot_json(random_snapshot),
+                        now,
+                        pig_instance_id,
+                    ),
+                )
+                effect_summaries += (technique_summary,)
             auto_gift_target_player_id = ""
-            if group_effect_application.source_user_id:
+            if (
+                active_group_technique is None
+                and group_effect_application.source_user_id
+            ):
                 auto_gift_chance = 0.0
                 auto_gift_rarities: tuple[int, ...] = (6,)
                 auto_gift_source_label = "阿萨姆红茶奶雾锅"
@@ -1515,6 +1701,9 @@ class GameplayService:
                 "group_effect_source_display_name": (
                     group_effect_application.source_display_name
                 ),
+                "duplication_triggered": duplication_triggered,
+                "duplicated_pig_instance_id": duplicated_pig_instance_id,
+                "duplicated_short_code": duplicated_short_code,
             }
             provisional_receipt = CommandReceipt(
                 receipt_id="",
@@ -1608,6 +1797,604 @@ class GameplayService:
                 giant_sighting=giant_sighting,
             )
 
+    async def activate_group_technique(
+        self,
+        identity: CommandIdentity,
+        *,
+        technique_id: str,
+    ) -> TechniqueActivationResult:
+        """Consume one food-granted permit and start an exact-scope group effect."""
+
+        uses_by_technique = {
+            TECHNIQUE_MALEVOLENT_KITCHEN: 10,
+            TECHNIQUE_LAPSE_BLUE: 5,
+            TECHNIQUE_REVERSAL_RED: 5,
+        }
+        if technique_id not in uses_by_technique:
+            raise TechniqueError("未知的群体术式。")
+        command_name = f"pig-catcher.technique.{technique_id}"
+        request_payload = {"command_version": 1, "technique_id": technique_id}
+        idempotency_key = MessageKeyFactory.build(identity, command_name)
+        now = iso_timestamp(self.clock.now())
+        async with self.database.transaction() as session:
+            existing = await self.receipt_repository.get_by_key(
+                session,
+                idempotency_key,
+            )
+            if existing is not None:
+                validate_existing_receipt(
+                    existing,
+                    identity=identity,
+                    command_name=command_name,
+                    request_payload=request_payload,
+                )
+                payload = receipt_payload(existing)
+                return TechniqueActivationResult(
+                    receipt=existing,
+                    receipt_created=False,
+                    technique_id=technique_id,
+                    summary=existing.text_summary,
+                    total_uses=int(payload.get("total_uses") or 0),
+                    remaining_permits=int(
+                        payload.get("remaining_permits") or 0
+                    ),
+                    purple_unlocked=int(payload.get("purple_unlocked") or 0),
+                )
+            await self.framework_repository.touch_identity(
+                session,
+                identity=identity,
+                now=now,
+            )
+            active = await self.technique_repository.active_group_effect(
+                session,
+                scope_id=identity.scope.value,
+            )
+            if active is not None:
+                active_name = TECHNIQUE_DISPLAY_NAMES.get(
+                    str(active["technique_id"]),
+                    "未知术式",
+                )
+                raise TechniqueError(
+                    f"本群的{active_name}仍剩 {int(active['remaining_uses'])} 次结算；"
+                    "结束前不能发动另一种群体术式。"
+                )
+            consumed = await self.technique_repository.consume_permit(
+                session,
+                player_id=identity.player_id,
+                technique_id=technique_id,
+                now=now,
+            )
+            if not consumed:
+                raise TechniqueError(
+                    f"你没有可用的{TECHNIQUE_DISPLAY_NAMES[technique_id]}发动资格；"
+                    "请先食用对应专属菜。"
+                )
+            total_uses = uses_by_technique[technique_id]
+            effect_entry_id = self._new_identifier()
+            await self.technique_repository.insert_group_effect(
+                session,
+                effect_entry_id=effect_entry_id,
+                scope_id=identity.scope.value,
+                technique_id=technique_id,
+                source_player_id=identity.player_id,
+                uses=total_uses,
+                now=now,
+            )
+            if technique_id == TECHNIQUE_MALEVOLENT_KITCHEN:
+                await self.technique_repository.grant_permit(
+                    session,
+                    player_id=identity.player_id,
+                    technique_id=TECHNIQUE_DOMAIN_GOJO_BYPASS,
+                    uses=1,
+                    now=now,
+                )
+            purple_unlocked = await self.technique_repository.record_color_activation(
+                session,
+                player_id=identity.player_id,
+                technique_id=technique_id,
+                now=now,
+            )
+            remaining_permits = await self.technique_repository.available_permits(
+                session,
+                player_id=identity.player_id,
+                technique_id=technique_id,
+            )
+            actor = str(identity.display_name or "").strip() or "未命名群友"
+            if technique_id == TECHNIQUE_MALEVOLENT_KITCHEN:
+                detail = (
+                    "接下来本群 10 次抓猪会把成品猪立即做成高品质菜；"
+                    "若抓到六星猪，六星菜概率固定为 25%。每次出餐各复制一份给发动者与抓猪者。"
+                )
+            elif technique_id == TECHNIQUE_LAPSE_BLUE:
+                detail = "接下来本群 5 次抓到的猪都会被苍吸引给发动者。"
+            else:
+                detail = "接下来本群 5 次抓到的猪都会由赫随机分配给一名已登记群友。"
+            purple_text = (
+                " 苍与赫已经完成一组组合，额外解锁 1 次 /虚式 茈。"
+                if purple_unlocked
+                else ""
+            )
+            summary = (
+                f"【{TECHNIQUE_DISPLAY_NAMES[technique_id]}发动】\n"
+                f"发动者：{actor}\n{detail}\n"
+                f"同类资格剩余：{remaining_permits} 次。{purple_text}"
+            )
+            payload = {
+                "technique_id": technique_id,
+                "effect_entry_id": effect_entry_id,
+                "total_uses": total_uses,
+                "remaining_permits": remaining_permits,
+                "purple_unlocked": purple_unlocked,
+            }
+            reservation = await self.receipt_repository.reserve(
+                session,
+                idempotency_key=idempotency_key,
+                scope_id=identity.scope.value,
+                player_id=identity.player_id,
+                command_name=command_name,
+                request_fingerprint=request_fingerprint(request_payload),
+                result_type="technique-activation",
+                result_object_id=effect_entry_id,
+                result_json=json.dumps(
+                    payload,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ),
+                text_summary=summary,
+                now=now,
+            )
+            return TechniqueActivationResult(
+                receipt=reservation.receipt,
+                receipt_created=reservation.created,
+                technique_id=technique_id,
+                summary=summary,
+                total_uses=total_uses,
+                remaining_permits=remaining_permits,
+                purple_unlocked=purple_unlocked,
+            )
+
+    async def activate_hollow_purple(
+        self,
+        identity: CommandIdentity,
+    ) -> TechniqueActivationResult:
+        """Consume one paired Blue/Red unlock and grant five random six-star pigs."""
+
+        command_name = "pig-catcher.technique.hollow-purple"
+        request_payload = {"command_version": 1}
+        idempotency_key = MessageKeyFactory.build(identity, command_name)
+        now = iso_timestamp(self.clock.now())
+        async with self.database.transaction() as session:
+            existing = await self.receipt_repository.get_by_key(
+                session,
+                idempotency_key,
+            )
+            if existing is not None:
+                validate_existing_receipt(
+                    existing,
+                    identity=identity,
+                    command_name=command_name,
+                    request_payload=request_payload,
+                )
+                payload = receipt_payload(existing)
+                raw_ids = payload.get("pig_instance_ids")
+                pig_ids = raw_ids if isinstance(raw_ids, list) else []
+                pig_views: list[PigView] = []
+                for pig_id in pig_ids:
+                    row = await self.repository.get_pig_by_instance_id(
+                        session,
+                        pig_instance_id=str(pig_id),
+                    )
+                    if row is not None:
+                        pig_views.append(self._pig_view(row))
+                pigs = tuple(pig_views)
+                return TechniqueActivationResult(
+                    receipt=existing,
+                    receipt_created=False,
+                    technique_id=TECHNIQUE_HOLLOW_PURPLE,
+                    summary=existing.text_summary,
+                    remaining_permits=int(
+                        payload.get("remaining_permits") or 0
+                    ),
+                    granted_pigs=pigs,
+                )
+            await self.framework_repository.touch_identity(
+                session,
+                identity=identity,
+                now=now,
+            )
+            templates = [
+                template
+                for template in await self.repository.list_drawable_pig_templates(
+                    session,
+                    scope_id=identity.scope.value,
+                )
+                if int(template["rarity"]) == 6
+            ]
+            if not templates:
+                raise TechniqueError("当前群没有已授权的六星猪模板，虚式资格未消耗。")
+            consumed = await self.technique_repository.consume_permit(
+                session,
+                player_id=identity.player_id,
+                technique_id=TECHNIQUE_HOLLOW_PURPLE,
+                now=now,
+            )
+            if not consumed:
+                raise TechniqueError(
+                    "你还没有完成一组苍与赫，暂时不能使用 /虚式 茈。"
+                )
+            pig_ids: list[str] = []
+            for index in range(5):
+                template_roll = self.random_source.random()
+                template = templates[
+                    min(int(template_roll * len(templates)), len(templates) - 1)
+                ]
+                attribute_rolls = tuple(
+                    self.random_source.random() for _ in range(5)
+                )
+                attributes = generate_pig_attributes(
+                    rarity=Rarity.SIX,
+                    length_min=float(template["length_min"]),
+                    length_max=float(template["length_max"]),
+                    weight_min=float(template["weight_min"]),
+                    weight_max=float(template["weight_max"]),
+                    fat_profile=str(template["fat_profile"]),
+                    random_values=attribute_rolls,
+                )
+                pig_instance_id = self._new_identifier()
+                short_code = await self._new_unique_short_code(session)
+                await self.repository.insert_pig_instance(
+                    session,
+                    values={
+                        "pig_instance_id": pig_instance_id,
+                        "short_code": short_code,
+                        "scope_id": identity.scope.value,
+                        "owner_player_id": identity.player_id,
+                        "template_id": str(template["template_id"]),
+                        "template_version": int(template["template_version"]),
+                        "rarity": 6,
+                        "display_name_snapshot": str(template["display_name"]),
+                        "size_value": attributes.size_value,
+                        "size_percentile": attributes.size_percentile,
+                        "weight_value": attributes.weight_value,
+                        "weight_percentile": attributes.weight_percentile,
+                        "fat_ratio": attributes.fat_ratio,
+                        "official_value": attributes.official_value,
+                        "ruleset_version": RULESET_VERSION,
+                        "random_snapshot_json": self.repository.random_snapshot_json(
+                            {
+                                "ruleset_version": RULESET_VERSION,
+                                "source": TECHNIQUE_HOLLOW_PURPLE,
+                                "grant_index": index,
+                                "template_roll": template_roll,
+                                "attribute_rolls": list(attribute_rolls),
+                            }
+                        ),
+                        "acquired_at": now,
+                        "updated_at": now,
+                    },
+                )
+                await self.repository.upsert_pig_catalog(
+                    session,
+                    player_id=identity.player_id,
+                    template_id=str(template["template_id"]),
+                    size_value=attributes.size_value,
+                    weight_value=attributes.weight_value,
+                    now=now,
+                )
+                pig_ids.append(pig_instance_id)
+            remaining_permits = await self.technique_repository.available_permits(
+                session,
+                player_id=identity.player_id,
+                technique_id=TECHNIQUE_HOLLOW_PURPLE,
+            )
+            pig_views = []
+            for pig_id in pig_ids:
+                row = await self.repository.get_pig_by_instance_id(
+                    session,
+                    pig_instance_id=pig_id,
+                )
+                if row is not None:
+                    pig_views.append(self._pig_view(row))
+            pigs = tuple(pig_views)
+            selectors = "、".join(pig.selector for pig in pigs)
+            summary = (
+                "【虚式·茈发动】\n"
+                f"{identity.display_name or '未命名群友'} 随机获得 5 只六星猪：\n"
+                f"{selectors}\n剩余虚式资格：{remaining_permits} 次。"
+            )
+            payload = {
+                "pig_instance_ids": pig_ids,
+                "remaining_permits": remaining_permits,
+            }
+            reservation = await self.receipt_repository.reserve(
+                session,
+                idempotency_key=idempotency_key,
+                scope_id=identity.scope.value,
+                player_id=identity.player_id,
+                command_name=command_name,
+                request_fingerprint=request_fingerprint(request_payload),
+                result_type="hollow-purple",
+                result_object_id=pig_ids[0],
+                result_json=json.dumps(
+                    payload,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ),
+                text_summary=summary,
+                now=now,
+            )
+            return TechniqueActivationResult(
+                receipt=reservation.receipt,
+                receipt_created=reservation.created,
+                technique_id=TECHNIQUE_HOLLOW_PURPLE,
+                summary=summary,
+                remaining_permits=remaining_permits,
+                granted_pigs=pigs,
+            )
+
+    async def _apply_group_technique_to_catch(
+        self,
+        session: DatabaseSession,
+        *,
+        identity: CommandIdentity,
+        active_effect: Mapping[str, object],
+        pig_instance_id: str,
+        short_code: str,
+        template: Mapping[str, object],
+        rarity: Rarity,
+        attributes: PigAttributes,
+        now: str,
+    ) -> tuple[str, int]:
+        technique_id = str(active_effect["technique_id"])
+        source_player_id = str(active_effect["source_player_id"])
+        source_name = str(active_effect.get("source_display_name") or "").strip()
+        source_name = source_name or "未命名群友"
+        if technique_id == TECHNIQUE_MALEVOLENT_KITCHEN:
+            food_summary = await self._domain_auto_cook(
+                session,
+                identity=identity,
+                source_player_id=source_player_id,
+                pig_instance_id=pig_instance_id,
+                template=template,
+                rarity=rarity,
+                attributes=attributes,
+                now=now,
+            )
+            action = (
+                f"{TECHNIQUE_DISPLAY_NAMES[technique_id]}由 {source_name} 接管："
+                f"{template['display_name']}#{short_code} 已立即做成 {food_summary}，"
+                "发动者与抓猪者各获得一份"
+            )
+        else:
+            players = sorted(
+                await self.economy_repository.players_in_scope(
+                    session,
+                    scope_id=identity.scope.value,
+                ),
+                key=lambda row: str(row["player_id"]),
+            )
+            if technique_id == TECHNIQUE_LAPSE_BLUE:
+                target_player_id = source_player_id
+                target_name = source_name
+            elif technique_id == TECHNIQUE_REVERSAL_RED:
+                target_roll = self.random_source.random()
+                target = players[
+                    min(int(target_roll * len(players)), len(players) - 1)
+                ]
+                target_player_id = str(target["player_id"])
+                target_name = str(target.get("display_name") or "").strip()
+                target_name = target_name or "未命名群友"
+            else:
+                raise RuntimeError("持久化了未知群体术式。")
+            if target_player_id != identity.player_id:
+                transferred = await self.repository.transfer_pig_owner(
+                    session,
+                    pig_instance_id=pig_instance_id,
+                    owner_player_id=target_player_id,
+                    now=now,
+                )
+                if not transferred:
+                    raise RuntimeError("术式转移猪猪归属失败。")
+                await self.social_repository.insert_transfer_event(
+                    session,
+                    transfer_event_id=self._new_identifier(),
+                    scope_id=identity.scope.value,
+                    asset_kind=AssetKind.PIG,
+                    asset_instance_id=pig_instance_id,
+                    from_player_id=identity.player_id,
+                    to_player_id=target_player_id,
+                    transfer_type="system-group-effect",
+                    trade_id=None,
+                    now=now,
+                )
+                await self.repository.upsert_pig_catalog(
+                    session,
+                    player_id=target_player_id,
+                    template_id=str(template["template_id"]),
+                    size_value=attributes.size_value,
+                    weight_value=attributes.weight_value,
+                    now=now,
+                )
+            action = (
+                f"{TECHNIQUE_DISPLAY_NAMES[technique_id]}由 {source_name} 接管："
+                f"{template['display_name']}#{short_code} 归属 {target_name}"
+            )
+        remaining = await self.technique_repository.consume_group_effect_use(
+            session,
+            effect_entry_id=str(active_effect["effect_entry_id"]),
+            now=now,
+        )
+        return f"{action}（本群术式剩余 {remaining} 次）", remaining
+
+    async def _domain_auto_cook(
+        self,
+        session: DatabaseSession,
+        *,
+        identity: CommandIdentity,
+        source_player_id: str,
+        pig_instance_id: str,
+        template: Mapping[str, object],
+        rarity: Rarity,
+        attributes: PigAttributes,
+        now: str,
+    ) -> str:
+        """Consume a just-caught pig and create one serving for each beneficiary."""
+
+        if str(template["template_id"]) == GOJO_PIG_TEMPLATE_ID:
+            weights = normalize_weights((0, 0, 0, 0, 100, 0))
+        else:
+            weights = domain_cooking_weights(int(rarity))
+        rarity_roll = self.random_source.random()
+        output_rarity = choose_rarity(weights, rarity_roll)
+        food_templates = await self.economy_repository.list_drawable_food_templates(
+            session,
+            scope_id=identity.scope.value,
+            rarity=int(output_rarity),
+        )
+        if not food_templates:
+            raise TechniqueError(
+                f"领域缺少 {int(output_rarity)} 星美食模板，本次抓猪未结算。"
+            )
+        source_template_id = str(template["template_id"])
+        special_roll: float | None = None
+        special_template_id = ""
+        if int(output_rarity) == 6:
+            special_template_id = str(
+                template.get("paired_food_template_id") or ""
+            )
+            if not special_template_id:
+                raise TechniqueError("领域抽到六星菜，但原料猪没有对应定制菜。")
+        elif int(output_rarity) == 5:
+            if source_template_id == GOJO_PIG_TEMPLATE_ID:
+                special_roll = self.random_source.random()
+                special_template_id = GOJO_EXCLUSIVE_FOOD_TEMPLATE_IDS[
+                    min(
+                        int(special_roll * len(GOJO_EXCLUSIVE_FOOD_TEMPLATE_IDS)),
+                        len(GOJO_EXCLUSIVE_FOOD_TEMPLATE_IDS) - 1,
+                    )
+                ]
+            elif source_template_id == SUKUNA_PIG_TEMPLATE_ID:
+                special_roll = self.random_source.random()
+                if special_roll < (1.0 / 3.0):
+                    special_template_id = SUKUNA_FOOD_TEMPLATE_ID
+            elif source_template_id == KFC_PIG_TEMPLATE_ID:
+                special_roll = self.random_source.random()
+                if special_roll < 0.50:
+                    special_template_id = KFC_FOOD_TEMPLATE_ID
+        if special_template_id:
+            candidates = [
+                candidate
+                for candidate in food_templates
+                if str(candidate["template_id"]) == special_template_id
+            ]
+            if not candidates:
+                raise TechniqueError("领域命中了专属菜，但该模板尚未启用。")
+        else:
+            candidates = [
+                candidate
+                for candidate in food_templates
+                if str(candidate["template_id"])
+                not in SOURCE_EXCLUSIVE_FOOD_TEMPLATE_IDS
+            ]
+            if not candidates:
+                raise TechniqueError("领域缺少可用的普通五星菜模板。")
+        template_roll = self.random_source.random()
+        food_template = candidates[
+            min(int(template_roll * len(candidates)), len(candidates) - 1)
+        ]
+        owners = (source_player_id, identity.player_id)
+        food_ids = [self._new_identifier(), self._new_identifier()]
+        first_short_code = await self._new_unique_short_code(session)
+        short_codes = [
+            first_short_code,
+            await self._new_unique_short_code(
+                session,
+                reserved=(first_short_code,),
+            ),
+        ]
+        portion_rolls = [self.random_source.random(), self.random_source.random()]
+        food_attributes = [
+            generate_food_attributes(
+                rarity=output_rarity,
+                template_id=str(food_template["template_id"]),
+                source_weight=attributes.weight_value,
+                source_weight_percentile=attributes.weight_percentile,
+                portion_roll=portion_roll,
+            )
+            for portion_roll in portion_rolls
+        ]
+        consumed = await self.economy_repository.consume_pig_for_cooking(
+            session,
+            pig_instance_id=pig_instance_id,
+            player_id=identity.player_id,
+            scope_id=identity.scope.value,
+            now=now,
+        )
+        if not consumed:
+            raise RuntimeError("领域自动做菜时原料猪状态发生变化。")
+        for index, (owner, food_id, short_code, food_attribute) in enumerate(
+            zip(owners, food_ids, short_codes, food_attributes, strict=True)
+        ):
+            await self.economy_repository.insert_food_instance(
+                session,
+                values={
+                    "food_instance_id": food_id,
+                    "short_code": short_code,
+                    "scope_id": identity.scope.value,
+                    "owner_player_id": owner,
+                    "template_id": str(food_template["template_id"]),
+                    "template_version": int(food_template["template_version"]),
+                    "source_pig_instance_id": pig_instance_id,
+                    "rarity": int(output_rarity),
+                    "display_name_snapshot": str(food_template["display_name"]),
+                    "portion_weight": food_attribute.portion_weight,
+                    "fat_category": attributes.fat_category,
+                    "official_value": food_attribute.official_value,
+                    "effect_id": str(food_template.get("effect_id") or ""),
+                    "effect_params_json": str(
+                        food_template.get("effect_params_json") or "{}"
+                    ),
+                    "ruleset_version": RULESET_VERSION,
+                    "random_snapshot_json": self.repository.random_snapshot_json(
+                        {
+                            "ruleset_version": RULESET_VERSION,
+                            "source": TECHNIQUE_MALEVOLENT_KITCHEN,
+                            "source_pig_instance_id": pig_instance_id,
+                            "weights": list(weights),
+                            "rarity_roll": rarity_roll,
+                            "template_roll": template_roll,
+                            "special_roll": special_roll,
+                            "special_template_id": special_template_id,
+                            "serving_index": index,
+                            "portion_roll": portion_rolls[index],
+                            "recipe_factor": food_attribute.recipe_factor,
+                        }
+                    ),
+                    "acquired_at": now,
+                    "updated_at": now,
+                },
+            )
+            await self.economy_repository.upsert_food_catalog(
+                session,
+                player_id=owner,
+                template_id=str(food_template["template_id"]),
+                portion_weight=food_attribute.portion_weight,
+                now=now,
+            )
+        await self.social_repository.increment_statistic(
+            session,
+            player_id=source_player_id,
+            field="total_cooks",
+            now=now,
+        )
+        selectors = "、".join(
+            f"{food_template['display_name']}#{short_code}"
+            for short_code in short_codes
+        )
+        return f"{int(output_rarity)} 星 {selectors}"
+
     async def toggle_baogian(
         self,
         identity: CommandIdentity,
@@ -1621,6 +2408,23 @@ class GameplayService:
         返回 (切换数量, 新变体, 提示文案)。
         """
 
+        return await self.toggle_pig_art(
+            identity,
+            display_name="保千猪",
+            alternate_label="表情包",
+            short_code=short_code,
+        )
+
+    async def toggle_pig_art(
+        self,
+        identity: CommandIdentity,
+        *,
+        display_name: str,
+        alternate_label: str,
+        short_code: str | None = None,
+    ) -> tuple[int, str, str]:
+        """Switch one owned alternate-art pig by name and optional short code."""
+
         now_datetime = _safe_datetime(self.clock.now())
         now = iso_timestamp(now_datetime)
         async with self.database.transaction() as session:
@@ -1629,34 +2433,44 @@ class GameplayService:
                 identity=identity,
                 now=now,
             )
-            instances = await self.repository.list_baogian_instances(
+            instances = await self.repository.list_switchable_pig_instances(
                 session,
                 player_id=identity.player_id,
+                display_name=display_name,
             )
         if not instances:
-            return 0, "", "你还没有保千猪，无法切换立绘。"
+            return 0, "", f"你还没有{display_name}，无法切换立绘。"
         target: dict[str, object] | None = None
         if short_code:
             normalized = str(short_code).strip().upper()
             matches = [instance for instance in instances if str(instance["short_code"]).upper() == normalized]
             if not matches:
                 codes = "、".join(str(instance["short_code"]) for instance in instances)
-                return 0, "", (f"背包中没有编号 {short_code} 的保千猪；你当前持有的保千猪编号：{codes}")
+                return 0, "", (
+                    f"背包中没有编号 {short_code} 的{display_name}；"
+                    f"你当前持有的{display_name}编号：{codes}"
+                )
             target = matches[0]
         elif len(instances) > 1:
             codes = "、".join(str(instance["short_code"]) for instance in instances)
-            return 0, "", (f"你有 {len(instances)} 只保千猪，请指定编号切换：/切换 猪保千 {codes}")
+            command_name = "猪保千" if display_name == "保千猪" else display_name
+            return 0, "", (
+                f"你有 {len(instances)} 只{display_name}，请指定编号切换："
+                f"/切换 {command_name} {codes}"
+            )
         else:
             target = instances[0]
         async with self.database.transaction() as session:
-            count, new_variant = await self.repository.toggle_baogian_instances(
+            count, new_variant = await self.repository.toggle_pig_instances(
                 session,
                 player_id=identity.player_id,
                 instance_ids=[str(target["pig_instance_id"])],
                 now=now,
             )
-        label = "表情包" if new_variant == "sticker" else "猪猪立绘"
-        return count, new_variant, (f"已将保千猪 {target['short_code']} 切换为 {label}。")
+        label = alternate_label if new_variant == "sticker" else "默认立绘"
+        return count, new_variant, (
+            f"已将{display_name} {target['short_code']} 切换为{label}。"
+        )
 
     async def profile(self, identity: CommandIdentity) -> PlayerProfile:
         """Read the current-group player profile."""
@@ -2463,10 +3277,18 @@ class GameplayService:
             raise RuntimeError("实例 ID 生成器返回了无效值。")
         return candidate
 
-    async def _new_unique_short_code(self, session: DatabaseSession) -> str:
+    async def _new_unique_short_code(
+        self,
+        session: DatabaseSession,
+        *,
+        reserved: Sequence[str] = (),
+    ) -> str:
+        reserved_codes = {str(value).strip().upper() for value in reserved}
         for _ in range(32):
             candidate = str(self.short_code_factory() or "").strip().upper()
             if not is_valid_short_code(candidate):
+                continue
+            if candidate in reserved_codes:
                 continue
             if not await self.repository.short_code_exists(session, candidate):
                 return candidate

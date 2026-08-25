@@ -58,6 +58,11 @@ from .pig_catcher.domain.models import (
     CommandReceipt,
     ScopeKey,
 )
+from .pig_catcher.domain.special_content import (
+    TECHNIQUE_LAPSE_BLUE,
+    TECHNIQUE_MALEVOLENT_KITCHEN,
+    TECHNIQUE_REVERSAL_RED,
+)
 from .pig_catcher.infrastructure import PigCatcherDatabase, safe_database_path
 from .pig_catcher.rendering import (
     AnimatedCardComposer,
@@ -1824,7 +1829,10 @@ class PigCatcherPlugin(MaiBotPlugin):
         try:
             result = await cast(GameplayService, self._gameplay_service).catch(identity)
             fallback = result.receipt.text_summary or format_catch_summary(result)
-            if result.receipt_created and result.pig.alternate_image_relpath:
+            if (
+                result.receipt_created
+                and result.pig.alternate_image_relpath
+            ):
                 await self._send_image_file(
                     identity.stream_id,
                     result.pig.alternate_image_relpath,
@@ -1880,6 +1888,166 @@ class PigCatcherPlugin(MaiBotPlugin):
             return await self._command_error(
                 stream_id=identity.stream_id,
                 operation="切换保千猪立绘",
+                error=exc,
+            )
+
+    @Command(
+        "pig_catcher_toggle_uika",
+        description="切换初华猪的普通版与戴帽子版立绘",
+        pattern=r"^/切换\s+初华猪(?:\s+(?P<code>[0-9A-Za-z]{4,16}))?\s*$",
+    )
+    async def handle_toggle_uika(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_command(
+            stream_id,
+            kwargs,
+            feature_enabled=self.settings.features.catching_enabled,
+            feature_label="抓猪",
+        )
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            count, _, message = await cast(
+                GameplayService,
+                self._gameplay_service,
+            ).toggle_pig_art(
+                identity,
+                display_name="初华猪",
+                alternate_label="戴帽子版立绘",
+                short_code=matched_group(kwargs, "code") or None,
+            )
+            return await self._reply_text(
+                identity.stream_id,
+                message,
+                success=count > 0,
+            )
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation="切换初华猪立绘",
+                error=exc,
+            )
+
+    async def _activate_group_technique_command(
+        self,
+        stream_id: str,
+        kwargs: dict[str, Any],
+        *,
+        technique_id: str,
+        operation: str,
+    ) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_command(
+            stream_id,
+            kwargs,
+            feature_enabled=self.settings.features.cooking_enabled,
+            feature_label="做菜",
+        )
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            result = await cast(
+                GameplayService,
+                self._gameplay_service,
+            ).activate_group_technique(
+                identity,
+                technique_id=technique_id,
+            )
+            return await self._deliver_text_receipt(
+                stream_id=identity.stream_id,
+                receipt=result.receipt,
+            )
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation=operation,
+                error=exc,
+            )
+
+    @Command(
+        "pig_catcher_domain_expansion",
+        description="发动一次伏魔御厨子群体领域",
+        pattern=r"^/领域展开\s+伏魔御厨子\s*$",
+    )
+    async def handle_domain_expansion(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        return await self._activate_group_technique_command(
+            stream_id,
+            kwargs,
+            technique_id=TECHNIQUE_MALEVOLENT_KITCHEN,
+            operation="领域展开 伏魔御厨子",
+        )
+
+    @Command(
+        "pig_catcher_lapse_blue",
+        description="发动一次术式顺转苍",
+        pattern=r"^/术式顺转\s+苍\s*$",
+    )
+    async def handle_lapse_blue(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        return await self._activate_group_technique_command(
+            stream_id,
+            kwargs,
+            technique_id=TECHNIQUE_LAPSE_BLUE,
+            operation="术式顺转 苍",
+        )
+
+    @Command(
+        "pig_catcher_reversal_red",
+        description="发动一次术式反转赫",
+        pattern=r"^/术式反转\s+赫\s*$",
+    )
+    async def handle_reversal_red(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        return await self._activate_group_technique_command(
+            stream_id,
+            kwargs,
+            technique_id=TECHNIQUE_REVERSAL_RED,
+            operation="术式反转 赫",
+        )
+
+    @Command(
+        "pig_catcher_hollow_purple",
+        description="消耗一次苍赫组合资格发动虚式茈",
+        pattern=r"^/虚式\s+茈\s*$",
+    )
+    async def handle_hollow_purple(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_command(
+            stream_id,
+            kwargs,
+            feature_enabled=self.settings.features.cooking_enabled,
+            feature_label="做菜",
+        )
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            result = await cast(
+                GameplayService,
+                self._gameplay_service,
+            ).activate_hollow_purple(identity)
+            return await self._deliver_text_receipt(
+                stream_id=identity.stream_id,
+                receipt=result.receipt,
+            )
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation="虚式 茈",
                 error=exc,
             )
 
@@ -2528,6 +2696,40 @@ class PigCatcherPlugin(MaiBotPlugin):
             return await self._command_error(
                 stream_id=identity.stream_id,
                 operation="美食图鉴",
+                error=exc,
+            )
+
+    @Command(
+        "pig_catcher_roulette",
+        description="消耗一次猪保千猪排轮盘机会并抽取奖励",
+        pattern=r"^/转轮盘\s*$",
+    )
+    async def handle_roulette(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_command(
+            stream_id,
+            kwargs,
+            feature_enabled=self.settings.features.eating_enabled,
+            feature_label="猪排轮盘",
+        )
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            result = await cast(
+                EconomyService,
+                self._economy_service,
+            ).spin_roulette(identity)
+            return await self._deliver_text_receipt(
+                stream_id=identity.stream_id,
+                receipt=result.receipt,
+            )
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation="转轮盘",
                 error=exc,
             )
 

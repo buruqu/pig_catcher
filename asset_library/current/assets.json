@@ -1,7 +1,7 @@
 {
   "manifest_version": 4,
   "catalog_id": "pig-catcher-user-library-v1",
-  "source_label": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+  "source_label": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
   "entries": [
     {
       "template_id": "pig-r1-upscale",
@@ -14,7 +14,7 @@
       "image": "media/猪猪素材库/白色品质/上流猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -43,7 +43,7 @@
       "image": "media/猪猪素材库/白色品质/口琴猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -72,7 +72,7 @@
       "image": "media/猪猪素材库/白色品质/哭哭猪.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -101,7 +101,7 @@
       "image": "media/猪猪素材库/白色品质/土木猪.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -130,7 +130,7 @@
       "image": "media/猪猪素材库/白色品质/安卓猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -159,7 +159,7 @@
       "image": "media/猪猪素材库/白色品质/床上猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -188,7 +188,7 @@
       "image": "media/猪猪素材库/白色品质/死掉猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -217,7 +217,7 @@
       "image": "media/猪猪素材库/白色品质/流鼻涕猪_1.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -246,7 +246,7 @@
       "image": "media/猪猪素材库/白色品质/猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -275,7 +275,7 @@
       "image": "media/猪猪素材库/白色品质/猪B.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -304,7 +304,7 @@
       "image": "media/猪猪素材库/白色品质/猪刷怪蛋.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -333,7 +333,7 @@
       "image": "media/猪猪素材库/白色品质/猪古力.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -362,7 +362,7 @@
       "image": "media/猪猪素材库/白色品质/猪蹄.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -391,7 +391,7 @@
       "image": "media/猪猪素材库/白色品质/猪鼻.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -420,7 +420,7 @@
       "image": "media/猪猪素材库/白色品质/瘦猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -449,7 +449,7 @@
       "image": "media/猪猪素材库/白色品质/皇帝的新猪.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -478,7 +478,7 @@
       "image": "media/猪猪素材库/白色品质/矮脚猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -507,7 +507,7 @@
       "image": "media/猪猪素材库/白色品质/色猪.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -536,7 +536,7 @@
       "image": "media/猪猪素材库/白色品质/苯猪.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -565,7 +565,7 @@
       "image": "media/猪猪素材库/白色品质/野猪.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -594,7 +594,7 @@
       "image": "media/猪猪素材库/绿色品质/华尔街之猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -623,7 +623,7 @@
       "image": "media/猪猪素材库/绿色品质/大懒猪.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -652,7 +652,7 @@
       "image": "media/猪猪素材库/绿色品质/大胃袋.jpeg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -681,7 +681,7 @@
       "image": "media/猪猪素材库/绿色品质/大象.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -711,7 +711,7 @@
       "image": "media/猪猪素材库/绿色品质/好多猪.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -740,7 +740,7 @@
       "image": "media/猪猪素材库/绿色品质/挡路猪.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -769,7 +769,7 @@
       "image": "media/猪猪素材库/绿色品质/智能计算猪.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -798,7 +798,7 @@
       "image": "media/猪猪素材库/绿色品质/检疫合格肥猪.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -827,7 +827,7 @@
       "image": "media/猪猪素材库/绿色品质/洗猪.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -856,7 +856,7 @@
       "image": "media/猪猪素材库/绿色品质/特小猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -885,7 +885,7 @@
       "image": "media/猪猪素材库/绿色品质/猪bee.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -914,7 +914,7 @@
       "image": "media/猪猪素材库/绿色品质/理工猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -943,7 +943,7 @@
       "image": "media/猪猪素材库/绿色品质/老猪历.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -972,7 +972,7 @@
       "image": "media/猪猪素材库/绿色品质/肥猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -1001,7 +1001,7 @@
       "image": "media/猪猪素材库/绿色品质/苹果猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -1030,7 +1030,7 @@
       "image": "media/猪猪素材库/绿色品质/酒鬼猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -1059,7 +1059,7 @@
       "image": "media/猪猪素材库/绿色品质/锗(猪元素).jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -1088,7 +1088,7 @@
       "image": "media/猪猪素材库/绿色品质/韭菜猪.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -1117,7 +1117,7 @@
       "image": "media/猪猪素材库/绿色品质/黑客猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -1146,7 +1146,7 @@
       "image": "media/猪猪素材库/绿色品质/龟猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -1175,7 +1175,7 @@
       "image": "media/猪猪素材库/蓝色品质/Pigseek.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -1204,7 +1204,7 @@
       "image": "media/猪猪素材库/蓝色品质/不接电话猪.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -1233,7 +1233,7 @@
       "image": "media/猪猪素材库/蓝色品质/东方明猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -1262,7 +1262,7 @@
       "image": "media/猪猪素材库/蓝色品质/你这吃白饭的猪.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -1291,7 +1291,7 @@
       "image": "media/猪猪素材库/蓝色品质/像素猪.gif",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -1320,7 +1320,7 @@
       "image": "media/猪猪素材库/蓝色品质/冲榜猪.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -1349,7 +1349,7 @@
       "image": "media/猪猪素材库/蓝色品质/可爱猪翻身.gif",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -1378,7 +1378,7 @@
       "image": "media/猪猪素材库/蓝色品质/唱片猪(旋转猪).gif",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -1407,7 +1407,7 @@
       "image": "media/猪猪素材库/蓝色品质/挖矿猪.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -1436,7 +1436,7 @@
       "image": "media/猪猪素材库/蓝色品质/接单猪.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -1465,7 +1465,7 @@
       "image": "media/猪猪素材库/蓝色品质/柠檬猪.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -1494,7 +1494,7 @@
       "image": "media/猪猪素材库/蓝色品质/猪博士.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -1523,7 +1523,7 @@
       "image": "media/猪猪素材库/蓝色品质/猪播.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -1552,7 +1552,7 @@
       "image": "media/猪猪素材库/蓝色品质/红包猪.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -1581,7 +1581,7 @@
       "image": "media/猪猪素材库/蓝色品质/织猪.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -1610,7 +1610,7 @@
       "image": "media/猪猪素材库/蓝色品质/觉醒猪.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -1639,7 +1639,7 @@
       "image": "media/猪猪素材库/蓝色品质/金翅猪.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -1668,7 +1668,7 @@
       "image": "media/猪猪素材库/蓝色品质/隐身猪.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -1697,7 +1697,7 @@
       "image": "media/猪猪素材库/蓝色品质/麦麦猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -1726,7 +1726,7 @@
       "image": "media/猪猪素材库/蓝色品质/猪纵连.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -1755,7 +1755,7 @@
       "image": "media/猪猪素材库/紫色品质/二维猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -1784,7 +1784,7 @@
       "image": "media/猪猪素材库/紫色品质/委屈猪.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -1813,7 +1813,7 @@
       "image": "media/猪猪素材库/紫色品质/拱人猪.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -1842,7 +1842,7 @@
       "image": "media/猪猪素材库/紫色品质/梵高猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -1871,7 +1871,7 @@
       "image": "media/猪猪素材库/紫色品质/洗衣机猪（舞萌猪）.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -1900,7 +1900,7 @@
       "image": "media/猪猪素材库/紫色品质/渚泪滴.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -1929,7 +1929,7 @@
       "image": "media/猪猪素材库/紫色品质/澄闪猪咪(明日方舟).jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -1958,7 +1958,7 @@
       "image": "media/猪猪素材库/紫色品质/猪猪弗斯.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -1987,7 +1987,7 @@
       "image": "media/猪猪素材库/紫色品质/珍猪.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -2016,7 +2016,7 @@
       "image": "media/猪猪素材库/紫色品质/白吃token的猪.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -2045,7 +2045,7 @@
       "image": "media/猪猪素材库/紫色品质/面包鼓猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -2085,7 +2085,7 @@
       "image": "media/猪猪素材库/紫色品质/兔吉猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -2125,7 +2125,7 @@
       "image": "media/猪猪素材库/紫色品质/巴巴猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -2165,7 +2165,7 @@
       "image": "media/猪猪素材库/紫色品质/鸫鸫猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -2205,7 +2205,7 @@
       "image": "media/猪猪素材库/蓝色品质/可爱猪翻身.gif",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -2234,7 +2234,7 @@
       "image": "media/猪猪素材库/紫色品质/蹦迪猪.gif",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -2263,7 +2263,7 @@
       "image": "media/猪猪素材库/紫色品质/龙猪.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -2292,7 +2292,7 @@
       "image": "media/猪猪素材库/金色品质/地球猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -2321,7 +2321,7 @@
       "image": "media/猪猪素材库/金色品质/傲娇猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -2361,7 +2361,7 @@
       "image": "media/猪猪素材库/金色品质/巧克力猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -2400,7 +2400,7 @@
       "image": "media/猪猪素材库/金色品质/星星猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -2439,7 +2439,7 @@
       "image": "media/猪猪素材库/金色品质/猪龙鱼公爵.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -2468,7 +2468,7 @@
       "image": "media/猪猪素材库/金色品质/磁流体约束恒星物质猪.gif",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -2497,7 +2497,7 @@
       "image": "media/猪猪素材库/金色品质/粉音猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -2536,7 +2536,7 @@
       "image": "media/猪猪素材库/金色品质/大绯猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -2576,7 +2576,7 @@
       "image": "media/猪猪素材库/金色品质/摩卡猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -2616,7 +2616,7 @@
       "image": "media/猪猪素材库/金色品质/红挑染猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -2655,7 +2655,7 @@
       "image": "media/猪猪素材库/金色品质/红茶猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -2694,7 +2694,7 @@
       "image": "media/猪猪素材库/金色品质/群猪.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -2723,7 +2723,7 @@
       "image": "media/定制猪群友库/1092931381/1004猪鼻哥.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -2752,7 +2752,7 @@
       "image": "media/定制猪群友库/1092931381/撅撅猪.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -2781,7 +2781,7 @@
       "image": "media/定制猪群友库/1092931381/小马猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -2812,7 +2812,7 @@
       "image": "media/定制猪群友库/237716658/1004猪鼻哥.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -2841,7 +2841,7 @@
       "image": "media/定制猪群友库/237716658/撅撅猪.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -2870,7 +2870,7 @@
       "image": "media/定制猪群友库/237716658/小马猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -2901,7 +2901,7 @@
       "image": "media/美食素材库/猪肉脯.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -2925,7 +2925,7 @@
       "image": "media/美食素材库/一只油炸猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -2949,7 +2949,7 @@
       "image": "media/美食素材库/三文猪寿司_寿司.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -2972,7 +2972,7 @@
       "image": "media/美食素材库/叉烧….jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -2995,7 +2995,7 @@
       "image": "media/美食素材库/培根.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -3018,7 +3018,7 @@
       "image": "media/美食素材库/烤猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -3041,16 +3041,17 @@
       "image": "media/美食素材库/猪利猪.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
         "饼干",
         "甜点"
       ],
-      "effect_id": "next-small-six-star-catch",
+      "effect_id": "next-five-six-star-catch",
       "effect_params": {
-        "bonus_percent": 1
+        "five_star_bonus_percent": 5,
+        "six_star_bonus_percent": 3
       },
       "paired_food_template_id": "",
       "collection": null
@@ -3066,7 +3067,7 @@
       "image": "media/美食素材库/一盒油炸猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -3092,7 +3093,7 @@
       "image": "media/美食素材库/猪包.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -3115,7 +3116,7 @@
       "image": "media/美食素材库/猪堡.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -3138,7 +3139,7 @@
       "image": "media/美食素材库/猪意味.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -3161,7 +3162,7 @@
       "image": "media/美食素材库/猪排.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -3184,7 +3185,7 @@
       "image": "media/美食素材库/猪排饭.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -3207,7 +3208,7 @@
       "image": "media/美食素材库/猪籽军舰.jpeg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -3233,7 +3234,7 @@
       "image": "media/美食素材库/猪咪虾寿司.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -3260,7 +3261,7 @@
       "image": "media/美食素材库/猪猪玉子烧.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -3287,7 +3288,7 @@
       "image": "media/美食素材库/猪饭.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -3310,7 +3311,7 @@
       "image": "media/美食素材库/黑猪麻汤圆.jpeg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -3338,7 +3339,7 @@
       "image": "media/美食素材库/猪猪白菜炖粉条.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -3366,7 +3367,7 @@
       "image": "media/美食素材库/猪寿司拼盘.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -3392,7 +3393,7 @@
       "image": "media/美食素材库/一猪六吃.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -3418,7 +3419,7 @@
       "image": "media/定制美食库/1092931381/撅撅猪派.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -3444,7 +3445,7 @@
       "image": "media/定制美食库/1092931381/猪鼻蛋包饭.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -3477,7 +3478,7 @@
       "image": "media/定制美食库/1092931381/小马猪蒙布朗.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -3505,7 +3506,7 @@
       "image": "media/定制美食库/237716658/撅撅猪派.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -3531,7 +3532,7 @@
       "image": "media/定制美食库/237716658/猪鼻蛋包饭.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -3564,7 +3565,7 @@
       "image": "media/定制美食库/237716658/小马猪蒙布朗.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -3592,7 +3593,7 @@
       "image": "media/猪猪素材库/紫色品质/扁猪.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -3621,7 +3622,7 @@
       "image": "media/猪猪素材库/紫色品质/提琴猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -3660,7 +3661,7 @@
       "image": "media/猪猪素材库/紫色品质/潮流猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -3700,7 +3701,7 @@
       "image": "media/猪猪素材库/金色品质/仓鼠猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -3740,7 +3741,7 @@
       "image": "media/猪猪素材库/金色品质/企鹅猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -3780,7 +3781,7 @@
       "image": "media/猪猪素材库/金色品质/抹茶猪咪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -3820,7 +3821,7 @@
       "image": "media/猪猪素材库/金色品质/普通猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -3860,7 +3861,7 @@
       "image": "media/猪猪素材库/金色品质/熊猫鼓猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -3900,7 +3901,7 @@
       "image": "media/猪猪素材库/金色品质/白日梦猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -3940,7 +3941,7 @@
       "image": "media/猪猪素材库/金色品质/绿茶猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -3980,7 +3981,7 @@
       "image": "media/美食素材库/猪油.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -4004,7 +4005,7 @@
       "image": "media/美食素材库/猪下锅.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -4027,7 +4028,7 @@
       "image": "media/美食素材库/烤乳猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -4050,7 +4051,7 @@
       "image": "media/美食素材库/猪罐头.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -4073,7 +4074,7 @@
       "image": "media/美食素材库/猪趴柠檬茶.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -4100,7 +4101,7 @@
       "image": "media/美食素材库/猪饺.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -4126,7 +4127,7 @@
       "image": "media/美食素材库/珍猪奶茶.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -4134,10 +4135,10 @@
         "珍珠",
         "饮品"
       ],
-      "effect_id": "next-pig-rarity",
+      "effect_id": "catch-duplication-chance",
       "effect_params": {
-        "rarity": 5,
-        "multiplier": 2.5
+        "chance_percent": 55,
+        "uses": 2
       },
       "paired_food_template_id": "",
       "collection": null
@@ -4153,7 +4154,7 @@
       "image": "media/美食素材库/猪咪莓蛋糕.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -4179,7 +4180,7 @@
       "image": "media/美食素材库/猪果冻.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -4205,7 +4206,7 @@
       "image": "media/美食素材库/猪皮奶.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -4213,10 +4214,9 @@
         "甜品",
         "奶香"
       ],
-      "effect_id": "next-five-six-star-catch",
+      "effect_id": "next-small-six-star-catch",
       "effect_params": {
-        "five_star_bonus_percent": 20,
-        "six_star_bonus_percent": 3
+        "bonus_percent": 15
       },
       "paired_food_template_id": "",
       "collection": null
@@ -4232,7 +4232,7 @@
       "image": "media/定制猪群友库/1092931381/向你道早猪.gif",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -4262,7 +4262,7 @@
       "image": "media/定制猪群友库/1092931381/软糯丰川祥猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -4292,7 +4292,7 @@
       "image": "media/定制美食库/1092931381/向你道早猪猪巧克力螺.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -4318,7 +4318,7 @@
       "image": "media/定制美食库/1092931381/雾蓝键盘大福.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -4328,11 +4328,11 @@
       ],
       "effect_id": "next-high-star-catch",
       "effect_params": {
-        "uses": 10,
-        "four_star_percent": 60,
-        "five_star_percent": 30,
-        "six_star_percent": 10,
-        "last_use_six_star_percent": 50
+        "uses": 5,
+        "four_star_percent": 61.5385,
+        "five_star_percent": 30.7692,
+        "six_star_percent": 7.6923,
+        "current_window_only": true
       },
       "paired_food_template_id": "",
       "collection": null
@@ -4348,7 +4348,7 @@
       "image": "media/定制猪群友库/237716658/向你道早猪.gif",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -4378,7 +4378,7 @@
       "image": "media/定制猪群友库/237716658/软糯丰川祥猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -4408,7 +4408,7 @@
       "image": "media/定制美食库/237716658/向你道早猪猪巧克力螺.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -4434,7 +4434,7 @@
       "image": "media/定制美食库/237716658/雾蓝键盘大福.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -4444,11 +4444,11 @@
       ],
       "effect_id": "next-high-star-catch",
       "effect_params": {
-        "uses": 10,
-        "four_star_percent": 60,
-        "five_star_percent": 30,
-        "six_star_percent": 10,
-        "last_use_six_star_percent": 50
+        "uses": 5,
+        "four_star_percent": 61.5385,
+        "five_star_percent": 30.7692,
+        "six_star_percent": 7.6923,
+        "current_window_only": true
       },
       "paired_food_template_id": "",
       "collection": null
@@ -4464,7 +4464,7 @@
       "image": "media/猪猪素材库/金色品质/偶像猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -4504,7 +4504,7 @@
       "image": "media/猪猪素材库/金色品质/天才猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -4544,7 +4544,7 @@
       "image": "media/猪猪素材库/紫色品质/淑女猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -4584,7 +4584,7 @@
       "image": "media/猪猪素材库/紫色品质/器材猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -4624,7 +4624,7 @@
       "image": "media/猪猪素材库/金色品质/武士道猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -4664,7 +4664,7 @@
       "image": "media/定制猪群友库/1092931381/彩彩修车猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -4695,7 +4695,7 @@
       "image": "media/定制美食库/1092931381/彩彩修车猪慕斯.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -4704,9 +4704,10 @@
         "慕斯",
         "草莓"
       ],
-      "effect_id": "next-five-star-cook",
+      "effect_id": "six-star-cook-failure-return",
       "effect_params": {
-        "uses": 10
+        "uses": 3,
+        "return_chance_percent": 75
       },
       "paired_food_template_id": "",
       "collection": null
@@ -4722,7 +4723,7 @@
       "image": "media/定制猪群友库/237716658/彩彩修车猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -4753,7 +4754,7 @@
       "image": "media/定制美食库/237716658/彩彩修车猪慕斯.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -4762,9 +4763,10 @@
         "慕斯",
         "草莓"
       ],
-      "effect_id": "next-five-star-cook",
+      "effect_id": "six-star-cook-failure-return",
       "effect_params": {
-        "uses": 10
+        "uses": 3,
+        "return_chance_percent": 75
       },
       "paired_food_template_id": "",
       "collection": null
@@ -4780,7 +4782,7 @@
       "image": "media/猪猪素材库/金色品质/HAPPY猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -4820,7 +4822,7 @@
       "image": "media/猪猪素材库/金色品质/歌剧猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -4860,7 +4862,7 @@
       "image": "media/猪猪素材库/金色品质/迷路猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -4900,7 +4902,7 @@
       "image": "media/猪猪素材库/紫色品质/美咲猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -4940,7 +4942,7 @@
       "image": "media/猪猪素材库/紫色品质/可乐饼猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -4980,7 +4982,7 @@
       "image": "media/猪猪素材库/蓝色品质/米歇尔猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -5020,7 +5022,7 @@
       "image": "media/定制猪群友库/1092931381/保千猪.png",
       "alternate_image": "media/定制猪群友库/1092931381/猪保千表情包.png",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -5050,7 +5052,7 @@
       "image": "media/定制猪群友库/237716658/保千猪.png",
       "alternate_image": "media/定制猪群友库/237716658/猪保千表情包.png",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -5080,7 +5082,7 @@
       "image": "media/定制美食库/1092931381/猪保千猪排轮盘.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -5089,10 +5091,9 @@
         "猪排",
         "轮盘"
       ],
-      "effect_id": "even-catch-distribution",
+      "effect_id": "roulette-chances",
       "effect_params": {
-        "uses": 10,
-        "last_use_six_star_percent": 50
+        "count": 3
       },
       "paired_food_template_id": "",
       "collection": null
@@ -5108,7 +5109,7 @@
       "image": "media/定制美食库/237716658/猪保千猪排轮盘.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -5117,10 +5118,9 @@
         "猪排",
         "轮盘"
       ],
-      "effect_id": "even-catch-distribution",
+      "effect_id": "roulette-chances",
       "effect_params": {
-        "uses": 10,
-        "last_use_six_star_percent": 50
+        "count": 3
       },
       "paired_food_template_id": "",
       "collection": null
@@ -5136,7 +5136,7 @@
       "image": "media/猪猪素材库/金色品质/歌姬猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -5176,7 +5176,7 @@
       "image": "media/猪猪素材库/金色品质/妈妈猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -5216,7 +5216,7 @@
       "image": "media/猪猪素材库/紫色品质/薯条猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -5256,7 +5256,7 @@
       "image": "media/猪猪素材库/金色品质/魔王猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -5296,7 +5296,7 @@
       "image": "media/猪猪素材库/紫色品质/宅宅猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -5336,7 +5336,7 @@
       "image": "media/定制猪群友库/1092931381/ob一串猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -5366,7 +5366,7 @@
       "image": "media/定制猪群友库/237716658/ob一串猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -5396,7 +5396,7 @@
       "image": "media/定制美食库/1092931381/糖醋排骨.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -5429,7 +5429,7 @@
       "image": "media/定制美食库/237716658/糖醋排骨.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -5462,7 +5462,7 @@
       "image": "media/定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/ob一串猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -5492,7 +5492,7 @@
       "image": "media/定制美食库/5E5854406D0297D6FEAE696A13E3A339/糖醋排骨.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -5525,7 +5525,7 @@
       "image": "media/定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/ob一串猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -5555,7 +5555,7 @@
       "image": "media/定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/糖醋排骨.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -5588,7 +5588,7 @@
       "image": "media/定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/撅撅猪.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -5617,7 +5617,7 @@
       "image": "media/定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/1004猪鼻哥.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -5646,7 +5646,7 @@
       "image": "media/定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/小马猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -5677,7 +5677,7 @@
       "image": "media/定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/软糯丰川祥猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -5707,7 +5707,7 @@
       "image": "media/定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/向你道早猪.gif",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -5737,7 +5737,7 @@
       "image": "media/定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/彩彩修车猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -5768,7 +5768,7 @@
       "image": "media/定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/保千猪.png",
       "alternate_image": "media/定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/猪保千表情包.png",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -5798,7 +5798,7 @@
       "image": "media/定制美食库/5E5854406D0297D6FEAE696A13E3A339/撅撅猪派.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -5824,7 +5824,7 @@
       "image": "media/定制美食库/5E5854406D0297D6FEAE696A13E3A339/猪鼻蛋包饭.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -5857,7 +5857,7 @@
       "image": "media/定制美食库/5E5854406D0297D6FEAE696A13E3A339/小马猪蒙布朗.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -5885,7 +5885,7 @@
       "image": "media/定制美食库/5E5854406D0297D6FEAE696A13E3A339/雾蓝键盘大福.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -5895,11 +5895,11 @@
       ],
       "effect_id": "next-high-star-catch",
       "effect_params": {
-        "uses": 10,
-        "four_star_percent": 60,
-        "five_star_percent": 30,
-        "six_star_percent": 10,
-        "last_use_six_star_percent": 50
+        "uses": 5,
+        "four_star_percent": 61.5385,
+        "five_star_percent": 30.7692,
+        "six_star_percent": 7.6923,
+        "current_window_only": true
       },
       "paired_food_template_id": "",
       "collection": null
@@ -5915,7 +5915,7 @@
       "image": "media/定制美食库/5E5854406D0297D6FEAE696A13E3A339/向你道早猪猪巧克力螺.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -5941,7 +5941,7 @@
       "image": "media/定制美食库/5E5854406D0297D6FEAE696A13E3A339/彩彩修车猪慕斯.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -5950,9 +5950,10 @@
         "慕斯",
         "草莓"
       ],
-      "effect_id": "next-five-star-cook",
+      "effect_id": "six-star-cook-failure-return",
       "effect_params": {
-        "uses": 10
+        "uses": 3,
+        "return_chance_percent": 75
       },
       "paired_food_template_id": "",
       "collection": null
@@ -5968,7 +5969,7 @@
       "image": "media/定制美食库/5E5854406D0297D6FEAE696A13E3A339/猪保千猪排轮盘.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -5977,10 +5978,9 @@
         "猪排",
         "轮盘"
       ],
-      "effect_id": "even-catch-distribution",
+      "effect_id": "roulette-chances",
       "effect_params": {
-        "uses": 10,
-        "last_use_six_star_percent": 50
+        "count": 3
       },
       "paired_food_template_id": "",
       "collection": null
@@ -5996,7 +5996,7 @@
       "image": "media/定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/撅撅猪.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -6025,7 +6025,7 @@
       "image": "media/定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/1004猪鼻哥.jpg",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -6054,7 +6054,7 @@
       "image": "media/定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/小马猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -6085,7 +6085,7 @@
       "image": "media/定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/软糯丰川祥猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -6115,7 +6115,7 @@
       "image": "media/定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/向你道早猪.gif",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -6145,7 +6145,7 @@
       "image": "media/定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/彩彩修车猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -6176,7 +6176,7 @@
       "image": "media/定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/保千猪.png",
       "alternate_image": "media/定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/猪保千表情包.png",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -6206,7 +6206,7 @@
       "image": "media/定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/撅撅猪派.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -6232,7 +6232,7 @@
       "image": "media/定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/猪鼻蛋包饭.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -6265,7 +6265,7 @@
       "image": "media/定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/小马猪蒙布朗.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -6293,7 +6293,7 @@
       "image": "media/定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/雾蓝键盘大福.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -6303,11 +6303,11 @@
       ],
       "effect_id": "next-high-star-catch",
       "effect_params": {
-        "uses": 10,
-        "four_star_percent": 60,
-        "five_star_percent": 30,
-        "six_star_percent": 10,
-        "last_use_six_star_percent": 50
+        "uses": 5,
+        "four_star_percent": 61.5385,
+        "five_star_percent": 30.7692,
+        "six_star_percent": 7.6923,
+        "current_window_only": true
       },
       "paired_food_template_id": "",
       "collection": null
@@ -6323,7 +6323,7 @@
       "image": "media/定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/向你道早猪猪巧克力螺.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -6349,7 +6349,7 @@
       "image": "media/定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/彩彩修车猪慕斯.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -6358,9 +6358,10 @@
         "慕斯",
         "草莓"
       ],
-      "effect_id": "next-five-star-cook",
+      "effect_id": "six-star-cook-failure-return",
       "effect_params": {
-        "uses": 10
+        "uses": 3,
+        "return_chance_percent": 75
       },
       "paired_food_template_id": "",
       "collection": null
@@ -6376,7 +6377,7 @@
       "image": "media/定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/猪保千猪排轮盘.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -6385,10 +6386,9 @@
         "猪排",
         "轮盘"
       ],
-      "effect_id": "even-catch-distribution",
+      "effect_id": "roulette-chances",
       "effect_params": {
-        "uses": 10,
-        "last_use_six_star_percent": 50
+        "count": 3
       },
       "paired_food_template_id": "",
       "collection": null
@@ -6404,7 +6404,7 @@
       "image": "media/猪猪素材库/紫色品质/LAYER猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -6444,7 +6444,7 @@
       "image": "media/猪猪素材库/金色品质/LOCK猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -6484,7 +6484,7 @@
       "image": "media/猪猪素材库/紫色品质/摩托猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -6524,7 +6524,7 @@
       "image": "media/猪猪素材库/金色品质/PAREO猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -6564,7 +6564,7 @@
       "image": "media/猪猪素材库/金色品质/chuchu猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "not-required",
       "recipe_tags": [
@@ -6604,7 +6604,7 @@
       "image": "media/定制猪群友库/1092931381/神龙化猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -6634,7 +6634,7 @@
       "image": "media/定制美食库/1092931381/神龙化猪七星云海锅.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -6665,7 +6665,7 @@
       "image": "media/定制猪群友库/237716658/神龙化猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -6695,7 +6695,7 @@
       "image": "media/定制美食库/237716658/神龙化猪七星云海锅.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -6726,7 +6726,7 @@
       "image": "media/定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/神龙化猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -6756,7 +6756,7 @@
       "image": "media/定制美食库/5E5854406D0297D6FEAE696A13E3A339/神龙化猪七星云海锅.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -6787,7 +6787,7 @@
       "image": "media/定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/神龙化猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -6817,7 +6817,7 @@
       "image": "media/定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/神龙化猪七星云海锅.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -6848,7 +6848,7 @@
       "image": "media/定制猪群友库/1092931381/达妮娅猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -6877,7 +6877,7 @@
       "image": "media/定制美食库/1092931381/达妮娅泡泡云冻.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -6904,7 +6904,7 @@
       "image": "media/定制猪群友库/1092931381/阿萨姆猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -6933,7 +6933,7 @@
       "image": "media/定制美食库/1092931381/阿萨姆猪红茶奶雾锅.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -6975,7 +6975,7 @@
       "image": "media/定制猪群友库/237716658/达妮娅猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -7004,7 +7004,7 @@
       "image": "media/定制美食库/237716658/达妮娅泡泡云冻.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -7031,7 +7031,7 @@
       "image": "media/定制猪群友库/237716658/阿萨姆猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -7060,7 +7060,7 @@
       "image": "media/定制美食库/237716658/阿萨姆猪红茶奶雾锅.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -7102,7 +7102,7 @@
       "image": "media/定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/达妮娅猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -7131,7 +7131,7 @@
       "image": "media/定制美食库/5E5854406D0297D6FEAE696A13E3A339/达妮娅泡泡云冻.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -7158,7 +7158,7 @@
       "image": "media/定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/阿萨姆猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -7187,7 +7187,7 @@
       "image": "media/定制美食库/5E5854406D0297D6FEAE696A13E3A339/阿萨姆猪红茶奶雾锅.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -7229,7 +7229,7 @@
       "image": "media/定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/达妮娅猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -7258,7 +7258,7 @@
       "image": "media/定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/达妮娅泡泡云冻.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -7285,7 +7285,7 @@
       "image": "media/定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/阿萨姆猪.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -7314,7 +7314,7 @@
       "image": "media/定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/阿萨姆猪红茶奶雾锅.png",
       "alternate_image": "",
       "fit": "contain",
-      "source": "用户于 2026-07-28 至 2026-08-11 提供的抓猪素材库，本地授权使用",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
       "license": "user-provided-local-use",
       "consent_status": "granted",
       "recipe_tags": [
@@ -7341,6 +7341,470 @@
         ],
         "source_label": "阿萨姆红茶奶雾锅",
         "quota_exempt": true
+      },
+      "paired_food_template_id": "",
+      "collection": null
+    },
+    {
+      "template_id": "pig-bandori-avemujica-sakiko",
+      "kind": "pig",
+      "display_name": "saki猪",
+      "rarity": 5,
+      "scope": "common",
+      "group_scope_id": null,
+      "description": "端坐在键盘前的saki猪把礼貌措辞和大小姐仪态收得一丝不乱；它借来丰川祥子的决绝，为迷途的同伴搭起Ave Mujica的假面舞台，也坚持亲手守住乐队完整的世界观。",
+      "image": "media/猪猪素材库/金色品质/saki猪.png",
+      "alternate_image": "",
+      "fit": "contain",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
+      "license": "user-provided-local-use",
+      "consent_status": "not-required",
+      "recipe_tags": [
+        "BanG Dream!",
+        "Ave Mujica",
+        "键盘",
+        "Oblivionis"
+      ],
+      "effect_id": "",
+      "effect_params": {},
+      "paired_food_template_id": "",
+      "collection": {
+        "collaboration_name": "BanG Dream!",
+        "collection_id": "bandori-ave-mujica",
+        "collection_name": "Ave Mujica",
+        "slot": 1,
+        "total": 6,
+        "character_id": "sakiko",
+        "character_name": "丰川祥子／Oblivionis",
+        "official_profile_url": "https://anime.bang-dream.com/avemujica/character/sakiko/"
+      },
+      "length_min_cm": 40.0,
+      "length_max_cm": 148.0,
+      "weight_min_kg": 38.0,
+      "weight_max_kg": 480.0,
+      "fat_profile": "balanced",
+      "stature_profile": "standard"
+    },
+    {
+      "template_id": "pig-bandori-avemujica-uika",
+      "kind": "pig",
+      "display_name": "初华猪",
+      "rarity": 5,
+      "scope": "common",
+      "group_scope_id": null,
+      "description": "抱紧黑金吉他的初华猪在灯下仍会先抬头找星星；它借来三角初华身为sumimi偶像与Ave Mujica吉他主唱的双重舞台感，也把写进歌词的心事藏在Doloris的微笑之后。",
+      "image": "media/猪猪素材库/金色品质/初华猪.png",
+      "alternate_image": "media/猪猪素材库/金色品质/初华猪-戴帽子版.png",
+      "fit": "contain",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
+      "license": "user-provided-local-use",
+      "consent_status": "not-required",
+      "recipe_tags": [
+        "BanG Dream!",
+        "Ave Mujica",
+        "吉他主唱",
+        "Doloris",
+        "星星"
+      ],
+      "effect_id": "",
+      "effect_params": {},
+      "paired_food_template_id": "",
+      "collection": {
+        "collaboration_name": "BanG Dream!",
+        "collection_id": "bandori-ave-mujica",
+        "collection_name": "Ave Mujica",
+        "slot": 2,
+        "total": 6,
+        "character_id": "uika",
+        "character_name": "三角初华／Doloris",
+        "official_profile_url": "https://anime.bang-dream.com/avemujica/character/uika/"
+      },
+      "length_min_cm": 40.0,
+      "length_max_cm": 148.0,
+      "weight_min_kg": 38.0,
+      "weight_max_kg": 480.0,
+      "fat_profile": "lean",
+      "stature_profile": "standard"
+    },
+    {
+      "template_id": "pig-bandori-avemujica-umiri",
+      "kind": "pig",
+      "display_name": "贝斯佣兵猪",
+      "rarity": 5,
+      "scope": "common",
+      "group_scope_id": null,
+      "description": "贝斯佣兵猪把演出表、后台动线和低音声部一起排得分秒不差；它借来八幡海铃足以支援数十支乐队的专业技术，表情再冷静，也会以Timoris之名稳稳托住整座舞台。",
+      "image": "media/猪猪素材库/金色品质/贝斯佣兵猪.png",
+      "alternate_image": "",
+      "fit": "contain",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
+      "license": "user-provided-local-use",
+      "consent_status": "not-required",
+      "recipe_tags": [
+        "BanG Dream!",
+        "Ave Mujica",
+        "贝斯",
+        "Timoris",
+        "职业乐手"
+      ],
+      "effect_id": "",
+      "effect_params": {},
+      "paired_food_template_id": "",
+      "collection": {
+        "collaboration_name": "BanG Dream!",
+        "collection_id": "bandori-ave-mujica",
+        "collection_name": "Ave Mujica",
+        "slot": 3,
+        "total": 6,
+        "character_id": "umiri",
+        "character_name": "八幡海铃／Timoris",
+        "official_profile_url": "https://anime.bang-dream.com/avemujica/character/umiri/"
+      },
+      "length_min_cm": 40.0,
+      "length_max_cm": 148.0,
+      "weight_min_kg": 38.0,
+      "weight_max_kg": 480.0,
+      "fat_profile": "balanced",
+      "stature_profile": "standard"
+    },
+    {
+      "template_id": "pig-bandori-avemujica-mutsumi",
+      "kind": "pig",
+      "display_name": "黄瓜猪",
+      "rarity": 5,
+      "scope": "common",
+      "group_scope_id": null,
+      "description": "黄瓜猪抱着银白吉他和一根新鲜黄瓜安静候场；它借来若叶睦不善表露却会默默关心伙伴的性格，话少得像休止符，指尖落下时却显出扎实而细腻的吉他功底。",
+      "image": "media/猪猪素材库/金色品质/黄瓜猪.png",
+      "alternate_image": "",
+      "fit": "contain",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
+      "license": "user-provided-local-use",
+      "consent_status": "not-required",
+      "recipe_tags": [
+        "BanG Dream!",
+        "Ave Mujica",
+        "吉他",
+        "若叶睦",
+        "黄瓜"
+      ],
+      "effect_id": "",
+      "effect_params": {},
+      "paired_food_template_id": "",
+      "collection": {
+        "collaboration_name": "BanG Dream!",
+        "collection_id": "bandori-ave-mujica",
+        "collection_name": "Ave Mujica",
+        "slot": 4,
+        "total": 6,
+        "character_id": "mutsumi",
+        "character_name": "若叶睦",
+        "official_profile_url": "https://bang-dream.com/artist/avemujica/wakaba-mutsumi/"
+      },
+      "length_min_cm": 40.0,
+      "length_max_cm": 148.0,
+      "weight_min_kg": 38.0,
+      "weight_max_kg": 480.0,
+      "fat_profile": "lean",
+      "stature_profile": "standard"
+    },
+    {
+      "template_id": "pig-bandori-avemujica-mortis",
+      "kind": "pig",
+      "display_name": "墨提斯猪",
+      "rarity": 5,
+      "scope": "common",
+      "group_scope_id": null,
+      "description": "戴着红色贝雷帽的墨提斯猪把粉色吉他拨得锋利又鲜活；它从若叶睦难以言说的内侧走到聚光灯前，以Mortis的名字接住被压低的声音，让每个强拍都像一次不肯消失的回答。",
+      "image": "media/猪猪素材库/金色品质/墨提斯猪.png",
+      "alternate_image": "",
+      "fit": "contain",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
+      "license": "user-provided-local-use",
+      "consent_status": "not-required",
+      "recipe_tags": [
+        "BanG Dream!",
+        "Ave Mujica",
+        "吉他",
+        "Mortis",
+        "若叶睦"
+      ],
+      "effect_id": "",
+      "effect_params": {},
+      "paired_food_template_id": "",
+      "collection": {
+        "collaboration_name": "BanG Dream!",
+        "collection_id": "bandori-ave-mujica",
+        "collection_name": "Ave Mujica",
+        "slot": 5,
+        "total": 6,
+        "character_id": "mortis",
+        "character_name": "墨提斯／Mortis",
+        "official_profile_url": "https://bang-dream.com/artist/avemujica/wakaba-mutsumi/"
+      },
+      "length_min_cm": 40.0,
+      "length_max_cm": 148.0,
+      "weight_min_kg": 38.0,
+      "weight_max_kg": 480.0,
+      "fat_profile": "balanced",
+      "stature_profile": "standard"
+    },
+    {
+      "template_id": "pig-bandori-avemujica-nyamu",
+      "kind": "pig",
+      "display_name": "喵梦猪",
+      "rarity": 5,
+      "scope": "common",
+      "group_scope_id": null,
+      "description": "喵梦猪把紫发、镜头和鼓棒都调到最上镜的角度；它借来祐天寺若麦经营“喵梦亲”频道的行动力，左右手都能应付镜头与鼓点，还把对演技和华丽舞台的野心藏进Amoris的笑容。",
+      "image": "media/猪猪素材库/金色品质/喵梦猪.png",
+      "alternate_image": "",
+      "fit": "contain",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
+      "license": "user-provided-local-use",
+      "consent_status": "not-required",
+      "recipe_tags": [
+        "BanG Dream!",
+        "Ave Mujica",
+        "鼓手",
+        "Amoris",
+        "视频创作者"
+      ],
+      "effect_id": "",
+      "effect_params": {},
+      "paired_food_template_id": "",
+      "collection": {
+        "collaboration_name": "BanG Dream!",
+        "collection_id": "bandori-ave-mujica",
+        "collection_name": "Ave Mujica",
+        "slot": 6,
+        "total": 6,
+        "character_id": "nyamu",
+        "character_name": "祐天寺若麦／Amoris",
+        "official_profile_url": "https://anime.bang-dream.com/avemujica/character/nyamu/"
+      },
+      "length_min_cm": 40.0,
+      "length_max_cm": 148.0,
+      "weight_min_kg": 38.0,
+      "weight_max_kg": 480.0,
+      "fat_profile": "balanced",
+      "stature_profile": "standard"
+    },
+    {
+      "template_id": "pig-kfc-crazy-thursday",
+      "kind": "pig",
+      "display_name": "KFC猪",
+      "rarity": 4,
+      "scope": "common",
+      "group_scope_id": null,
+      "description": "红白围裙一系，KFC猪便守着炸鸡桶等待北京时间的星期四；平日它只在后厨悄悄腌料，疯狂星期四一到才会冲进猪圈，把酥脆香气撒满整轮抓猪。",
+      "image": "media/猪猪素材库/紫色品质/KFC猪.png",
+      "alternate_image": "",
+      "fit": "contain",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
+      "license": "user-provided-local-use",
+      "consent_status": "not-required",
+      "recipe_tags": [
+        "KFC",
+        "疯狂星期四",
+        "星期四限定",
+        "炸鸡"
+      ],
+      "effect_id": "",
+      "effect_params": {},
+      "paired_food_template_id": "",
+      "collection": null,
+      "length_min_cm": 34.0,
+      "length_max_cm": 118.0,
+      "weight_min_kg": 28.0,
+      "weight_max_kg": 330.0,
+      "fat_profile": "fatty",
+      "stature_profile": "standard"
+    },
+    {
+      "template_id": "food-kfc-family-bucket",
+      "kind": "food",
+      "display_name": "炸猪全家桶",
+      "rarity": 5,
+      "scope": "common",
+      "group_scope_id": null,
+      "description": "金黄炸猪排、脆皮小食和热气一起塞满红白全家桶；桶盖一掀，疯狂星期四的香味便沿群聊扩散，连旁观的群友也忍不住为这顿加餐掏出猪币。",
+      "image": "media/美食素材库/炸猪全家桶.png",
+      "alternate_image": "",
+      "fit": "contain",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
+      "license": "user-provided-local-use",
+      "consent_status": "not-required",
+      "recipe_tags": [
+        "KFC",
+        "疯狂星期四",
+        "专属菜",
+        "炸物"
+      ],
+      "effect_id": "group-coin-tribute",
+      "effect_params": {
+        "coin_per_player": 50
+      },
+      "paired_food_template_id": "",
+      "collection": null
+    },
+    {
+      "template_id": "pig-jjk-gojo",
+      "kind": "pig",
+      "display_name": "五条猪",
+      "rarity": 5,
+      "scope": "common",
+      "group_scope_id": null,
+      "description": "白发与眼罩把五条猪的笑意衬得格外从容，指尖苍蓝咒力却让整个猪圈保持距离；它借来五条悟被称作最强术师的压倒性气场，也把照看后来者的教师身份藏在玩笑后面。",
+      "image": "media/猪猪素材库/金色品质/五条猪.png",
+      "alternate_image": "",
+      "fit": "contain",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
+      "license": "user-provided-local-use",
+      "consent_status": "not-required",
+      "recipe_tags": [
+        "咒术回战",
+        "五条悟",
+        "无下限",
+        "联动"
+      ],
+      "effect_id": "",
+      "effect_params": {},
+      "paired_food_template_id": "",
+      "collection": {
+        "collaboration_name": "咒术回战",
+        "collection_id": "jujutsu-kaisen",
+        "collection_name": "咒术回战",
+        "slot": 1,
+        "total": 2,
+        "character_id": "gojo",
+        "character_name": "五条悟",
+        "official_profile_url": "https://jujutsukaisen.jp/character/index_1st.php"
+      },
+      "length_min_cm": 40.0,
+      "length_max_cm": 148.0,
+      "weight_min_kg": 38.0,
+      "weight_max_kg": 480.0,
+      "fat_profile": "lean",
+      "stature_profile": "standard"
+    },
+    {
+      "template_id": "pig-jjk-sukuna",
+      "kind": "pig",
+      "display_name": "宿傩猪",
+      "rarity": 5,
+      "scope": "common",
+      "group_scope_id": null,
+      "description": "黑色咒纹爬上宿傩猪的脸与猪蹄，身后的伏魔御厨子静静张开；这位寄宿于器皿中的诅咒之王跨越千年仍傲慢强横，连加餐都像在宣告谁才是猪圈真正的支配者。",
+      "image": "media/猪猪素材库/金色品质/宿傩猪.png",
+      "alternate_image": "",
+      "fit": "contain",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
+      "license": "user-provided-local-use",
+      "consent_status": "not-required",
+      "recipe_tags": [
+        "咒术回战",
+        "两面宿傩",
+        "诅咒之王",
+        "联动"
+      ],
+      "effect_id": "",
+      "effect_params": {},
+      "paired_food_template_id": "",
+      "collection": {
+        "collaboration_name": "咒术回战",
+        "collection_id": "jujutsu-kaisen",
+        "collection_name": "咒术回战",
+        "slot": 2,
+        "total": 2,
+        "character_id": "sukuna",
+        "character_name": "两面宿傩",
+        "official_profile_url": "https://jujutsukaisen.jp/character/index_1st.php"
+      },
+      "length_min_cm": 40.0,
+      "length_max_cm": 148.0,
+      "weight_min_kg": 38.0,
+      "weight_max_kg": 480.0,
+      "fat_profile": "balanced",
+      "stature_profile": "standard"
+    },
+    {
+      "template_id": "food-jjk-malevolent-kitchen",
+      "kind": "food",
+      "display_name": "伏魔朱焰咒纹猪蹄饭",
+      "rarity": 5,
+      "scope": "common",
+      "group_scope_id": null,
+      "description": "朱焰沿咒纹烧亮软糯猪蹄，米饭中央立起一座小小御厨子；每一刀都像提前划定领域边界，只等食用者把整群接下来的抓猪送进这间咒力厨房。",
+      "image": "media/美食素材库/伏魔朱焰咒纹猪蹄饭.png",
+      "alternate_image": "",
+      "fit": "contain",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
+      "license": "user-provided-local-use",
+      "consent_status": "not-required",
+      "recipe_tags": [
+        "咒术回战",
+        "宿傩猪专属菜",
+        "领域展开",
+        "伏魔御厨子"
+      ],
+      "effect_id": "technique-permit",
+      "effect_params": {
+        "technique_id": "malevolent-kitchen"
+      },
+      "paired_food_template_id": "",
+      "collection": null
+    },
+    {
+      "template_id": "food-jjk-limitless-blue",
+      "kind": "food",
+      "display_name": "五条猪无量苍蓝雪山",
+      "rarity": 5,
+      "scope": "common",
+      "group_scope_id": null,
+      "description": "苍蓝雪山在玻璃盏中向一点缓缓坍缩，奶霜与蓝莓像被看不见的引力牵住；吃下它，便能取得一次让群里猪猪朝自己聚拢的术式顺转资格。",
+      "image": "media/美食素材库/五条猪无量苍蓝雪山.png",
+      "alternate_image": "",
+      "fit": "contain",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
+      "license": "user-provided-local-use",
+      "consent_status": "not-required",
+      "recipe_tags": [
+        "咒术回战",
+        "五条猪专属菜",
+        "术式顺转",
+        "苍"
+      ],
+      "effect_id": "technique-permit",
+      "effect_params": {
+        "technique_id": "lapse-blue"
+      },
+      "paired_food_template_id": "",
+      "collection": null
+    },
+    {
+      "template_id": "food-jjk-limitless-red",
+      "kind": "food",
+      "display_name": "五条猪无量赫焰雪山",
+      "rarity": 5,
+      "scope": "common",
+      "group_scope_id": null,
+      "description": "赫红雪山从杯心向外迸开，草莓火焰把奶霜推成层层冲击；吃下它，便能取得一次把群里猪猪弹向任意群友的术式反转资格。",
+      "image": "media/美食素材库/五条猪无量赫焰雪山.png",
+      "alternate_image": "",
+      "fit": "contain",
+      "source": "用户于 2026-07-28 至 2026-08-25 提供的抓猪素材库，本地授权使用",
+      "license": "user-provided-local-use",
+      "consent_status": "not-required",
+      "recipe_tags": [
+        "咒术回战",
+        "五条猪专属菜",
+        "术式反转",
+        "赫"
+      ],
+      "effect_id": "technique-permit",
+      "effect_params": {
+        "technique_id": "reversal-red"
       },
       "paired_food_template_id": "",
       "collection": null

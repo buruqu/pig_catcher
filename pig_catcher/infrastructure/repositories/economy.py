@@ -447,6 +447,96 @@ class EconomyRepository:
             ),
         )
 
+    async def grant_roulette_spins(
+        self,
+        session: DatabaseSession,
+        *,
+        player_id: str,
+        source_food_instance_id: str,
+        count: int,
+        now: str,
+    ) -> int:
+        """Add durable roulette chances and return the new available balance."""
+
+        if int(count) <= 0:
+            raise ValueError("轮盘机会增加数量必须大于零。")
+        await session.execute(
+            """
+            INSERT INTO player_roulette_state(
+                player_id, available_spins, source_food_instance_id,
+                created_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(player_id) DO UPDATE SET
+                available_spins = player_roulette_state.available_spins
+                    + excluded.available_spins,
+                source_food_instance_id = excluded.source_food_instance_id,
+                updated_at = excluded.updated_at
+            """,
+            (player_id, int(count), source_food_instance_id, now, now),
+        )
+        row = await session.fetch_one(
+            """
+            SELECT available_spins
+            FROM player_roulette_state
+            WHERE player_id = ?
+            """,
+            (player_id,),
+        )
+        if row is None:
+            raise RuntimeError("轮盘机会发放后无法读取。")
+        return int(row["available_spins"])
+
+    async def roulette_state(
+        self,
+        session: DatabaseSession,
+        *,
+        player_id: str,
+    ) -> dict[str, object] | None:
+        row = await session.fetch_one(
+            """
+            SELECT player_id, available_spins, source_food_instance_id,
+                   created_at, updated_at
+            FROM player_roulette_state
+            WHERE player_id = ?
+            """,
+            (player_id,),
+        )
+        return dict(row) if row is not None else None
+
+    async def consume_roulette_spin(
+        self,
+        session: DatabaseSession,
+        *,
+        player_id: str,
+        now: str,
+    ) -> int:
+        """Consume one chance atomically and return the remaining balance."""
+
+        cursor = await session.execute(
+            """
+            UPDATE player_roulette_state
+            SET available_spins = available_spins - 1,
+                updated_at = ?
+            WHERE player_id = ?
+              AND available_spins > 0
+            """,
+            (now, player_id),
+        )
+        if cursor.rowcount != 1:
+            raise RuntimeError("没有可用的猪排轮盘机会。")
+        row = await session.fetch_one(
+            """
+            SELECT available_spins
+            FROM player_roulette_state
+            WHERE player_id = ?
+            """,
+            (player_id,),
+        )
+        if row is None:
+            raise RuntimeError("轮盘机会消费后无法读取。")
+        return int(row["available_spins"])
+
     async def consume_food_effects(
         self,
         session: DatabaseSession,

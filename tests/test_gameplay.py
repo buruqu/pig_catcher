@@ -17,10 +17,22 @@ from pig_catcher.domain.errors import (
     CatchCooldownError,
     DailyCatchLimitError,
     ItemInventoryError,
+    TechniqueError,
 )
 from pig_catcher.domain.models import CommandIdentity, ScopeKey
+from pig_catcher.domain.special_content import (
+    KFC_PIG_TEMPLATE_ID,
+    TECHNIQUE_HOLLOW_PURPLE,
+    TECHNIQUE_LAPSE_BLUE,
+    TECHNIQUE_MALEVOLENT_KITCHEN,
+    TECHNIQUE_REVERSAL_RED,
+)
 from pig_catcher.infrastructure import PigCatcherDatabase
-from pig_catcher.infrastructure.repositories import EconomyRepository, FrameworkRepository
+from pig_catcher.infrastructure.repositories import (
+    EconomyRepository,
+    FrameworkRepository,
+    TechniqueRepository,
+)
 from pig_catcher.rendering import pig_card_view, profile_view
 from pig_catcher.services import (
     AssetCatalogService,
@@ -78,6 +90,7 @@ def _pig_entry(
     group_id: str | None = None,
     stature_profile: str = "standard",
     collection: dict[str, object] | None = None,
+    paired_food_template_id: str = "",
 ) -> dict[str, object]:
     group_only = group_id is not None
     entry: dict[str, object] = {
@@ -100,6 +113,7 @@ def _pig_entry(
         "fat_profile": "balanced",
         "stature_profile": stature_profile,
         "recipe_tags": ["测试"],
+        "paired_food_template_id": paired_food_template_id,
     }
     if collection is not None:
         entry["collection"] = collection
@@ -138,6 +152,8 @@ def _food_entry(
 async def _database_with_catalog(
     tmp_path: Path,
     entries: list[dict[str, object]],
+    *,
+    manifest_version: int = 2,
 ) -> PigCatcherDatabase:
     source = tmp_path / "source"
     source.mkdir()
@@ -151,7 +167,7 @@ async def _database_with_catalog(
     manifest.write_text(
         json.dumps(
             {
-                "manifest_version": 2,
+                "manifest_version": manifest_version,
                 "catalog_id": "third-round-tests",
                 "source_label": "pytest third-round catalog",
                 "entries": entries,
@@ -702,6 +718,128 @@ async def test_six_star_dish_dedicated_catches_do_not_consume_normal_quota(
     assert effect is not None and tuple(effect) == (5, 5)
     profile = await service.profile(_identity(message_id="dedicated-profile"))
     assert (profile.daily_count, profile.daily_limit) == (1, 1)
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_pearl_pig_milk_tea_duplicates_without_duplicate_rewards(
+    tmp_path: Path,
+) -> None:
+    database = await _database_with_catalog(
+        tmp_path,
+        [
+            _pig_entry("duplication-pig", rarity=1),
+            _food_entry(
+                "duplication-food",
+                effect_id="catch-duplication-chance",
+                effect_params={"chance_percent": 55, "uses": 2},
+                display_name="珍猪奶茶",
+                rarity=4,
+                group_id=None,
+            ),
+        ],
+    )
+    identity = _identity(message_id="duplication-owner")
+    await FrameworkService(database).touch_identity(identity)
+    now = "2026-07-28T04:00:00.000Z"
+    async with database.transaction() as session:
+        await session.execute(
+            """
+            INSERT INTO food_instances(
+                food_instance_id, short_code, scope_id, owner_player_id,
+                template_id, template_version, rarity, display_name_snapshot,
+                portion_weight, fat_category, official_value, effect_id,
+                effect_params_json, ruleset_version, random_snapshot_json,
+                state, acquired_at, disposed_at, updated_at
+            ) VALUES (
+                'duplication-source-food', 'MILK0001', ?, ?,
+                'duplication-food', 1, 4, '珍猪奶茶',
+                1.0, 'balanced', 1000, 'catch-duplication-chance',
+                '{"chance_percent":55,"uses":2}', 27, '{}',
+                'consumed', ?, ?, ?
+            )
+            """,
+            (identity.scope.value, identity.player_id, now, now, now),
+        )
+        await session.execute(
+            """
+            INSERT INTO player_food_effects(
+                effect_entry_id, player_id, source_food_instance_id,
+                effect_id, params_json, granted_uses, consumed_uses,
+                expires_at, created_at, updated_at
+            ) VALUES (
+                'duplication-effect', ?, 'duplication-source-food',
+                'catch-duplication-chance',
+                '{"chance_percent":55,"uses":2}', 2, 0, NULL, ?, ?
+            )
+            """,
+            (identity.player_id, now, now),
+        )
+
+    ids = iter(
+        (
+            "caught-one",
+            "duplicated-one",
+            "ledger-one",
+            "caught-two",
+            "ledger-two",
+        )
+    )
+    codes = iter(("CATCH001", "DUPL0001", "CATCH002"))
+    service = GameplayService(
+        database,
+        CatchingSection(cooldown_seconds=0),
+        clock=MutableClock(datetime(2026, 7, 28, 4, 0, tzinfo=UTC)),
+        random_source=SequenceRandom(
+            *_catch_rolls(),
+            0.54,
+            *_catch_rolls(),
+            0.55,
+        ),
+        id_factory=ids.__next__,
+        short_code_factory=codes.__next__,
+    )
+    first = await service.catch(
+        _identity(message_id="duplication-catch-one")
+    )
+    second = await service.catch(
+        _identity(message_id="duplication-catch-two")
+    )
+    assert any("复制成功" in text for text in first.effect_summaries)
+    assert any("未触发复制" in text for text in second.effect_summaries)
+    pigs = await database.fetch_all(
+        """
+        SELECT pig_instance_id, random_snapshot_json
+        FROM pig_instances
+        WHERE owner_player_id = ? AND state = 'active'
+        ORDER BY pig_instance_id
+        """,
+        (identity.player_id,),
+    )
+    assert {str(row["pig_instance_id"]) for row in pigs} == {
+        "caught-one",
+        "caught-two",
+        "duplicated-one",
+    }
+    duplicate = next(
+        row for row in pigs if row["pig_instance_id"] == "duplicated-one"
+    )
+    snapshot = json.loads(str(duplicate["random_snapshot_json"]))
+    assert snapshot["duplicated_from_pig_instance_id"] == "caught-one"
+    assert snapshot["duplicate_reward_granted"] is False
+    effect = await database.fetch_one(
+        """
+        SELECT granted_uses, consumed_uses
+        FROM player_food_effects
+        WHERE effect_entry_id = 'duplication-effect'
+        """
+    )
+    assert effect is not None and tuple(effect) == (2, 2)
+    statistics = await database.fetch_one(
+        "SELECT total_catches FROM player_statistics WHERE player_id = ?",
+        (identity.player_id,),
+    )
+    assert statistics is not None and int(statistics["total_catches"]) == 2
     await database.close()
 
 
@@ -1510,3 +1648,300 @@ async def test_concurrent_duplicate_catch_across_database_managers_commits_once(
     assert row is not None and row["count"] == 1
     await second_database.close()
     await first_database.close()
+
+
+@pytest.mark.asyncio
+async def test_kfc_pig_is_only_drawable_on_beijing_thursday(tmp_path: Path) -> None:
+    database = await _database_with_catalog(
+        tmp_path,
+        [
+            _pig_entry(KFC_PIG_TEMPLATE_ID, rarity=4, display_name="KFC猪"),
+            _pig_entry("pig-z-normal-four", rarity=4, display_name="普通四星猪"),
+        ],
+    )
+    clock = MutableClock(datetime(2026, 8, 26, 4, 0, tzinfo=UTC))
+    wednesday = GameplayService(
+        database,
+        CatchingSection(cooldown_seconds=0),
+        random_source=SequenceRandom(
+            *_catch_rolls(rarity_roll=0.90, template_roll=0.0)
+        ),
+        clock=clock,
+        id_factory=iter(("wed-pig", "wed-ledger")).__next__,
+        short_code_factory=lambda: "WEDKFC01",
+    )
+    first = await wednesday.catch(_identity(message_id="kfc-wednesday"))
+    assert first.pig.template_id == "pig-z-normal-four"
+
+    clock.value = datetime(2026, 8, 27, 4, 0, tzinfo=UTC)
+    thursday = GameplayService(
+        database,
+        CatchingSection(cooldown_seconds=0),
+        random_source=SequenceRandom(
+            *_catch_rolls(rarity_roll=0.90, template_roll=0.0)
+        ),
+        clock=clock,
+        id_factory=iter(("thu-pig", "thu-ledger")).__next__,
+        short_code_factory=lambda: "THUKFC01",
+    )
+    second = await thursday.catch(_identity(message_id="kfc-thursday"))
+    assert second.pig.template_id == KFC_PIG_TEMPLATE_ID
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_blue_red_pair_unlocks_purple_and_grants_five_six_star_pigs(
+    tmp_path: Path,
+) -> None:
+    six_pig = _pig_entry(
+        "pig-phase8-six",
+        rarity=6,
+        group_id="100",
+        paired_food_template_id="food-phase8-six",
+    )
+    database = await _database_with_catalog(
+        tmp_path,
+        [
+            _pig_entry("pig-phase8-one", rarity=1),
+            six_pig,
+            _food_entry(
+                "food-phase8-six",
+                effect_id="",
+                effect_params={},
+                rarity=6,
+                group_id="100",
+            ),
+        ],
+        manifest_version=4,
+    )
+    activator = _identity(
+        user_id="100",
+        message_id="technique-activator",
+        display_name="苍赫发动者",
+    )
+    await FrameworkService(database).touch_identity(activator)
+    now = "2026-08-27T04:00:00.000Z"
+    techniques = TechniqueRepository()
+    async with database.transaction() as session:
+        await techniques.grant_permit(
+            session,
+            player_id=activator.player_id,
+            technique_id=TECHNIQUE_LAPSE_BLUE,
+            uses=1,
+            now=now,
+        )
+        await techniques.grant_permit(
+            session,
+            player_id=activator.player_id,
+            technique_id=TECHNIQUE_REVERSAL_RED,
+            uses=1,
+            now=now,
+        )
+
+    counters = {"id": 0, "code": 0}
+
+    def next_id() -> str:
+        counters["id"] += 1
+        return f"phase8-object-{counters['id']}"
+
+    def next_code() -> str:
+        counters["code"] += 1
+        return f"P8{counters['code']:06d}"
+
+    clock = MutableClock(datetime(2026, 8, 27, 4, 0, tzinfo=UTC))
+    activation = GameplayService(
+        database,
+        CatchingSection(cooldown_seconds=0),
+        clock=clock,
+        random_source=SequenceRandom(*([0.0] * 30)),
+        id_factory=next_id,
+        short_code_factory=next_code,
+    )
+    blue = await activation.activate_group_technique(
+        _identity(
+            user_id="100",
+            message_id="activate-blue",
+            display_name="苍赫发动者",
+        ),
+        technique_id=TECHNIQUE_LAPSE_BLUE,
+    )
+    assert blue.total_uses == 5
+    with pytest.raises(TechniqueError, match="不能发动另一种群体术式"):
+        await activation.activate_group_technique(
+            _identity(
+                user_id="100",
+                message_id="red-blocked-by-blue",
+                display_name="苍赫发动者",
+            ),
+            technique_id=TECHNIQUE_REVERSAL_RED,
+        )
+
+    catches = GameplayService(
+        database,
+        CatchingSection(cooldown_seconds=0),
+        clock=clock,
+        random_source=SequenceRandom(
+            *(value for _ in range(5) for value in _catch_rolls())
+        ),
+        id_factory=next_id,
+        short_code_factory=next_code,
+    )
+    for index in range(5):
+        result = await catches.catch(
+            _identity(
+                user_id=str(201 + index),
+                message_id=f"blue-catch-{index}",
+                display_name=f"抓猪者{index + 1}",
+            )
+        )
+        assert result.pig.owner_player_id == activator.player_id
+        assert f"本群术式剩余 {4 - index} 次" in result.receipt.text_summary
+
+    red = await activation.activate_group_technique(
+        _identity(
+            user_id="100",
+            message_id="activate-red",
+            display_name="苍赫发动者",
+        ),
+        technique_id=TECHNIQUE_REVERSAL_RED,
+    )
+    assert red.purple_unlocked == 1
+    async with database.transaction() as session:
+        assert await techniques.available_permits(
+            session,
+            player_id=activator.player_id,
+            technique_id=TECHNIQUE_HOLLOW_PURPLE,
+        ) == 1
+
+    purple = await activation.activate_hollow_purple(
+        _identity(
+            user_id="100",
+            message_id="activate-purple",
+            display_name="苍赫发动者",
+        )
+    )
+    assert len(purple.granted_pigs) == 5
+    assert all(pig.rarity == 6 for pig in purple.granted_pigs)
+    assert purple.remaining_permits == 0
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_malevolent_kitchen_auto_cooks_and_duplicates_six_star_food(
+    tmp_path: Path,
+) -> None:
+    database = await _database_with_catalog(
+        tmp_path,
+        [
+            _pig_entry(
+                "pig-domain-six",
+                rarity=6,
+                group_id="100",
+                paired_food_template_id="food-domain-six",
+            ),
+            _food_entry(
+                "food-domain-six",
+                effect_id="",
+                effect_params={},
+                display_name="领域六星菜",
+                rarity=6,
+                group_id="100",
+            ),
+        ],
+        manifest_version=4,
+    )
+    activator = _identity(
+        user_id="100",
+        message_id="domain-activator",
+        display_name="领域发动者",
+    )
+    await FrameworkService(database).touch_identity(activator)
+    techniques = TechniqueRepository()
+    async with database.transaction() as session:
+        await techniques.grant_permit(
+            session,
+            player_id=activator.player_id,
+            technique_id=TECHNIQUE_MALEVOLENT_KITCHEN,
+            uses=1,
+            now="2026-08-27T04:00:00.000Z",
+        )
+
+    counters = {"id": 0, "code": 0}
+
+    def next_id() -> str:
+        counters["id"] += 1
+        return f"domain-object-{counters['id']}"
+
+    def next_code() -> str:
+        counters["code"] += 1
+        return f"DM{counters['code']:06d}"
+
+    clock = MutableClock(datetime(2026, 8, 27, 4, 0, tzinfo=UTC))
+    service = GameplayService(
+        database,
+        CatchingSection(cooldown_seconds=0),
+        clock=clock,
+        random_source=SequenceRandom(
+            0.999,
+            0.0,
+            0.5,
+            0.5,
+            0.5,
+            0.5,
+            0.5,
+            0.99,
+            0.0,
+            0.5,
+            0.5,
+        ),
+        id_factory=next_id,
+        short_code_factory=next_code,
+    )
+    activated = await service.activate_group_technique(
+        _identity(
+            user_id="100",
+            message_id="activate-domain",
+            display_name="领域发动者",
+        ),
+        technique_id=TECHNIQUE_MALEVOLENT_KITCHEN,
+    )
+    assert activated.total_uses == 10
+    caught = await service.catch(
+        _identity(
+            user_id="200",
+            message_id="domain-catch",
+            display_name="领域抓猪者",
+        )
+    )
+    assert "六星菜概率固定为 25%" in activated.summary
+    assert "发动者与抓猪者各获得一份" in caught.receipt.text_summary
+    source = await database.fetch_one(
+        "SELECT state FROM pig_instances WHERE pig_instance_id = ?",
+        (caught.pig.pig_instance_id,),
+    )
+    assert source is not None and source["state"] == "consumed-for-cooking"
+    foods = await database.fetch_all(
+        """
+        SELECT owner_player_id, template_id, rarity
+        FROM food_instances
+        WHERE source_pig_instance_id = ?
+        ORDER BY owner_player_id
+        """,
+        (caught.pig.pig_instance_id,),
+    )
+    assert len(foods) == 2
+    assert {str(row["owner_player_id"]) for row in foods} == {
+        activator.player_id,
+        "qq:100:200",
+    }
+    assert all(row["template_id"] == "food-domain-six" for row in foods)
+    assert all(row["rarity"] == 6 for row in foods)
+    effect = await database.fetch_one(
+        """
+        SELECT remaining_uses
+        FROM group_technique_effects
+        WHERE scope_id = 'qq:100' AND status = 'active'
+        """
+    )
+    assert effect is not None and effect["remaining_uses"] == 9
+    await database.close()

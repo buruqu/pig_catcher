@@ -59,6 +59,9 @@ async def test_empty_database_migrates_and_passes_integrity_check(tmp_path: Path
         "anti_abuse_notices",
         "anti_abuse_holds",
         "anti_abuse_events",
+        "player_technique_permits",
+        "group_technique_effects",
+        "player_technique_progress",
     } <= names
     armed_columns = await database.fetch_all("PRAGMA table_info(armed_items)")
     assert "remaining_uses" in {str(row["name"]) for row in armed_columns}
@@ -572,11 +575,15 @@ async def test_v23_migrates_food_effects_and_repairs_intermediate_pig_cookie(
     assert active["小马猪蒙布朗"][2] == 5
     assert active["雾蓝键盘大福"] == (
         "next-high-star-catch",
-        '{"five_star_percent":30,"four_star_percent":60,'
-        '"last_use_six_star_percent":50,"six_star_percent":10,"uses":10}',
-        10,
+        '{"current_window_only":true,"five_star_percent":30.7692,'
+        '"four_star_percent":61.5385,"six_star_percent":7.6923,"uses":5}',
+        5,
     )
-    assert active["彩彩修车猪慕斯"][2] == 10
+    assert active["彩彩修车猪慕斯"] == (
+        "six-star-cook-failure-return",
+        '{"return_chance_percent":75,"uses":3}',
+        3,
+    )
     assert active["猪保千猪排轮盘"] == (
         "even-catch-distribution",
         '{"last_use_six_star_percent":50,"uses":10}',
@@ -588,8 +595,8 @@ async def test_v23_migrates_food_effects_and_repairs_intermediate_pig_cookie(
         1,
     )
     assert active["猪利猪"] == (
-        "next-small-six-star-catch",
-        '{"bonus_percent":1}',
+        "next-five-six-star-catch",
+        '{"five_star_bonus_percent":5,"six_star_bonus_percent":3}',
         1,
     )
     assert active["猪籽军舰"] == (
@@ -628,10 +635,23 @@ async def test_v23_migrates_food_effects_and_repairs_intermediate_pig_cookie(
         3,
     )
     assert active["猪皮奶"] == (
-        "next-five-six-star-catch",
-        '{"five_star_bonus_percent":20,"six_star_bonus_percent":3}',
+        "next-small-six-star-catch",
+        '{"bonus_percent":15}',
         1,
     )
+    roulette = await database.fetch_one(
+        """
+        SELECT state.available_spins, effect.consumed_uses,
+               effect.granted_uses
+        FROM player_roulette_state AS state
+        JOIN player_food_effects AS effect
+          ON effect.source_food_instance_id = state.source_food_instance_id
+        WHERE state.player_id = 'qq:100:200'
+        """
+    )
+    assert roulette is not None
+    assert int(roulette["available_spins"]) == 3
+    assert int(roulette["consumed_uses"]) == int(roulette["granted_uses"])
     group_effect_rows = await database.fetch_all(
         """
         SELECT group_effect_entry_id, params_json, granted_uses_per_player

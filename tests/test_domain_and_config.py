@@ -72,6 +72,11 @@ from pig_catcher.domain.short_codes import (
     SHORT_CODE_ALPHABET,
     new_short_code,
 )
+from pig_catcher.domain.special_content import (
+    TECHNIQUE_LAPSE_BLUE,
+    domain_cooking_weights,
+    is_crazy_thursday,
+)
 
 
 def test_scope_key_is_stable_and_group_scoped() -> None:
@@ -238,14 +243,44 @@ def test_rebalanced_item_catalog_is_unique_and_priced_by_strength() -> None:
         "稳火保底锅盖": 780,
         "升星炉芯": 1080,
         "丰收围裙": 460,
+        "天逆鉾": 1000,
     }
-    assert len(ITEM_DEFINITIONS) == 15
+    assert len(ITEM_DEFINITIONS) == 16
     assert {item.display_name: item.price for item in ITEM_DEFINITIONS} == expected_prices
-    assert len({item.item_id for item in ITEM_DEFINITIONS}) == 15
-    assert len({item.effect_summary for item in ITEM_DEFINITIONS}) == 15
+    assert len({item.item_id for item in ITEM_DEFINITIONS}) == 16
+    assert len({item.effect_summary for item in ITEM_DEFINITIONS}) == 16
     assert all(item.action_type in {"catching", "cooking"} for item in ITEM_DEFINITIONS)
     assert expected_prices["超级幸运猪哨"] < 2000
     assert expected_prices["超级主厨香料"] < 2000
+
+
+def test_phase8_item_food_and_calendar_rules_are_explicit() -> None:
+    spear = next(item for item in ITEM_DEFINITIONS if item.display_name == "天逆鉾")
+    assert spear.item_id == "inverted-spear-of-heaven"
+    assert spear.action_type == "cooking"
+    assert spear.effect_summary == "解除术式"
+
+    technique = resolve_food_effect(
+        "technique-permit",
+        {"technique_id": TECHNIQUE_LAPSE_BLUE},
+    )
+    assert technique.granted_uses == 1
+    assert "/术式顺转 苍" in technique.summary
+    tribute = resolve_food_effect(
+        "group-coin-tribute",
+        {"coin_per_player": 50},
+    )
+    assert tribute.params == {"coin_per_player": 50}
+
+    assert is_crazy_thursday(
+        datetime(2026, 8, 27, 0, 0, tzinfo=UTC),
+        timezone_name="Asia/Shanghai",
+    )
+    assert not is_crazy_thursday(
+        datetime(2026, 8, 26, 0, 0, tzinfo=UTC),
+        timezone_name="Asia/Shanghai",
+    )
+    assert domain_cooking_weights(6) == (0.0, 0.0, 0.0, 0.0, 75.0, 25.0)
 
 
 def test_catch_attribute_items_have_distinct_bounded_profiles() -> None:
@@ -965,13 +1000,13 @@ def test_ordinary_six_star_cook_bonus_stacks_then_caps_at_fifty_percent() -> Non
 
 def test_expanded_catch_food_effects_have_exact_monotonic_results() -> None:
     small_six = _active_effect(
-        "pig-cookie",
+        "pig-skin-milk",
         "next-small-six-star-catch",
-        {"bonus_percent": 1},
+        {"bonus_percent": 15},
         created_at="2026-08-11T00:00:00.000Z",
     )
     small_six_result = apply_catch_effects(BASE_CATCH_WEIGHTS, [small_six])
-    assert small_six_result.weights[3:6] == pytest.approx((8.0, 4.0, 2.0))
+    assert small_six_result.weights[3:6] == pytest.approx((8.0, 4.0, 16.0))
 
     giant = _active_effect(
         "giant-tangyuan",
@@ -1000,14 +1035,72 @@ def test_expanded_catch_food_effects_have_exact_monotonic_results() -> None:
     assert collaboration_result.collaboration_only is True
 
     high_pair = _active_effect(
-        "pig-skin-milk",
+        "pig-cookie",
         "next-five-six-star-catch",
-        {"five_star_bonus_percent": 20, "six_star_bonus_percent": 3},
+        {"five_star_bonus_percent": 5, "six_star_bonus_percent": 3},
         created_at="2026-08-11T00:00:03.000Z",
     )
     high_pair_result = apply_catch_effects(BASE_CATCH_WEIGHTS, [high_pair])
-    assert high_pair_result.weights[3:] == pytest.approx((8, 24, 4))
-    assert sum(high_pair_result.weights[:3]) == pytest.approx(64)
+    assert high_pair_result.weights[3:] == pytest.approx((8, 9, 4))
+    assert sum(high_pair_result.weights[:3]) == pytest.approx(79)
+
+    duplication = _active_effect(
+        "duplication",
+        "catch-duplication-chance",
+        {"chance_percent": 55, "uses": 2},
+        granted_uses=2,
+        created_at="2026-08-11T00:00:04.000Z",
+    )
+    duplicated = apply_catch_effects(BASE_CATCH_WEIGHTS, [duplication])
+    assert duplicated.weights == pytest.approx(BASE_CATCH_WEIGHTS)
+    assert duplicated.duplicate_chance_percent == pytest.approx(55)
+    assert duplicated.duplication_entry_id == "duplication"
+    assert duplicated.consumed_entry_ids == ("duplication",)
+
+    mist = _active_effect(
+        "mist",
+        "next-high-star-catch",
+        {
+            "uses": 5,
+            "four_star_percent": 61.5385,
+            "five_star_percent": 30.7692,
+            "six_star_percent": 7.6923,
+            "current_window_only": True,
+        },
+        granted_uses=5,
+        created_at="2026-08-11T00:00:05.000Z",
+    )
+    mist_result = apply_catch_effects(
+        BASE_CATCH_WEIGHTS,
+        [duplication, mist],
+    )
+    assert mist_result.weights == pytest.approx(
+        (0, 0, 0, 61.5385, 30.7692, 7.6923),
+        abs=0.0001,
+    )
+    assert mist_result.consumed_entry_ids == ("mist",)
+    assert any("独占" in summary for summary in mist_result.skipped_summaries)
+
+    guaranteed = _active_effect(
+        "guaranteed-six",
+        "next-guaranteed-six-star-catch",
+        {},
+        created_at="2026-08-11T00:00:06.000Z",
+    )
+    guaranteed_result = apply_catch_effects(
+        BASE_CATCH_WEIGHTS,
+        [guaranteed],
+    )
+    assert guaranteed_result.weights == pytest.approx((0, 0, 0, 0, 0, 100))
+    assert "next-guaranteed-six-star-catch" not in QUOTA_EXEMPT_CATCH_EFFECTS
+
+    rolling_quota = _active_effect(
+        "rolling-quota",
+        "rolling-day-window-catches",
+        {"count": 4},
+        created_at="2026-08-11T00:00:07.000Z",
+    )
+    assert active_quota_effect_bonuses([rolling_quota]) == (4, 0)
 
 
 def test_expanded_cooking_food_effects_include_five_dumpling_layers() -> None:
@@ -1070,6 +1163,26 @@ def test_expanded_cooking_food_effects_include_five_dumpling_layers() -> None:
         "dumpling-5",
     )
     assert any("猪饺叠加 5 层" in summary for summary in stacked.summaries)
+
+    repair = _active_effect(
+        "repair",
+        "six-star-cook-failure-return",
+        {"uses": 3, "return_chance_percent": 75},
+        granted_uses=3,
+        created_at="2026-08-11T00:00:08.000Z",
+    )
+    protected = apply_cooking_effects(
+        cooking_weights(6),
+        [repair],
+        source_rarity=6,
+    )
+    assert protected.weights == pytest.approx(cooking_weights(6))
+    assert protected.consumed_entry_ids == ()
+    assert "剩余 3/3 次" in protected.summaries[0]
+
+    roulette = resolve_food_effect("roulette-chances", {"count": 3})
+    assert roulette.granted_uses == 1
+    assert "/转轮盘" in roulette.summary
 
 
 def test_numeric_level_and_honor_title_remain_separate_progress_tracks() -> None:
