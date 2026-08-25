@@ -341,6 +341,7 @@ uv run python .\tools\uat_production_recovery.py `
 - [抓猪额度运维手册](docs/08-catch-quota-operations.md)
 - [运营控制面板手册](docs/09-admin-panel-operations.md)
 - [2026-08-20 GitHub 同步记录](docs/14-github-sync-record-2026-08-20.md)
+- [抓猪成就系统完整设计提案（讨论稿，尚未实装）](docs/15-achievement-system-design-proposal.md)
 
 ## 不变原则
 
