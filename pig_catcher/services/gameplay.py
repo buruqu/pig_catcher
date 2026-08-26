@@ -71,8 +71,10 @@ from ..domain.selectors import parse_asset_selector
 from ..domain.short_codes import is_valid_short_code, new_short_code
 from ..domain.social import describe_body_scale
 from ..domain.special_content import (
+    GOJO_BLUE_FOOD_TEMPLATE_ID,
     GOJO_EXCLUSIVE_FOOD_TEMPLATE_IDS,
     GOJO_PIG_TEMPLATE_ID,
+    GOJO_RED_FOOD_TEMPLATE_ID,
     KFC_FOOD_TEMPLATE_ID,
     KFC_PIG_TEMPLATE_ID,
     SOURCE_EXCLUSIVE_FOOD_TEMPLATE_IDS,
@@ -2238,11 +2240,24 @@ class GameplayService:
                 now=now,
             )
             food_summary = "、".join(food.selector for food in generated_foods)
-            action = (
-                f"{TECHNIQUE_DISPLAY_NAMES[technique_id]}由 {source_name} 接管："
-                f"{template['display_name']}#{short_code} 已立即做成 {food_summary}，"
-                "发动者与抓猪者各获得一份"
-            )
+            if str(template["template_id"]) == GOJO_PIG_TEMPLATE_ID:
+                self_caught_in_own_domain = identity.player_id == source_player_id
+                action = (
+                    f"{TECHNIQUE_DISPLAY_NAMES[technique_id]}由 {source_name} 接管："
+                    f"{template['display_name']}#{short_code} 已立即做成两道专属菜："
+                    f"{food_summary}，"
+                    + (
+                        "由发动者本人全部获得"
+                        if self_caught_in_own_domain
+                        else "随机分给两名不同群友，一人一道"
+                    )
+                )
+            else:
+                action = (
+                    f"{TECHNIQUE_DISPLAY_NAMES[technique_id]}由 {source_name} 接管："
+                    f"{template['display_name']}#{short_code} 已立即做成 {food_summary}，"
+                    "发动者与抓猪者各获得一份"
+                )
             target_player_id = ""
             target_name = ""
         else:
@@ -2332,7 +2347,9 @@ class GameplayService:
     ) -> tuple[TechniqueFoodView, ...]:
         """Consume a just-caught pig and create one serving for each beneficiary."""
 
-        if str(template["template_id"]) == GOJO_PIG_TEMPLATE_ID:
+        source_template_id = str(template["template_id"])
+        is_gojo_pig = source_template_id == GOJO_PIG_TEMPLATE_ID
+        if is_gojo_pig:
             weights = normalize_weights((0, 0, 0, 0, 100, 0))
         else:
             weights = domain_cooking_weights(int(rarity))
@@ -2347,25 +2364,62 @@ class GameplayService:
             raise TechniqueError(
                 f"领域缺少 {int(output_rarity)} 星美食模板，本次抓猪未结算。"
             )
-        source_template_id = str(template["template_id"])
         special_roll: float | None = None
         special_template_id = ""
-        if int(output_rarity) == 6:
+        template_roll: float | None = None
+        recipient_rolls: tuple[float, ...] = ()
+        gojo_self_caught_in_own_domain = False
+        if is_gojo_pig:
+            templates_by_id = {
+                str(candidate["template_id"]): candidate
+                for candidate in food_templates
+            }
+            missing_template_ids = [
+                template_id
+                for template_id in GOJO_EXCLUSIVE_FOOD_TEMPLATE_IDS
+                if template_id not in templates_by_id
+            ]
+            if missing_template_ids:
+                raise TechniqueError("领域命中五条猪，但两道专属菜尚未完整启用。")
+            serving_templates = (
+                templates_by_id[GOJO_BLUE_FOOD_TEMPLATE_ID],
+                templates_by_id[GOJO_RED_FOOD_TEMPLATE_ID],
+            )
+            gojo_self_caught_in_own_domain = identity.player_id == source_player_id
+            if gojo_self_caught_in_own_domain:
+                owners = (source_player_id, source_player_id)
+            else:
+                players = sorted(
+                    await self.economy_repository.players_in_scope(
+                        session,
+                        scope_id=identity.scope.value,
+                    ),
+                    key=lambda row: str(row["player_id"]),
+                )
+                if len(players) < 2:
+                    raise TechniqueError(
+                        "领域命中五条猪，但当前群已登记玩家不足两人，"
+                        "无法一人分配一道专属菜。"
+                    )
+                first_roll = self.random_source.random()
+                first_index = min(int(first_roll * len(players)), len(players) - 1)
+                first_owner = players.pop(first_index)
+                second_roll = self.random_source.random()
+                second_index = min(int(second_roll * len(players)), len(players) - 1)
+                second_owner = players[second_index]
+                owners = (
+                    str(first_owner["player_id"]),
+                    str(second_owner["player_id"]),
+                )
+                recipient_rolls = (first_roll, second_roll)
+        elif int(output_rarity) == 6:
             special_template_id = str(
                 template.get("paired_food_template_id") or ""
             )
             if not special_template_id:
                 raise TechniqueError("领域抽到六星菜，但原料猪没有对应定制菜。")
         elif int(output_rarity) == 5:
-            if source_template_id == GOJO_PIG_TEMPLATE_ID:
-                special_roll = self.random_source.random()
-                special_template_id = GOJO_EXCLUSIVE_FOOD_TEMPLATE_IDS[
-                    min(
-                        int(special_roll * len(GOJO_EXCLUSIVE_FOOD_TEMPLATE_IDS)),
-                        len(GOJO_EXCLUSIVE_FOOD_TEMPLATE_IDS) - 1,
-                    )
-                ]
-            elif source_template_id == SUKUNA_PIG_TEMPLATE_ID:
+            if source_template_id == SUKUNA_PIG_TEMPLATE_ID:
                 special_roll = self.random_source.random()
                 if special_roll < 0.20:
                     special_template_id = SUKUNA_FOOD_TEMPLATE_ID
@@ -2373,28 +2427,30 @@ class GameplayService:
                 special_roll = self.random_source.random()
                 if special_roll < 0.50:
                     special_template_id = KFC_FOOD_TEMPLATE_ID
-        if special_template_id:
-            candidates = [
-                candidate
-                for candidate in food_templates
-                if str(candidate["template_id"]) == special_template_id
+        if not is_gojo_pig:
+            if special_template_id:
+                candidates = [
+                    candidate
+                    for candidate in food_templates
+                    if str(candidate["template_id"]) == special_template_id
+                ]
+                if not candidates:
+                    raise TechniqueError("领域命中了专属菜，但该模板尚未启用。")
+            else:
+                candidates = [
+                    candidate
+                    for candidate in food_templates
+                    if str(candidate["template_id"])
+                    not in SOURCE_EXCLUSIVE_FOOD_TEMPLATE_IDS
+                ]
+                if not candidates:
+                    raise TechniqueError("领域缺少可用的普通五星菜模板。")
+            template_roll = self.random_source.random()
+            food_template = candidates[
+                min(int(template_roll * len(candidates)), len(candidates) - 1)
             ]
-            if not candidates:
-                raise TechniqueError("领域命中了专属菜，但该模板尚未启用。")
-        else:
-            candidates = [
-                candidate
-                for candidate in food_templates
-                if str(candidate["template_id"])
-                not in SOURCE_EXCLUSIVE_FOOD_TEMPLATE_IDS
-            ]
-            if not candidates:
-                raise TechniqueError("领域缺少可用的普通五星菜模板。")
-        template_roll = self.random_source.random()
-        food_template = candidates[
-            min(int(template_roll * len(candidates)), len(candidates) - 1)
-        ]
-        owners = (source_player_id, identity.player_id)
+            serving_templates = (food_template, food_template)
+            owners = (source_player_id, identity.player_id)
         food_ids = [self._new_identifier(), self._new_identifier()]
         first_short_code = await self._new_unique_short_code(session)
         short_codes = [
@@ -2408,12 +2464,16 @@ class GameplayService:
         food_attributes = [
             generate_food_attributes(
                 rarity=output_rarity,
-                template_id=str(food_template["template_id"]),
+                template_id=str(serving_template["template_id"]),
                 source_weight=attributes.weight_value,
                 source_weight_percentile=attributes.weight_percentile,
                 portion_roll=portion_roll,
             )
-            for portion_roll in portion_rolls
+            for serving_template, portion_roll in zip(
+                serving_templates,
+                portion_rolls,
+                strict=True,
+            )
         ]
         consumed = await self.economy_repository.consume_pig_for_cooking(
             session,
@@ -2424,8 +2484,21 @@ class GameplayService:
         )
         if not consumed:
             raise RuntimeError("领域自动做菜时原料猪状态发生变化。")
-        for index, (owner, food_id, short_code, food_attribute) in enumerate(
-            zip(owners, food_ids, short_codes, food_attributes, strict=True)
+        for index, (
+            owner,
+            food_template,
+            food_id,
+            short_code,
+            food_attribute,
+        ) in enumerate(
+            zip(
+                owners,
+                serving_templates,
+                food_ids,
+                short_codes,
+                food_attributes,
+                strict=True,
+            )
         ):
             await self.economy_repository.insert_food_instance(
                 session,
@@ -2456,7 +2529,17 @@ class GameplayService:
                             "rarity_roll": rarity_roll,
                             "template_roll": template_roll,
                             "special_roll": special_roll,
-                            "special_template_id": special_template_id,
+                            "special_template_id": (
+                                str(food_template["template_id"])
+                                if is_gojo_pig
+                                else special_template_id
+                            ),
+                            "domain_gojo_dual_recipe": is_gojo_pig,
+                            "domain_gojo_self_caught": (
+                                gojo_self_caught_in_own_domain
+                            ),
+                            "recipient_rolls": list(recipient_rolls),
+                            "recipient_player_ids": list(owners),
                             "serving_index": index,
                             "portion_roll": portion_rolls[index],
                             "recipe_factor": food_attribute.recipe_factor,

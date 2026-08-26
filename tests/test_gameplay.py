@@ -21,6 +21,9 @@ from pig_catcher.domain.errors import (
 )
 from pig_catcher.domain.models import CommandIdentity, ScopeKey
 from pig_catcher.domain.special_content import (
+    GOJO_BLUE_FOOD_TEMPLATE_ID,
+    GOJO_PIG_TEMPLATE_ID,
+    GOJO_RED_FOOD_TEMPLATE_ID,
     KFC_PIG_TEMPLATE_ID,
     TECHNIQUE_HOLLOW_PURPLE,
     TECHNIQUE_LAPSE_BLUE,
@@ -37,6 +40,7 @@ from pig_catcher.rendering import (
     pig_card_view,
     profile_view,
     technique_activation_view,
+    technique_catch_event_view,
 )
 from pig_catcher.services import (
     AssetCatalogService,
@@ -2033,6 +2037,272 @@ async def test_malevolent_kitchen_auto_cooks_and_duplicates_six_star_food(
     }
     assert all(row["template_id"] == "food-domain-six" for row in foods)
     assert all(row["rarity"] == 6 for row in foods)
+    effect = await database.fetch_one(
+        """
+        SELECT remaining_uses
+        FROM group_technique_effects
+        WHERE scope_id = 'qq:100' AND status = 'active'
+        """
+    )
+    assert effect is not None and effect["remaining_uses"] == 9
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_malevolent_kitchen_gojo_creates_both_exclusive_foods_for_two_random_players(
+    tmp_path: Path,
+) -> None:
+    database = await _database_with_catalog(
+        tmp_path,
+        [
+            _pig_entry(
+                GOJO_PIG_TEMPLATE_ID,
+                rarity=5,
+                display_name="五条猪",
+            ),
+            _food_entry(
+                GOJO_BLUE_FOOD_TEMPLATE_ID,
+                effect_id="technique-permit",
+                effect_params={"technique_id": "lapse-blue"},
+                display_name="五条猪无量苍蓝雪山",
+                rarity=5,
+                group_id=None,
+            ),
+            _food_entry(
+                GOJO_RED_FOOD_TEMPLATE_ID,
+                effect_id="technique-permit",
+                effect_params={"technique_id": "reversal-red"},
+                display_name="五条猪无量赫焰雪山",
+                rarity=5,
+                group_id=None,
+            ),
+        ],
+    )
+    identities = (
+        _identity(user_id="100", message_id="gojo-domain-owner", display_name="领域发动者"),
+        _identity(user_id="200", message_id="gojo-domain-catcher", display_name="抓猪者"),
+        _identity(user_id="300", message_id="gojo-domain-blue", display_name="苍蓝获得者"),
+        _identity(user_id="400", message_id="gojo-domain-red", display_name="赫焰获得者"),
+    )
+    framework = FrameworkService(database)
+    for identity in identities:
+        await framework.touch_identity(identity)
+    techniques = TechniqueRepository()
+    async with database.transaction() as session:
+        await techniques.grant_permit(
+            session,
+            player_id=identities[0].player_id,
+            technique_id=TECHNIQUE_MALEVOLENT_KITCHEN,
+            uses=1,
+            now="2026-08-27T04:00:00.000Z",
+        )
+
+    counters = {"id": 0, "code": 0}
+
+    def next_id() -> str:
+        counters["id"] += 1
+        return f"gojo-domain-object-{counters['id']}"
+
+    def next_code() -> str:
+        counters["code"] += 1
+        return f"GJ{counters['code']:06d}"
+
+    service = GameplayService(
+        database,
+        CatchingSection(cooldown_seconds=0),
+        clock=MutableClock(datetime(2026, 8, 27, 4, 0, tzinfo=UTC)),
+        random_source=SequenceRandom(
+            *_catch_rolls(),
+            0.5,
+            0.55,
+            0.99,
+            0.5,
+            0.5,
+        ),
+        id_factory=next_id,
+        short_code_factory=next_code,
+    )
+    await service.activate_group_technique(
+        _identity(
+            user_id="100",
+            message_id="activate-gojo-domain",
+            display_name="领域发动者",
+        ),
+        technique_id=TECHNIQUE_MALEVOLENT_KITCHEN,
+    )
+    catch_identity = _identity(
+        user_id="200",
+        message_id="gojo-domain-catch",
+        display_name="抓猪者",
+    )
+    caught = await service.catch(catch_identity)
+    resolution = caught.technique_resolution
+    assert resolution is not None
+    assert resolution.technique_id == TECHNIQUE_MALEVOLENT_KITCHEN
+    assert resolution.remaining_uses == 9
+    assert [food.display_name for food in resolution.generated_foods] == [
+        "五条猪无量苍蓝雪山",
+        "五条猪无量赫焰雪山",
+    ]
+    assert [food.owner_player_id for food in resolution.generated_foods] == [
+        identities[2].player_id,
+        identities[3].player_id,
+    ]
+    assert len({food.owner_player_id for food in resolution.generated_foods}) == 2
+    assert "随机分给两名不同群友，一人一道" in caught.receipt.text_summary
+
+    view = technique_catch_event_view(
+        caught,
+        catcher_name=catch_identity.display_name,
+        catcher_player_id=catch_identity.player_id,
+        group_name=catch_identity.group_name,
+    )
+    assert view.title == "五条猪化为苍蓝与赫焰"
+    assert view.hero_value == "5 星 · 专属双菜"
+    assert "苍蓝获得者" in view.rows[1].detail
+    assert "赫焰获得者" in view.rows[1].detail
+
+    food_rows = await database.fetch_all(
+        """
+        SELECT owner_player_id, template_id, random_snapshot_json
+        FROM food_instances
+        WHERE source_pig_instance_id = ?
+        ORDER BY template_id
+        """,
+        (caught.pig.pig_instance_id,),
+    )
+    assert {
+        (str(row["template_id"]), str(row["owner_player_id"]))
+        for row in food_rows
+    } == {
+        (GOJO_BLUE_FOOD_TEMPLATE_ID, identities[2].player_id),
+        (GOJO_RED_FOOD_TEMPLATE_ID, identities[3].player_id),
+    }
+    for row in food_rows:
+        snapshot = json.loads(str(row["random_snapshot_json"]))
+        assert snapshot["domain_gojo_dual_recipe"] is True
+        assert snapshot["domain_gojo_self_caught"] is False
+        assert snapshot["special_template_id"] == str(row["template_id"])
+        assert snapshot["recipient_player_ids"] == [
+            identities[2].player_id,
+            identities[3].player_id,
+        ]
+
+    replayed = await service.catch(catch_identity)
+    assert replayed.receipt_created is False
+    assert replayed.technique_resolution == resolution
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_malevolent_kitchen_gojo_self_catch_gives_both_foods_to_activator(
+    tmp_path: Path,
+) -> None:
+    database = await _database_with_catalog(
+        tmp_path,
+        [
+            _pig_entry(
+                GOJO_PIG_TEMPLATE_ID,
+                rarity=5,
+                display_name="五条猪",
+            ),
+            _food_entry(
+                GOJO_BLUE_FOOD_TEMPLATE_ID,
+                effect_id="technique-permit",
+                effect_params={"technique_id": "lapse-blue"},
+                display_name="五条猪无量苍蓝雪山",
+                rarity=5,
+                group_id=None,
+            ),
+            _food_entry(
+                GOJO_RED_FOOD_TEMPLATE_ID,
+                effect_id="technique-permit",
+                effect_params={"technique_id": "reversal-red"},
+                display_name="五条猪无量赫焰雪山",
+                rarity=5,
+                group_id=None,
+            ),
+        ],
+    )
+    identity = _identity(
+        user_id="100",
+        message_id="single-gojo-domain-owner",
+        display_name="唯一玩家",
+    )
+    await FrameworkService(database).touch_identity(identity)
+    techniques = TechniqueRepository()
+    async with database.transaction() as session:
+        await techniques.grant_permit(
+            session,
+            player_id=identity.player_id,
+            technique_id=TECHNIQUE_MALEVOLENT_KITCHEN,
+            uses=1,
+            now="2026-08-27T04:00:00.000Z",
+        )
+    service = GameplayService(
+        database,
+        CatchingSection(cooldown_seconds=0),
+        clock=MutableClock(datetime(2026, 8, 27, 4, 0, tzinfo=UTC)),
+        random_source=SequenceRandom(*_catch_rolls(), 0.5, 0.5, 0.5),
+    )
+    await service.activate_group_technique(
+        _identity(
+            user_id="100",
+            message_id="activate-single-gojo-domain",
+            display_name="唯一玩家",
+        ),
+        technique_id=TECHNIQUE_MALEVOLENT_KITCHEN,
+    )
+    caught = await service.catch(
+        _identity(
+            user_id="100",
+            message_id="single-gojo-domain-catch",
+            display_name="唯一玩家",
+        )
+    )
+    resolution = caught.technique_resolution
+    assert resolution is not None
+    assert [food.owner_player_id for food in resolution.generated_foods] == [
+        identity.player_id,
+        identity.player_id,
+    ]
+    assert [food.display_name for food in resolution.generated_foods] == [
+        "五条猪无量苍蓝雪山",
+        "五条猪无量赫焰雪山",
+    ]
+    assert "由发动者本人全部获得" in caught.receipt.text_summary
+    view = technique_catch_event_view(
+        caught,
+        catcher_name=identity.display_name,
+        catcher_player_id=identity.player_id,
+        group_name=identity.group_name,
+    )
+    assert view.subtitle == "发动者亲自抓获五条猪，两道专属雪山全部归发动者"
+    food_rows = await database.fetch_all(
+        """
+        SELECT owner_player_id, template_id, random_snapshot_json
+        FROM food_instances
+        WHERE source_pig_instance_id = ?
+        ORDER BY template_id
+        """,
+        (caught.pig.pig_instance_id,),
+    )
+    assert len(food_rows) == 2
+    assert {str(row["owner_player_id"]) for row in food_rows} == {
+        identity.player_id
+    }
+    assert {str(row["template_id"]) for row in food_rows} == {
+        GOJO_BLUE_FOOD_TEMPLATE_ID,
+        GOJO_RED_FOOD_TEMPLATE_ID,
+    }
+    for row in food_rows:
+        snapshot = json.loads(str(row["random_snapshot_json"]))
+        assert snapshot["domain_gojo_self_caught"] is True
+        assert snapshot["recipient_rolls"] == []
+        assert snapshot["recipient_player_ids"] == [
+            identity.player_id,
+            identity.player_id,
+        ]
     effect = await database.fetch_one(
         """
         SELECT remaining_uses
