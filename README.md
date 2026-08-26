@@ -26,6 +26,15 @@
 在抓猪结果图和文字摘要中展示发动群友的 QQ 昵称，不再直接展示数字 QQ 号或
 QQ 官方 OpenID；底层稳定身份仍保留用于审计和幂等。
 
+## 抓猪 2.0 隔离开发
+
+抓猪 2.0 的新机制不会在开发过程中直接放入当前运行中的 MaiBot。当前 `1.29.0` 生产线继续在
+`main` 和正式插件目录运行；2.0 只在 `develop/2.0` 与 MaiBot 插件发现目录之外的独立工作树中
+开发，并使用独立数据库克隆、缓存、素材和 UAT 环境。只有全部开发、生产数据克隆迁移、完整
+回归、图片验收、故障恢复及回滚彩排通过，并由用户批准维护时间后，才会通过一次计划内大维护
+切换到 `2.0.0`。完整边界见
+[抓猪 2.0 隔离开发与大版本上线方案](docs/16-v2-development-and-release-plan.md)。
+
 ## 当前状态
 
 - 插件 ID：`local.pig-catcher`
@@ -342,6 +351,7 @@ uv run python .\tools\uat_production_recovery.py `
 - [运营控制面板手册](docs/09-admin-panel-operations.md)
 - [2026-08-20 GitHub 同步记录](docs/14-github-sync-record-2026-08-20.md)
 - [抓猪成就系统完整设计提案（讨论稿，尚未实装）](docs/15-achievement-system-design-proposal.md)
+- [抓猪 2.0 隔离开发与大版本上线方案](docs/16-v2-development-and-release-plan.md)
 
 ## 不变原则
 
