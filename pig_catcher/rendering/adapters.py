@@ -23,6 +23,7 @@ from ..domain.gameplay import level_progress, size_label, weight_label
 from ..domain.rules import catch_weights, cooking_weights
 from ..domain.social import TRADE_STATUS_LABELS
 from ..domain.special_content import (
+    GOJO_PIG_TEMPLATE_ID,
     TECHNIQUE_DISPLAY_NAMES,
     TECHNIQUE_HOLLOW_PURPLE,
     TECHNIQUE_LAPSE_BLUE,
@@ -1313,23 +1314,47 @@ def technique_catch_event_view(
         preview_food = foods[0] if foods else None
         food_name = foods[0].display_name if foods else "未知美食"
         food_rarity = foods[0].rarity if foods else 0
+        is_gojo_dual_recipe = result.pig.template_id == GOJO_PIG_TEMPLATE_ID
+        gojo_self_caught_in_own_domain = (
+            is_gojo_dual_recipe
+            and bool(foods)
+            and all(
+                food.owner_player_id == resolution.source_player_id for food in foods
+            )
+        )
         owner_summary = "、".join(
             f"{food.owner_display_name}：{food.selector}" for food in foods
         )
         return GroupEventViewModel(
             tone="technique",
             eyebrow="伏魔御厨子 · 自动出餐结算",
-            title=f"{result.pig.display_name}已化为{food_name}",
-            subtitle="抓猪、消耗原料、做菜与双份发放已在同一事务完成",
+            title=(
+                "五条猪化为苍蓝与赫焰"
+                if is_gojo_dual_recipe
+                else f"{result.pig.display_name}已化为{food_name}"
+            ),
+            subtitle=(
+                (
+                    "发动者亲自抓获五条猪，两道专属雪山全部归发动者"
+                    if gojo_self_caught_in_own_domain
+                    else "两道专属雪山已随机分给两名不同群友"
+                )
+                if is_gojo_dual_recipe
+                else "抓猪、消耗原料、做菜与双份发放已在同一事务完成"
+            ),
             actor_name=resolution.source_display_name,
             group_name=group_name or "当前群",
             event_time=_display_time(result.receipt.created_at),
             hero_label="本次出餐品质",
-            hero_value=f"{food_rarity} 星 · 双份",
+            hero_value=(
+                f"{food_rarity} 星 · 专属双菜"
+                if is_gojo_dual_recipe
+                else f"{food_rarity} 星 · 双份"
+            ),
             rows=(
                 GroupEventRowViewModel("抓猪群友", catcher, result.pig.selector),
                 GroupEventRowViewModel(
-                    "双份美食",
+                    "专属双菜" if is_gojo_dual_recipe else "双份美食",
                     f"{len(foods)} 份",
                     owner_summary,
                 ),
