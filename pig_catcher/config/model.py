@@ -129,6 +129,14 @@ class FeaturesSection(PluginConfigBase):
             "对应 /猪猪成就、/成就详情、/成就排行及业务后的解锁弹窗",
         ),
     )
+    weekly_competitions_enabled: bool = Field(
+        default=True,
+        description="是否启用 PiG Dream 周冲榜、周结算奖励与榜单图片",
+        json_schema_extra=_ui(
+            "启用周冲榜",
+            "对应 /抓猪线 与 /zzx；玩家数据仍严格按平台和群隔离",
+        ),
+    )
     inventory_enabled: bool = Field(
         default=True,
         description="是否允许查看猪猪背包和详情",

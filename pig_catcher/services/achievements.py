@@ -31,6 +31,7 @@ from ..domain.gameplay import generate_pig_attributes, level_progress
 from ..domain.models import CommandIdentity, CommandReceipt
 from ..domain.ports import Clock, SystemClock
 from ..domain.short_codes import new_short_code, normalize_short_code
+from ..domain.weekly_competitions import WEEKLY_REWARD_NAMES
 from ..infrastructure.database import DatabaseSession, PigCatcherDatabase
 from ..infrastructure.repositories import (
     AchievementRepository,
@@ -110,6 +111,7 @@ _REWARD_NAMES: Mapping[str, str] = {
     "all-giants": "万猪之巅",
     "all-minis": "掌上万猪",
     "badge-showcase-3": "三格徽章展示架",
+    **WEEKLY_REWARD_NAMES,
 }
 
 
@@ -1104,7 +1106,10 @@ class AchievementService:
                     for definition in ACHIEVEMENT_DEFINITIONS
                     if definition.achievement_id == str(profile["showcase_achievement_id"])
                 ),
-                "",
+                _REWARD_NAMES.get(
+                    str(profile["showcase_achievement_id"]),
+                    str(profile["showcase_achievement_id"]),
+                ),
             ),
             next_milestone,
             tuple((str(row["reward_type"]), str(row["reward_id"]), int(row["quantity"])) for row in rewards),

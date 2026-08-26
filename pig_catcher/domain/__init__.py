@@ -66,6 +66,15 @@ from .social import (
     normalize_ranking_type,
     normalize_trade_id,
 )
+from .weekly_competitions import (
+    WEEKLY_COMPETITION_DEFINITIONS,
+    WEEKLY_REWARD_NAMES,
+    WeeklyAggregation,
+    WeeklyCompetitionDefinition,
+    WeeklyReward,
+    WeeklyRewardTier,
+    WeeklySortDirection,
+)
 
 __all__ = [
     "AssetKind",
@@ -104,6 +113,13 @@ __all__ = [
     "TemplateScope",
     "TransferSignal",
     "UPGRADE_DISPLAY_NAMES",
+    "WEEKLY_COMPETITION_DEFINITIONS",
+    "WEEKLY_REWARD_NAMES",
+    "WeeklyAggregation",
+    "WeeklyCompetitionDefinition",
+    "WeeklyReward",
+    "WeeklyRewardTier",
+    "WeeklySortDirection",
     "adjusted_cooking_weights",
     "analyze_transfer_graph",
     "build_store_products",

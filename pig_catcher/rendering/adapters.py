@@ -109,6 +109,9 @@ from .models import (
     StoreViewModel,
     TradeListItemViewModel,
     TradeListViewModel,
+    WeeklyCompetitionAwardViewModel,
+    WeeklyCompetitionRowViewModel,
+    WeeklyCompetitionViewModel,
 )
 
 _BEIJING_TIMEZONE = timezone(timedelta(hours=8), "Asia/Shanghai")
@@ -1829,4 +1832,48 @@ def achievement_ranking_view(result: object) -> AchievementRankingViewModel:
             AchievementRankingRowViewModel(item.rank, item.display_name, item.points, item.unlocked_count)
             for item in result.entries
         ),
+    )
+
+
+def weekly_competition_view(result: object) -> WeeklyCompetitionViewModel:
+    return WeeklyCompetitionViewModel(
+        season_number=result.season_number,
+        name=result.name,
+        status_label=result.status_label,
+        group_name=result.group_name,
+        metric_label=result.metric_label,
+        period_text=result.period_text,
+        countdown_text=result.countdown_text,
+        page=result.page,
+        page_count=result.page_count,
+        total_count=result.total_count,
+        player_position_text=(
+            f"我的名次：第 {result.player_rank} 名 · {result.player_score_text}"
+            if result.player_rank is not None
+            else "我的名次：尚未上榜"
+        ),
+        entries=tuple(
+            WeeklyCompetitionRowViewModel(
+                rank=item.rank,
+                display_name=item.display_name,
+                score_text=item.score_text,
+                catch_count=item.catch_count,
+                highest_single_text=item.highest_single_text,
+                last_update_at=item.last_update_at,
+            )
+            for item in result.entries
+        ),
+    )
+
+
+def weekly_competition_award_view(result: object) -> WeeklyCompetitionAwardViewModel:
+    from ..services.weekly_competitions import weekly_reward_label
+
+    return WeeklyCompetitionAwardViewModel(
+        season_number=result.season_number,
+        competition_name=result.competition_name,
+        display_name=result.display_name,
+        final_rank=result.final_rank,
+        score_text=result.score_text,
+        reward_lines=tuple(weekly_reward_label(item) for item in result.rewards),
     )

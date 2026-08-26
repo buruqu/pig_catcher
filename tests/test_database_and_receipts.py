@@ -74,6 +74,10 @@ async def test_empty_database_migrates_and_passes_integrity_check(tmp_path: Path
         "achievement_milestone_claims",
         "achievement_operations",
         "achievement_ticket_effects",
+        "weekly_competitions",
+        "weekly_competition_entries",
+        "weekly_competition_settlements",
+        "weekly_competition_awards",
     } <= names
     armed_columns = await database.fetch_all("PRAGMA table_info(armed_items)")
     assert "remaining_uses" in {str(row["name"]) for row in armed_columns}
@@ -103,6 +107,43 @@ async def test_empty_database_migrates_and_passes_integrity_check(tmp_path: Path
     assert int(receipt_column_map["catch_quota_cost"]["notnull"]) == 1
     assert str(receipt_column_map["catch_quota_cost"]["dflt_value"]) == "1"
     await database.close()
+
+
+@pytest.mark.asyncio
+async def test_schema_35_database_migrates_to_weekly_competitions(tmp_path: Path) -> None:
+    path = tmp_path / "schema-35.sqlite3"
+    database = PigCatcherDatabase(path)
+    await database.open()
+    await database.close()
+
+    connection = sqlite3.connect(path)
+    connection.execute("PRAGMA foreign_keys = OFF")
+    for table in (
+        "weekly_competition_awards",
+        "weekly_competition_settlements",
+        "weekly_competition_entries",
+        "weekly_competitions",
+    ):
+        connection.execute(f"DROP TABLE {table}")
+    connection.execute("DELETE FROM schema_migrations WHERE version = 36")
+    connection.execute("PRAGMA user_version = 35")
+    connection.commit()
+    connection.close()
+
+    migrated = PigCatcherDatabase(path)
+    await migrated.open()
+    assert await migrated.schema_version() == 36
+    tables = await migrated.fetch_all(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'weekly_competition%'"
+    )
+    assert {str(row["name"]) for row in tables} == {
+        "weekly_competitions",
+        "weekly_competition_entries",
+        "weekly_competition_settlements",
+        "weekly_competition_awards",
+    }
+    assert await migrated.fetch_all("PRAGMA foreign_key_check") == []
+    await migrated.close()
 
 
 @pytest.mark.asyncio

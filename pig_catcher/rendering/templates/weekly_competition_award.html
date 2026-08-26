@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <style>
+    :root{--font-family:{{ font_family }};}{{ theme_css|safe }}
+    .award-stage{padding:42px 52px 36px;text-align:center;background:linear-gradient(180deg,#fff7dc 0,#fff 65%)}
+    .award-medal{width:132px;height:132px;margin:0 auto 18px;display:grid;place-items:center;border:5px solid #fff;border-radius:50%;box-shadow:0 8px 30px rgba(140,91,20,.2);background:{% if view.final_rank == 1 %}#e2b849{% elif view.final_rank == 2 %}#aebbc4{% elif view.final_rank == 3 %}#c88762{% else %}#d85d8b{% endif %};color:white;font-size:58px;font-weight:900}
+    .award-stage h2{margin:0 0 10px;font-size:36px}.award-score{margin:0;color:#a14568;font-size:24px;font-weight:800}
+    .award-rewards{padding:26px 46px 34px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;background:#fff}
+    .award-reward{padding:16px 18px;border:1px solid #efd7e0;border-radius:9px;background:#fffafd;color:#513f47;font-size:17px;font-weight:700}
+    .award-hint{margin:0 46px 32px;padding:15px;border-left:5px solid #d84f83;background:#fff0f5;color:#713d52;font-size:16px}
+  </style>
+</head>
+<body>
+<main class="game-sheet" data-pig-catcher-root data-render-ready="true">
+  <header class="game-header"><div class="game-header__copy"><p class="game-header__eyebrow">PiG Dream! · 第 {{ view.season_number }} 期周冲榜结算</p><h1>{{ view.competition_name }}</h1></div><div class="game-header__meta"><span>奖励已入账</span><strong>TOP {{ view.final_rank }}</strong></div></header>
+  <section class="award-stage"><div class="award-medal">{{ view.final_rank }}</div><h2>{{ view.display_name }}</h2><p class="award-score">最终成绩 {{ view.score_text }}</p></section>
+  <section class="award-rewards">{% for line in view.reward_lines %}<div class="award-reward">{{ line }}</div>{% endfor %}</section>
+  <div class="award-hint">输入 /佩戴成就 {{ view.competition_name }}，即可佩戴本期称号、边框与牌子。</div>
+  <footer class="game-footer"><span>周榜奖励已完成原子结算，不会重复发放</span><strong>PiG Dream!</strong></footer>
+</main>
+</body>
+</html>

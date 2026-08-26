@@ -122,6 +122,16 @@ from .social import (
     format_trade_page_summary,
     format_trade_summary,
 )
+from .weekly_competitions import (
+    WeeklyCompetitionAward,
+    WeeklyCompetitionPage,
+    WeeklyCompetitionRankingEntry,
+    WeeklyCompetitionService,
+    beijing_week_window,
+    format_weekly_award_summary,
+    format_weekly_competition_summary,
+    weekly_reward_label,
+)
 
 __all__ = [
     "AssetCatalogService",
@@ -204,6 +214,10 @@ __all__ = [
     "TradeActionResult",
     "TradePage",
     "TradeView",
+    "WeeklyCompetitionAward",
+    "WeeklyCompetitionPage",
+    "WeeklyCompetitionRankingEntry",
+    "WeeklyCompetitionService",
     "format_catalog_summary",
     "format_batch_sale_summary",
     "format_batch_cooking_summary",
@@ -231,7 +245,11 @@ __all__ = [
     "format_store_summary",
     "format_trade_page_summary",
     "format_trade_summary",
+    "format_weekly_award_summary",
+    "format_weekly_competition_summary",
     "is_group_event_food",
     "format_achievement_unlocks",
     "reward_label",
+    "weekly_reward_label",
+    "beijing_week_window",
 ]

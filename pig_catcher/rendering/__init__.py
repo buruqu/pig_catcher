@@ -45,6 +45,8 @@ from .adapters import (
     technique_catch_event_view,
     trade_list_view,
     trade_receipt_view,
+    weekly_competition_award_view,
+    weekly_competition_view,
 )
 from .animation import AnimatedCardComposer
 from .delivery import RenderDelivery
@@ -96,6 +98,9 @@ from .models import (
     StoreViewModel,
     TradeListItemViewModel,
     TradeListViewModel,
+    WeeklyCompetitionAwardViewModel,
+    WeeklyCompetitionRowViewModel,
+    WeeklyCompetitionViewModel,
 )
 from .renderer import PigCatcherRenderer
 
@@ -108,6 +113,9 @@ __all__ = [
     "AchievementRowViewModel",
     "AchievementUnlockViewModel",
     "AchievementBackfillSummaryViewModel",
+    "WeeklyCompetitionAwardViewModel",
+    "WeeklyCompetitionRowViewModel",
+    "WeeklyCompetitionViewModel",
     "AssetPreviewViewModel",
     "BatchCookingItemViewModel",
     "BatchCookingViewModel",
@@ -157,6 +165,8 @@ __all__ = [
     "achievement_ranking_view",
     "achievement_row_view",
     "achievement_unlock_view",
+    "weekly_competition_award_view",
+    "weekly_competition_view",
     "catalog_media_paths",
     "batch_sale_receipt_view",
     "catalog_view",

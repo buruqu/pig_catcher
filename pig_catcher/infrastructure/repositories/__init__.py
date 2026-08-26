@@ -13,6 +13,7 @@ from .regulation import RegulationRepository
 from .restrictions import RestrictionRepository
 from .social import SocialRepository
 from .techniques import TechniqueRepository
+from .weekly_competitions import WeeklyCompetitionRepository
 
 __all__ = [
     "AssetRepository",
@@ -28,4 +29,5 @@ __all__ = [
     "RestrictionRepository",
     "SocialRepository",
     "TechniqueRepository",
+    "WeeklyCompetitionRepository",
 ]

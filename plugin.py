@@ -114,6 +114,8 @@ from .pig_catcher.rendering import (
     technique_catch_event_view,
     trade_list_view,
     trade_receipt_view,
+    weekly_competition_award_view,
+    weekly_competition_view,
 )
 from .pig_catcher.services import (
     AchievementService,
@@ -136,6 +138,7 @@ from .pig_catcher.services import (
     RegulationService,
     RestrictionAdminService,
     SocialService,
+    WeeklyCompetitionService,
     format_achievement_unlocks,
     format_batch_cooking_summary,
     format_batch_sale_summary,
@@ -162,6 +165,8 @@ from .pig_catcher.services import (
     format_store_summary,
     format_trade_page_summary,
     format_trade_summary,
+    format_weekly_award_summary,
+    format_weekly_competition_summary,
     is_group_event_food,
     reward_label,
 )
@@ -201,6 +206,7 @@ class PigCatcherPlugin(MaiBotPlugin):
         self._restriction_admin_service: RestrictionAdminService | None = None
         self._announcement_admin_service: AnnouncementAdminService | None = None
         self._achievement_service: AchievementService | None = None
+        self._weekly_competition_service: WeeklyCompetitionService | None = None
         self._renderer: PigCatcherRenderer | None = None
         self._animation_composer: AnimatedCardComposer | None = None
         self._delivery: RenderDelivery | None = None
@@ -418,6 +424,10 @@ class PigCatcherPlugin(MaiBotPlugin):
             achievement_service = AchievementService(database)
             await achievement_service.initialize()
             self._achievement_service = achievement_service
+            if settings.features.weekly_competitions_enabled:
+                weekly_competition_service = WeeklyCompetitionService(database)
+                await weekly_competition_service.initialize()
+                self._weekly_competition_service = weekly_competition_service
             self._renderer = renderer
             self._animation_composer = animation_composer
             self._delivery = RenderDelivery(
@@ -459,6 +469,7 @@ class PigCatcherPlugin(MaiBotPlugin):
         self._restriction_admin_service = None
         self._announcement_admin_service = None
         self._achievement_service = None
+        self._weekly_competition_service = None
         self._receipt_service = None
         self._regulation_service = None
         self._economy_service = None
@@ -957,12 +968,17 @@ class PigCatcherPlugin(MaiBotPlugin):
         if receipts is None:
             return False, "抓猪回执服务尚未就绪。", 1
         await self._process_achievement_receipt(receipt)
+        await self._process_weekly_competition_receipt(receipt)
         if not await receipts.claim_send(receipt.receipt_id):
             await self._deliver_achievement_notifications(
                 stream_id=stream_id,
                 receipt=receipt,
             )
             await self._deliver_achievement_backfill_summary(
+                stream_id=stream_id,
+                player_id=receipt.player_id,
+            )
+            await self._deliver_weekly_competition_award(
                 stream_id=stream_id,
                 player_id=receipt.player_id,
             )
@@ -995,6 +1011,10 @@ class PigCatcherPlugin(MaiBotPlugin):
                 stream_id=stream_id,
                 player_id=receipt.player_id,
             )
+            await self._deliver_weekly_competition_award(
+                stream_id=stream_id,
+                player_id=receipt.player_id,
+            )
             return True, fallback_text, 2
         await receipts.mark_failed(
             receipt.receipt_id,
@@ -1014,12 +1034,17 @@ class PigCatcherPlugin(MaiBotPlugin):
         if receipts is None:
             return False, "抓猪回执服务尚未就绪。", 1
         await self._process_achievement_receipt(receipt)
+        await self._process_weekly_competition_receipt(receipt)
         if not await receipts.claim_send(receipt.receipt_id):
             await self._deliver_achievement_notifications(
                 stream_id=stream_id,
                 receipt=receipt,
             )
             await self._deliver_achievement_backfill_summary(
+                stream_id=stream_id,
+                player_id=receipt.player_id,
+            )
+            await self._deliver_weekly_competition_award(
                 stream_id=stream_id,
                 player_id=receipt.player_id,
             )
@@ -1044,6 +1069,10 @@ class PigCatcherPlugin(MaiBotPlugin):
                 stream_id=stream_id,
                 player_id=receipt.player_id,
             )
+            await self._deliver_weekly_competition_award(
+                stream_id=stream_id,
+                player_id=receipt.player_id,
+            )
             return True, receipt.text_summary, 2
         await receipts.mark_failed(receipt.receipt_id, "纯文字发送未成功")
         return False, receipt.text_summary, 1
@@ -1061,6 +1090,22 @@ class PigCatcherPlugin(MaiBotPlugin):
             # the unchanged receipt remains a durable retry source.
             self.ctx.logger.exception(
                 "成就事件处理失败，等待同一业务回执重试：receipt=%s",
+                receipt.receipt_id,
+            )
+
+    async def _process_weekly_competition_receipt(self, receipt: CommandReceipt) -> None:
+        """Consume one committed receipt as an idempotent weekly score entry."""
+
+        service = self._weekly_competition_service
+        if service is None or not receipt.player_id or not self.settings.features.weekly_competitions_enabled:
+            return
+        try:
+            await service.process_receipt(receipt)
+        except Exception:
+            # The business receipt is already committed and remains a durable
+            # source for the next backfill/query, so scoring cannot break play.
+            self.ctx.logger.exception(
+                "周冲榜计分失败，等待回执补录：receipt=%s",
                 receipt.receipt_id,
             )
 
@@ -1146,6 +1191,42 @@ class PigCatcherPlugin(MaiBotPlugin):
             return
         await service.mark_notifications(
             unlock_ids,
+            sent=bool(sent),
+            error="" if sent else "图片和文字均未发送成功",
+        )
+
+    async def _deliver_weekly_competition_award(
+        self,
+        *,
+        stream_id: str,
+        player_id: str | None,
+    ) -> None:
+        service = self._weekly_competition_service
+        if service is None or not player_id or not self.settings.features.weekly_competitions_enabled:
+            return
+        award = await service.claim_pending_award(player_id=player_id)
+        if award is None:
+            return
+        fallback = format_weekly_award_summary(award)
+        renderer = cast(PigCatcherRenderer, self._renderer)
+        try:
+            if self._delivery is None:
+                sent = await self._send_text_capability(fallback, stream_id)
+            else:
+                sent = await self._delivery.send_image_or_text(
+                    stream_id=stream_id,
+                    render=lambda: renderer.render_weekly_competition_award(
+                        weekly_competition_award_view(award)
+                    ),
+                    fallback_text=fallback,
+                    rendering_enabled=self.settings.rendering.enabled,
+                )
+        except Exception as exc:
+            await service.mark_award_notification(award.award_id, sent=False, error=str(exc))
+            self.ctx.logger.exception("周冲榜结算卡投递失败")
+            return
+        await service.mark_award_notification(
+            award.award_id,
             sent=bool(sent),
             error="" if sent else "图片和文字均未发送成功",
         )
@@ -3793,7 +3874,13 @@ class PigCatcherPlugin(MaiBotPlugin):
     )
     async def handle_achievement_equip(self, stream_id: str = "", **kwargs: Any) -> tuple[bool, str, int]:
         identity, rejected = await self._prepare_command(
-            stream_id, kwargs, feature_enabled=self.settings.features.achievements_enabled, feature_label="佩戴成就"
+            stream_id,
+            kwargs,
+            feature_enabled=(
+                self.settings.features.achievements_enabled
+                or self.settings.features.weekly_competitions_enabled
+            ),
+            feature_label="佩戴成就",
         )
         if rejected is not None or identity is None:
             return rejected or (False, "", 0)
@@ -3801,6 +3888,17 @@ class PigCatcherPlugin(MaiBotPlugin):
             name = matched_group(kwargs, "arguments").strip()
             if not name:
                 raise CommandContextError("请填写带有称号奖励的已解锁成就名。")
+            weekly_service = self._weekly_competition_service
+            if weekly_service is not None and self.settings.features.weekly_competitions_enabled:
+                weekly_cosmetics = await weekly_service.equip_competition_cosmetics(identity, name)
+                if weekly_cosmetics is not None:
+                    return await self._reply_text(
+                        identity.stream_id,
+                        "已佩戴周冲榜外观：" + "、".join(weekly_cosmetics),
+                        success=True,
+                    )
+            if not self.settings.features.achievements_enabled:
+                raise CommandContextError("成就系统当前未启用，且没有找到可佩戴的周冲榜奖励。")
             cosmetics = await cast(AchievementService, self._achievement_service).equip_cosmetics_by_achievement(
                 identity, name
             )
@@ -3988,6 +4086,49 @@ class PigCatcherPlugin(MaiBotPlugin):
             )
         except Exception as exc:
             return await self._command_error(stream_id=identity.stream_id, operation="成就排行", error=exc)
+
+    @Command(
+        "pig_catcher_weekly_competition",
+        description="查看本期 PiG Dream 周冲榜",
+        pattern=r"^/(?:抓猪线|zzx)(?:\s+(?P<arguments>\d+))?\s*$",
+    )
+    async def handle_weekly_competition(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_command(
+            stream_id,
+            kwargs,
+            feature_enabled=self.settings.features.weekly_competitions_enabled,
+            feature_label="周冲榜",
+        )
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            service = self._weekly_competition_service
+            if service is None:
+                raise RuntimeError("周冲榜服务尚未就绪。")
+            page_text = matched_group(kwargs, "arguments")
+            result = await service.leaderboard(identity, page=int(page_text or 1))
+            renderer = cast(PigCatcherRenderer, self._renderer)
+            delivered = await self._deliver_query(
+                stream_id=identity.stream_id,
+                render=lambda: renderer.render_weekly_competition(weekly_competition_view(result)),
+                fallback_text=format_weekly_competition_summary(result),
+            )
+            if delivered[0]:
+                await self._deliver_weekly_competition_award(
+                    stream_id=identity.stream_id,
+                    player_id=identity.player_id,
+                )
+            return delivered
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation="周冲榜",
+                error=exc,
+            )
 
     @Command(
         "pig_catcher_ranking",

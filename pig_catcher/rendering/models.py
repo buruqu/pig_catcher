@@ -762,3 +762,39 @@ class AchievementRankingViewModel:
     page_count: int
     total_count: int
     entries: tuple[AchievementRankingRowViewModel, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class WeeklyCompetitionRowViewModel:
+    rank: int
+    display_name: str
+    score_text: str
+    catch_count: int
+    highest_single_text: str
+    last_update_at: str
+
+
+@dataclass(frozen=True, slots=True)
+class WeeklyCompetitionViewModel:
+    season_number: int
+    name: str
+    status_label: str
+    group_name: str
+    metric_label: str
+    period_text: str
+    countdown_text: str
+    page: int
+    page_count: int
+    total_count: int
+    player_position_text: str
+    entries: tuple[WeeklyCompetitionRowViewModel, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class WeeklyCompetitionAwardViewModel:
+    season_number: int
+    competition_name: str
+    display_name: str
+    final_rank: int
+    score_text: str
+    reward_lines: tuple[str, ...]

@@ -221,6 +221,10 @@ class PigCatcherDatabase:
             "achievement_milestone_claims",
             "achievement_operations",
             "achievement_ticket_effects",
+            "weekly_competitions",
+            "weekly_competition_entries",
+            "weekly_competition_settlements",
+            "weekly_competition_awards",
         }
         table_rows = await (
             await connection.execute(

@@ -48,6 +48,8 @@ from .models import (
     RenderOptions,
     StoreViewModel,
     TradeListViewModel,
+    WeeklyCompetitionAwardViewModel,
+    WeeklyCompetitionViewModel,
 )
 
 _ASSET_PREVIEW_SLOT = MediaSlot(x=38, y=154, width=500, height=500)
@@ -461,6 +463,12 @@ class PigCatcherRenderer:
 
     async def render_achievement_ranking(self, view: AchievementRankingViewModel) -> RenderedImage:
         return await self._render_template("achievement_ranking.html", view=view)
+
+    async def render_weekly_competition(self, view: WeeklyCompetitionViewModel) -> RenderedImage:
+        return await self._render_template("weekly_competition.html", view=view)
+
+    async def render_weekly_competition_award(self, view: WeeklyCompetitionAwardViewModel) -> RenderedImage:
+        return await self._render_template("weekly_competition_award.html", view=view)
 
     async def _render_template(
         self,

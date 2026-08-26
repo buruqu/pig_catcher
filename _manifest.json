@@ -1,9 +1,9 @@
 {
   "manifest_version": 2,
   "id": "local.pig-catcher",
-  "version": "2.0.0.dev1",
+  "version": "2.0.0.dev2",
   "name": "抓猪插件",
-  "description": "抓猪 2.0 隔离开发版：在完整收集、料理、经济与社交玩法上增加可扩展的 PiG Dream 成就系统。",
+  "description": "抓猪 2.0 隔离开发版：增加可扩展的 PiG Dream 成就系统、周冲榜与第一期抓猪冲刺。",
   "author": {
     "name": "buruqu",
     "url": "https://github.com/buruqu"

@@ -145,6 +145,7 @@ async def create_test_plugin(
     # Legacy command-flow tests assert exact image counts.  Achievement tests
     # opt in explicitly so unlock popups are verified independently.
     config["features"]["achievements_enabled"] = False
+    config["features"]["weekly_competitions_enabled"] = False
     for section, updates in (config_updates or {}).items():
         config[section].update(updates)
     plugin.set_plugin_config(config)

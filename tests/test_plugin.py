@@ -236,9 +236,9 @@ async def test_group_reset_command_rejects_unconfigured_user_before_backup(
 def test_plugin_registers_only_explicit_production_commands() -> None:
     plugin = create_plugin()
     components = plugin.get_components()
-    assert len(components) == 65
+    assert len(components) == 66
     commands = {component["name"] for component in components if component["type"] == "COMMAND"}
-    assert len(commands) == 64
+    assert len(commands) == 65
     assert commands == {
         "pig_catcher_help",
         "pig_catcher_reset_quota",
@@ -304,6 +304,7 @@ def test_plugin_registers_only_explicit_production_commands() -> None:
         "pig_catcher_achievement_ticket",
         "pig_catcher_achievement_reforge",
         "pig_catcher_achievement_ranking",
+        "pig_catcher_weekly_competition",
     }
     home_card = next(component for component in components if component["type"] == "HOME_CARD")
     assert home_card["name"] == "pig_catcher_quota_control"
