@@ -136,23 +136,17 @@ class PigCatcherDatabase:
             async with self._operation_lock:
                 async with self._backup_lock:
                     async with self._read_condition:
-                        await self._read_condition.wait_for(
-                            lambda: self._active_reads == 0
-                        )
+                        await self._read_condition.wait_for(lambda: self._active_reads == 0)
 
     async def _migrate(self, connection: aiosqlite.Connection) -> None:
         version_row = await (await connection.execute("PRAGMA user_version")).fetchone()
         current_version = int(version_row[0]) if version_row is not None else 0
         if current_version > SCHEMA_VERSION:
-            raise MigrationError(
-                f"数据库版本 {current_version} 高于当前插件支持的 {SCHEMA_VERSION}，拒绝降级打开。"
-            )
+            raise MigrationError(f"数据库版本 {current_version} 高于当前插件支持的 {SCHEMA_VERSION}，拒绝降级打开。")
         if current_version == SCHEMA_VERSION:
             try:
                 migration_row = await (
-                    await connection.execute(
-                        "SELECT COALESCE(MAX(version), 0) FROM schema_migrations"
-                    )
+                    await connection.execute("SELECT COALESCE(MAX(version), 0) FROM schema_migrations")
                 ).fetchone()
             except sqlite3.Error:
                 migration_row = None
@@ -197,14 +191,10 @@ class PigCatcherDatabase:
             if user_version != SCHEMA_VERSION:
                 raise MigrationError(f"迁移结束版本 {user_version} 与代码版本 {SCHEMA_VERSION} 不一致。")
             await self._validate_current_schema(connection)
-            foreign_key_rows = await (
-                await connection.execute("PRAGMA foreign_key_check")
-            ).fetchall()
+            foreign_key_rows = await (await connection.execute("PRAGMA foreign_key_check")).fetchall()
             if foreign_key_rows:
                 first = tuple(foreign_key_rows[0])
-                raise MigrationError(
-                    f"迁移后外键检查失败，共 {len(foreign_key_rows)} 条，首条={first}。"
-                )
+                raise MigrationError(f"迁移后外键检查失败，共 {len(foreign_key_rows)} 条，首条={first}。")
             await connection.commit()
         except BaseException:
             await connection.rollback()
@@ -214,39 +204,48 @@ class PigCatcherDatabase:
 
     @staticmethod
     async def _validate_current_schema(connection: aiosqlite.Connection) -> None:
-        """Reject a stamped database whose critical v34 structures did not converge."""
+        """Reject a stamped database whose critical current structures did not converge."""
 
-        required_tables = {"player_food_effects", "player_roulette_state"}
+        required_tables = {
+            "player_food_effects",
+            "player_roulette_state",
+            "achievement_definition_snapshots",
+            "achievement_profiles",
+            "achievement_progress",
+            "achievement_events",
+            "achievement_unlocks",
+            "achievement_reward_inventory",
+            "achievement_metric_counters",
+            "achievement_scope_targets",
+            "achievement_backfill_state",
+            "achievement_milestone_claims",
+            "achievement_operations",
+            "achievement_ticket_effects",
+        }
         table_rows = await (
             await connection.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name IN (?, ?)",
+                "SELECT name FROM sqlite_master WHERE type='table' AND name IN ("
+                + ",".join("?" for _ in required_tables)
+                + ")",
                 tuple(sorted(required_tables)),
             )
         ).fetchall()
         present_tables = {str(row[0]) for row in table_rows}
         missing_tables = required_tables - present_tables
         if missing_tables:
-            raise MigrationError(
-                "数据库版本已是当前版，但缺少关键表："
-                + "、".join(sorted(missing_tables))
-            )
+            raise MigrationError("数据库版本已是当前版，但缺少关键表：" + "、".join(sorted(missing_tables)))
 
-        index_rows = await (
-            await connection.execute("PRAGMA index_list(player_food_effects)")
-        ).fetchall()
+        index_rows = await (await connection.execute("PRAGMA index_list(player_food_effects)")).fetchall()
         source_index_found = False
         for row in index_rows:
             index_name = str(row[1])
             is_unique = bool(row[2])
             escaped_name = index_name.replace('"', '""')
-            column_rows = await (
-                await connection.execute(f'PRAGMA index_info("{escaped_name}")')
-            ).fetchall()
+            column_rows = await (await connection.execute(f'PRAGMA index_info("{escaped_name}")')).fetchall()
             columns = tuple(str(column[2]) for column in column_rows)
             if "source_food_instance_id" in columns and is_unique:
                 raise MigrationError(
-                    "player_food_effects.source_food_instance_id 仍带 UNIQUE 约束，"
-                    "会导致轮盘多奖励结算失败。"
+                    "player_food_effects.source_food_instance_id 仍带 UNIQUE 约束，会导致轮盘多奖励结算失败。"
                 )
             if columns and columns[0] == "source_food_instance_id" and not is_unique:
                 source_index_found = True

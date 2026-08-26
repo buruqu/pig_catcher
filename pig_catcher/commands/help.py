@@ -60,6 +60,17 @@ _TOPICS: dict[str, tuple[str, ...]] = {
         "/设置展示 <猪猪|美食> <名称[#短编号]>",
         "/设置展示 <猪猪|美食> 取消",
     ),
+    "成就": (
+        "/猪猪成就 [分类] [页码]",
+        "/成就详情 <完整成就名>",
+        "/成就排行 [页码]",
+        "/佩戴成就 <完整成就名>",
+        "/取消佩戴成就",
+        "/使用成就券 <券名>",
+        "/打开成就宝箱 <抓猪|做菜|图鉴|外观>",
+        "/重铸编号 <猪猪|美食> <原编号> <新编号>",
+        "/领取成就纪念猪 <未收集的公共五星猪名>",
+    ),
 }
 
 _TOPIC_ALIASES = {
@@ -87,6 +98,7 @@ def _usage_block() -> str:
             "吃菜只填菜名时自动吃最低价值同名菜；最后一份需在 30 秒内用 /是 确认。",
             "同名道具可一次安排多次，兼容动作成功后逐次消耗并显示剩余次数。",
             "赠送与交易必须明确 @ 一位当前群成员。",
+            "成就奖励不可交易；隐藏成就未解锁前不会公开准确条件。",
         )
     )
 
@@ -98,23 +110,14 @@ def format_help(topic: str = "") -> str:
     normalized = _TOPIC_ALIASES.get(normalized, normalized)
     if normalized and normalized not in {"全部", *list(_TOPICS)}:
         topics = "、".join(_TOPICS)
-        return (
-            "【抓猪插件·指令帮助】\n\n"
-            f"未知帮助主题：{normalized}\n"
-            f"可用主题：{topics}\n"
-            "示例：/抓猪帮助 做菜"
-        )
+        return f"【抓猪插件·指令帮助】\n\n未知帮助主题：{normalized}\n可用主题：{topics}\n示例：/抓猪帮助 做菜"
     if normalized and normalized != "全部":
-        return (
-            "【抓猪插件·指令帮助】\n\n"
-            f"{_topic_block(normalized)}\n\n"
-            f"{_usage_block()}"
-        )
+        return f"【抓猪插件·指令帮助】\n\n{_topic_block(normalized)}\n\n{_usage_block()}"
 
     lines = [
         "【抓猪插件·指令帮助】",
         "",
-        "/抓猪帮助 [抓猪|背包|道具|做菜|商城|交易|排行]",
+        "/抓猪帮助 [抓猪|背包|道具|做菜|商城|交易|排行|成就]",
         "",
     ]
     for index, topic_name in enumerate(_TOPICS):

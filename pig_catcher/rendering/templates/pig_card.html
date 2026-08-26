@@ -6,10 +6,12 @@
   <style>
     :root { --font-family: {{ font_family }}; }
     {{ theme_css | safe }}
+    .achievement-firework{position:absolute;z-index:8;inset:112px 18px auto;display:flex;justify-content:space-between;pointer-events:none;color:#d83f7a;font-size:42px;text-shadow:0 3px 12px #fff}.achievement-firework span:nth-child(2){color:#d09a22;transform:translateY(24px)}
   </style>
 </head>
 <body>
-  <main class="game-sheet pig-card rarity-{{ view.rarity }}{% if view.description|length > 160 %} pig-card--long{% endif %}{% if view.probability_line %} pig-card--probability{% endif %}" data-pig-catcher-root data-render-ready="true">
+  <main class="game-sheet pig-card rarity-{{ view.rarity }}{% if view.description|length > 160 %} pig-card--long{% endif %}{% if view.probability_line %} pig-card--probability{% endif %}"{% if view.achievement_frame %} style="outline:6px solid {% if 'purple' in view.achievement_frame %}#76539c{% elif 'gold' in view.achievement_frame %}#d3a52c{% else %}#dc8aaa{% endif %};outline-offset:-6px"{% endif %} data-pig-catcher-root data-render-ready="true">
+    {% if view.achievement_firework %}<div class="achievement-firework"><span>✦ ✧ ✦</span><span>PiG Dream!</span><span>✦ ✧ ✦</span></div>{% endif %}
     <header class="game-header pig-card__header">
       <div class="game-header__copy">
         <p class="game-header__eyebrow">{{ view.mode_label }} · {{ view.owner_display_name }}</p>
@@ -42,6 +44,7 @@
         {% if view.global_size_record %}<span class="pill pill--blue">全群体型最高</span>{% endif %}
         {% if view.global_weight_record %}<span class="pill pill--gold">全群重量最高</span>{% endif %}
         {% if view.giant_sighting %}<span class="pill pill--pink">巨物目击留档</span>{% endif %}
+        {% if view.achievement_title %}<span class="pill pill--gold">成就称号 · {{ view.achievement_title }}</span>{% endif %}
       </div>
       <div class="pig-card__facts">
         <div class="pig-card__fact">

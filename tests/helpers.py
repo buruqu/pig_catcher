@@ -142,6 +142,9 @@ async def create_test_plugin(
     plugin._set_context(context)
     config = plugin.get_default_config()
     config["maintenance"]["enabled"] = False
+    # Legacy command-flow tests assert exact image counts.  Achievement tests
+    # opt in explicitly so unlock popups are verified independently.
+    config["features"]["achievements_enabled"] = False
     for section, updates in (config_updates or {}).items():
         config[section].update(updates)
     plugin.set_plugin_config(config)

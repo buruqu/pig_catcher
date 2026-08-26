@@ -91,6 +91,7 @@ from ..domain.special_content import (
 )
 from ..infrastructure.database import DatabaseSession, PigCatcherDatabase
 from ..infrastructure.repositories import (
+    AchievementRepository,
     AssetRepository,
     EconomyRepository,
     FrameworkRepository,
@@ -123,9 +124,7 @@ _FAT_LABELS = {
     "balanced": "均衡",
     "fatty": "偏肥",
 }
-_CATCH_PROBABILITY_ITEM_IDS = frozenset(
-    {"lucky-whistle", "super-lucky-whistle", "star-pig-radar"}
-)
+_CATCH_PROBABILITY_ITEM_IDS = frozenset({"lucky-whistle", "super-lucky-whistle", "star-pig-radar"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -649,9 +648,7 @@ def format_catch_summary(result: CatchResult) -> str:
         else ""
     )
     probability_line = " ".join(
-        f"{index + 1}★{_format_probability(value)}%"
-        for index, value in enumerate(result.weights)
-        if value > 0
+        f"{index + 1}★{_format_probability(value)}%" for index, value in enumerate(result.weights) if value > 0
     )
     probability_source_parts = [
         f"等级 Lv.{progress.level}",
@@ -703,23 +700,17 @@ def format_profile_summary(profile: PlayerProfile) -> str:
         else "无"
     )
     cooking_armed = (
-        f"{profile.armed_cooking_item.display_name}"
-        f"（剩余 {profile.armed_cooking_item_quantity} 次）"
+        f"{profile.armed_cooking_item.display_name}（剩余 {profile.armed_cooking_item_quantity} 次）"
         if profile.armed_cooking_item is not None
         else "无"
     )
     veteran_next = (
         "已达最高档"
         if profile.veteran_next_tier_level is None
-        else (
-            f"下一档 Lv.{profile.veteran_next_tier_level}"
-            f" 奖励 {profile.veteran_next_tier_coin_reward:,} 猪币"
-        )
+        else (f"下一档 Lv.{profile.veteran_next_tier_level} 奖励 {profile.veteran_next_tier_coin_reward:,} 猪币")
     )
     veteran_claim = (
-        "全部已领取"
-        if profile.veteran_claimed_tier >= profile.veteran_tier
-        else "有已达成奖励待在下次获得经验时补领"
+        "全部已领取" if profile.veteran_claimed_tier >= profile.veteran_tier else "有已达成奖励待在下次获得经验时补领"
     )
     return (
         "【抓猪档案】\n"
@@ -769,8 +760,7 @@ def format_pig_detail_summary(pig: PigView) -> str:
         else ""
     )
     collection = (
-        f"联动：{pig.collection_name}"
-        f"{' · ' + pig.character_name if pig.character_name else ''}\n"
+        f"联动：{pig.collection_name}{' · ' + pig.character_name if pig.character_name else ''}\n"
         if pig.collection_name
         else "联动：非联动猪\n"
     )
@@ -938,6 +928,7 @@ class GameplayService:
         restriction_repository: RestrictionRepository | None = None,
         quota_repository: QuotaRepository | None = None,
         technique_repository: TechniqueRepository | None = None,
+        achievement_repository: AchievementRepository | None = None,
         random_source: RandomSource | None = None,
         clock: Clock | None = None,
         id_factory: Callable[[], str] | None = None,
@@ -955,6 +946,7 @@ class GameplayService:
         self.restriction_repository = restriction_repository or RestrictionRepository()
         self.quota_repository = quota_repository or QuotaRepository()
         self.technique_repository = technique_repository or TechniqueRepository()
+        self.achievement_repository = achievement_repository or AchievementRepository()
         self.random_source = random_source or SystemRandomSource()
         self.clock = clock or SystemClock()
         self.id_factory = id_factory or (lambda: uuid4().hex)
@@ -1013,28 +1005,32 @@ class GameplayService:
                     now=now,
                 )
             )
-            current_window_bonus, today_window_bonus = active_quota_effect_bonuses(
-                active_effects
+            current_window_bonus, today_window_bonus = active_quota_effect_bonuses(active_effects)
+            extra_granted, extra_consumed = await self.economy_repository.extra_catch_grants(
+                session,
+                player_id=identity.player_id,
+                now=now,
             )
-            extra_granted, extra_consumed = (
-                await self.economy_repository.extra_catch_grants(
-                    session,
-                    player_id=identity.player_id,
-                    now=now,
-                )
-            )
-            permanent_bonus, weekly_bonus = (
-                await self.economy_repository.catch_quota_bonuses(
-                    session,
-                    player_id=identity.player_id,
-                    now=now,
-                )
+            permanent_bonus, weekly_bonus = await self.economy_repository.catch_quota_bonuses(
+                session,
+                player_id=identity.player_id,
+                now=now,
             )
             catch_restriction = await self.restriction_repository.active_restriction(
                 session,
                 player_id=identity.player_id,
                 restriction_type=CATCH_WINDOW_LIMIT,
                 now=now,
+            )
+            achievement_catch_tickets = await self.achievement_repository.active_ticket_ids(
+                session,
+                player_id=identity.player_id,
+                action_type="catching",
+            )
+            achievement_visual_tickets = await self.achievement_repository.active_ticket_ids(
+                session,
+                player_id=identity.player_id,
+                action_type="visual",
             )
             window_boost = await self.quota_repository.active_window_boost(
                 session,
@@ -1060,9 +1056,7 @@ class GameplayService:
                     extra_consumed=extra_consumed,
                 )
             base_window_limit = quota_layers.base_window_limit
-            normal_daily_limit = quota_layers.effective_limit(
-                used_count=daily_count
-            )
+            normal_daily_limit = quota_layers.effective_limit(used_count=daily_count)
             daily_limit = self._restricted_daily_limit(
                 normal_limit=normal_daily_limit,
                 restriction=catch_restriction,
@@ -1075,29 +1069,23 @@ class GameplayService:
                 now_datetime,
                 timezone_name=self.catching.daily_reset_timezone,
             ):
-                templates = [
-                    template
-                    for template in templates
-                    if str(template["template_id"]) != KFC_PIG_TEMPLATE_ID
-                ]
+                templates = [template for template in templates if str(template["template_id"]) != KFC_PIG_TEMPLATE_ID]
             if not templates:
                 raise NoDrawableTemplateError("当前群没有可用猪猪素材，请联系管理员导入并启用素材。")
-            active_group_technique = (
-                await self.technique_repository.active_group_effect(
-                    session,
-                    scope_id=identity.scope.value,
-                )
+            active_group_technique = await self.technique_repository.active_group_effect(
+                session,
+                scope_id=identity.scope.value,
             )
-            deferred_duplication_effects = tuple(
-                effect
-                for effect in active_effects
-                if effect.effect_id == CATCH_DUPLICATION_CHANCE
-            ) if active_group_technique is not None else ()
-            applicable_active_effects = tuple(
-                effect
-                for effect in active_effects
-                if effect.effect_id != CATCH_DUPLICATION_CHANCE
-            ) if deferred_duplication_effects else active_effects
+            deferred_duplication_effects = (
+                tuple(effect for effect in active_effects if effect.effect_id == CATCH_DUPLICATION_CHANCE)
+                if active_group_technique is not None
+                else ()
+            )
+            applicable_active_effects = (
+                tuple(effect for effect in active_effects if effect.effect_id != CATCH_DUPLICATION_CHANCE)
+                if deferred_duplication_effects
+                else active_effects
+            )
             buckets = self._template_buckets(templates)
             feed_level = await self.repository.get_feed_level(
                 session,
@@ -1115,9 +1103,7 @@ class GameplayService:
             )
             armed_item, armed_uses = self._armed_item(armed_row, "catching")
             equipped_item = armed_item
-            group_exclusive_effect_active = (
-                has_compatible_exclusive_group_catch_effect(active_group_effects)
-            )
+            group_exclusive_effect_active = has_compatible_exclusive_group_catch_effect(active_group_effects)
             personal_exclusive_effect_active = (
                 not group_exclusive_effect_active
                 and has_compatible_exclusive_catch_effect(
@@ -1126,9 +1112,7 @@ class GameplayService:
                 )
             )
             # 六星菜独占效果：回到未受等级、饲料、道具和普通菜影响的基础层。
-            exclusive_effect_active = (
-                group_exclusive_effect_active or personal_exclusive_effect_active
-            )
+            exclusive_effect_active = group_exclusive_effect_active or personal_exclusive_effect_active
             if exclusive_effect_active:
                 armed_item = None
             weights = self._available_weights(
@@ -1154,8 +1138,7 @@ class GameplayService:
                 )
                 if equipped_item is not None:
                     excluded_summaries += (
-                        f"已装备的“{equipped_item.display_name}”受全群六星菜独占规则影响，"
-                        "本次未生效且未消耗。",
+                        f"已装备的“{equipped_item.display_name}”受全群六星菜独占规则影响，本次未生效且未消耗。",
                     )
             else:
                 effect_application = apply_catch_effects(
@@ -1168,15 +1151,11 @@ class GameplayService:
                 if personal_exclusive_effect_active:
                     group_effect_application = apply_group_catch_effects(weights, ())
                     if active_group_effects:
-                        excluded_summaries += (
-                            "当前全群六星菜加成本次由个人六星菜独占规则接管，未参与结算。",
-                        )
+                        excluded_summaries += ("当前全群六星菜加成本次由个人六星菜独占规则接管，未参与结算。",)
                 elif effect_application.collaboration_only:
                     group_effect_application = apply_group_catch_effects(weights, ())
                     if active_group_effects:
-                        excluded_summaries += (
-                            "当前全群六星菜概率加成不改变联动猪固定品质分布，本次未参与结算。",
-                        )
+                        excluded_summaries += ("当前全群六星菜概率加成不改变联动猪固定品质分布，本次未参与结算。",)
                 else:
                     group_effect_application = apply_group_catch_effects(
                         weights,
@@ -1194,14 +1173,11 @@ class GameplayService:
             candidate_buckets = buckets
             if effect_application.collaboration_only:
                 collaboration_templates = [
-                    template
-                    for template in templates
-                    if str(template.get("collection_id") or "").strip()
+                    template for template in templates if str(template.get("collection_id") or "").strip()
                 ]
                 candidate_buckets = self._template_buckets(collaboration_templates)
                 available = tuple(
-                    weight if candidate_buckets[rarity] else 0.0
-                    for rarity, weight in zip(Rarity, weights, strict=True)
+                    weight if candidate_buckets[rarity] else 0.0 for rarity, weight in zip(Rarity, weights, strict=True)
                 )
                 if not any(available):
                     raise NoDrawableTemplateError("当前群没有可用联动猪，效果已保留且本次抓猪未结算。")
@@ -1211,9 +1187,7 @@ class GameplayService:
                         f"已装备的“{armed_item.display_name}”不改变联动猪固定品质分布，本次保留未消耗。",
                     )
                     armed_item = None
-            consumed_effect_ids = {
-                effect.effect_entry_id: effect.effect_id for effect in active_effects
-            }
+            consumed_effect_ids = {effect.effect_entry_id: effect.effect_id for effect in active_effects}
             quota_exempt_catch = any(
                 consumed_effect_ids.get(entry_id) in QUOTA_EXEMPT_CATCH_EFFECTS
                 for entry_id in effect_application.consumed_entry_ids
@@ -1223,6 +1197,10 @@ class GameplayService:
                 or group_effect_application.dedicated_entry_id
                 or group_effect_application.quota_exempt
             )
+            achievement_catch_ticket_used = "achievement-catch" in achievement_catch_tickets and not quota_exempt_catch
+            if achievement_catch_ticket_used:
+                quota_exempt_catch = True
+                effect_summaries += ("成就抓猪券：本次为专属普通抓猪，不消耗正常时段额度。",)
             if catch_restriction is not None and total_catch_count >= daily_limit:
                 expiry = str(catch_restriction.get("expires_at") or "")
                 raise DailyCatchLimitError(
@@ -1236,19 +1214,13 @@ class GameplayService:
                     f"下次刷新：北京时间 {quota_window.next_refresh_label}。"
                 )
             using_extra_catch = (
-                not quota_exempt_catch
-                and catch_restriction is None
-                and daily_count >= base_window_limit
+                not quota_exempt_catch and catch_restriction is None and daily_count >= base_window_limit
             )
             if using_extra_catch and extra_consumed >= extra_granted:
-                raise DailyCatchLimitError(
-                    f"本时段已经抓了 {daily_count}/{daily_limit} 次，额外抓猪机会已用完。"
-                )
+                raise DailyCatchLimitError(f"本时段已经抓了 {daily_count}/{daily_limit} 次，额外抓猪机会已用完。")
             if using_extra_catch:
                 effect_summaries += (
-                    "额外抓猪次数池：本次结算后剩余 "
-                    f"{max(0, extra_granted - extra_consumed - 1)}/"
-                    f"{extra_granted} 次。",
+                    f"额外抓猪次数池：本次结算后剩余 {max(0, extra_granted - extra_consumed - 1)}/{extra_granted} 次。",
                 )
             remaining = _cooldown_remaining(
                 now=now_datetime,
@@ -1272,15 +1244,10 @@ class GameplayService:
                 weights = group_effect_application.weights
                 if group_effect_application.hidden_boost_triggered:
                     prefix_length = len(effect_summaries) - len(previous_group_summaries)
-                    effect_summaries = (
-                        effect_summaries[:prefix_length]
-                        + group_effect_application.summaries
-                    )
-            six_star_progress_stacks = (
-                await self.economy_repository.six_star_progress_stacks(
-                    session,
-                    player_id=identity.player_id,
-                )
+                    effect_summaries = effect_summaries[:prefix_length] + group_effect_application.summaries
+            six_star_progress_stacks = await self.economy_repository.six_star_progress_stacks(
+                session,
+                player_id=identity.player_id,
             )
             if six_star_progress_stacks and not exclusive_effect_active:
                 progressed_weights = apply_six_star_progress(
@@ -1297,22 +1264,48 @@ class GameplayService:
                         f"个百分点（{six_star_progress_stacks} 层）。",
                     )
             elif six_star_progress_stacks:
-                excluded_summaries += (
-                    "达妮娅泡泡云冻永久概率加成本次受六星菜独占规则影响，未参与结算。",
-                )
+                excluded_summaries += ("达妮娅泡泡云冻永久概率加成本次受六星菜独占规则影响，未参与结算。",)
             rarity_roll = self.random_source.random()
             rarity = choose_rarity(weights, rarity_roll)
             candidates = candidate_buckets[rarity]
+            catalog_guide_used = False
             template_roll = self.random_source.random()
             template = self._select_template(
                 candidates,
                 template_roll,
                 giant_template_multiplier=(
-                    effect_application.giant_template_multiplier
-                    if rarity is Rarity.FIVE
-                    else 1.0
+                    effect_application.giant_template_multiplier if rarity is Rarity.FIVE else 1.0
                 ),
             )
+            if (
+                "catalog-guide" in achievement_catch_tickets
+                and rarity is not Rarity.SIX
+                and not effect_application.collaboration_only
+                and str(template.get("template_id") or "") != KFC_PIG_TEMPLATE_ID
+                and str(template.get("scope_type") or "common") == "common"
+            ):
+                eligible_candidates = [
+                    row
+                    for row in candidates
+                    if str(row.get("template_id") or "") != KFC_PIG_TEMPLATE_ID
+                    and str(row.get("scope_type") or "common") == "common"
+                ]
+                unseen = await self.achievement_repository.unseen_pig_template_ids(
+                    session,
+                    player_id=identity.player_id,
+                    template_ids=tuple(str(row["template_id"]) for row in eligible_candidates),
+                )
+                guided = [row for row in eligible_candidates if str(row["template_id"]) in unseen]
+                if guided:
+                    template = self._select_template(
+                        guided,
+                        template_roll,
+                        giant_template_multiplier=(
+                            effect_application.giant_template_multiplier if rarity is Rarity.FIVE else 1.0
+                        ),
+                    )
+                    catalog_guide_used = True
+                    effect_summaries += ("图鉴引路券：在已确定品质内优先选择尚未发现的公共猪猪。",)
             attribute_rolls = tuple(self.random_source.random() for _ in range(5))
             attributes = generate_pig_attributes(
                 rarity=rarity,
@@ -1325,6 +1318,42 @@ class GameplayService:
                 item_id=armed_item.item_id if armed_item is not None else "",
                 stature_bias=effect_application.stature_bias,
             )
+            rescale_ticket_id = next(
+                (
+                    ticket_id
+                    for ticket_id in ("giant-rescale", "mini-rescale")
+                    if ticket_id in achievement_catch_tickets
+                ),
+                "",
+            )
+            rescale_rolls: tuple[float, ...] = ()
+            if rescale_ticket_id:
+                rescale_rolls = tuple(self.random_source.random() for _ in range(5))
+                alternative = generate_pig_attributes(
+                    rarity=rarity,
+                    length_min=float(template["length_min"]),
+                    length_max=float(template["length_max"]),
+                    weight_min=float(template["weight_min"]),
+                    weight_max=float(template["weight_max"]),
+                    fat_profile=str(template["fat_profile"]),
+                    random_values=rescale_rolls,
+                    item_id=armed_item.item_id if armed_item is not None else "",
+                    stature_bias=effect_application.stature_bias,
+                )
+                first_score = attributes.size_percentile + attributes.weight_percentile
+                second_score = alternative.size_percentile + alternative.weight_percentile
+                keep_alternative = (
+                    second_score > first_score if rescale_ticket_id == "giant-rescale" else second_score < first_score
+                )
+                if keep_alternative:
+                    attributes = alternative
+                effect_summaries += (
+                    (
+                        "巨物复秤券：生成两套体型体重并保留巨物评分更高的一套。"
+                        if rescale_ticket_id == "giant-rescale"
+                        else "迷你复秤券：生成两套体型体重并保留更迷你的一套。"
+                    ),
+                )
             pig_instance_id = self._new_identifier()
             short_code = await self._new_unique_short_code(session)
             duplication_roll: float | None = None
@@ -1333,9 +1362,7 @@ class GameplayService:
             duplicated_short_code = ""
             if effect_application.duplicate_chance_percent > 0.0:
                 duplication_roll = self.random_source.random()
-                duplication_triggered = duplication_roll < (
-                    effect_application.duplicate_chance_percent / 100.0
-                )
+                duplication_triggered = duplication_roll < (effect_application.duplicate_chance_percent / 100.0)
                 if duplication_triggered:
                     duplicated_pig_instance_id = self._new_identifier()
                     duplicated_short_code = await self._new_unique_short_code(
@@ -1348,9 +1375,7 @@ class GameplayService:
                         "复制品不重复发放抓猪奖励。",
                     )
                 else:
-                    effect_summaries += (
-                        "珍猪奶茶本次未触发复制。",
-                    )
+                    effect_summaries += ("珍猪奶茶本次未触发复制。",)
             auto_gift_target_player_id = ""
             random_snapshot = {
                 "ruleset_version": RULESET_VERSION,
@@ -1362,24 +1387,16 @@ class GameplayService:
                 "rarity_roll": rarity_roll,
                 "template_roll": template_roll,
                 "attribute_rolls": list(attribute_rolls),
+                "achievement_rescale_rolls": list(rescale_rolls),
+                "achievement_ticket_ids": sorted(achievement_catch_tickets),
                 "food_effect_entry_ids": list(effect_application.consumed_entry_ids),
                 "food_effect_summaries": list(effect_summaries),
-                "group_food_effect_entry_ids": list(
-                    group_effect_application.consumed_entry_ids
-                ),
-                "group_dedicated_effect_entry_id": (
-                    group_effect_application.dedicated_entry_id
-                ),
+                "group_food_effect_entry_ids": list(group_effect_application.consumed_entry_ids),
+                "group_dedicated_effect_entry_id": (group_effect_application.dedicated_entry_id),
                 "group_hidden_boost_roll": group_effect_application.hidden_boost_roll,
-                "group_hidden_boost_triggered": (
-                    group_effect_application.hidden_boost_triggered
-                ),
-                "group_effect_source_user_id": (
-                    group_effect_application.source_user_id
-                ),
-                "group_effect_source_display_name": (
-                    group_effect_application.source_display_name
-                ),
+                "group_hidden_boost_triggered": (group_effect_application.hidden_boost_triggered),
+                "group_effect_source_user_id": (group_effect_application.source_user_id),
+                "group_effect_source_display_name": (group_effect_application.source_display_name),
                 "auto_gift_target_player_id": auto_gift_target_player_id,
                 "stature_bias": effect_application.stature_bias,
                 "collaboration_only": effect_application.collaboration_only,
@@ -1400,14 +1417,10 @@ class GameplayService:
                 ),
                 "quota_window_boost_limit": (int(window_boost["limit_value"]) if window_boost is not None else 0),
                 "group_technique_id": (
-                    str(active_group_technique["technique_id"])
-                    if active_group_technique is not None
-                    else ""
+                    str(active_group_technique["technique_id"]) if active_group_technique is not None else ""
                 ),
                 "group_technique_source_player_id": (
-                    str(active_group_technique["source_player_id"])
-                    if active_group_technique is not None
-                    else ""
+                    str(active_group_technique["source_player_id"]) if active_group_technique is not None else ""
                 ),
                 "duplication_roll": duplication_roll,
                 "duplication_triggered": duplication_triggered,
@@ -1462,11 +1475,7 @@ class GameplayService:
                         "fat_ratio": attributes.fat_ratio,
                         "official_value": attributes.official_value,
                         "ruleset_version": RULESET_VERSION,
-                        "random_snapshot_json": (
-                            self.repository.random_snapshot_json(
-                                duplicate_snapshot
-                            )
-                        ),
+                        "random_snapshot_json": (self.repository.random_snapshot_json(duplicate_snapshot)),
                         "acquired_at": now,
                         "updated_at": now,
                     },
@@ -1474,22 +1483,18 @@ class GameplayService:
             technique_resolution: TechniqueCatchResolution | None = None
             if active_group_technique is not None:
                 technique_resolution = await self._apply_group_technique_to_catch(
-                        session,
-                        identity=identity,
-                        active_effect=active_group_technique,
-                        pig_instance_id=pig_instance_id,
-                        short_code=short_code,
-                        template=template,
-                        rarity=rarity,
-                        attributes=attributes,
-                        now=now,
-                    )
-                random_snapshot["group_technique_remaining_uses"] = (
-                    technique_resolution.remaining_uses
+                    session,
+                    identity=identity,
+                    active_effect=active_group_technique,
+                    pig_instance_id=pig_instance_id,
+                    short_code=short_code,
+                    template=template,
+                    rarity=rarity,
+                    attributes=attributes,
+                    now=now,
                 )
-                random_snapshot["food_effect_summaries"] = list(
-                    (*effect_summaries, technique_resolution.summary)
-                )
+                random_snapshot["group_technique_remaining_uses"] = technique_resolution.remaining_uses
+                random_snapshot["food_effect_summaries"] = list((*effect_summaries, technique_resolution.summary))
                 await session.execute(
                     """
                     UPDATE pig_instances
@@ -1504,41 +1509,28 @@ class GameplayService:
                 )
                 effect_summaries += (technique_resolution.summary,)
             auto_gift_target_player_id = ""
-            if (
-                active_group_technique is None
-                and group_effect_application.source_user_id
-            ):
+            if active_group_technique is None and group_effect_application.source_user_id:
                 auto_gift_chance = 0.0
                 auto_gift_rarities: tuple[int, ...] = (6,)
                 auto_gift_source_label = "阿萨姆红茶奶雾锅"
                 for group_effect in active_group_effects:
                     if (
-                        group_effect.group_effect_entry_id
-                        in group_effect_application.consumed_entry_ids
-                        or group_effect.group_effect_entry_id
-                        == group_effect_application.dedicated_entry_id
+                        group_effect.group_effect_entry_id in group_effect_application.consumed_entry_ids
+                        or group_effect.group_effect_entry_id == group_effect_application.dedicated_entry_id
                     ):
-                        auto_gift_chance = float(
-                            group_effect.params.get("auto_gift_chance_percent") or 0.0
-                        )
+                        auto_gift_chance = float(group_effect.params.get("auto_gift_chance_percent") or 0.0)
                         if group_effect.params.get("auto_gift_rarities"):
                             auto_gift_rarities = tuple(
-                                int(value)
-                                for value in group_effect.params["auto_gift_rarities"]
+                                int(value) for value in group_effect.params["auto_gift_rarities"]
                             )
-                        auto_gift_source_label = str(
-                            group_effect.params.get("source_label")
-                            or auto_gift_source_label
-                        )
+                        auto_gift_source_label = str(group_effect.params.get("source_label") or auto_gift_source_label)
                         break
                 if (
                     int(rarity) in auto_gift_rarities
                     and auto_gift_chance > 0.0
                     and self.random_source.random() < auto_gift_chance / 100.0
                 ):
-                    activator_player_id = (
-                        f"{identity.scope.value}:{group_effect_application.source_user_id}"
-                    )
+                    activator_player_id = f"{identity.scope.value}:{group_effect_application.source_user_id}"
                     if activator_player_id != identity.player_id:
                         transferred = await self.repository.transfer_pig_owner(
                             session,
@@ -1568,9 +1560,7 @@ class GameplayService:
                                 now=now,
                             )
                             auto_gift_target_player_id = activator_player_id
-                            random_snapshot["auto_gift_target_player_id"] = (
-                                activator_player_id
-                            )
+                            random_snapshot["auto_gift_target_player_id"] = activator_player_id
                             await session.execute(
                                 """
                                 UPDATE pig_instances
@@ -1578,9 +1568,7 @@ class GameplayService:
                                 WHERE pig_instance_id = ?
                                 """,
                                 (
-                                    self.repository.random_snapshot_json(
-                                        random_snapshot
-                                    ),
+                                    self.repository.random_snapshot_json(random_snapshot),
                                     now,
                                     pig_instance_id,
                                 ),
@@ -1723,6 +1711,29 @@ class GameplayService:
                     player_id=identity.player_id,
                     now=now,
                 )
+            for ticket_id, used in (
+                ("achievement-catch", achievement_catch_ticket_used),
+                ("catalog-guide", catalog_guide_used),
+                (rescale_ticket_id, bool(rescale_ticket_id)),
+            ):
+                if not ticket_id or not used:
+                    continue
+                if not await self.achievement_repository.consume_active_ticket(
+                    session,
+                    player_id=identity.player_id,
+                    ticket_id=ticket_id,
+                    now=now,
+                ):
+                    raise RuntimeError("成就券状态已变化，本次抓猪未结算。")
+            if "achievement-firework" in achievement_visual_tickets:
+                if not await self.achievement_repository.consume_active_ticket(
+                    session,
+                    player_id=identity.player_id,
+                    ticket_id="achievement-firework",
+                    now=now,
+                ):
+                    raise RuntimeError("成就礼花券状态已变化，本次抓猪未结算。")
+                effect_summaries += ("成就礼花券：本次成功卡启用 PiG Dream! 庆祝礼花。",)
             pig_row = await self.repository.get_pig_by_instance_id(
                 session,
                 pig_instance_id=pig_instance_id,
@@ -1750,23 +1761,15 @@ class GameplayService:
                 "feed_level": feed_level,
                 "item_id": armed_item.item_id if armed_item is not None else "",
                 "item_name": armed_item.display_name if armed_item is not None else "",
-                "item_remaining_uses": (
-                    max(0, armed_uses - 1) if armed_item is not None else 0
-                ),
+                "item_remaining_uses": (max(0, armed_uses - 1) if armed_item is not None else 0),
                 "weights": [round(value, 8) for value in weights],
                 "effect_summaries": list(effect_summaries),
                 "excluded_summaries": list(excluded_summaries),
                 "exclusive_effect_active": exclusive_effect_active,
                 "quota_exempt_catch": quota_exempt_catch,
-                "group_hidden_boost_triggered": (
-                    group_effect_application.hidden_boost_triggered
-                ),
-                "group_effect_source_user_id": (
-                    group_effect_application.source_user_id
-                ),
-                "group_effect_source_display_name": (
-                    group_effect_application.source_display_name
-                ),
+                "group_hidden_boost_triggered": (group_effect_application.hidden_boost_triggered),
+                "group_effect_source_user_id": (group_effect_application.source_user_id),
+                "group_effect_source_display_name": (group_effect_application.source_display_name),
                 "duplication_triggered": duplication_triggered,
                 "duplicated_pig_instance_id": duplicated_pig_instance_id,
                 "duplicated_short_code": duplicated_short_code,
@@ -1808,9 +1811,7 @@ class GameplayService:
                 item_id=armed_item.item_id if armed_item is not None else "",
                 item_name=armed_item.display_name if armed_item is not None else "",
                 weights=weights,
-                item_remaining_uses=(
-                    max(0, armed_uses - 1) if armed_item is not None else 0
-                ),
+                item_remaining_uses=(max(0, armed_uses - 1) if armed_item is not None else 0),
                 effect_summaries=effect_summaries,
                 excluded_summaries=excluded_summaries,
                 exclusive_effect_active=exclusive_effect_active,
@@ -1859,9 +1860,7 @@ class GameplayService:
                 item_id=armed_item.item_id if armed_item is not None else "",
                 item_name=armed_item.display_name if armed_item is not None else "",
                 weights=weights,
-                item_remaining_uses=(
-                    max(0, armed_uses - 1) if armed_item is not None else 0
-                ),
+                item_remaining_uses=(max(0, armed_uses - 1) if armed_item is not None else 0),
                 effect_summaries=effect_summaries,
                 excluded_summaries=excluded_summaries,
                 exclusive_effect_active=exclusive_effect_active,
@@ -1912,9 +1911,7 @@ class GameplayService:
                     technique_id=technique_id,
                     summary=existing.text_summary,
                     total_uses=int(payload.get("total_uses") or 0),
-                    remaining_permits=int(
-                        payload.get("remaining_permits") or 0
-                    ),
+                    remaining_permits=int(payload.get("remaining_permits") or 0),
                     purple_unlocked=int(payload.get("purple_unlocked") or 0),
                 )
             await self.framework_repository.touch_identity(
@@ -1932,8 +1929,7 @@ class GameplayService:
                     "未知术式",
                 )
                 raise TechniqueError(
-                    f"本群的{active_name}仍剩 {int(active['remaining_uses'])} 次结算；"
-                    "结束前不能发动另一种群体术式。"
+                    f"本群的{active_name}仍剩 {int(active['remaining_uses'])} 次结算；结束前不能发动另一种群体术式。"
                 )
             consumed = await self.technique_repository.consume_permit(
                 session,
@@ -1943,8 +1939,7 @@ class GameplayService:
             )
             if not consumed:
                 raise TechniqueError(
-                    f"你没有可用的{TECHNIQUE_DISPLAY_NAMES[technique_id]}发动资格；"
-                    "请先食用对应专属菜。"
+                    f"你没有可用的{TECHNIQUE_DISPLAY_NAMES[technique_id]}发动资格；请先食用对应专属菜。"
                 )
             total_uses = uses_by_technique[technique_id]
             effect_entry_id = self._new_identifier()
@@ -1986,11 +1981,7 @@ class GameplayService:
                 detail = "接下来本群 5 次抓到的猪都会被苍吸引给发动者。"
             else:
                 detail = "接下来本群 5 次抓到的猪都会由赫随机分配给一名已登记群友。"
-            purple_text = (
-                " 苍与赫已经完成一组组合，额外解锁 1 次 /虚式 茈。"
-                if purple_unlocked
-                else ""
-            )
+            purple_text = " 苍与赫已经完成一组组合，额外解锁 1 次 /虚式 茈。" if purple_unlocked else ""
             summary = (
                 f"【{TECHNIQUE_DISPLAY_NAMES[technique_id]}发动】\n"
                 f"发动者：{actor}\n{detail}\n"
@@ -2070,9 +2061,7 @@ class GameplayService:
                     receipt_created=False,
                     technique_id=TECHNIQUE_HOLLOW_PURPLE,
                     summary=existing.text_summary,
-                    remaining_permits=int(
-                        payload.get("remaining_permits") or 0
-                    ),
+                    remaining_permits=int(payload.get("remaining_permits") or 0),
                     granted_pigs=pigs,
                 )
             await self.framework_repository.touch_identity(
@@ -2097,18 +2086,12 @@ class GameplayService:
                 now=now,
             )
             if not consumed:
-                raise TechniqueError(
-                    "你还没有完成一组苍与赫，暂时不能使用 /虚式 茈。"
-                )
+                raise TechniqueError("你还没有完成一组苍与赫，暂时不能使用 /虚式 茈。")
             pig_ids: list[str] = []
             for index in range(5):
                 template_roll = self.random_source.random()
-                template = templates[
-                    min(int(template_roll * len(templates)), len(templates) - 1)
-                ]
-                attribute_rolls = tuple(
-                    self.random_source.random() for _ in range(5)
-                )
+                template = templates[min(int(template_roll * len(templates)), len(templates) - 1)]
+                attribute_rolls = tuple(self.random_source.random() for _ in range(5))
                 attributes = generate_pig_attributes(
                     rarity=Rarity.SIX,
                     length_min=float(template["length_min"]),
@@ -2246,11 +2229,7 @@ class GameplayService:
                     f"{TECHNIQUE_DISPLAY_NAMES[technique_id]}由 {source_name} 接管："
                     f"{template['display_name']}#{short_code} 已立即做成两道专属菜："
                     f"{food_summary}，"
-                    + (
-                        "由发动者本人全部获得"
-                        if self_caught_in_own_domain
-                        else "随机分给两名不同群友，一人一道"
-                    )
+                    + ("由发动者本人全部获得" if self_caught_in_own_domain else "随机分给两名不同群友，一人一道")
                 )
             else:
                 action = (
@@ -2274,9 +2253,7 @@ class GameplayService:
                 target_name = source_name
             elif technique_id == TECHNIQUE_REVERSAL_RED:
                 target_roll = self.random_source.random()
-                target = players[
-                    min(int(target_roll * len(players)), len(players) - 1)
-                ]
+                target = players[min(int(target_roll * len(players)), len(players) - 1)]
                 target_player_id = str(target["player_id"])
                 target_name = str(target.get("display_name") or "").strip()
                 target_name = target_name or "未命名群友"
@@ -2361,23 +2338,16 @@ class GameplayService:
             rarity=int(output_rarity),
         )
         if not food_templates:
-            raise TechniqueError(
-                f"领域缺少 {int(output_rarity)} 星美食模板，本次抓猪未结算。"
-            )
+            raise TechniqueError(f"领域缺少 {int(output_rarity)} 星美食模板，本次抓猪未结算。")
         special_roll: float | None = None
         special_template_id = ""
         template_roll: float | None = None
         recipient_rolls: tuple[float, ...] = ()
         gojo_self_caught_in_own_domain = False
         if is_gojo_pig:
-            templates_by_id = {
-                str(candidate["template_id"]): candidate
-                for candidate in food_templates
-            }
+            templates_by_id = {str(candidate["template_id"]): candidate for candidate in food_templates}
             missing_template_ids = [
-                template_id
-                for template_id in GOJO_EXCLUSIVE_FOOD_TEMPLATE_IDS
-                if template_id not in templates_by_id
+                template_id for template_id in GOJO_EXCLUSIVE_FOOD_TEMPLATE_IDS if template_id not in templates_by_id
             ]
             if missing_template_ids:
                 raise TechniqueError("领域命中五条猪，但两道专属菜尚未完整启用。")
@@ -2397,10 +2367,7 @@ class GameplayService:
                     key=lambda row: str(row["player_id"]),
                 )
                 if len(players) < 2:
-                    raise TechniqueError(
-                        "领域命中五条猪，但当前群已登记玩家不足两人，"
-                        "无法一人分配一道专属菜。"
-                    )
+                    raise TechniqueError("领域命中五条猪，但当前群已登记玩家不足两人，无法一人分配一道专属菜。")
                 first_roll = self.random_source.random()
                 first_index = min(int(first_roll * len(players)), len(players) - 1)
                 first_owner = players.pop(first_index)
@@ -2413,9 +2380,7 @@ class GameplayService:
                 )
                 recipient_rolls = (first_roll, second_roll)
         elif int(output_rarity) == 6:
-            special_template_id = str(
-                template.get("paired_food_template_id") or ""
-            )
+            special_template_id = str(template.get("paired_food_template_id") or "")
             if not special_template_id:
                 raise TechniqueError("领域抽到六星菜，但原料猪没有对应定制菜。")
         elif int(output_rarity) == 5:
@@ -2430,9 +2395,7 @@ class GameplayService:
         if not is_gojo_pig:
             if special_template_id:
                 candidates = [
-                    candidate
-                    for candidate in food_templates
-                    if str(candidate["template_id"]) == special_template_id
+                    candidate for candidate in food_templates if str(candidate["template_id"]) == special_template_id
                 ]
                 if not candidates:
                     raise TechniqueError("领域命中了专属菜，但该模板尚未启用。")
@@ -2440,15 +2403,12 @@ class GameplayService:
                 candidates = [
                     candidate
                     for candidate in food_templates
-                    if str(candidate["template_id"])
-                    not in SOURCE_EXCLUSIVE_FOOD_TEMPLATE_IDS
+                    if str(candidate["template_id"]) not in SOURCE_EXCLUSIVE_FOOD_TEMPLATE_IDS
                 ]
                 if not candidates:
                     raise TechniqueError("领域缺少可用的普通五星菜模板。")
             template_roll = self.random_source.random()
-            food_template = candidates[
-                min(int(template_roll * len(candidates)), len(candidates) - 1)
-            ]
+            food_template = candidates[min(int(template_roll * len(candidates)), len(candidates) - 1)]
             serving_templates = (food_template, food_template)
             owners = (source_player_id, identity.player_id)
         food_ids = [self._new_identifier(), self._new_identifier()]
@@ -2516,9 +2476,7 @@ class GameplayService:
                     "fat_category": attributes.fat_category,
                     "official_value": food_attribute.official_value,
                     "effect_id": str(food_template.get("effect_id") or ""),
-                    "effect_params_json": str(
-                        food_template.get("effect_params_json") or "{}"
-                    ),
+                    "effect_params_json": str(food_template.get("effect_params_json") or "{}"),
                     "ruleset_version": RULESET_VERSION,
                     "random_snapshot_json": self.repository.random_snapshot_json(
                         {
@@ -2530,14 +2488,10 @@ class GameplayService:
                             "template_roll": template_roll,
                             "special_roll": special_roll,
                             "special_template_id": (
-                                str(food_template["template_id"])
-                                if is_gojo_pig
-                                else special_template_id
+                                str(food_template["template_id"]) if is_gojo_pig else special_template_id
                             ),
                             "domain_gojo_dual_recipe": is_gojo_pig,
-                            "domain_gojo_self_caught": (
-                                gojo_self_caught_in_own_domain
-                            ),
+                            "domain_gojo_self_caught": (gojo_self_caught_in_own_domain),
                             "recipient_rolls": list(recipient_rolls),
                             "recipient_player_ids": list(owners),
                             "serving_index": index,
@@ -2624,18 +2578,12 @@ class GameplayService:
             matches = [instance for instance in instances if str(instance["short_code"]).upper() == normalized]
             if not matches:
                 codes = "、".join(str(instance["short_code"]) for instance in instances)
-                return 0, "", (
-                    f"背包中没有编号 {short_code} 的{display_name}；"
-                    f"你当前持有的{display_name}编号：{codes}"
-                )
+                return 0, "", (f"背包中没有编号 {short_code} 的{display_name}；你当前持有的{display_name}编号：{codes}")
             target = matches[0]
         elif len(instances) > 1:
             codes = "、".join(str(instance["short_code"]) for instance in instances)
             command_name = "猪保千" if display_name == "保千猪" else display_name
-            return 0, "", (
-                f"你有 {len(instances)} 只{display_name}，请指定编号切换："
-                f"/切换 {command_name} {codes}"
-            )
+            return 0, "", (f"你有 {len(instances)} 只{display_name}，请指定编号切换：/切换 {command_name} {codes}")
         else:
             target = instances[0]
         async with self.database.transaction() as session:
@@ -2646,9 +2594,7 @@ class GameplayService:
                 now=now,
             )
         label = alternate_label if new_variant == "sticker" else "默认立绘"
-        return count, new_variant, (
-            f"已将{display_name} {target['short_code']} 切换为{label}。"
-        )
+        return count, new_variant, (f"已将{display_name} {target['short_code']} 切换为{label}。")
 
     async def profile(self, identity: CommandIdentity) -> PlayerProfile:
         """Read the current-group player profile."""
@@ -2688,20 +2634,16 @@ class GameplayService:
                     now=now,
                 )
             )
-            current_window_bonus, today_window_bonus = active_quota_effect_bonuses(
-                active_effects
-            )
+            current_window_bonus, today_window_bonus = active_quota_effect_bonuses(active_effects)
             extra_granted, extra_consumed = await self.economy_repository.extra_catch_grants(
                 session,
                 player_id=identity.player_id,
                 now=now,
             )
-            permanent_bonus, weekly_bonus = (
-                await self.economy_repository.catch_quota_bonuses(
-                    session,
-                    player_id=identity.player_id,
-                    now=now,
-                )
+            permanent_bonus, weekly_bonus = await self.economy_repository.catch_quota_bonuses(
+                session,
+                player_id=identity.player_id,
+                now=now,
             )
             catch_restriction = await self.restriction_repository.active_restriction(
                 session,
@@ -2760,18 +2702,14 @@ class GameplayService:
             )
             if economy_row is None:
                 raise RuntimeError("玩家经济档案初始化后无法读取。")
-            claimed_veteran_tiers = (
-                await self.economy_repository.claimed_veteran_reward_tiers(
-                    session,
-                    player_id=identity.player_id,
-                )
+            claimed_veteran_tiers = await self.economy_repository.claimed_veteran_reward_tiers(
+                session,
+                player_id=identity.player_id,
             )
-            food_collected, food_total = (
-                await self.economy_repository.visible_food_catalog_counts(
-                    session,
-                    player_id=identity.player_id,
-                    scope_id=identity.scope.value,
-                )
+            food_collected, food_total = await self.economy_repository.visible_food_catalog_counts(
+                session,
+                player_id=identity.player_id,
+                scope_id=identity.scope.value,
             )
             visible_collected, visible_total = await self.repository.visible_catalog_counts(
                 session,
@@ -3054,14 +2992,12 @@ class GameplayService:
                 identity=identity,
                 now=end_at,
             )
-            participant_count, catch_count, size_rows, weight_rows = (
-                await self.repository.daily_giants(
-                    session,
-                    scope_id=identity.scope.value,
-                    start_at=start_at,
-                    end_at=end_at,
-                    limit=self.ranking.ranking_page_size,
-                )
+            participant_count, catch_count, size_rows, weight_rows = await self.repository.daily_giants(
+                session,
+                scope_id=identity.scope.value,
+                start_at=start_at,
+                end_at=end_at,
+                limit=self.ranking.ranking_page_size,
             )
 
         def entries(rows: Sequence[Mapping[str, object]]) -> tuple[DailyGiantEntry, ...]:
@@ -3142,8 +3078,7 @@ class GameplayService:
                 raise ItemInventoryError(f"你的背包中没有“{item.display_name}”。")
             if quantity > inventory_quantity:
                 raise ItemInventoryError(
-                    f"“{item.display_name}”库存只有 {inventory_quantity} 个，"
-                    f"无法安排连续 {quantity} 次。"
+                    f"“{item.display_name}”库存只有 {inventory_quantity} 个，无法安排连续 {quantity} 次。"
                 )
             await self.repository.arm_item(
                 session,
@@ -3350,14 +3285,9 @@ class GameplayService:
             global_size_record=bool(payload.get("global_size_record") or False),
             global_weight_record=bool(payload.get("global_weight_record") or False),
             giant_sighting=bool(payload.get("giant_sighting") or False),
-            technique_resolution=self._technique_resolution_from_payload(
-                payload.get("technique_resolution")
-            ),
+            technique_resolution=self._technique_resolution_from_payload(payload.get("technique_resolution")),
             veteran_coin_reward=int(payload.get("veteran_coin_reward") or 0),
-            veteran_reward_levels=tuple(
-                int(value)
-                for value in payload.get("veteran_reward_levels", [])
-            ),
+            veteran_reward_levels=tuple(int(value) for value in payload.get("veteran_reward_levels", [])),
         )
 
     @staticmethod
@@ -3366,10 +3296,7 @@ class GameplayService:
             food_instance_id=str(row["food_instance_id"]),
             short_code=str(row["short_code"]),
             owner_player_id=str(row["owner_player_id"]),
-            owner_display_name=(
-                str(row.get("owner_display_name") or "").strip()
-                or "未命名群友"
-            ),
+            owner_display_name=(str(row.get("owner_display_name") or "").strip() or "未命名群友"),
             rarity=int(row["rarity"]),
             display_name=str(row["display_name_snapshot"]),
             image_relpath=str(row.get("image_relpath") or ""),
@@ -3473,9 +3400,7 @@ class GameplayService:
         if multiplier == 1.0:
             return candidates[min(int(normalized_roll * len(candidates)), len(candidates) - 1)]
         candidate_weights = [
-            multiplier
-            if str(candidate.get("stature_profile") or "") == StatureProfile.GIANT.value
-            else 1.0
+            multiplier if str(candidate.get("stature_profile") or "") == StatureProfile.GIANT.value else 1.0
             for candidate in candidates
         ]
         target = normalized_roll * sum(candidate_weights)

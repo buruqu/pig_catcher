@@ -1,6 +1,12 @@
 """白底淡粉图片渲染与发送降级。"""
 
 from .adapters import (
+    achievement_backfill_summary_view,
+    achievement_overview_view,
+    achievement_page_view,
+    achievement_ranking_view,
+    achievement_row_view,
+    achievement_unlock_view,
     batch_cook_view,
     batch_sale_receipt_view,
     catalog_media_paths,
@@ -43,6 +49,13 @@ from .adapters import (
 from .animation import AnimatedCardComposer
 from .delivery import RenderDelivery
 from .models import (
+    AchievementBackfillSummaryViewModel,
+    AchievementOverviewViewModel,
+    AchievementPageViewModel,
+    AchievementRankingRowViewModel,
+    AchievementRankingViewModel,
+    AchievementRowViewModel,
+    AchievementUnlockViewModel,
     AssetPreviewViewModel,
     BatchCookingItemViewModel,
     BatchCookingViewModel,
@@ -88,6 +101,13 @@ from .renderer import PigCatcherRenderer
 
 __all__ = [
     "AnimatedCardComposer",
+    "AchievementOverviewViewModel",
+    "AchievementPageViewModel",
+    "AchievementRankingRowViewModel",
+    "AchievementRankingViewModel",
+    "AchievementRowViewModel",
+    "AchievementUnlockViewModel",
+    "AchievementBackfillSummaryViewModel",
     "AssetPreviewViewModel",
     "BatchCookingItemViewModel",
     "BatchCookingViewModel",
@@ -131,6 +151,12 @@ __all__ = [
     "TradeListItemViewModel",
     "TradeListViewModel",
     "batch_cook_view",
+    "achievement_overview_view",
+    "achievement_backfill_summary_view",
+    "achievement_page_view",
+    "achievement_ranking_view",
+    "achievement_row_view",
+    "achievement_unlock_view",
     "catalog_media_paths",
     "batch_sale_receipt_view",
     "catalog_view",

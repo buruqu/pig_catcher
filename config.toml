@@ -1,12 +1,13 @@
 [plugin]
 enabled = true
-config_version = "1.29.1"
+config_version = "2.0.0.dev1"
 framework_phase = "6"
 
 [features]
 help_enabled = true
 catching_enabled = true
 profile_enabled = true
+achievements_enabled = true
 inventory_enabled = true
 catalog_enabled = true
 records_enabled = true

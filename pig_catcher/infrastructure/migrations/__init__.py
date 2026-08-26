@@ -35,6 +35,7 @@ from .v0031_asset_favorites import MIGRATION_0031
 from .v0032_group_techniques import MIGRATION_0032
 from .v0033_food_roulette_rebalance import MIGRATION_0033
 from .v0034_player_food_effect_source_repair import MIGRATION_0034
+from .v0035_achievement_system import MIGRATION_0035
 
 MIGRATIONS: tuple[Migration, ...] = (
     MIGRATION_0001,
@@ -71,6 +72,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     MIGRATION_0032,
     MIGRATION_0033,
     MIGRATION_0034,
+    MIGRATION_0035,
 )
 
 __all__ = ["MIGRATIONS", "Migration"]

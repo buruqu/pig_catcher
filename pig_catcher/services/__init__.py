@@ -1,5 +1,18 @@
 """应用服务。"""
 
+from .achievements import (
+    AchievementBackfillSummary,
+    AchievementCosmetics,
+    AchievementEntry,
+    AchievementMemorialPig,
+    AchievementOverview,
+    AchievementPage,
+    AchievementRanking,
+    AchievementRankingEntry,
+    AchievementService,
+    format_achievement_unlocks,
+    reward_label,
+)
 from .administration import (
     AdminBlacklistSnapshot,
     AdminCommandResult,
@@ -112,6 +125,15 @@ from .social import (
 
 __all__ = [
     "AssetCatalogService",
+    "AchievementEntry",
+    "AchievementBackfillSummary",
+    "AchievementCosmetics",
+    "AchievementMemorialPig",
+    "AchievementOverview",
+    "AchievementPage",
+    "AchievementRanking",
+    "AchievementRankingEntry",
+    "AchievementService",
     "AdminBlacklistSnapshot",
     "AdminCommandResult",
     "AdministrationService",
@@ -210,4 +232,6 @@ __all__ = [
     "format_trade_page_summary",
     "format_trade_summary",
     "is_group_event_food",
+    "format_achievement_unlocks",
+    "reward_label",
 ]

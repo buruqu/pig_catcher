@@ -121,6 +121,14 @@ class FeaturesSection(PluginConfigBase):
         description="是否允许查看个人抓猪档案",
         json_schema_extra=_ui("允许抓猪档案", "对应 /抓猪档案，展示经验、猪币、次数与收藏进度"),
     )
+    achievements_enabled: bool = Field(
+        default=True,
+        description="是否启用 PiG Dream 成就系统、奖励结算与解锁图片",
+        json_schema_extra=_ui(
+            "启用成就系统",
+            "对应 /猪猪成就、/成就详情、/成就排行及业务后的解锁弹窗",
+        ),
+    )
     inventory_enabled: bool = Field(
         default=True,
         description="是否允许查看猪猪背包和详情",
@@ -1346,12 +1354,8 @@ class PigCatcherConfig(PluginConfigBase):
     regulation: RegulationSection = Field(default_factory=RegulationSection)
     ranking: RankingSection = Field(default_factory=RankingSection)
     rendering: RenderingSection = Field(default_factory=RenderingSection)
-    quota_administration: QuotaAdministrationSection = Field(
-        default_factory=QuotaAdministrationSection
-    )
-    blacklist_administration: BlacklistAdministrationSection = Field(
-        default_factory=BlacklistAdministrationSection
-    )
+    quota_administration: QuotaAdministrationSection = Field(default_factory=QuotaAdministrationSection)
+    blacklist_administration: BlacklistAdministrationSection = Field(default_factory=BlacklistAdministrationSection)
     announcement_administration: AnnouncementAdministrationSection = Field(
         default_factory=AnnouncementAdministrationSection
     )
@@ -1360,10 +1364,7 @@ class PigCatcherConfig(PluginConfigBase):
     @model_validator(mode="after")
     def validate_cross_section_rules(self) -> PigCatcherConfig:
         self.catching.weights()
-        if (
-            self.quota_administration.execute_current_window_reset
-            and not self.quota_administration.group_id
-        ):
+        if self.quota_administration.execute_current_window_reset and not self.quota_administration.group_id:
             raise ValueError("执行额度重置前必须填写目标群号")
         blacklist = self.blacklist_administration
         if blacklist.execute_blacklist_update:
@@ -1387,10 +1388,6 @@ class PigCatcherConfig(PluginConfigBase):
             raise ValueError("执行控制面板操作前必须先启用抓猪插件")
         if self.cooking.six_star_to_five_percent + self.cooking.six_star_to_six_percent != 100:
             raise ValueError("六星猪料理概率必须合计 100%")
-        if (
-            self.ranking.pig_catalog_weight_percent
-            + self.ranking.food_catalog_weight_percent
-            != 100
-        ):
+        if self.ranking.pig_catalog_weight_percent + self.ranking.food_catalog_weight_percent != 100:
             raise ValueError("综合榜的猪猪与美食图鉴权重必须合计 100%")
         return self

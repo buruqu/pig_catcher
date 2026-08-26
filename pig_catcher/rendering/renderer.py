@@ -20,6 +20,11 @@ from PIL import Image, UnidentifiedImageError
 
 from ..domain.errors import RenderError
 from .models import (
+    AchievementBackfillSummaryViewModel,
+    AchievementOverviewViewModel,
+    AchievementPageViewModel,
+    AchievementRankingViewModel,
+    AchievementUnlockViewModel,
     AssetPreviewViewModel,
     BatchCookingViewModel,
     CatalogViewModel,
@@ -84,18 +89,12 @@ class PigCatcherRenderer:
             enable_async=False,
         )
         self._theme_css = (self.templates_root / "theme.css").read_text(encoding="utf-8")
-        self.preview_cache_root = (
-            Path(preview_cache_root).resolve()
-            if preview_cache_root is not None
-            else None
-        )
+        self.preview_cache_root = Path(preview_cache_root).resolve() if preview_cache_root is not None else None
         self._preview_cache: OrderedDict[tuple[object, ...], str] = OrderedDict()
         self._preview_cache_size = 0
         self._preview_cache_lock = asyncio.Lock()
         self._preview_key_locks: dict[tuple[object, ...], asyncio.Lock] = {}
-        self._preprocess_semaphore = asyncio.Semaphore(
-            max(1, int(self.options.media_preprocess_concurrency))
-        )
+        self._preprocess_semaphore = asyncio.Semaphore(max(1, int(self.options.media_preprocess_concurrency)))
         self._disk_cache_lock = Lock()
 
     async def render_framework_preview(
@@ -226,10 +225,7 @@ class PigCatcherRenderer:
         """Render one inventory page with deterministic animated-media previews."""
 
         media_data_urls = await self._list_media_data_urls(
-            (
-                (item.key, item.media_visible, item.is_animated)
-                for item in view.items
-            ),
+            ((item.key, item.media_visible, item.is_animated) for item in view.items),
             media_paths,
         )
         return await self._render_template(
@@ -276,10 +272,7 @@ class PigCatcherRenderer:
 
         items = (*view.size_items, *view.weight_items)
         media_data_urls = await self._list_media_data_urls(
-            (
-                (item.key, item.media_visible, item.is_animated)
-                for item in items
-            ),
+            ((item.key, item.media_visible, item.is_animated) for item in items),
             media_paths,
         )
         return await self._render_template(
@@ -340,10 +333,7 @@ class PigCatcherRenderer:
         """Render one food inventory page."""
 
         media_data_urls = await self._list_media_data_urls(
-            (
-                (item.key, item.media_visible, item.is_animated)
-                for item in view.items
-            ),
+            ((item.key, item.media_visible, item.is_animated) for item in view.items),
             media_paths,
         )
         return await self._render_template(
@@ -384,10 +374,7 @@ class PigCatcherRenderer:
         """Render one batch-cooking grid with all produced foods."""
 
         media_data_urls = await self._list_media_data_urls(
-            (
-                (item.key, item.media_visible, item.is_animated)
-                for item in view.items
-            ),
+            ((item.key, item.media_visible, item.is_animated) for item in view.items),
             media_paths,
         )
         return await self._render_template(
@@ -451,10 +438,7 @@ class PigCatcherRenderer:
         """Render one group leaderboard with static showcase media."""
 
         media_data_urls = await self._list_media_data_urls(
-            (
-                (item.key, item.media_visible, item.is_animated)
-                for item in view.items
-            ),
+            ((item.key, item.media_visible, item.is_animated) for item in view.items),
             media_paths,
         )
         return await self._render_template(
@@ -462,6 +446,21 @@ class PigCatcherRenderer:
             view=view,
             media_data_urls=media_data_urls,
         )
+
+    async def render_achievement_overview(self, view: AchievementOverviewViewModel) -> RenderedImage:
+        return await self._render_template("achievement_overview.html", view=view)
+
+    async def render_achievement_page(self, view: AchievementPageViewModel) -> RenderedImage:
+        return await self._render_template("achievement_page.html", view=view)
+
+    async def render_achievement_unlock(self, view: AchievementUnlockViewModel) -> RenderedImage:
+        return await self._render_template("achievement_unlock.html", view=view)
+
+    async def render_achievement_backfill_summary(self, view: AchievementBackfillSummaryViewModel) -> RenderedImage:
+        return await self._render_template("achievement_backfill_summary.html", view=view)
+
+    async def render_achievement_ranking(self, view: AchievementRankingViewModel) -> RenderedImage:
+        return await self._render_template("achievement_ranking.html", view=view)
 
     async def _render_template(
         self,
@@ -502,10 +501,7 @@ class PigCatcherRenderer:
                 for _, path, is_animated in requested
             )
         )
-        return {
-            key: preview
-            for (key, _, _), preview in zip(requested, previews, strict=True)
-        }
+        return {key: preview for (key, _, _), preview in zip(requested, previews, strict=True)}
 
     async def _cached_preview_data_url(
         self,
@@ -560,10 +556,7 @@ class PigCatcherRenderer:
             # 单飞锁只服务一次 cache key 构建；素材换版/mtime 变化时不让旧锁
             # 在长时间运行的机器人进程中缓慢累积。
             async with self._preview_cache_lock:
-                if (
-                    self._preview_key_locks.get(key) is key_lock
-                    and not key_lock.locked()
-                ):
+                if self._preview_key_locks.get(key) is key_lock and not key_lock.locked():
                     self._preview_key_locks.pop(key, None)
 
     async def _remember_preview(self, key: tuple[object, ...], value: str) -> None:
@@ -700,10 +693,7 @@ class PigCatcherRenderer:
             max_side=_COMPACT_PREVIEW_MAX_SIDE,
             quality=_COMPACT_PREVIEW_WEBP_QUALITY,
         )
-        return (
-            "data:image/webp;base64,"
-            f"{base64.b64encode(payload).decode('ascii')}"
-        )
+        return f"data:image/webp;base64,{base64.b64encode(payload).decode('ascii')}"
 
     @staticmethod
     def _animated_preview_data_url(source_path: Path) -> str:
@@ -722,10 +712,7 @@ class PigCatcherRenderer:
     async def _render_asset_html(self, html: str) -> RenderedImage:
         html_size = len(html.encode("utf-8"))
         if html_size > _MAX_HTML_RPC_BYTES:
-            raise RenderError(
-                f"HTML 渲染请求为 {html_size} 字节，超过插件的 "
-                f"{_MAX_HTML_RPC_BYTES} 字节 RPC 安全上限"
-            )
+            raise RenderError(f"HTML 渲染请求为 {html_size} 字节，超过插件的 {_MAX_HTML_RPC_BYTES} 字节 RPC 安全上限")
         try:
             result = await self.capability.html2png(
                 html,

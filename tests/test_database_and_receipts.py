@@ -62,6 +62,18 @@ async def test_empty_database_migrates_and_passes_integrity_check(tmp_path: Path
         "player_technique_permits",
         "group_technique_effects",
         "player_technique_progress",
+        "achievement_definition_snapshots",
+        "achievement_profiles",
+        "achievement_progress",
+        "achievement_events",
+        "achievement_unlocks",
+        "achievement_reward_inventory",
+        "achievement_metric_counters",
+        "achievement_scope_targets",
+        "achievement_backfill_state",
+        "achievement_milestone_claims",
+        "achievement_operations",
+        "achievement_ticket_effects",
     } <= names
     armed_columns = await database.fetch_all("PRAGMA table_info(armed_items)")
     assert "remaining_uses" in {str(row["name"]) for row in armed_columns}
@@ -90,6 +102,128 @@ async def test_empty_database_migrates_and_passes_integrity_check(tmp_path: Path
     receipt_column_map = {str(row["name"]): row for row in receipt_columns}
     assert int(receipt_column_map["catch_quota_cost"]["notnull"]) == 1
     assert str(receipt_column_map["catch_quota_cost"]["dflt_value"]) == "1"
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_schema35_marks_only_preexisting_players_for_backfill(tmp_path: Path) -> None:
+    database_path = tmp_path / "pre-v35.sqlite3"
+    connection = sqlite3.connect(database_path)
+    connection.execute("PRAGMA foreign_keys=ON")
+    connection.execute(
+        """
+        CREATE TABLE schema_migrations(
+            version INTEGER PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE,
+            applied_at TEXT NOT NULL
+        )
+        """
+    )
+    for migration in (item for item in MIGRATIONS if item.version <= 34):
+        for statement in migration.statements:
+            connection.execute(statement)
+        connection.execute(
+            """
+            INSERT INTO schema_migrations(version, name, applied_at)
+            VALUES (?, ?, '2026-08-26T00:00:00.000Z')
+            """,
+            (migration.version, migration.name),
+        )
+        connection.execute(f"PRAGMA user_version={migration.version}")
+    connection.execute(
+        """
+        INSERT INTO scopes(
+            scope_id, platform, group_id, group_name, stream_id,
+            created_at, updated_at
+        ) VALUES (
+            'qq:old-group', 'qq', 'old-group', '旧群', 'old-stream',
+            '2026-08-25T00:00:00.000Z', '2026-08-25T00:00:00.000Z'
+        )
+        """
+    )
+    connection.execute(
+        """
+        INSERT INTO players(
+            player_id, scope_id, platform_user_id, display_name,
+            created_at, updated_at
+        ) VALUES (
+            'qq:old-group:old-user', 'qq:old-group', 'old-user', '旧玩家',
+            '2026-08-25T00:00:00.000Z', '2026-08-25T00:00:00.000Z'
+        )
+        """
+    )
+    connection.execute(
+        """
+        INSERT INTO player_statistics(player_id, updated_at)
+        VALUES ('qq:old-group:old-user', '2026-08-25T00:00:00.000Z')
+        """
+    )
+    connection.execute(
+        """
+        UPDATE players SET coin_balance=1123
+        WHERE player_id='qq:old-group:old-user'
+        """
+    )
+    connection.executemany(
+        """
+        INSERT INTO currency_ledger(
+            ledger_entry_id, player_id, scope_id, amount, balance_after,
+            reason_code, reason_text, source_object_type, source_object_id,
+            idempotency_key, created_at
+        ) VALUES (?, 'qq:old-group:old-user', 'qq:old-group', ?, ?, ?, ?, '', '', ?, ?)
+        """,
+        (
+            (
+                "old-normal-income",
+                123,
+                123,
+                "catch-reward",
+                "旧抓猪奖励",
+                "old-normal-income",
+                "2026-08-25T01:00:00.000Z",
+            ),
+            (
+                "old-admin-adjustment",
+                1000,
+                1123,
+                "admin-coin-adjustment",
+                "旧管理员调账",
+                "old-admin-adjustment",
+                "2026-08-25T02:00:00.000Z",
+            ),
+        ),
+    )
+    connection.commit()
+    connection.close()
+
+    database = PigCatcherDatabase(database_path)
+    await database.open()
+    old_state = await database.fetch_one(
+        "SELECT status FROM achievement_backfill_state WHERE player_id='qq:old-group:old-user'"
+    )
+    assert old_state is not None and old_state["status"] == "pending"
+    old_metrics = await database.fetch_all(
+        """
+        SELECT metric_key, metric_value FROM achievement_metric_counters
+        WHERE player_id='qq:old-group:old-user' ORDER BY metric_key
+        """
+    )
+    assert [(str(row["metric_key"]), int(row["metric_value"])) for row in old_metrics] == [
+        ("admin_coin_adjustment_net", 1000),
+        ("ordinary_coins_earned", 123),
+    ]
+    await FrameworkService(database).touch_identity(
+        CommandIdentity(
+            scope=ScopeKey("qq", "new-group"),
+            stream_id="new-stream",
+            user_id="new-user",
+            display_name="新玩家",
+        )
+    )
+    new_state = await database.fetch_one(
+        "SELECT status FROM achievement_backfill_state WHERE player_id='qq:new-group:new-user'"
+    )
+    assert new_state is None
     await database.close()
 
 
@@ -233,15 +367,9 @@ async def test_v24_armed_item_queue_migrates_to_positive_only_rows(tmp_path: Pat
     database = PigCatcherDatabase(path)
     await database.open()
     assert await database.schema_version() == SCHEMA_VERSION
-    rows = await database.fetch_all(
-        "SELECT player_id, remaining_uses FROM armed_items ORDER BY player_id"
-    )
-    assert [(str(row["player_id"]), int(row["remaining_uses"])) for row in rows] == [
-        ("qq:100:200", 1)
-    ]
-    table = await database.fetch_one(
-        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'armed_items'"
-    )
+    rows = await database.fetch_all("SELECT player_id, remaining_uses FROM armed_items ORDER BY player_id")
+    assert [(str(row["player_id"]), int(row["remaining_uses"])) for row in rows] == [("qq:100:200", 1)]
+    table = await database.fetch_one("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'armed_items'")
     assert table is not None
     assert "CHECK (remaining_uses > 0)" in str(table["sql"])
     assert await database.integrity_check() == ("ok",)
@@ -683,9 +811,7 @@ async def test_v23_migrates_food_effects_and_repairs_intermediate_pig_cookie(
     quota = await database.fetch_one(
         "SELECT weekly_expires_at FROM player_catch_quota_bonuses WHERE player_id = 'qq:100:200'"
     )
-    receipt = await database.fetch_one(
-        "SELECT catch_quota_cost FROM command_receipts WHERE receipt_id = 'old-receipt'"
-    )
+    receipt = await database.fetch_one("SELECT catch_quota_cost FROM command_receipts WHERE receipt_id = 'old-receipt'")
     assert quota is not None and quota["weekly_expires_at"] == "2026-08-17T01:00:00.000Z"
     assert receipt is not None and receipt["catch_quota_cost"] == 1
     assert await database.integrity_check() == ("ok",)
@@ -991,11 +1117,18 @@ async def test_released_v33_source_unique_constraint_is_repaired(tmp_path: Path)
             version INTEGER PRIMARY KEY,
             name TEXT NOT NULL UNIQUE,
             applied_at TEXT NOT NULL
-        );
-        INSERT INTO schema_migrations(version, name, applied_at)
-        VALUES (33, 'food-roulette-rebalance', '2026-08-24T17:46:47.946Z');
-        CREATE TABLE players(player_id TEXT PRIMARY KEY);
-        CREATE TABLE food_instances(food_instance_id TEXT PRIMARY KEY);
+            );
+            INSERT INTO schema_migrations(version, name, applied_at)
+            VALUES (33, 'food-roulette-rebalance', '2026-08-24T17:46:47.946Z');
+            CREATE TABLE players(player_id TEXT PRIMARY KEY);
+            CREATE TABLE currency_ledger(
+                ledger_entry_id TEXT PRIMARY KEY,
+                player_id TEXT NOT NULL,
+                amount INTEGER NOT NULL,
+                reason_code TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
+            CREATE TABLE food_instances(food_instance_id TEXT PRIMARY KEY);
         INSERT INTO players(player_id) VALUES ('qq:100:200');
         INSERT INTO food_instances(food_instance_id) VALUES ('roulette-source');
         CREATE TABLE player_roulette_state(
@@ -1040,9 +1173,7 @@ async def test_released_v33_source_unique_constraint_is_repaired(tmp_path: Path)
     database = PigCatcherDatabase(path)
     await database.open()
     assert await database.schema_version() == SCHEMA_VERSION
-    table = await database.fetch_one(
-        "SELECT sql FROM sqlite_master WHERE type='table' AND name='player_food_effects'"
-    )
+    table = await database.fetch_one("SELECT sql FROM sqlite_master WHERE type='table' AND name='player_food_effects'")
     assert table is not None
     assert "source_food_instance_id TEXT NOT NULL UNIQUE" not in str(table["sql"])
     async with database.transaction() as session:
@@ -1057,9 +1188,7 @@ async def test_released_v33_source_unique_constraint_is_repaired(tmp_path: Path)
             )
             """
         )
-    rows = await database.fetch_all(
-        "SELECT effect_id FROM player_food_effects ORDER BY effect_entry_id"
-    )
+    rows = await database.fetch_all("SELECT effect_id FROM player_food_effects ORDER BY effect_entry_id")
     assert [str(row["effect_id"]) for row in rows] == [
         "next-six-star-cook-bonus",
         "next-guaranteed-six-star-catch",
@@ -1077,10 +1206,7 @@ async def test_current_schema_rejects_reintroduced_source_unique_index(tmp_path:
     await database.close()
 
     connection = sqlite3.connect(path)
-    connection.execute(
-        "CREATE UNIQUE INDEX broken_source_unique "
-        "ON player_food_effects(source_food_instance_id)"
-    )
+    connection.execute("CREATE UNIQUE INDEX broken_source_unique ON player_food_effects(source_food_instance_id)")
     connection.commit()
     connection.close()
 

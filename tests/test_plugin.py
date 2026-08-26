@@ -227,22 +227,18 @@ async def test_group_reset_command_rejects_unconfigured_user_before_backup(
     assert "只有插件配置中的管理员" in denied[1]
     assert len(context.send.texts) == 1
     assert not (tmp_path / "backups").exists()
-    assert await plugin.database.fetch_one(
-        "SELECT 1 FROM audit_events WHERE action = 'catch-quota-window-reset'"
-    ) is None
+    assert (
+        await plugin.database.fetch_one("SELECT 1 FROM audit_events WHERE action = 'catch-quota-window-reset'") is None
+    )
     await plugin.on_unload()
 
 
 def test_plugin_registers_only_explicit_production_commands() -> None:
     plugin = create_plugin()
     components = plugin.get_components()
-    assert len(components) == 56
-    commands = {
-        component["name"]
-        for component in components
-        if component["type"] == "COMMAND"
-    }
-    assert len(commands) == 55
+    assert len(components) == 65
+    commands = {component["name"] for component in components if component["type"] == "COMMAND"}
+    assert len(commands) == 64
     assert commands == {
         "pig_catcher_help",
         "pig_catcher_reset_quota",
@@ -299,12 +295,17 @@ def test_plugin_registers_only_explicit_production_commands() -> None:
         "pig_catcher_enable_batch_keep",
         "pig_catcher_disable_batch_keep",
         "pig_catcher_favorite",
-        }
-    home_card = next(
-        component
-        for component in components
-        if component["type"] == "HOME_CARD"
-    )
+        "pig_catcher_achievements",
+        "pig_catcher_achievement_detail",
+        "pig_catcher_achievement_equip",
+        "pig_catcher_achievement_unequip",
+        "pig_catcher_achievement_chest",
+        "pig_catcher_achievement_memorial_pig",
+        "pig_catcher_achievement_ticket",
+        "pig_catcher_achievement_reforge",
+        "pig_catcher_achievement_ranking",
+    }
+    home_card = next(component for component in components if component["type"] == "HOME_CARD")
     assert home_card["name"] == "pig_catcher_quota_control"
     assert "打开运营控制" in str(home_card)
     assert "社交黑名单" in str(home_card)
@@ -318,16 +319,9 @@ def test_plugin_registers_only_explicit_production_commands() -> None:
 
 
 def test_store_command_patterns_do_not_claim_livehouse_commands() -> None:
-    components = {
-        component["name"]: component
-        for component in create_plugin().get_components()
-    }
-    purchase_pattern = components["pig_catcher_purchase"]["metadata"][
-        "command_pattern"
-    ]
-    upgrade_pattern = components["pig_catcher_upgrade"]["metadata"][
-        "command_pattern"
-    ]
+    components = {component["name"]: component for component in create_plugin().get_components()}
+    purchase_pattern = components["pig_catcher_purchase"]["metadata"]["command_pattern"]
+    upgrade_pattern = components["pig_catcher_upgrade"]["metadata"]["command_pattern"]
 
     for text in (
         "/购买 幸运猪哨 2",
@@ -360,36 +354,23 @@ def test_store_command_patterns_do_not_claim_livehouse_commands() -> None:
 
 
 def test_pig_detail_command_supports_new_and_legacy_names() -> None:
-    components = {
-        component["name"]: component
-        for component in create_plugin().get_components()
-    }
-    pattern = components["pig_catcher_pig_detail"]["metadata"][
-        "command_pattern"
-    ]
+    components = {component["name"]: component for component in create_plugin().get_components()}
+    pattern = components["pig_catcher_pig_detail"]["metadata"]["command_pattern"]
     assert re.search(pattern, "/猪猪详情 地球猪#Pig9Fun")
     assert re.search(pattern, "/抓猪详情 地球猪#pig9fun")
     assert re.search(pattern, "/猪详情 地球猪#pig9fun") is None
 
 
 def test_daily_giants_command_claims_only_the_exact_query() -> None:
-    components = {
-        component["name"]: component
-        for component in create_plugin().get_components()
-    }
-    pattern = components["pig_catcher_daily_giants"]["metadata"][
-        "command_pattern"
-    ]
+    components = {component["name"]: component for component in create_plugin().get_components()}
+    pattern = components["pig_catcher_daily_giants"]["metadata"]["command_pattern"]
     assert re.search(pattern, "/今日巨物")
     assert re.search(pattern, "/今日巨物   ")
     assert re.search(pattern, "/今日巨物 2") is None
 
 
 def test_admin_command_patterns_claim_only_the_documented_syntax() -> None:
-    components = {
-        component["name"]: component
-        for component in create_plugin().get_components()
-    }
+    components = {component["name"]: component for component in create_plugin().get_components()}
     examples = {
         "pig_catcher_admin_help": ("/猪管帮助",),
         "pig_catcher_admin_grant_coins": ("/猪管发币 @玩家 100",),
@@ -412,9 +393,7 @@ def test_admin_command_patterns_claim_only_the_documented_syntax() -> None:
             "/猪管监管",
             "/猪管监管 ABCD1234",
         ),
-        "pig_catcher_admin_regulation_release": (
-            "/猪管监管解除 ABCD1234 人工复核通过",
-        ),
+        "pig_catcher_admin_regulation_release": ("/猪管监管解除 ABCD1234 人工复核通过",),
         "pig_catcher_admin_reset_player_quota": ("/猪管重置玩家 @玩家",),
     }
     for component_name, commands in examples.items():
@@ -422,14 +401,10 @@ def test_admin_command_patterns_claim_only_the_documented_syntax() -> None:
         for command in commands:
             assert re.search(pattern, command), (component_name, command)
 
-    asset_pattern = components["pig_catcher_admin_grant_asset"]["metadata"][
-        "command_pattern"
-    ]
+    asset_pattern = components["pig_catcher_admin_grant_asset"]["metadata"]["command_pattern"]
     assert re.search(asset_pattern, "/猪管发币 @玩家 100") is None
 
-    toggle_pattern = components["pig_catcher_toggle_baogian"]["metadata"][
-        "command_pattern"
-    ]
+    toggle_pattern = components["pig_catcher_toggle_baogian"]["metadata"]["command_pattern"]
     assert re.search(toggle_pattern, "/切换 猪保千 pig9fun")
 
 
@@ -454,7 +429,8 @@ async def test_help_command_sends_copyable_text_without_rendering(tmp_path: Path
     success, text, level = await invoke_help(plugin)
     assert success is True
     assert level == 2
-    assert "/抓猪帮助 [抓猪|背包|道具|做菜|商城|交易|排行]" in text
+    assert "/抓猪帮助 [抓猪|背包|道具|做菜|商城|交易|排行|成就]" in text
+    assert "/使用成就券 <券名>" in text
     assert "当前版本：" not in text
     assert "已开放抓猪" not in text
     assert "/抓猪档案" not in text
@@ -565,10 +541,7 @@ async def _install_test_pig(
     source.mkdir()
     image_name = "command-pig.gif" if animated else "command-pig.png"
     if animated:
-        frames = [
-            Image.new("RGBA", (256, 256), color)
-            for color in ("#F58CAD", "#66BFA3", "#5B8FD1")
-        ]
+        frames = [Image.new("RGBA", (256, 256), color) for color in ("#F58CAD", "#66BFA3", "#5B8FD1")]
         frames[0].save(
             source / image_name,
             format="GIF",
@@ -904,9 +877,7 @@ async def test_complete_fourth_round_command_flow_and_duplicate_publication(
     assert eaten[0] is True
     assert len(context.send.images) == 6
 
-    player = await plugin.database.fetch_one(
-        "SELECT coin_balance FROM players WHERE player_id = 'qq:10001:20001'"
-    )
+    player = await plugin.database.fetch_one("SELECT coin_balance FROM players WHERE player_id = 'qq:10001:20001'")
     assert player is not None
     balance_after_seed = int(player["coin_balance"]) + 2000
     async with plugin.database.transaction() as session:
@@ -964,9 +935,7 @@ async def test_complete_fourth_round_command_flow_and_duplicate_publication(
         """
     )
     assert second_pig is not None
-    second_pig_selector = (
-        f"{second_pig['display_name_snapshot']}#{second_pig['short_code']}"
-    )
+    second_pig_selector = f"{second_pig['display_name_snapshot']}#{second_pig['short_code']}"
     await plugin.handle_cook(
         stream_id="stream-10001",
         **_command_kwargs(
@@ -984,9 +953,7 @@ async def test_complete_fourth_round_command_flow_and_duplicate_publication(
         """
     )
     assert second_food is not None
-    second_food_selector = (
-        f"{second_food['display_name_snapshot']}#{second_food['short_code']}"
-    )
+    second_food_selector = f"{second_food['display_name_snapshot']}#{second_food['short_code']}"
     await plugin.handle_sell_food(
         stream_id="stream-10001",
         **_command_kwargs(
@@ -1009,9 +976,7 @@ async def test_complete_fourth_round_command_flow_and_duplicate_publication(
         """
     )
     assert third_pig is not None
-    third_pig_selector = (
-        f"{third_pig['display_name_snapshot']}#{third_pig['short_code']}"
-    )
+    third_pig_selector = f"{third_pig['display_name_snapshot']}#{third_pig['short_code']}"
     await plugin.handle_sell_pig(
         stream_id="stream-10001",
         **_command_kwargs(
@@ -1225,9 +1190,7 @@ async def test_complete_fifth_round_command_flow_with_structured_mention(
         """
     )
     assert len(rows) == 2
-    selectors = [
-        f"{row['display_name_snapshot']}#{row['short_code']}" for row in rows
-    ]
+    selectors = [f"{row['display_name_snapshot']}#{row['short_code']}" for row in rows]
 
     gift_message = build_message(message_id="round5-gift")
     gift_message["raw_message"] = [
@@ -1293,9 +1256,7 @@ async def test_complete_fifth_round_command_flow_with_structured_mention(
         ),
     )
     assert offered[0] is True
-    offer = await plugin.database.fetch_one(
-        "SELECT trade_id FROM trade_offers WHERE status = 'pending'"
-    )
+    offer = await plugin.database.fetch_one("SELECT trade_id FROM trade_offers WHERE status = 'pending'")
     assert offer is not None
     trade_id = str(offer["trade_id"])
 
@@ -1417,9 +1378,7 @@ async def test_catch_render_failure_falls_back_once_without_rollback(
     )
     assert duplicate[2] == 0
     assert len(context.send.texts) == 1
-    row = await plugin.database.fetch_one(
-        "SELECT COUNT(*) AS count FROM pig_instances"
-    )
+    row = await plugin.database.fetch_one("SELECT COUNT(*) AS count FROM pig_instances")
     assert row is not None and row["count"] == 1
     await plugin.on_unload()
 
@@ -1479,9 +1438,7 @@ async def test_missing_pig_asset_uses_image_placeholder(
         config_updates={"catching": {"cooldown_seconds": 0}, "cooking": {"cook_cooldown_seconds": 0}},
     )
     await _install_test_pig(plugin, tmp_path, animated=animated)
-    row = await plugin.database.fetch_one(
-        "SELECT image_relpath FROM pig_templates WHERE template_id = 'command-pig'"
-    )
+    row = await plugin.database.fetch_one("SELECT image_relpath FROM pig_templates WHERE template_id = 'command-pig'")
     assert row is not None
     source_path = (tmp_path / str(row["image_relpath"])).resolve()
     assert source_path.is_relative_to(tmp_path.resolve())
@@ -1560,9 +1517,7 @@ async def test_maintenance_reports_ledger_and_asset_faults_without_repair(
             WHERE player_id = 'qq:10001:20001'
             """
         )
-    row = await plugin.database.fetch_one(
-        "SELECT image_relpath FROM pig_templates WHERE template_id = 'command-pig'"
-    )
+    row = await plugin.database.fetch_one("SELECT image_relpath FROM pig_templates WHERE template_id = 'command-pig'")
     assert row is not None
     source_path = (tmp_path / str(row["image_relpath"])).resolve()
     source_path.unlink()
@@ -2082,9 +2037,7 @@ async def test_window_quota_boost_overrides_limit_and_bypasses_restriction(
     for index in range(1, 16):
         ok, _, _ = await plugin.handle_catch(
             stream_id="stream-10001",
-            **_command_kwargs(
-                build_message(message_id=f"boost-catch-{index}")
-            ),
+            **_command_kwargs(build_message(message_id=f"boost-catch-{index}")),
         )
         assert ok is True, f"第 {index} 次抓猪应成功"
 
@@ -2172,7 +2125,6 @@ async def test_admin_panel_boost_one_shot_is_scoped_and_audited(
     await plugin.on_unload()
 
 
-
 @pytest.mark.asyncio
 async def test_batch_keep_commands_toggle_player_preference(
     tmp_path: Path,
@@ -2227,16 +2179,13 @@ async def test_batch_keep_commands_toggle_player_preference(
     await plugin.on_unload()
 
 
-
 async def _install_baogian_template(plugin: Any, tmp_path: Path) -> None:
     """安装一只带备用表情包图的保千猪模板（公共素材，四个群通用）。"""
 
     source = tmp_path / "baogian-assets"
     source.mkdir()
     Image.new("RGBA", (64, 64), "#F58CAD").save(source / "baogian.png", format="PNG")
-    Image.new("RGBA", (64, 64), "#66BFA3").save(
-        source / "baogian-sticker.png", format="PNG"
-    )
+    Image.new("RGBA", (64, 64), "#66BFA3").save(source / "baogian-sticker.png", format="PNG")
     manifest = source / "assets.json"
     manifest.write_text(
         json.dumps(
@@ -2307,8 +2256,13 @@ async def _insert_baogian(
                     ?, 'active', ?, ?)
             """,
             (
-                instance_id, short_code, scope_id, player_id,
-                variant, "2026-07-28T04:00:00.000Z", "2026-07-28T04:00:00.000Z",
+                instance_id,
+                short_code,
+                scope_id,
+                player_id,
+                variant,
+                "2026-07-28T04:00:00.000Z",
+                "2026-07-28T04:00:00.000Z",
             ),
         )
 
@@ -2338,12 +2292,18 @@ async def test_toggle_baogian_works_across_groups_and_requires_code_when_multipl
     )
     player_id = f"{official_scope}:U001"
     await _insert_baogian(
-        plugin, scope_id=official_scope, player_id=player_id,
-        short_code="BA0A0001", instance_id="baogian-1",
+        plugin,
+        scope_id=official_scope,
+        player_id=player_id,
+        short_code="BA0A0001",
+        instance_id="baogian-1",
     )
     await _insert_baogian(
-        plugin, scope_id=official_scope, player_id=player_id,
-        short_code="Pig9Fun", instance_id="baogian-2",
+        plugin,
+        scope_id=official_scope,
+        player_id=player_id,
+        short_code="Pig9Fun",
+        instance_id="baogian-2",
     )
 
     # 多只且未给编号：提示需要编号
@@ -2432,8 +2392,11 @@ async def test_toggle_baogian_single_instance_needs_no_code(
         )
     )
     await _insert_baogian(
-        plugin, scope_id=scope_id, player_id=f"{scope_id}:20001",
-        short_code="BA0B0001", instance_id="baogian-single",
+        plugin,
+        scope_id=scope_id,
+        player_id=f"{scope_id}:20001",
+        short_code="BA0B0001",
+        instance_id="baogian-single",
     )
     ok, message, _ = await plugin.handle_toggle_baogian(
         stream_id="stream-10001",

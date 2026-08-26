@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 
+from ..domain.achievements import TIER_LABELS, AchievementReward
 from ..domain.economy import (
     adjusted_cooking_weights,
     cookware_higher_rarity_multiplier,
@@ -67,6 +68,13 @@ from ..services.social import (
     TradePage,
 )
 from .models import (
+    AchievementBackfillSummaryViewModel,
+    AchievementOverviewViewModel,
+    AchievementPageViewModel,
+    AchievementRankingRowViewModel,
+    AchievementRankingViewModel,
+    AchievementRowViewModel,
+    AchievementUnlockViewModel,
     BatchCookingItemViewModel,
     BatchCookingViewModel,
     CatalogItemViewModel,
@@ -160,11 +168,7 @@ def _probability_line(weights: Sequence[float]) -> str:
             return f"{value:.1f}"
         return f"{value:.3f}"
 
-    return " ".join(
-        f"{index + 1}★{formatted(value)}%"
-        for index, value in enumerate(weights)
-        if value > 0
-    )
+    return " ".join(f"{index + 1}★{formatted(value)}%" for index, value in enumerate(weights) if value > 0)
 
 
 def _probability_sources(
@@ -228,9 +232,7 @@ def pig_card_view(
         coin_reward=catch.coin_reward if catch is not None else None,
         experience_reward=catch.experience_reward if catch is not None else None,
         veteran_coin_reward=(catch.veteran_coin_reward if catch is not None else 0),
-        veteran_reward_levels=(
-            catch.veteran_reward_levels if catch is not None else ()
-        ),
+        veteran_reward_levels=(catch.veteran_reward_levels if catch is not None else ()),
         coin_balance=catch.coin_balance if catch is not None else None,
         total_experience=catch.total_experience if catch is not None else None,
         player_level=progress.level if progress is not None else None,
@@ -269,6 +271,7 @@ def pig_card_view(
             if catch is not None
             else ""
         ),
+        achievement_firework=(catch is not None and any("成就礼花券" in summary for summary in catch.effect_summaries)),
     )
 
 
@@ -515,12 +518,8 @@ def food_card_view(
         media_format=food.media_format,
         coin_reward=cooking.coin_reward if cooking is not None else None,
         experience_reward=(cooking.experience_reward if cooking is not None else None),
-        veteran_coin_reward=(
-            cooking.veteran_coin_reward if cooking is not None else 0
-        ),
-        veteran_reward_levels=(
-            cooking.veteran_reward_levels if cooking is not None else ()
-        ),
+        veteran_coin_reward=(cooking.veteran_coin_reward if cooking is not None else 0),
+        veteran_reward_levels=(cooking.veteran_reward_levels if cooking is not None else ()),
         coin_balance=cooking.coin_balance if cooking is not None else None,
         total_experience=(cooking.total_experience if cooking is not None else None),
         player_level=progress.level if progress is not None else None,
@@ -529,13 +528,14 @@ def food_card_view(
         level_progress_percent=(progress.progress_percent if progress is not None else 0.0),
         cookware_level=(cooking.cookware_level if cooking is not None else None),
         item_name=cooking.item_name if cooking is not None else "",
-        item_remaining_uses=(
-            cooking.item_remaining_uses if cooking is not None else 0
-        ),
+        item_remaining_uses=(cooking.item_remaining_uses if cooking is not None else 0),
         catalog_new_count=(cooking.catalog_new_count if cooking is not None else 0),
         bonus_selector=bonus_selector,
         probability_summary=(cooking.probability_summary if cooking is not None else ""),
         effect_summaries=(cooking.effect_summaries if cooking is not None else ()),
+        achievement_firework=(
+            cooking is not None and any("成就礼花券" in summary for summary in cooking.effect_summaries)
+        ),
         excluded_summaries=(cooking.excluded_summaries if cooking is not None else ()),
         probability_line=(_probability_line(cooking.weights) if cooking is not None else ""),
         probability_sources=(
@@ -619,10 +619,7 @@ def store_view(page: StorePage) -> StoreViewModel:
         StoreProbabilityRowViewModel(
             level=level,
             value=f"{high_probability:.2f}%",
-            delta=" · ".join(
-                f"{rarity}★{weights[rarity - 1]:.2f}"
-                for rarity in range(4, 7)
-            ),
+            delta=" · ".join(f"{rarity}★{weights[rarity - 1]:.2f}" for rarity in range(4, 7)),
             current=level == page.feed_level,
         )
         for level in range(6)
@@ -792,11 +789,7 @@ def batch_sale_receipt_view(result: BatchSaleResult) -> EconomyReceiptViewModel:
     scope = (
         f"同名美食“{result.display_name}”"
         if result.display_name
-        else (
-            f"{result.rarity} 星{kind}"
-            if result.rarity is not None
-            else f"1 至 {result.max_rarity} 星{kind}"
-        )
+        else (f"{result.rarity} 星{kind}" if result.rarity is not None else f"1 至 {result.max_rarity} 星{kind}")
     )
     return EconomyReceiptViewModel(
         eyebrow="官方回收 · 原子批量结算",
@@ -902,9 +895,7 @@ def group_event_eat_view(
         dedicated_catches = int(params.get("group_dedicated_catches") or 0)
         five_multiplier = float(params.get("five_star_multiplier") or 1.0)
         six_multiplier = float(params.get("six_star_multiplier") or 1.0)
-        hidden_chance = float(
-            params.get("hidden_boost_chance_percent") or 0.0
-        )
+        hidden_chance = float(params.get("hidden_boost_chance_percent") or 0.0)
         return GroupEventViewModel(
             tone="sugar",
             eyebrow="六星盛宴 · 全群事件资格已取得",
@@ -937,8 +928,7 @@ def group_event_eat_view(
             ),
             note=(
                 "本次食用只取得发动资格，尚未重置任何额度。"
-                "请由食用者在本群发送 /重置额度，届时将再次发布正式发动通告。"
-                + _veteran_reward_note(result)
+                "请由食用者在本群发送 /重置额度，届时将再次发布正式发动通告。" + _veteran_reward_note(result)
             ),
             footer="全群事件将在真正发动时原子结算",
             settlement_committed=False,
@@ -992,8 +982,7 @@ def group_event_eat_view(
             ),
             note=(
                 "全群效果从当前抓猪时段开始，到次日同一时段刷新时清除；"
-                "每名玩家的下一次兼容抓猪独立消费自己的加成。"
-                + _veteran_reward_note(result)
+                "每名玩家的下一次兼容抓猪独立消费自己的加成。" + _veteran_reward_note(result)
             ),
             footer="神龙赐福已在本群完成结算",
             media_visible=result.food.media_visible,
@@ -1065,8 +1054,7 @@ def special_event_eat_view(
             note=(
                 f"{result.food.selector} 已消耗；本次从 "
                 f"{result.group_rewarded_players} 名群友处实际汇总 "
-                f"{result.group_coin_total:,} 猪币。"
-                + _veteran_reward_note(result)
+                f"{result.group_coin_total:,} 猪币。" + _veteran_reward_note(result)
             ),
             footer="全家桶猪币往来已原子结算",
             media_visible=result.food.media_visible,
@@ -1077,9 +1065,7 @@ def special_event_eat_view(
             committed_note="扣款、汇总与入账已经提交；重复消息不会重复收取",
         )
     if effect_id == TECHNIQUE_PERMIT:
-        technique_id = str(
-            result.effect.queued_effect_params.get("technique_id") or ""
-        )
+        technique_id = str(result.effect.queued_effect_params.get("technique_id") or "")
         technique_name = TECHNIQUE_DISPLAY_NAMES.get(technique_id, "未知术式")
         command = _TECHNIQUE_COMMANDS.get(technique_id, "请查看效果说明")
         return GroupEventViewModel(
@@ -1235,19 +1221,12 @@ def technique_activation_view(
                 )
                 for index, pig in enumerate(result.granted_pigs[:3])
             ),
-            note=(
-                f"完整资产编号：{selectors}。"
-                f"剩余虚式资格 {result.remaining_permits} 次。"
-            ),
+            note=(f"完整资产编号：{selectors}。剩余虚式资格 {result.remaining_permits} 次。"),
             footer="虚式奖励已原子发放",
             seal_top="虚式",
             seal_bottom="结算",
-            media_visible=bool(
-                preview_pig is not None and preview_pig.media_visible
-            ),
-            is_animated=bool(
-                preview_pig is not None and preview_pig.is_animated
-            ),
+            media_visible=bool(preview_pig is not None and preview_pig.media_visible),
+            is_animated=bool(preview_pig is not None and preview_pig.is_animated),
             image_fit=(preview_pig.image_fit if preview_pig is not None else "contain"),
         )
     technique_name = TECHNIQUE_DISPLAY_NAMES.get(
@@ -1318,21 +1297,13 @@ def technique_catch_event_view(
         gojo_self_caught_in_own_domain = (
             is_gojo_dual_recipe
             and bool(foods)
-            and all(
-                food.owner_player_id == resolution.source_player_id for food in foods
-            )
+            and all(food.owner_player_id == resolution.source_player_id for food in foods)
         )
-        owner_summary = "、".join(
-            f"{food.owner_display_name}：{food.selector}" for food in foods
-        )
+        owner_summary = "、".join(f"{food.owner_display_name}：{food.selector}" for food in foods)
         return GroupEventViewModel(
             tone="technique",
             eyebrow="伏魔御厨子 · 自动出餐结算",
-            title=(
-                "五条猪化为苍蓝与赫焰"
-                if is_gojo_dual_recipe
-                else f"{result.pig.display_name}已化为{food_name}"
-            ),
+            title=("五条猪化为苍蓝与赫焰" if is_gojo_dual_recipe else f"{result.pig.display_name}已化为{food_name}"),
             subtitle=(
                 (
                     "发动者亲自抓获五条猪，两道专属雪山全部归发动者"
@@ -1346,11 +1317,7 @@ def technique_catch_event_view(
             group_name=group_name or "当前群",
             event_time=_display_time(result.receipt.created_at),
             hero_label="本次出餐品质",
-            hero_value=(
-                f"{food_rarity} 星 · 专属双菜"
-                if is_gojo_dual_recipe
-                else f"{food_rarity} 星 · 双份"
-            ),
+            hero_value=(f"{food_rarity} 星 · 专属双菜" if is_gojo_dual_recipe else f"{food_rarity} 星 · 双份"),
             rows=(
                 GroupEventRowViewModel("抓猪群友", catcher, result.pig.selector),
                 GroupEventRowViewModel(
@@ -1369,15 +1336,9 @@ def technique_catch_event_view(
             seal_top="领域",
             seal_bottom="出餐",
             actor_label="领域发动者",
-            media_visible=bool(
-                preview_food is not None and preview_food.media_visible
-            ),
-            is_animated=bool(
-                preview_food is not None and preview_food.is_animated
-            ),
-            image_fit=(
-                preview_food.image_fit if preview_food is not None else "contain"
-            ),
+            media_visible=bool(preview_food is not None and preview_food.media_visible),
+            is_animated=bool(preview_food is not None and preview_food.is_animated),
+            image_fit=(preview_food.image_fit if preview_food is not None else "contain"),
         )
     return GroupEventViewModel(
         tone="technique",
@@ -1765,3 +1726,107 @@ def daily_giants_media_paths(
                 entry.image_relpath,
             )
     return paths
+
+
+def _achievement_reward_text(rewards: Sequence[object]) -> str:
+    from ..services.achievements import reward_label
+
+    return "、".join(reward_label(reward) for reward in rewards) or "成就点"
+
+
+def achievement_row_view(entry: object) -> AchievementRowViewModel:
+    return AchievementRowViewModel(
+        achievement_id=entry.achievement_id,
+        name=entry.name,
+        category=entry.category,
+        tier_label=entry.tier_label,
+        unlocked=entry.unlocked,
+        hidden=entry.hidden,
+        description=entry.description,
+        progress=entry.progress,
+        target=entry.target,
+        points=entry.points,
+        reward_text=_achievement_reward_text(entry.rewards),
+        unlocked_at=entry.unlocked_at,
+    )
+
+
+def achievement_overview_view(result: object) -> AchievementOverviewViewModel:
+    from ..services.achievements import reward_label
+
+    reward_text = (
+        "、".join(
+            reward_label(AchievementReward(reward_type, reward_id, quantity))
+            for reward_type, reward_id, quantity in result.rewards
+        )
+        or "暂无库存"
+    )
+    return AchievementOverviewViewModel(
+        display_name=result.display_name,
+        points=result.points,
+        unlocked_count=result.unlocked_count,
+        total_count=result.total_count,
+        completion_percent=(result.unlocked_count * 100 / result.total_count if result.total_count else 0),
+        title_text=result.equipped_title_id or "未佩戴",
+        frame_text=result.equipped_frame_id or "默认淡粉",
+        showcase_text=result.showcase_achievement_name or "未展示",
+        next_milestone_text=(f"{result.next_milestone} 点" if result.next_milestone else "已完成全部里程碑"),
+        reward_inventory_text=reward_text,
+        recent=tuple(achievement_row_view(entry) for entry in result.recent),
+    )
+
+
+def achievement_page_view(result: object) -> AchievementPageViewModel:
+    return AchievementPageViewModel(
+        display_name=result.display_name,
+        category=result.category,
+        page=result.page,
+        page_count=result.page_count,
+        total_count=result.total_count,
+        entries=tuple(achievement_row_view(entry) for entry in result.entries),
+    )
+
+
+def achievement_unlock_view(display_name: str, unlocks: Sequence[object]) -> AchievementUnlockViewModel:
+    rows = []
+    for unlock in unlocks:
+        rows.append(
+            AchievementRowViewModel(
+                achievement_id=unlock.achievement_id,
+                name=unlock.name,
+                category="新成就",
+                tier_label=TIER_LABELS[unlock.tier],
+                unlocked=True,
+                hidden=False,
+                description="成就条件已经完成，奖励已原子结算。",
+                progress=1,
+                target=1,
+                points=unlock.points,
+                reward_text=_achievement_reward_text(unlock.rewards),
+                unlocked_at=unlock.unlocked_at,
+            )
+        )
+    return AchievementUnlockViewModel(display_name, sum(item.points for item in unlocks), tuple(rows))
+
+
+def achievement_backfill_summary_view(result: object) -> AchievementBackfillSummaryViewModel:
+    return AchievementBackfillSummaryViewModel(
+        display_name=result.display_name,
+        unlocked_count=result.unlocked_count,
+        total_points=result.total_points,
+        reward_text=_achievement_reward_text(result.rewards),
+        highlights=result.highlights,
+    )
+
+
+def achievement_ranking_view(result: object) -> AchievementRankingViewModel:
+    return AchievementRankingViewModel(
+        group_name=result.group_name,
+        page=result.page,
+        page_count=result.page_count,
+        total_count=result.total_count,
+        entries=tuple(
+            AchievementRankingRowViewModel(item.rank, item.display_name, item.points, item.unlocked_count)
+            for item in result.entries
+        ),
+    )

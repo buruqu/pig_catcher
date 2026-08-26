@@ -142,6 +142,9 @@ class PigCardViewModel:
     tutorial_text: str = ""
     probability_line: str = ""
     probability_sources: str = ""
+    achievement_firework: bool = False
+    achievement_title: str = ""
+    achievement_frame: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -426,6 +429,9 @@ class FoodCardViewModel:
     bonus_selector: str = ""
     probability_summary: str = ""
     effect_summaries: tuple[str, ...] = ()
+    achievement_firework: bool = False
+    achievement_title: str = ""
+    achievement_frame: str = ""
     excluded_summaries: tuple[str, ...] = ()
     probability_line: str = ""
     probability_sources: str = ""
@@ -682,3 +688,77 @@ class RankingViewModel:
     page_count: int
     total_count: int
     items: tuple[RankingItemViewModel, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class AchievementRowViewModel:
+    achievement_id: str
+    name: str
+    category: str
+    tier_label: str
+    unlocked: bool
+    hidden: bool
+    description: str
+    progress: int
+    target: int
+    points: int
+    reward_text: str
+    unlocked_at: str
+
+
+@dataclass(frozen=True, slots=True)
+class AchievementOverviewViewModel:
+    display_name: str
+    points: int
+    unlocked_count: int
+    total_count: int
+    completion_percent: float
+    title_text: str
+    frame_text: str
+    showcase_text: str
+    next_milestone_text: str
+    reward_inventory_text: str
+    recent: tuple[AchievementRowViewModel, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class AchievementPageViewModel:
+    display_name: str
+    category: str
+    page: int
+    page_count: int
+    total_count: int
+    entries: tuple[AchievementRowViewModel, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class AchievementUnlockViewModel:
+    display_name: str
+    total_points: int
+    entries: tuple[AchievementRowViewModel, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class AchievementBackfillSummaryViewModel:
+    display_name: str
+    unlocked_count: int
+    total_points: int
+    reward_text: str
+    highlights: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class AchievementRankingRowViewModel:
+    rank: int
+    display_name: str
+    points: int
+    unlocked_count: int
+
+
+@dataclass(frozen=True, slots=True)
+class AchievementRankingViewModel:
+    group_name: str
+    page: int
+    page_count: int
+    total_count: int
+    entries: tuple[AchievementRankingRowViewModel, ...]

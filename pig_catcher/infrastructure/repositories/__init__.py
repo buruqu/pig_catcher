@@ -1,5 +1,6 @@
 """不自行提交事务的 SQLite 仓储。"""
 
+from .achievements import AchievementRepository
 from .administration import AdministrationRepository
 from .assets import AssetRepository
 from .economy import EconomyRepository
@@ -15,6 +16,7 @@ from .techniques import TechniqueRepository
 
 __all__ = [
     "AssetRepository",
+    "AchievementRepository",
     "AdministrationRepository",
     "EconomyRepository",
     "FrameworkRepository",
