@@ -39,6 +39,10 @@ QQ 官方 OpenID；底层稳定身份仍保留用于审计和幂等。
 切换到 `2.0.0`。完整边界见
 [抓猪 2.0 隔离开发与大版本上线方案](docs/16-v2-development-and-release-plan.md)。
 
+猪猪对战目前仅完成核心轮盘规则设计，尚未实现命令或上线。已确认的双猪招式盘、五级养成、
+贷款扣招、出招数盘与伤势风险规则，以及仍待讨论的材料和奖励细节，见
+[猪猪对战设计与已确认轮盘规则](docs/18-pig-battle-system-design.md)。
+
 ## 当前状态
 
 - 插件 ID：`local.pig-catcher`
@@ -368,6 +372,7 @@ uv run python .\tools\uat_production_recovery.py `
 - [2026-08-20 GitHub 同步记录](docs/14-github-sync-record-2026-08-20.md)
 - [抓猪成就系统设计与 2.0 第一轮实现记录（尚未上线）](docs/15-achievement-system-design-proposal.md)
 - [PiG Dream! 周冲榜机制与第一期实现记录（尚未上线）](docs/17-weekly-competition-system.md)
+- [猪猪对战设计与已确认轮盘规则（仅设计，未实现）](docs/18-pig-battle-system-design.md)
 - [抓猪 2.0 隔离开发与大版本上线方案](docs/16-v2-development-and-release-plan.md)
 
 ## 不变原则
