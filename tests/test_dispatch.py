@@ -626,7 +626,7 @@ async def test_schema_36_migrates_to_dispatch_without_changing_existing_tables(t
     connection.close()
     db = PigCatcherDatabase(path)
     await db.open()
-    assert await db.schema_version() == 38
+    assert await db.schema_version() == 39
     current = {
         row["name"]: row["sql"] for row in await db.fetch_all("SELECT name,sql FROM sqlite_master WHERE type='table'")
     }

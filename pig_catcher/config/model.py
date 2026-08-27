@@ -158,6 +158,11 @@ class FeaturesSection(PluginConfigBase):
             "对应 /我的猪猪乐队、/猪猪巡演、/巡演游记、/巡演联演；关闭不会清除乐队或保护标记",
         ),
     )
+    battle_enabled: bool = Field(
+        default=True,
+        description="是否启用猪猪对战、战斗养成和专属战利品抓猪",
+        json_schema_extra=_ui("启用猪猪对战", "每群同时一场；关闭不清除养成，已开战仍按到期规则安全释放占用"),
+    )
     catalog_enabled: bool = Field(
         default=True,
         description="是否允许查看猪猪图鉴",

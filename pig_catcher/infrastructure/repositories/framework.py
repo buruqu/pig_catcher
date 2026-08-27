@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from ...domain.models import CommandIdentity, ScopeKey
 from ..database import DatabaseSession
+from .battle import BattleRepository
 from .dispatch import DispatchRepository
 
 
@@ -92,3 +93,5 @@ class FrameworkRepository:
         await self.ensure_player(session, identity=identity, now=now)
         # 每次相关操作最多推进三趟旅行；与业务共用事务，到期后先释放猪猪。
         await DispatchRepository().settle_elapsed(session, identity.player_id, now)
+        # 对战到期按无奖励关闭；只清本群最多一个槽位，不因进程重启判玩家失败。
+        await BattleRepository().expire_scope(session, identity.scope.value, now)

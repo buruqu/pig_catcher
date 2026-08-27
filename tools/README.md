@@ -19,6 +19,19 @@
 
 ## 命令级 UAT
 
+第三轮 2.0 对战仅在隔离开发目录运行：
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q tests/test_battle_rules.py tests/test_battle.py tests/test_battle_safety.py tests/test_battle_plugin.py
+.\.venv\Scripts\python.exe tools/accept_battle_views.py --output artifacts/battle-acceptance-next
+.\.venv\Scripts\python.exe tools/check_battle_balance.py --samples 3000
+```
+
+`accept_battle_views.py` 生成 25 张完整状态流图卡、DOM 诊断与联系表，使用临时合成数据和已有公开素材；
+输出路径必须不存在。浏览器是独立无头进程，不连接用户已打开的浏览器、不连生产或 QQ。
+`check_battle_balance.py` 对四种强化组合各模拟指定场数，比较观测胜率/回合/连招，不修改实际规则。
+当前 127 项对战专项、670 项全量回归通过，完整步骤与接线见 [第三轮交付](../docs/25-battle-implementation-and-acceptance.md)。
+
 | 脚本 | 用途 |
 | --- | --- |
 | `uat_catching_and_collection.py` | 正式素材下的抓取与收藏流程 |

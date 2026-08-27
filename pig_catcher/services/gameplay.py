@@ -565,7 +565,12 @@ def pig_view_from_row(
         alternate_image_relpath=alternate_image_relpath,
         is_favorite=bool(row.get("is_favorite") or False),
         activity_label={"dispatch": "派遣中", "tour": "巡演中", "battle": "对战中"}.get(
-            str(row.get("busy_purpose") or ""), "乐队保护" if row.get("tour_protected") else ""
+            str(row.get("busy_purpose") or ""),
+            " / ".join(
+                label for label, active in (
+                    ("乐队保护", row.get("tour_protected")), ("战斗保护", row.get("battle_protected"))
+                ) if active
+            )
         ),
     )
 

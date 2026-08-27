@@ -236,10 +236,17 @@ async def test_group_reset_command_rejects_unconfigured_user_before_backup(
 def test_plugin_registers_only_explicit_production_commands() -> None:
     plugin = create_plugin()
     components = plugin.get_components()
-    assert len(components) == 74
+    assert len(components) == 81
     commands = {component["name"] for component in components if component["type"] == "COMMAND"}
-    assert len(commands) == 73
+    assert len(commands) == 80
     assert commands == {
+        "pig_catcher_battle_pig",
+        "pig_catcher_battle_challenge",
+        "pig_catcher_battle_count",
+        "pig_catcher_battle_move",
+        "pig_catcher_battle_status",
+        "pig_catcher_battle_history",
+        "pig_catcher_battle_loot",
         "pig_catcher_band",
         "pig_catcher_tour",
         "pig_catcher_tour_journal",
@@ -438,7 +445,8 @@ async def test_help_command_sends_copyable_text_without_rendering(tmp_path: Path
     success, text, level = await invoke_help(plugin)
     assert success is True
     assert level == 2
-    assert "/抓猪帮助 [抓猪|背包|道具|做菜|商城|交易|排行|成就|派遣|巡演]" in text
+    assert "/抓猪帮助 [抓猪|背包|道具|做菜|商城|交易|排行|成就|派遣|巡演|对战]" in text
+    assert "/比划比划 @成员" in text and "/战利品抓猪" in text
     assert "/使用成就券 <券名>" in text
     assert "当前版本：" not in text
     assert "已开放抓猪" not in text
@@ -458,6 +466,8 @@ async def test_help_topic_and_unknown_topic_are_explicit(tmp_path: Path) -> None
     success, text, _ = await invoke_help(plugin, topic="交易")
     assert success
     assert "/接受交易 <交易号>" in text
+    success, battle, _ = await invoke_help(plugin, topic="对战")
+    assert success and "/战斗猪 帮助" in battle and "/出招数 → /出招" in battle
     _, unknown, _ = await invoke_help(plugin, topic="不存在")
     assert "未知帮助主题：不存在" in unknown
     await plugin.on_unload()

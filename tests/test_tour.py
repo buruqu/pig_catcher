@@ -742,7 +742,7 @@ async def test_schema_37_migration_preserves_existing_assets_materials_and_econo
     migrated = PigCatcherDatabase(path)
     await migrated.open()
     try:
-        assert await migrated.schema_version() == 38
+        assert await migrated.schema_version() == 39
         schema = {
             r["name"]: r["sql"]
             for r in await migrated.fetch_all("SELECT name,sql FROM sqlite_master WHERE type='table'")

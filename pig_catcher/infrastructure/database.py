@@ -206,6 +206,9 @@ class PigCatcherDatabase:
     async def _validate_current_schema(connection: aiosqlite.Connection) -> None:
         """Reject a stamped database whose critical current structures did not converge."""
 
+        from .migrations.v0039_battles import GUARDS as BATTLE_GUARDS
+        from .migrations.v0039_battles import TABLES as BATTLE_TABLES
+
         required_tables = {
             "player_food_effects",
             "player_roulette_state",
@@ -255,6 +258,7 @@ class PigCatcherDatabase:
             "tour_joint_invites",
             "tour_joint_reservations",
         }
+        required_tables.update(BATTLE_TABLES)
         table_rows = await (
             await connection.execute(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name IN ("
@@ -310,6 +314,7 @@ class PigCatcherDatabase:
             "idx_tour_protected_player",
             "idx_tour_joint_reservation",
         }
+        required_guards.update(BATTLE_GUARDS)
         guard_rows = await (
             await connection.execute("SELECT name FROM sqlite_master WHERE type IN ('trigger','index')")
         ).fetchall()

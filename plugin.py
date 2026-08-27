@@ -46,9 +46,11 @@ from .pig_catcher.commands import (
     parse_trade_offer_query,
     parse_upgrade_name,
 )
+from .pig_catcher.commands.battle import BATTLE_HELP, parse_battle_request
 from .pig_catcher.commands.dispatch import DISPATCH_HELP, parse_dispatch_request
 from .pig_catcher.commands.tour import TOUR_HELP, parse_tour_request
 from .pig_catcher.config import AccessPolicy, PigCatcherConfig
+from .pig_catcher.domain.battle_views import BattleView
 from .pig_catcher.domain.dispatch_views import DispatchView
 from .pig_catcher.domain.enums import AssetKind
 from .pig_catcher.domain.errors import (
@@ -174,6 +176,7 @@ from .pig_catcher.services import (
     is_group_event_food,
     reward_label,
 )
+from .pig_catcher.services.battle import BattleService
 from .pig_catcher.services.dispatch import DispatchService
 from .pig_catcher.services.tour import TourService
 from .pig_catcher.version import PLUGIN_VERSION
@@ -215,6 +218,7 @@ class PigCatcherPlugin(MaiBotPlugin):
         self._weekly_competition_service: WeeklyCompetitionService | None = None
         self._dispatch_service: DispatchService | None = None
         self._tour_service: TourService | None = None
+        self._battle_service: BattleService | None = None
         self._renderer: PigCatcherRenderer | None = None
         self._animation_composer: AnimatedCardComposer | None = None
         self._delivery: RenderDelivery | None = None
@@ -411,6 +415,10 @@ class PigCatcherPlugin(MaiBotPlugin):
                 chat_message_provider=self._regulation_chat_messages,
             )
             self._regulation_service = regulation_service
+            self._battle_service = BattleService(
+                database, catching=settings.catching, regulation_service=regulation_service,
+                access_policy_factory=self._access_policy,
+            )
             self._social_service = SocialService(
                 database,
                 settings.trading,
@@ -482,6 +490,7 @@ class PigCatcherPlugin(MaiBotPlugin):
         self._weekly_competition_service = None
         self._dispatch_service = None
         self._tour_service = None
+        self._battle_service = None
         self._receipt_service = None
         self._regulation_service = None
         self._economy_service = None
@@ -1227,9 +1236,7 @@ class PigCatcherPlugin(MaiBotPlugin):
             else:
                 sent = await self._delivery.send_image_or_text(
                     stream_id=stream_id,
-                    render=lambda: renderer.render_weekly_competition_award(
-                        weekly_competition_award_view(award)
-                    ),
+                    render=lambda: renderer.render_weekly_competition_award(weekly_competition_award_view(award)),
                     fallback_text=fallback,
                     rendering_enabled=self.settings.rendering.enabled,
                 )
@@ -3889,8 +3896,7 @@ class PigCatcherPlugin(MaiBotPlugin):
             stream_id,
             kwargs,
             feature_enabled=(
-                self.settings.features.achievements_enabled
-                or self.settings.features.weekly_competitions_enabled
+                self.settings.features.achievements_enabled or self.settings.features.weekly_competitions_enabled
             ),
             feature_label="佩戴成就",
         )
@@ -4206,9 +4212,7 @@ class PigCatcherPlugin(MaiBotPlugin):
             result = await service.execute(identity, request)
             data_dir = Path(self.ctx.paths.data_dir).resolve()
             paths = {
-                pig.short_code: media_path(data_dir, pig.image_relpath)
-                for pig in result.view.pigs
-                if pig.image_relpath
+                pig.short_code: media_path(data_dir, pig.image_relpath) for pig in result.view.pigs if pig.image_relpath
             }
 
             async def render() -> RenderedImage:
@@ -4306,8 +4310,7 @@ class PigCatcherPlugin(MaiBotPlugin):
             result = await service.execute(identity, request)
             data_dir = Path(self.ctx.paths.data_dir).resolve()
             paths = {
-                pig.short_code: media_path(data_dir, pig.image_relpath)
-                for pig in result.view.pigs if pig.image_relpath
+                pig.short_code: media_path(data_dir, pig.image_relpath) for pig in result.view.pigs if pig.image_relpath
             }
 
             async def render() -> RenderedImage:
@@ -4342,32 +4345,161 @@ class PigCatcherPlugin(MaiBotPlugin):
             return await self._command_error(stream_id=identity.stream_id, operation="猪猪巡演", error=exc)
 
     @Command(
-        "pig_catcher_band", description="自由乐队、三套阵容、舞台养成和成员保护",
+        "pig_catcher_band",
+        description="自由乐队、三套阵容、舞台养成和成员保护",
         pattern=rf"^{_COMMAND_LEADING_MENTION_PATTERN}/(?P<entry>我的猪猪乐队|组建乐队|乐队编队|乐队练习)(?:\s+(?P<arguments>.*?))?\s*$",
     )
     async def handle_band(self, stream_id: str = "", **kwargs: Any) -> tuple[bool, str, int]:
         return await self._tour_command(stream_id, kwargs, "band")
 
     @Command(
-        "pig_catcher_tour", description="猪猪巡演三站编排、排练与结算",
+        "pig_catcher_tour",
+        description="猪猪巡演三站编排、排练与结算",
         pattern=rf"^{_COMMAND_LEADING_MENTION_PATTERN}/(?P<entry>猪猪巡演|巡演继续|巡演一键)(?:\s+(?P<arguments>.*?))?\s*$",
     )
     async def handle_tour(self, stream_id: str = "", **kwargs: Any) -> tuple[bool, str, int]:
         return await self._tour_command(stream_id, kwargs, "tour")
 
     @Command(
-        "pig_catcher_tour_journal", description="巡演站点游记和主题收藏",
+        "pig_catcher_tour_journal",
+        description="巡演站点游记和主题收藏",
         pattern=rf"^{_COMMAND_LEADING_MENTION_PATTERN}/巡演游记(?:\s+(?P<arguments>.*?))?\s*$",
     )
     async def handle_tour_journal(self, stream_id: str = "", **kwargs: Any) -> tuple[bool, str, int]:
         return await self._tour_command(stream_id, kwargs, "journal")
 
     @Command(
-        "pig_catcher_joint_tour", description="同群双方确认的独立乐队联演",
+        "pig_catcher_joint_tour",
+        description="同群双方确认的独立乐队联演",
         pattern=rf"^{_COMMAND_LEADING_MENTION_PATTERN}/巡演联演(?:\s+(?P<arguments>.*?))?\s*$",
     )
     async def handle_joint_tour(self, stream_id: str = "", **kwargs: Any) -> tuple[bool, str, int]:
         return await self._tour_command(stream_id, kwargs, "joint")
+
+    async def _battle_command(self, stream_id: str, kwargs: Mapping[str, Any], section: str) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_command(
+            stream_id,
+            kwargs,
+            feature_enabled=self.settings.features.battle_enabled
+            and (section != "loot" or self.settings.features.catching_enabled),
+            feature_label="猪猪对战" if section != "loot" else "战利品抓猪",
+        )
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        renderer = self._renderer
+        try:
+            arguments = matched_group(kwargs, "arguments")
+            target = None
+            if section == "challenge" and arguments not in {
+                "",
+                "接受",
+                "拒绝",
+                "取消",
+                "认输",
+                "确认认输",
+                "帮助",
+                "help",
+                "?",
+            }:
+                target = extract_mention_target(kwargs, arguments=arguments)
+            request = parse_battle_request(
+                arguments,
+                section=section,
+                target_user_id=target.user_id if target else "",
+                target_name=target.display_name if target else "",
+            )
+            if request.action == "help":
+                return await self._reply_text(identity.stream_id, BATTLE_HELP, success=True)
+            service = self._battle_service
+            if service is None or renderer is None:
+                raise RuntimeError("对战服务尚未就绪。")
+            result = await service.execute(identity, request)
+            root = Path(self.ctx.paths.data_dir).resolve()
+            paths = {
+                pig.short_code: media_path(root, pig.image_relpath) for pig in result.view.pigs if pig.image_relpath
+            }
+
+            async def render() -> RenderedImage:
+                return await renderer.render_battle(result.view, paths)
+
+            if result.receipt:
+                return await self._deliver_receipt(
+                    stream_id=identity.stream_id,
+                    receipt=result.receipt,
+                    render=render,
+                    fallback_text=result.view.text(),
+                )
+            return await self._deliver_query(
+                stream_id=identity.stream_id, render=render, fallback_text=result.view.text()
+            )
+        except PigCatcherError as exc:
+            if renderer is None:
+                return await self._command_error(stream_id=identity.stream_id, operation="猪猪对战", error=exc)
+            hint = BattleView(
+                title="对战提示", player_name="对战准备室", banner=str(exc), hints=("/战斗猪 帮助 查看可复制命令。",)
+            )
+            delivered = await self._deliver_query(
+                stream_id=identity.stream_id, render=lambda: renderer.render_battle(hint, {}), fallback_text=hint.text()
+            )
+            return False, delivered[1], delivered[2]
+        except Exception as exc:
+            return await self._command_error(stream_id=identity.stream_id, operation="猪猪对战", error=exc)
+
+    @Command(
+        "pig_catcher_battle_pig",
+        description="战斗猪设置、养成、保护、轮盘与器具",
+        pattern=rf"^{_COMMAND_LEADING_MENTION_PATTERN}/战斗猪(?:\s+(?P<arguments>.*?))?\s*$",
+    )
+    async def handle_battle_pig(self, stream_id: str = "", **kwargs: Any) -> tuple[bool, str, int]:
+        return await self._battle_command(stream_id, kwargs, "profile")
+
+    @Command(
+        "pig_catcher_battle_challenge",
+        description="同群双人挑战、接受、拒绝、认输",
+        pattern=rf"^{_COMMAND_LEADING_MENTION_PATTERN}/比划比划(?:\s+(?P<arguments>.*?))?\s*$",
+    )
+    async def handle_battle_challenge(self, stream_id: str = "", **kwargs: Any) -> tuple[bool, str, int]:
+        return await self._battle_command(stream_id, kwargs, "challenge")
+
+    @Command(
+        "pig_catcher_battle_count",
+        description="抽取本回合出招数并结算贷款扣招",
+        pattern=rf"^{_COMMAND_LEADING_MENTION_PATTERN}/出招数\s*$",
+    )
+    async def handle_battle_count(self, stream_id: str = "", **kwargs: Any) -> tuple[bool, str, int]:
+        return await self._battle_command(stream_id, kwargs, "count")
+
+    @Command(
+        "pig_catcher_battle_move",
+        description="自动执行本回合招式连锁并结算回合",
+        pattern=rf"^{_COMMAND_LEADING_MENTION_PATTERN}/出招\s*$",
+    )
+    async def handle_battle_move(self, stream_id: str = "", **kwargs: Any) -> tuple[bool, str, int]:
+        return await self._battle_command(stream_id, kwargs, "move")
+
+    @Command(
+        "pig_catcher_battle_status",
+        description="观战与查看双方当前状态",
+        pattern=rf"^{_COMMAND_LEADING_MENTION_PATTERN}/对战状态\s*$",
+    )
+    async def handle_battle_status(self, stream_id: str = "", **kwargs: Any) -> tuple[bool, str, int]:
+        return await self._battle_command(stream_id, kwargs, "status")
+
+    @Command(
+        "pig_catcher_battle_history",
+        description="本群对战与逐招历史记录",
+        pattern=rf"^{_COMMAND_LEADING_MENTION_PATTERN}/对战记录(?:\s+(?P<arguments>.*?))?\s*$",
+    )
+    async def handle_battle_history(self, stream_id: str = "", **kwargs: Any) -> tuple[bool, str, int]:
+        return await self._battle_command(stream_id, kwargs, "history")
+
+    @Command(
+        "pig_catcher_battle_loot",
+        description="败者额外五次战利品抓猪，直接交付胜者",
+        pattern=rf"^{_COMMAND_LEADING_MENTION_PATTERN}/战利品抓猪\s*$",
+    )
+    async def handle_battle_loot(self, stream_id: str = "", **kwargs: Any) -> tuple[bool, str, int]:
+        return await self._battle_command(stream_id, kwargs, "loot")
 
 
 def create_plugin() -> PigCatcherPlugin:

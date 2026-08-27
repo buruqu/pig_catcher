@@ -1,0 +1,187 @@
+"""用户定稿轮盘、核心无上限、分块精确重放和永久概率的纯规则验收。"""
+
+import pytest
+
+from pig_catcher.domain.battle import (
+    apply_injury,
+    apply_move,
+    choose,
+    dumps,
+    loads,
+    loot_weights,
+    new_state,
+    play_chunk,
+    randbelow,
+    resolve_round,
+    roll_count,
+    weight_label,
+)
+from pig_catcher.domain.battle_catalog import (
+    COUNT_WHEEL,
+    FIGHTERS,
+    HEAVY_COUNT_WHEEL,
+    INJURY_WHEELS,
+    UPGRADE_COSTS,
+    Move,
+)
+
+
+def state(level=0, trait=0, tool=""):
+    return new_state(
+        [{"fighter_id": item.fighter_id, "level": level, "trait_bonus": trait, "tool_id": tool} for item in FIGHTERS]
+    )
+
+
+def ready(player, pending=1):
+    player["turn"].update(raw=pending, effective=pending, pending=pending, done=False)
+
+
+def test_exact_catalog_and_growth_costs():
+    assert [len(f.moves) for f in FIGHTERS] == [9, 10]
+    assert all(move.draw_weight == 1 for fighter in FIGHTERS for move in fighter.moves)
+    assert [m.gain for m in FIGHTERS[0].moves] == [0, 10, 15, 21, 35, 0, 14, 7, 12]
+    assert [m.gain for m in FIGHTERS[1].moves] == [13, 20, 14, 10, 0, 14, 24, 30, 14, 35]
+    assert COUNT_WHEEL == ((1, 5), (2, 4), (3, 3), (4, 2), (5, 1))
+    assert HEAVY_COUNT_WHEEL == COUNT_WHEEL[:-1]
+    assert [[w for _, w in wheel] for wheel in INJURY_WHEELS] == [[6, 2, 1, 1], [2, 6, 1, 1], [1, 2, 6, 1]]
+    assert {k: sum(row[k] for row in UPGRADE_COSTS) for k in UPGRADE_COSTS[0]} == {
+        "ore": 1950,
+        "parts": 650,
+        "fiber": 650,
+        "supplies": 650,
+        "coins": 16600,
+    }
+
+
+@pytest.mark.parametrize("move", [move for fighter in FIGHTERS for move in fighter.moves])
+def test_upgrade_only_positive_numeric_part(move):
+    a, b = state()["sides"][0], state(5)["sides"][0]
+    ready(a)
+    ready(b)
+    low, high = apply_move(a, move), apply_move(b, move)
+    assert high["gain"] - low["gain"] == (5 if move.gain else 0)
+    assert high["extra_draws"] == low["extra_draws"] == move.draws
+    assert a["next_debt"] == b["next_debt"]
+
+
+def test_future_mixed_move_has_numeric_upgrade_but_same_function():
+    p = state(5)["sides"][0]
+    ready(p)
+    result = apply_move(p, Move("future-flash", "黑闪+5", 5, draws=2))
+    assert result["gain"] == 10 and p["turn"]["pending"] == 2
+
+
+@pytest.mark.parametrize("loans", [1, 2, 3, 50])
+def test_loans_keep_only_one_double_and_debt_once(loans):
+    s = state(5)
+    p = s["sides"][0]
+    ready(p)
+    for _ in range(loans):
+        event = apply_move(p, FIGHTERS[0].moves[5])
+        assert event["gain"] == 0 and p["double"] and p["turn"]["pending"] == 1
+    apply_move(p, FIGHTERS[0].moves[0])
+    assert p["double"] and p["turn"]["pending"] == 2
+    hit = apply_move(p, FIGHTERS[0].moves[1])
+    assert hit["gain"] == 30 and hit["multiplier"] == 2
+    assert apply_move(p, FIGHTERS[0].moves[1])["gain"] == 15
+    p["turn"]["raw"] = None
+    result = roll_count(s, 0, "debt")
+    assert result["debt"] == loans and result["effective"] == max(0, result["raw"] - loans)
+    assert p["next_debt"] == 0
+    assert not roll_count(s, 0, "debt")["changed"]
+
+
+@pytest.mark.parametrize(
+    "cores", [1, 5, 6, 50, 100, 2**70, 10**5000], ids=["1", "5", "6", "50", "100", "beyond-int64", "5001-digits"]
+)
+def test_core_unlimited_integer_persistence(cores):
+    s = state(5)
+    p = s["sides"][0]
+    p.update(core=cores, heavy=True, risk=2, weight=10**1000)
+    apply_injury(p, "core")
+    assert p["core"] == cores + 1 and not p["heavy"] and p["risk"] == 2
+    ready(p)
+    p["double"] = True
+    assert apply_move(p, Move("n", "数值招式", 10))["gain"] == (10 + 5 + cores + 1) * 2
+    assert loads(dumps(s)) == s
+    assert len(weight_label(p["weight"])) < 90
+
+
+def test_injury_never_regresses_history_or_recalculates_weight():
+    p = state()["sides"][0]
+    p["weight"] = 947
+    apply_injury(p, "heavy")
+    apply_injury(p, "light")
+    assert p["heavy"] and p["risk"] == 2
+    apply_injury(p, "heavy")
+    ready(p)
+    assert apply_move(p, Move("a", "普通", 10))["gain"] == 9
+    apply_injury(p, "core")
+    assert not p["heavy"] and p["risk"] == 2 and p["weight"] == 956
+    apply_injury(p, "light")
+    assert p["risk"] == 2 and not p["heavy"]
+    apply_injury(p, "heavy")
+    ready(p)
+    assert apply_move(p, Move("a", "普通", 10))["gain"] == 10
+
+
+def test_zero_actions_still_resolve_and_weight_is_cumulative():
+    s = state()
+    for index, p in enumerate(s["sides"]):
+        p.update(next_debt=50, weight=10 + index * 5)
+        assert roll_count(s, index, "zero")["effective"] == 0
+        assert play_chunk(s, index, "zero") == []
+    summary = resolve_round(s, "zero")
+    assert summary and [p["weight"] for p in s["sides"]] == [10, 15]
+    assert all(p["next_debt"] == 0 for p in s["sides"])
+
+
+@pytest.mark.parametrize("seed", [f"chunk-{i}" for i in range(15)])
+def test_command_order_and_chunk_size_do_not_change_outcome(seed):
+    a, b = state(3), state(3)
+    for s, order, size in ((a, [0, 1], 32), (b, [1, 0], 1)):
+        for side in order:
+            roll_count(s, side, seed)
+            while not s["sides"][side]["turn"]["done"]:
+                play_chunk(s, side, seed, chunk_size=size)
+                s.update(loads(dumps(s)))
+        resolve_round(s, seed)
+    assert a == b
+
+
+def test_exact_random_with_huge_bounds_no_float_overflow():
+    bound = 10**5000
+    assert 0 <= randbelow("huge", "winner", bound) < bound
+    assert randbelow("huge", "winner", bound) == randbelow("huge", "winner", bound)
+    assert randbelow("huge", "x", 1) == 0
+    assert {choose(str(i), "small", (("a", 1), ("b", 1)))[0] for i in range(40)} == {"a", "b"}
+    s = state()
+    for side in s["sides"]:
+        side["weight"] = bound
+        side["turn"]["done"] = True
+    assert resolve_round(s, "huge")["winner"] in (0, 1)
+
+
+@pytest.mark.parametrize("tool,expected", [("", 21), ("wristband", 23), ("bandage", 23)])
+def test_traits_and_tools_are_small_one_time_adjustments(tool, expected):
+    p = state(0, trait=1, tool=tool)["sides"][0]
+    p.update(heavy=True, double=True, core=1)
+    ready(p, 2)
+    # (10+0+1-1)*2 + trait1, 绷带取消-1会参与本次数值翻倍。
+    result = apply_move(p, Move("n", "普通", 10))
+    assert result["gain"] == expected
+    assert apply_move(p, Move("n", "普通", 10))["gain"] == 10
+
+
+@pytest.mark.parametrize("available", [True, False])
+def test_loot_permanent_distribution_monotonic(available):
+    base = loot_weights(level=1, feed=0, cloud=0, six_available=available)
+    full = loot_weights(level=21, feed=5, cloud=5, six_available=available)
+    assert sum(full) == pytest.approx(100)
+    assert all(full[i] >= base[i] - 1e-9 for i in (3, 4, 5))
+    if available:
+        assert base == pytest.approx((5, 10, 10, 25, 30, 20))
+        assert full == pytest.approx((3.1554, 6.3108, 6.3108, 25, 32.6654, 26.5577), abs=0.001)
+    else:
+        assert full[5] == 0 and base[4] == 50
+        assert full == loot_weights(level=21, feed=5, cloud=0, six_available=False)

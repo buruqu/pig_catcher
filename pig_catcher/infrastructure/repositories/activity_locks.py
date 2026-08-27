@@ -12,6 +12,8 @@ def unoccupied_clause(asset_kind: str, alias: str = "pig_instances") -> str:
     return (
         f"AND NOT EXISTS(SELECT 1 FROM asset_occupancies busy WHERE busy.pig_instance_id={alias}.pig_instance_id) "
         f"AND NOT EXISTS(SELECT 1 FROM tour_protections protected "
+        f"WHERE protected.pig_instance_id={alias}.pig_instance_id AND protected.protected=1) "
+        f"AND NOT EXISTS(SELECT 1 FROM battle_protections protected "
         f"WHERE protected.pig_instance_id={alias}.pig_instance_id AND protected.protected=1)"
     )
 
@@ -26,3 +28,7 @@ async def require_unoccupied(session: DatabaseSession, pig_instance_id: str) -> 
     )
     if protected:
         raise AssetStateConflictError("这只猪受乐队保护；请先 /我的猪猪乐队 解除保护 猪名#编号，并确认移出阵容。")
+    if await session.fetch_one(
+        "SELECT 1 FROM battle_protections WHERE pig_instance_id=? AND protected=1", (pig_instance_id,)
+    ):
+        raise AssetStateConflictError("这只猪受战斗保护；请先 /战斗猪 解除保护 猪名#编号，再 /战斗猪 确认。")

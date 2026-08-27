@@ -18,6 +18,7 @@ from uuid import uuid4
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
 from PIL import Image, UnidentifiedImageError
 
+from ..domain.battle_views import BattleView
 from ..domain.dispatch_views import DispatchView
 from ..domain.errors import RenderError
 from ..domain.tour_views import TourView
@@ -474,15 +475,24 @@ class PigCatcherRenderer:
 
     async def render_dispatch(self, view: DispatchView, media_paths: Mapping[str, Path]) -> RenderedImage:
         previews = await self._list_media_data_urls(
-            ((pig.short_code, bool(pig.image_relpath), False) for pig in view.pigs), media_paths,
+            ((pig.short_code, bool(pig.image_relpath), False) for pig in view.pigs),
+            media_paths,
         )
         return await self._render_template("dispatch.html", view=view, previews=previews)
 
     async def render_tour(self, view: TourView, media_paths: Mapping[str, Path]) -> RenderedImage:
         previews = await self._list_media_data_urls(
-            ((pig.short_code, bool(pig.image_relpath), False) for pig in view.pigs), media_paths,
+            ((pig.short_code, bool(pig.image_relpath), False) for pig in view.pigs),
+            media_paths,
         )
         return await self._render_template("tour.html", view=view, previews=previews)
+
+    async def render_battle(self, view: BattleView, media_paths: Mapping[str, Path]) -> RenderedImage:
+        previews = await self._list_media_data_urls(
+            ((pig.short_code, bool(pig.image_relpath), False) for pig in view.pigs),
+            media_paths,
+        )
+        return await self._render_template("battle.html", view=view, previews=previews)
 
     async def _render_template(
         self,
