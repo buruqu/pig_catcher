@@ -1145,6 +1145,8 @@ class EconomyRepository:
               AND is_favorite = 0
               AND NOT EXISTS(SELECT 1 FROM asset_occupancies busy
                              WHERE busy.pig_instance_id=pig_instances.pig_instance_id)
+              AND NOT EXISTS(SELECT 1 FROM tour_protections protected
+                             WHERE protected.pig_instance_id=pig_instances.pig_instance_id AND protected.protected=1)
             """,
             (now, now, pig_instance_id, player_id, scope_id),
         )
@@ -1199,6 +1201,8 @@ class EconomyRepository:
               AND is_favorite = 0
               AND NOT EXISTS(SELECT 1 FROM asset_occupancies busy
                              WHERE busy.pig_instance_id=pig_instances.pig_instance_id)
+              AND NOT EXISTS(SELECT 1 FROM tour_protections protected
+                             WHERE protected.pig_instance_id=pig_instances.pig_instance_id AND protected.protected=1)
             """,
             (now, now, pig_instance_id, player_id, scope_id),
         )

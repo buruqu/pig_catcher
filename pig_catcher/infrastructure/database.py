@@ -239,6 +239,21 @@ class PigCatcherDatabase:
             "dispatch_pending",
             "dispatch_choices",
             "activity_facts",
+            "tour_profiles",
+            "tour_ticket_ledger",
+            "tour_rosters",
+            "tour_proficiency",
+            "tour_contributions",
+            "tour_song_progress",
+            "tour_protections",
+            "tour_practice_days",
+            "tour_runs",
+            "tour_stages",
+            "tour_tools",
+            "tour_collections",
+            "tour_pending",
+            "tour_joint_invites",
+            "tour_joint_reservations",
         }
         table_rows = await (
             await connection.execute(
@@ -267,13 +282,40 @@ class PigCatcherDatabase:
             "idx_dispatch_unread_returns",
             "idx_dispatch_pending_choices",
             "idx_activity_facts_player_source",
+            "tour_protection_owner_insert",
+            "tour_protection_owner_update",
+            "tour_protected_pig_no_dispose",
+            "tour_protected_pig_no_delete",
+            "tour_trained_pig_new_owner",
+            "tour_profile_scope_insert",
+            "tour_run_scope_insert",
+            "tour_profiles_scope_update",
+            "tour_runs_scope_update",
+            "tour_roster_owner_insert",
+            "tour_roster_owner_update",
+            "tour_stage_owner_insert",
+            "tour_joint_scope_insert",
+            "tour_joint_reservation_owner",
+            "tour_finished_run_no_update",
+            "tour_ticket_ledger_no_update",
+            "tour_ticket_ledger_no_delete",
+            "tour_stages_no_update",
+            "tour_stages_no_delete",
+            "tour_collections_no_update",
+            "tour_collections_no_delete",
+            "idx_tour_active_player",
+            "idx_tour_history",
+            "idx_tour_collections_page",
+            "idx_tour_ticket_player",
+            "idx_tour_protected_player",
+            "idx_tour_joint_reservation",
         }
         guard_rows = await (
             await connection.execute("SELECT name FROM sqlite_master WHERE type IN ('trigger','index')")
         ).fetchall()
         missing_guards = required_guards - {str(row[0]) for row in guard_rows}
         if missing_guards:
-            raise MigrationError("数据库缺少派遣占用或账本保护：" + "、".join(sorted(missing_guards)))
+            raise MigrationError("数据库缺少活动占用、保护或账本约束：" + "、".join(sorted(missing_guards)))
 
         index_rows = await (await connection.execute("PRAGMA index_list(player_food_effects)")).fetchall()
         source_index_found = False

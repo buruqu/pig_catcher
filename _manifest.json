@@ -1,9 +1,9 @@
 {
   "manifest_version": 2,
   "id": "local.pig-catcher",
-  "version": "2.0.0.dev3",
+  "version": "2.0.0.dev4",
   "name": "抓猪插件",
-  "description": "抓猪 2.0 隔离开发版：成就、周冲榜与猪猪远行社，包含派遣材料、奇遇、器具和游记。",
+  "description": "抓猪 2.0 隔离开发版：成就、周冲榜、猪猪派遣与自由乐队巡演，含三站编排、角色高光、养成及双人联演。",
   "author": {
     "name": "buruqu",
     "url": "https://github.com/buruqu"

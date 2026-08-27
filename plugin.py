@@ -47,6 +47,7 @@ from .pig_catcher.commands import (
     parse_upgrade_name,
 )
 from .pig_catcher.commands.dispatch import DISPATCH_HELP, parse_dispatch_request
+from .pig_catcher.commands.tour import TOUR_HELP, parse_tour_request
 from .pig_catcher.config import AccessPolicy, PigCatcherConfig
 from .pig_catcher.domain.dispatch_views import DispatchView
 from .pig_catcher.domain.enums import AssetKind
@@ -66,6 +67,7 @@ from .pig_catcher.domain.special_content import (
     TECHNIQUE_MALEVOLENT_KITCHEN,
     TECHNIQUE_REVERSAL_RED,
 )
+from .pig_catcher.domain.tour_views import TourView
 from .pig_catcher.infrastructure import PigCatcherDatabase, safe_database_path
 from .pig_catcher.rendering import (
     AnimatedCardComposer,
@@ -173,6 +175,7 @@ from .pig_catcher.services import (
     reward_label,
 )
 from .pig_catcher.services.dispatch import DispatchService
+from .pig_catcher.services.tour import TourService
 from .pig_catcher.version import PLUGIN_VERSION
 
 _PURCHASE_PRODUCT_PATTERN = "(?:" + "|".join(escape(item.display_name) for item in ITEM_DEFINITIONS) + ")"
@@ -211,6 +214,7 @@ class PigCatcherPlugin(MaiBotPlugin):
         self._achievement_service: AchievementService | None = None
         self._weekly_competition_service: WeeklyCompetitionService | None = None
         self._dispatch_service: DispatchService | None = None
+        self._tour_service: TourService | None = None
         self._renderer: PigCatcherRenderer | None = None
         self._animation_composer: AnimatedCardComposer | None = None
         self._delivery: RenderDelivery | None = None
@@ -386,6 +390,7 @@ class PigCatcherPlugin(MaiBotPlugin):
             self._asset_service = asset_service
             self._framework_service = FrameworkService(database)
             self._dispatch_service = DispatchService(database)
+            self._tour_service = TourService(database)
             self._gameplay_service = GameplayService(
                 database,
                 settings.catching,
@@ -476,6 +481,7 @@ class PigCatcherPlugin(MaiBotPlugin):
         self._achievement_service = None
         self._weekly_competition_service = None
         self._dispatch_service = None
+        self._tour_service = None
         self._receipt_service = None
         self._regulation_service = None
         self._economy_service = None
@@ -4269,6 +4275,99 @@ class PigCatcherPlugin(MaiBotPlugin):
     )
     async def handle_dispatch_encounters(self, stream_id: str = "", **kwargs: Any) -> tuple[bool, str, int]:
         return await self._dispatch_command(stream_id, kwargs, "encounters")
+
+    async def _tour_command(self, stream_id: str, kwargs: Mapping[str, Any], section: str) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_command(
+            stream_id,
+            kwargs,
+            feature_enabled=self.settings.features.tour_enabled,
+            feature_label="猪猪巡演",
+        )
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        renderer = self._renderer
+        try:
+            arguments = matched_group(kwargs, "arguments")
+            target = None
+            if section == "joint" and arguments not in {"", "接受", "拒绝", "取消", "帮助", "help", "?"}:
+                target = extract_mention_target(kwargs, arguments=arguments)
+            request = parse_tour_request(
+                arguments,
+                section=section,
+                entry=matched_group(kwargs, "entry"),
+                target_user_id=target.user_id if target else "",
+                target_name=target.display_name if target else "",
+            )
+            if request.action == "help":
+                return await self._reply_text(identity.stream_id, TOUR_HELP, success=True)
+            service = self._tour_service
+            if service is None or renderer is None:
+                raise RuntimeError("巡演服务尚未就绪。")
+            result = await service.execute(identity, request)
+            data_dir = Path(self.ctx.paths.data_dir).resolve()
+            paths = {
+                pig.short_code: media_path(data_dir, pig.image_relpath)
+                for pig in result.view.pigs if pig.image_relpath
+            }
+
+            async def render() -> RenderedImage:
+                return await renderer.render_tour(result.view, paths)
+
+            if result.receipt is not None:
+                return await self._deliver_receipt(
+                    stream_id=identity.stream_id,
+                    receipt=result.receipt,
+                    render=render,
+                    fallback_text=result.view.text(),
+                )
+            return await self._deliver_query(
+                stream_id=identity.stream_id, render=render, fallback_text=result.view.text()
+            )
+        except PigCatcherError as exc:
+            if renderer is None:
+                return await self._command_error(stream_id=identity.stream_id, operation="猪猪巡演", error=exc)
+            view = TourView(
+                title="巡演提示",
+                player_name="巡演准备室",
+                banner=str(exc),
+                hints=("/猪猪巡演 帮助 查看可复制命令。",),
+            )
+            delivered = await self._deliver_query(
+                stream_id=identity.stream_id,
+                render=lambda: renderer.render_tour(view, {}),
+                fallback_text=view.text(),
+            )
+            return False, delivered[1], delivered[2]
+        except Exception as exc:
+            return await self._command_error(stream_id=identity.stream_id, operation="猪猪巡演", error=exc)
+
+    @Command(
+        "pig_catcher_band", description="自由乐队、三套阵容、舞台养成和成员保护",
+        pattern=rf"^{_COMMAND_LEADING_MENTION_PATTERN}/(?P<entry>我的猪猪乐队|组建乐队|乐队编队|乐队练习)(?:\s+(?P<arguments>.*?))?\s*$",
+    )
+    async def handle_band(self, stream_id: str = "", **kwargs: Any) -> tuple[bool, str, int]:
+        return await self._tour_command(stream_id, kwargs, "band")
+
+    @Command(
+        "pig_catcher_tour", description="猪猪巡演三站编排、排练与结算",
+        pattern=rf"^{_COMMAND_LEADING_MENTION_PATTERN}/(?P<entry>猪猪巡演|巡演继续|巡演一键)(?:\s+(?P<arguments>.*?))?\s*$",
+    )
+    async def handle_tour(self, stream_id: str = "", **kwargs: Any) -> tuple[bool, str, int]:
+        return await self._tour_command(stream_id, kwargs, "tour")
+
+    @Command(
+        "pig_catcher_tour_journal", description="巡演站点游记和主题收藏",
+        pattern=rf"^{_COMMAND_LEADING_MENTION_PATTERN}/巡演游记(?:\s+(?P<arguments>.*?))?\s*$",
+    )
+    async def handle_tour_journal(self, stream_id: str = "", **kwargs: Any) -> tuple[bool, str, int]:
+        return await self._tour_command(stream_id, kwargs, "journal")
+
+    @Command(
+        "pig_catcher_joint_tour", description="同群双方确认的独立乐队联演",
+        pattern=rf"^{_COMMAND_LEADING_MENTION_PATTERN}/巡演联演(?:\s+(?P<arguments>.*?))?\s*$",
+    )
+    async def handle_joint_tour(self, stream_id: str = "", **kwargs: Any) -> tuple[bool, str, int]:
+        return await self._tour_command(stream_id, kwargs, "joint")
 
 
 def create_plugin() -> PigCatcherPlugin:

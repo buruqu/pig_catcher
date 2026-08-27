@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
@@ -46,7 +47,7 @@ def _mention_segments(value: object) -> list[Mapping[str, Any]]:
     return segments
 
 
-def extract_mention_target(kwargs: Mapping[str, Any]) -> MentionTarget:
+def extract_mention_target(kwargs: Mapping[str, Any], *, arguments: str | None = None) -> MentionTarget:
     """Require exactly one structured @ target instead of trusting nickname text."""
 
     message = _mapping(kwargs.get("message"))
@@ -59,7 +60,7 @@ def extract_mention_target(kwargs: Mapping[str, Any]) -> MentionTarget:
     for segment in _mention_segments(raw_message):
         data = segment.get("data")
         if isinstance(data, Mapping):
-            user_id = str(data.get("target_user_id") or "").strip()
+            user_id = str(data.get("target_user_id") or data.get("qq") or "").strip()
             display_name = str(
                 data.get("target_user_cardname")
                 or data.get("target_user_nickname")
@@ -82,6 +83,17 @@ def extract_mention_target(kwargs: Mapping[str, Any]) -> MentionTarget:
                 user_id=user_id,
                 display_name=(display_name or user_id)[:128],
             )
+    if arguments is not None:
+        # 官方群消息常同时 @机器人 和 @群友。只保留明确出现在命令参数内的结构化目标，
+        # 不把触发机器人的前导 @ 算作邀请对象，也绝不只凭自由文本昵称定位玩家。
+        def in_arguments(target: MentionTarget) -> bool:
+            encoded = (f"<@{target.user_id}>", f"<@!{target.user_id}>", f"[CQ:at,qq={target.user_id}]")
+            if any(marker in arguments for marker in encoded):
+                return True
+            return any(re.search(r"(?<!\S)@" + re.escape(name) + r"(?=$|\s)", arguments)
+                       for name in {target.user_id, target.display_name} if name)
+
+        mentions = {key: target for key, target in mentions.items() if in_arguments(target)}
     if not mentions:
         raise MentionTargetError("请在命令中明确 @ 一位当前群成员。")
     if len(mentions) != 1:

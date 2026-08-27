@@ -428,6 +428,9 @@ class GameplayRepository:
                 instance.*,
                 (SELECT purpose FROM asset_occupancies busy
                  WHERE busy.pig_instance_id=instance.pig_instance_id) AS busy_purpose,
+                EXISTS(SELECT 1 FROM tour_protections protected
+                       WHERE protected.pig_instance_id=instance.pig_instance_id
+                       AND protected.protected=1) AS tour_protected,
                 template.description,
                 template.image_relpath,
                 template.image_fit,
@@ -524,6 +527,8 @@ class GameplayRepository:
         available_clause = """
             AND instance.locked_trade_id IS NULL AND instance.is_favorite=0
             AND NOT EXISTS(SELECT 1 FROM asset_occupancies busy WHERE busy.pig_instance_id=instance.pig_instance_id)
+            AND NOT EXISTS(SELECT 1 FROM tour_protections protected
+                           WHERE protected.pig_instance_id=instance.pig_instance_id AND protected.protected=1)
         """ if available_only else ""
         rows = await session.fetch_all(
             f"""
@@ -599,6 +604,8 @@ class GameplayRepository:
               AND instance.locked_trade_id IS NULL
               AND instance.is_favorite = 0
               AND NOT EXISTS(SELECT 1 FROM asset_occupancies busy WHERE busy.pig_instance_id=instance.pig_instance_id)
+              AND NOT EXISTS(SELECT 1 FROM tour_protections protected
+                             WHERE protected.pig_instance_id=instance.pig_instance_id AND protected.protected=1)
               {rarity_clause}
               {keep_clause}
             ORDER BY
@@ -776,6 +783,9 @@ class GameplayRepository:
                 instance.*,
                 (SELECT purpose FROM asset_occupancies busy
                  WHERE busy.pig_instance_id=instance.pig_instance_id) AS busy_purpose,
+                EXISTS(SELECT 1 FROM tour_protections protected
+                       WHERE protected.pig_instance_id=instance.pig_instance_id
+                       AND protected.protected=1) AS tour_protected,
                 template.description,
                 template.image_relpath,
                 template.image_fit,
@@ -1125,6 +1135,8 @@ class GameplayRepository:
             WHERE pig_instance_id = ? AND state = 'active'
               AND NOT EXISTS(SELECT 1 FROM asset_occupancies busy
                              WHERE busy.pig_instance_id=pig_instances.pig_instance_id)
+              AND NOT EXISTS(SELECT 1 FROM tour_protections protected
+                             WHERE protected.pig_instance_id=pig_instances.pig_instance_id AND protected.protected=1)
             """,
             (owner_player_id, now, pig_instance_id),
         )

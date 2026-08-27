@@ -236,10 +236,14 @@ async def test_group_reset_command_rejects_unconfigured_user_before_backup(
 def test_plugin_registers_only_explicit_production_commands() -> None:
     plugin = create_plugin()
     components = plugin.get_components()
-    assert len(components) == 70
+    assert len(components) == 74
     commands = {component["name"] for component in components if component["type"] == "COMMAND"}
-    assert len(commands) == 69
+    assert len(commands) == 73
     assert commands == {
+        "pig_catcher_band",
+        "pig_catcher_tour",
+        "pig_catcher_tour_journal",
+        "pig_catcher_joint_tour",
         "pig_catcher_dispatch",
         "pig_catcher_dispatch_bag",
         "pig_catcher_dispatch_journal",
@@ -434,7 +438,7 @@ async def test_help_command_sends_copyable_text_without_rendering(tmp_path: Path
     success, text, level = await invoke_help(plugin)
     assert success is True
     assert level == 2
-    assert "/抓猪帮助 [抓猪|背包|道具|做菜|商城|交易|排行|成就|派遣]" in text
+    assert "/抓猪帮助 [抓猪|背包|道具|做菜|商城|交易|排行|成就|派遣|巡演]" in text
     assert "/使用成就券 <券名>" in text
     assert "当前版本：" not in text
     assert "已开放抓猪" not in text

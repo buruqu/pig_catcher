@@ -150,6 +150,14 @@ class FeaturesSection(PluginConfigBase):
             "对应 /猪猪派遣、/派遣背包、/派遣游记、/派遣奇遇；关闭后已出发队伍仍会到期安全结算",
         ),
     )
+    tour_enabled: bool = Field(
+        default=True,
+        description="是否启用独立的猪猪乐队与三站巡演",
+        json_schema_extra=_ui(
+            "启用猪猪巡演",
+            "对应 /我的猪猪乐队、/猪猪巡演、/巡演游记、/巡演联演；关闭不会清除乐队或保护标记",
+        ),
+    )
     catalog_enabled: bool = Field(
         default=True,
         description="是否允许查看猪猪图鉴",

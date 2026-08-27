@@ -626,7 +626,7 @@ async def test_schema_36_migrates_to_dispatch_without_changing_existing_tables(t
     connection.close()
     db = PigCatcherDatabase(path)
     await db.open()
-    assert await db.schema_version() == 37
+    assert await db.schema_version() == 38
     current = {
         row["name"]: row["sql"] for row in await db.fetch_all("SELECT name,sql FROM sqlite_master WHERE type='table'")
     }
@@ -919,7 +919,7 @@ async def test_current_schema_rejects_missing_dispatch_guard(world: World, tmp_p
     with sqlite3.connect(path) as connection:
         connection.execute("DROP TRIGGER occupied_pig_no_dispose")
     database = PigCatcherDatabase(path)
-    with pytest.raises(MigrationError, match="派遣占用"):
+    with pytest.raises(MigrationError, match="活动占用"):
         await database.open()
     await database.close()
 
