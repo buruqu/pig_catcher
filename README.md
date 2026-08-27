@@ -45,6 +45,12 @@ QQ 官方 OpenID；底层稳定身份仍保留用于审计和幂等。
 完整细则见 [派遣](docs/19-pig-dispatch-system-design.md)、[巡演](docs/20-pig-tour-system-design.md)
 与 [对战 r2](docs/18-pig-battle-system-design.md)。
 
+三大玩法配套的 [48 项新成就与四轮开发方案](docs/22-three-systems-achievement-design.md) 已完成设计：
+34 项公开、14 项隐藏，奖励含材料、有限次玩法券和原创外观。接下来按“派遣 → 巡演 → 对战 →
+新增成就与总验收”四轮开发；前三轮先保存成就所需的业务事实，各轮都完成自身图片与测试。
+旧 49 项常规毕业条件不扩张；当前已实现目录仍是 82 项，130 项是接入后的目标，不表示已完成或上线。
+完整设计稿含隐藏条件，不应原样发到群里；本轮仅归档设计，不推送、不公告。
+
 ## 当前状态
 
 - 插件 ID：`local.pig-catcher`
