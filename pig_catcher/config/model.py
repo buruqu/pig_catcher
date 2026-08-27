@@ -142,6 +142,14 @@ class FeaturesSection(PluginConfigBase):
         description="是否允许查看猪猪背包和详情",
         json_schema_extra=_ui("允许背包与详情", "对应 /猪猪背包 和 /猪猪详情（兼容 /抓猪详情）"),
     )
+    dispatch_enabled: bool = Field(
+        default=True,
+        description="是否启用猪猪派遣、材料背包、奇遇与游记",
+        json_schema_extra=_ui(
+            "启用猪猪派遣",
+            "对应 /猪猪派遣、/派遣背包、/派遣游记、/派遣奇遇；关闭后已出发队伍仍会到期安全结算",
+        ),
+    )
     catalog_enabled: bool = Field(
         default=True,
         description="是否允许查看猪猪图鉴",

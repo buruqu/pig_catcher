@@ -213,6 +213,7 @@ def pig_card_view(
     return PigCardViewModel(
         mode_label=mode_label,
         display_name=pig.display_name,
+        activity_label=pig.activity_label,
         owner_display_name=pig.owner_display_name,
         rarity=pig.rarity,
         rarity_name=pig.rarity_name,
@@ -353,6 +354,7 @@ def inventory_view(page: InventoryPage) -> InventoryViewModel:
                 image_fit=pig.image_fit,
                 body_label=pig.body_label,
                 is_favorite=pig.is_favorite,
+                activity_label=pig.activity_label,
             )
             for pig in page.pigs
         ),

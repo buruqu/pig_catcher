@@ -426,6 +426,8 @@ class GameplayRepository:
             """
             SELECT
                 instance.*,
+                (SELECT purpose FROM asset_occupancies busy
+                 WHERE busy.pig_instance_id=instance.pig_instance_id) AS busy_purpose,
                 template.description,
                 template.image_relpath,
                 template.image_fit,
@@ -500,6 +502,7 @@ class GameplayRepository:
         player_id: str,
         selector: AssetSelector,
         prefer_highest: bool = False,
+        available_only: bool = False,
     ) -> list[dict[str, object]]:
         # 精确匹配优先；若未命中再按“去空白 + 忽略英文大小写”的紧凑名兜底，
         # 以兼容名称中含空格或英文大小写差异（如“白吃 Token 的猪”）。
@@ -518,6 +521,10 @@ class GameplayRepository:
             )
         )
         limit = 1 if prefer_highest else 20
+        available_clause = """
+            AND instance.locked_trade_id IS NULL AND instance.is_favorite=0
+            AND NOT EXISTS(SELECT 1 FROM asset_occupancies busy WHERE busy.pig_instance_id=instance.pig_instance_id)
+        """ if available_only else ""
         rows = await session.fetch_all(
             f"""
             SELECT instance.pig_instance_id
@@ -530,6 +537,7 @@ class GameplayRepository:
                      = ? COLLATE NOCASE
               )
               {short_code_clause}
+              {available_clause}
             ORDER BY {order_sql}
             LIMIT {limit}
             """,
@@ -590,6 +598,7 @@ class GameplayRepository:
               AND instance.state = 'active'
               AND instance.locked_trade_id IS NULL
               AND instance.is_favorite = 0
+              AND NOT EXISTS(SELECT 1 FROM asset_occupancies busy WHERE busy.pig_instance_id=instance.pig_instance_id)
               {rarity_clause}
               {keep_clause}
             ORDER BY
@@ -765,6 +774,8 @@ class GameplayRepository:
             f"""
             SELECT
                 instance.*,
+                (SELECT purpose FROM asset_occupancies busy
+                 WHERE busy.pig_instance_id=instance.pig_instance_id) AS busy_purpose,
                 template.description,
                 template.image_relpath,
                 template.image_fit,
@@ -1112,6 +1123,8 @@ class GameplayRepository:
             UPDATE pig_instances
             SET owner_player_id = ?, updated_at = ?
             WHERE pig_instance_id = ? AND state = 'active'
+              AND NOT EXISTS(SELECT 1 FROM asset_occupancies busy
+                             WHERE busy.pig_instance_id=pig_instances.pig_instance_id)
             """,
             (owner_player_id, now, pig_instance_id),
         )

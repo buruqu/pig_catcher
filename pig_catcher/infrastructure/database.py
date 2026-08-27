@@ -225,6 +225,20 @@ class PigCatcherDatabase:
             "weekly_competition_entries",
             "weekly_competition_settlements",
             "weekly_competition_awards",
+            "material_balances",
+            "material_ledger",
+            "asset_occupancies",
+            "dispatch_profiles",
+            "dispatch_teams",
+            "dispatch_trips",
+            "dispatch_route_progress",
+            "dispatch_proficiency",
+            "dispatch_contributions",
+            "dispatch_souvenirs",
+            "dispatch_tools",
+            "dispatch_pending",
+            "dispatch_choices",
+            "activity_facts",
         }
         table_rows = await (
             await connection.execute(
@@ -238,6 +252,28 @@ class PigCatcherDatabase:
         missing_tables = required_tables - present_tables
         if missing_tables:
             raise MigrationError("数据库版本已是当前版，但缺少关键表：" + "、".join(sorted(missing_tables)))
+
+        required_guards = {
+            "material_ledger_no_update",
+            "material_ledger_no_delete",
+            "occupancy_validate_owner",
+            "occupancy_validate_update",
+            "occupied_pig_no_dispose",
+            "occupied_pig_no_delete",
+            "activity_facts_no_update",
+            "activity_facts_no_delete",
+            "idx_dispatch_active_team",
+            "idx_dispatch_player_history",
+            "idx_dispatch_unread_returns",
+            "idx_dispatch_pending_choices",
+            "idx_activity_facts_player_source",
+        }
+        guard_rows = await (
+            await connection.execute("SELECT name FROM sqlite_master WHERE type IN ('trigger','index')")
+        ).fetchall()
+        missing_guards = required_guards - {str(row[0]) for row in guard_rows}
+        if missing_guards:
+            raise MigrationError("数据库缺少派遣占用或账本保护：" + "、".join(sorted(missing_guards)))
 
         index_rows = await (await connection.execute("PRAGMA index_list(player_food_effects)")).fetchall()
         source_index_found = False

@@ -36,6 +36,7 @@
     <section class="pig-card__detail">
       <div class="pill-row" style="margin-bottom: 16px">
         <span class="pill pill--strong">#{{ view.short_code }}</span>
+        {% if view.activity_label %}<span class="pill pill--mint">{{ view.activity_label }} · 已保护</span>{% endif %}
         <span class="pill">{{ view.media_format }}{% if view.is_animated %} · 动态{% endif %}</span>
         {% if view.catalog_new %}<span class="pill pill--mint">NEW · 首次收集</span>{% endif %}
         {% if view.body_label %}<span class="pill pill--strong">{{ view.body_label }}</span>{% endif %}

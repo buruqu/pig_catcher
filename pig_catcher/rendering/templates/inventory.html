@@ -45,7 +45,7 @@
           {% endif %}
         </div>
         <h2 style="font-size: {% if item.display_name|length > 45 %}12{% elif item.display_name|length > 28 %}15{% elif item.display_name|length > 18 %}18{% else %}21{% endif %}px">{{ item.display_name }}</h2>
-        <div class="inventory-item__code">{{ "★" * item.rarity }} · #{{ item.short_code }}{% if item.is_favorite %} · ♥ 已收藏{% endif %}</div>
+        <div class="inventory-item__code">{{ "★" * item.rarity }} · #{{ item.short_code }}{% if item.is_favorite %} · ♥ 已收藏{% endif %}{% if item.activity_label %} · {{ item.activity_label }}{% endif %}</div>
         <div class="inventory-item__facts">
           <span>{{ "%.1f"|format(item.size_value) }} cm</span>
           <span>{{ "%.2f"|format(item.weight_value) }} kg</span>

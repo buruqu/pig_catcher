@@ -6,6 +6,7 @@ from collections.abc import Mapping, Sequence
 
 from ...domain.enums import AssetKind, RecordType, TradeStatus
 from ..database import DatabaseSession
+from .activity_locks import unoccupied_clause
 
 _ASSET_TABLES: dict[AssetKind, tuple[str, str]] = {
     AssetKind.PIG: ("pig_instances", "pig_instance_id"),
@@ -269,6 +270,7 @@ class SocialRepository:
               AND state = 'active'
               AND locked_trade_id IS NULL
               AND is_favorite = 0
+              {unoccupied_clause(asset_kind.value)}
             """,
             (
                 to_player_id,
@@ -302,6 +304,7 @@ class SocialRepository:
               AND state = 'active'
               AND locked_trade_id IS NULL
               AND is_favorite = 0
+              {unoccupied_clause(asset_kind.value)}
             """,
             (trade_id, now, asset_instance_id, scope_id, owner_player_id),
         )
@@ -355,6 +358,7 @@ class SocialRepository:
               AND owner_player_id = ?
               AND state = 'locked-for-trade'
               AND locked_trade_id = ?
+              {unoccupied_clause(asset_kind.value)}
             """,
             (
                 recipient_player_id,

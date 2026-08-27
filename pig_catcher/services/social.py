@@ -43,6 +43,7 @@ from ..infrastructure.repositories import (
     RestrictionRepository,
     SocialRepository,
 )
+from ..infrastructure.repositories.activity_locks import require_unoccupied
 from ..infrastructure.repositories.restrictions import (
     GIFT_TRANSFER_BAN,
     PLUGIN_ACCESS_BAN,
@@ -1439,6 +1440,7 @@ class SocialService:
                 player_id=identity.player_id,
                 selector=selector,
                 prefer_highest=allow_favorite,
+                available_only=not allow_favorite and selector.short_code is None,
             )
             if not rows:
                 raise PigNotFoundError(
@@ -1469,6 +1471,8 @@ class SocialService:
             else:
                 row = rows[0]
             pig = self._pig_view(row)
+            if not allow_favorite:
+                await require_unoccupied(session, pig.pig_instance_id)
             if pig.is_favorite and not allow_favorite:
                 raise AssetStateConflictError(
                     f"“{pig.selector}”已收藏保护，请先使用 /取消收藏 猪猪 {pig.selector}。"

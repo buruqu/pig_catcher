@@ -364,6 +364,15 @@ PENDING -> EXPIRED
   精确群唯一；奖励按活动、群、玩家和最终名次唯一。结算猪币写不可变账本，称号、边框、牌子
   与玩法券进入现有不可交易成就奖励库存。活动首启和结算前都从已提交业务回执补录，避免图片
   失败、进程退出或功能短暂停用造成漏分。
+- Schema 37（仅 2.0 开发线）新增 14 张表：`material_balances`、`material_ledger`、
+  `asset_occupancies`、`dispatch_profiles`、`dispatch_teams`、`dispatch_trips`、
+  `dispatch_route_progress`、`dispatch_proficiency`、`dispatch_contributions`、
+  `dispatch_souvenirs`、`dispatch_tools`、`dispatch_pending`、`dispatch_choices`、`activity_facts`。
+  材料账本和业务事实不可变；占用记录以猪实例唯一并校验所有者/群，阻止在途资产消耗、
+  转移、交易锁定与删除。原表原行不改写，当前结构核验同时检查保护触发器和关键索引。
+  材料使用一千万定点单位，余额与零头按玩家/材料累计；单猪熟练时长与本人贡献分别保存。
+  旅行存出发快照、随机种子、逻辑起止和实际处理时间；保底按玩家/区域共享，确认和罗盘选择跨重启持久化。
+  `activity_facts` 按玩家、来源类型、来源 ID、子事件唯一，不用一张合并返程回执替代逐趟事实。
 
 群体术式的次数只在成功抓猪事务中递减。伏魔御厨子会把刚生成的原料猪置为
 `consumed-for-cooking`，普通原料生成两份同模板菜；五条猪例外生成苍蓝、赫焰各一份。发动者

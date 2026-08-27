@@ -12,6 +12,8 @@ build/
 logs/
 runtime/
 data/
+!pig_catcher/domain/data/
+!pig_catcher/domain/data/dispatch_specialties.json
 artifacts/
 config_back/
 asset_library/current-v*/

@@ -145,6 +145,7 @@ class PigCardViewModel:
     achievement_firework: bool = False
     achievement_title: str = ""
     achievement_frame: str = ""
+    activity_label: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -222,6 +223,7 @@ class InventoryItemViewModel:
     image_fit: str
     body_label: str = ""
     is_favorite: bool = False
+    activity_label: str = ""
 
 
 @dataclass(frozen=True, slots=True)

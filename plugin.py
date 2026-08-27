@@ -46,7 +46,9 @@ from .pig_catcher.commands import (
     parse_trade_offer_query,
     parse_upgrade_name,
 )
+from .pig_catcher.commands.dispatch import DISPATCH_HELP, parse_dispatch_request
 from .pig_catcher.config import AccessPolicy, PigCatcherConfig
+from .pig_catcher.domain.dispatch_views import DispatchView
 from .pig_catcher.domain.enums import AssetKind
 from .pig_catcher.domain.errors import (
     CommandContextError,
@@ -170,6 +172,7 @@ from .pig_catcher.services import (
     is_group_event_food,
     reward_label,
 )
+from .pig_catcher.services.dispatch import DispatchService
 from .pig_catcher.version import PLUGIN_VERSION
 
 _PURCHASE_PRODUCT_PATTERN = "(?:" + "|".join(escape(item.display_name) for item in ITEM_DEFINITIONS) + ")"
@@ -207,6 +210,7 @@ class PigCatcherPlugin(MaiBotPlugin):
         self._announcement_admin_service: AnnouncementAdminService | None = None
         self._achievement_service: AchievementService | None = None
         self._weekly_competition_service: WeeklyCompetitionService | None = None
+        self._dispatch_service: DispatchService | None = None
         self._renderer: PigCatcherRenderer | None = None
         self._animation_composer: AnimatedCardComposer | None = None
         self._delivery: RenderDelivery | None = None
@@ -381,6 +385,7 @@ class PigCatcherPlugin(MaiBotPlugin):
             self._storage = storage
             self._asset_service = asset_service
             self._framework_service = FrameworkService(database)
+            self._dispatch_service = DispatchService(database)
             self._gameplay_service = GameplayService(
                 database,
                 settings.catching,
@@ -470,6 +475,7 @@ class PigCatcherPlugin(MaiBotPlugin):
         self._announcement_admin_service = None
         self._achievement_service = None
         self._weekly_competition_service = None
+        self._dispatch_service = None
         self._receipt_service = None
         self._regulation_service = None
         self._economy_service = None
@@ -4174,6 +4180,95 @@ class PigCatcherPlugin(MaiBotPlugin):
                 operation="猪猪排行",
                 error=exc,
             )
+
+    async def _dispatch_command(self, stream_id: str, kwargs: Mapping[str, Any], section: str) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_command(
+            stream_id,
+            kwargs,
+            feature_enabled=self.settings.features.dispatch_enabled,
+            feature_label="猪猪派遣",
+        )
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            request = parse_dispatch_request(matched_group(kwargs, "arguments"), section=section)
+            if request.action == "help":
+                return await self._reply_text(identity.stream_id, DISPATCH_HELP, success=True)
+            service, renderer = self._dispatch_service, self._renderer
+            if service is None or renderer is None:
+                raise RuntimeError("派遣服务尚未就绪。")
+            result = await service.execute(identity, request)
+            data_dir = Path(self.ctx.paths.data_dir).resolve()
+            paths = {
+                pig.short_code: media_path(data_dir, pig.image_relpath)
+                for pig in result.view.pigs
+                if pig.image_relpath
+            }
+
+            async def render() -> RenderedImage:
+                return await renderer.render_dispatch(result.view, paths)
+
+            if result.receipt is not None:
+                return await self._deliver_receipt(
+                    stream_id=identity.stream_id,
+                    receipt=result.receipt,
+                    render=render,
+                    fallback_text=result.receipt.text_summary,
+                )
+            return await self._deliver_query(
+                stream_id=identity.stream_id,
+                render=render,
+                fallback_text=result.view.text(),
+            )
+        except PigCatcherError as exc:
+            if self._renderer is None:
+                return await self._command_error(stream_id=identity.stream_id, operation="猪猪派遣", error=exc)
+            view = DispatchView(
+                title="派遣提示",
+                player_name="猪猪远行社",
+                banner=str(exc),
+                hints=("/猪猪派遣 帮助 查看可复制命令。",),
+            )
+            delivered = await self._deliver_query(
+                stream_id=identity.stream_id,
+                render=lambda: self._renderer.render_dispatch(view, {}),
+                fallback_text=view.text(),
+            )
+            return False, delivered[1], delivered[2]
+        except Exception as exc:
+            return await self._command_error(stream_id=identity.stream_id, operation="猪猪派遣", error=exc)
+
+    @Command(
+        "pig_catcher_dispatch",
+        description="猪猪派遣编队、出发、确认、召回和返程",
+        pattern=rf"^{_COMMAND_LEADING_MENTION_PATTERN}/猪猪派遣(?:\s+(?P<arguments>.*?))?\s*$",
+    )
+    async def handle_dispatch(self, stream_id: str = "", **kwargs: Any) -> tuple[bool, str, int]:
+        return await self._dispatch_command(stream_id, kwargs, "dispatch")
+
+    @Command(
+        "pig_catcher_dispatch_bag",
+        description="派遣材料、器具配方、制作与转换",
+        pattern=rf"^{_COMMAND_LEADING_MENTION_PATTERN}/派遣背包(?:\s+(?P<arguments>.*?))?\s*$",
+    )
+    async def handle_dispatch_bag(self, stream_id: str = "", **kwargs: Any) -> tuple[bool, str, int]:
+        return await self._dispatch_command(stream_id, kwargs, "bag")
+
+    @Command(
+        "pig_catcher_dispatch_journal",
+        description="派遣游记和自然纪念品收藏",
+        pattern=rf"^{_COMMAND_LEADING_MENTION_PATTERN}/派遣游记(?:\s+(?P<arguments>.*?))?\s*$",
+    )
+    async def handle_dispatch_journal(self, stream_id: str = "", **kwargs: Any) -> tuple[bool, str, int]:
+        return await self._dispatch_command(stream_id, kwargs, "journal")
+
+    @Command(
+        "pig_catcher_dispatch_encounter",
+        description="查看并选择旅行奇遇",
+        pattern=rf"^{_COMMAND_LEADING_MENTION_PATTERN}/派遣奇遇(?:\s+(?P<arguments>.*?))?\s*$",
+    )
+    async def handle_dispatch_encounters(self, stream_id: str = "", **kwargs: Any) -> tuple[bool, str, int]:
+        return await self._dispatch_command(stream_id, kwargs, "encounters")
 
 
 def create_plugin() -> PigCatcherPlugin:

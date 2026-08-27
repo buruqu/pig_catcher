@@ -33,6 +33,8 @@ from ..infrastructure.repositories import (
     RestrictionRepository,
     SocialRepository,
 )
+from ..infrastructure.repositories.activity_locks import require_unoccupied
+from ..infrastructure.repositories.dispatch import DispatchRepository
 from ..infrastructure.repositories.restrictions import (
     GIFT_TRANSFER_BAN,
     PLUGIN_ACCESS_BAN,
@@ -476,6 +478,7 @@ class AdministrationService:
                 identity=identity,
                 platform_user_id=normalized_target,
             )
+            await DispatchRepository().settle_elapsed(session, str(target["player_id"]), now)
             asset = await self.repository.active_asset_by_selector(
                 session,
                 scope_id=identity.scope.value,
@@ -487,6 +490,8 @@ class AdministrationService:
             if asset is None:
                 raise DomainValidationError("该玩家当前没有这件有效资产，或名称与编号不匹配。")
             instance_id = str(asset["asset_instance_id"])
+            if asset_kind is AssetKind.PIG:
+                await require_unoccupied(session, instance_id)
             cancelled_trades = await self.repository.cancel_pending_trade_for_asset(
                 session,
                 scope_id=identity.scope.value,

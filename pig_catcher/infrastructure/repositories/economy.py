@@ -6,6 +6,7 @@ from collections.abc import Mapping
 
 from ...domain.models import AssetSelector
 from ..database import DatabaseSession
+from .activity_locks import unoccupied_clause
 from .batch_safety import (
     highest_collaboration_pig_ids_per_template,
     highest_instance_ids_per_template,
@@ -784,6 +785,7 @@ class EconomyRepository:
               AND locked_trade_id IS NULL
               AND is_favorite = 0
               AND rarity <= ?
+              {unoccupied_clause(asset_kind)}
             ORDER BY official_value, acquired_at, {id_column}
             LIMIT 1
             """,
@@ -934,6 +936,7 @@ class EconomyRepository:
               AND state = 'active'
               AND locked_trade_id IS NULL
               AND is_favorite = 0
+              {unoccupied_clause(asset_kind)}
               {rarity_clause}
               {name_clause}
               {keep_clause}
@@ -953,6 +956,7 @@ class EconomyRepository:
               AND state = 'active'
               AND locked_trade_id IS NULL
               AND is_favorite = 0
+              {unoccupied_clause(asset_kind)}
               {rarity_clause}
               {name_clause}
               {keep_clause}
@@ -1139,6 +1143,8 @@ class EconomyRepository:
               AND state = 'active'
               AND locked_trade_id IS NULL
               AND is_favorite = 0
+              AND NOT EXISTS(SELECT 1 FROM asset_occupancies busy
+                             WHERE busy.pig_instance_id=pig_instances.pig_instance_id)
             """,
             (now, now, pig_instance_id, player_id, scope_id),
         )
@@ -1191,6 +1197,8 @@ class EconomyRepository:
               AND state = 'active'
               AND locked_trade_id IS NULL
               AND is_favorite = 0
+              AND NOT EXISTS(SELECT 1 FROM asset_occupancies busy
+                             WHERE busy.pig_instance_id=pig_instances.pig_instance_id)
             """,
             (now, now, pig_instance_id, player_id, scope_id),
         )

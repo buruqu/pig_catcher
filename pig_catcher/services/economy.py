@@ -114,6 +114,7 @@ from ..infrastructure.repositories import (
     SocialRepository,
     TechniqueRepository,
 )
+from ..infrastructure.repositories.activity_locks import require_unoccupied
 from ..version import RULESET_VERSION
 from .command_state import (
     iso_timestamp,
@@ -3593,11 +3594,13 @@ class EconomyService:
                 session,
                 player_id=identity.player_id,
                 selector=selector,
+                available_only=selector.short_code is None,
             )
             if not rows:
                 raise PigNotFoundError(f"你的猪猪背包中找不到“{selector_text.strip()}”。")
             if selector.short_code is not None:
                 pig = pig_view_from_row(rows[0])
+                await require_unoccupied(session, pig.pig_instance_id)
                 if pig.is_favorite:
                     raise AssetStateConflictError(
                         f"“{pig.selector}”已收藏保护，请先使用 /取消收藏 猪猪 {pig.selector}。"

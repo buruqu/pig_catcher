@@ -170,6 +170,7 @@ class PigView:
     display_variant: str = "pig"
     alternate_image_relpath: str = ""
     is_favorite: bool = False
+    activity_label: str = ""
 
     @property
     def stars(self) -> str:
@@ -563,6 +564,9 @@ def pig_view_from_row(
         display_variant=display_variant,
         alternate_image_relpath=alternate_image_relpath,
         is_favorite=bool(row.get("is_favorite") or False),
+        activity_label={"dispatch": "派遣中", "tour": "巡演中", "battle": "对战中"}.get(
+            str(row.get("busy_purpose") or ""), ""
+        ),
     )
 
 
@@ -768,6 +772,7 @@ def format_pig_detail_summary(pig: PigView) -> str:
         "【猪猪详情】\n"
         f"{pig.stars} {pig.display_name}（{pig.rarity_name}）\n"
         f"编号：{pig.selector}{'（已收藏保护）' if pig.is_favorite else ''}\n"
+        f"状态：{pig.activity_label or '空闲'}\n"
         f"{collection}"
         f"体型：{pig.size_value:.1f} cm（{size_label(pig.size_percentile)}）\n"
         f"重量：{pig.weight_value:.2f} kg（{weight_label(pig.weight_percentile)}）\n"

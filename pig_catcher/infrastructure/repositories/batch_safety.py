@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Literal
 
 from ..database import DatabaseSession
+from .activity_locks import unoccupied_clause
 
 BatchAssetKind = Literal["pig", "food"]
 
@@ -50,6 +51,7 @@ async def highest_collaboration_pig_ids_per_template(
               AND candidate.locked_trade_id IS NULL
               AND candidate.is_favorite = 0
               AND template.collection_id IS NOT NULL
+              {unoccupied_clause("pig", "candidate")}
               AND template.collection_id != ''
               {rarity_clause}
         ) AS kept
@@ -132,6 +134,7 @@ async def highest_instance_ids_per_template(
               AND candidate.locked_trade_id IS NULL
               AND candidate.is_favorite = 0
               {template_filter}
+              {unoccupied_clause(asset_kind, "candidate")}
               {name_clause}
               {rarity_clause}
         ) AS kept

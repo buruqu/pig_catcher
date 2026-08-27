@@ -1,0 +1,698 @@
+{
+  "definition_version": 1,
+  "description": "按稳定模板ID审阅的旅行特长；未来未录入模板使用中性后勤，不按名称在运行时猜测。",
+  "templates": {
+    "pig-r1-upscale": [
+      "交涉",
+      "后勤"
+    ],
+    "pig-r1-harmonica": [
+      "音乐器材",
+      "后勤"
+    ],
+    "pig-r1-crying": [
+      "后勤",
+      "搜寻"
+    ],
+    "pig-r1-civil-engineer": [
+      "搬运",
+      "采掘"
+    ],
+    "pig-r1-android": [
+      "机械",
+      "研究"
+    ],
+    "pig-r1-bed": [
+      "后勤",
+      "搬运"
+    ],
+    "pig-r1-dead": [
+      "后勤",
+      "搬运"
+    ],
+    "pig-r1-runny-nose": [
+      "后勤",
+      "搜寻"
+    ],
+    "pig-r1-basic": [
+      "后勤",
+      "搜寻"
+    ],
+    "pig-r1-letter-b": [
+      "交涉",
+      "后勤"
+    ],
+    "pig-r1-spawn-egg": [
+      "后勤",
+      "搬运"
+    ],
+    "pig-r1-chocolate": [
+      "后勤",
+      "搜寻"
+    ],
+    "pig-r1-hoof": [
+      "后勤",
+      "搬运"
+    ],
+    "pig-r1-snout": [
+      "搜寻",
+      "探路"
+    ],
+    "pig-r1-skinny": [
+      "灵巧",
+      "探路"
+    ],
+    "pig-r1-emperors-new-pig": [
+      "灵巧",
+      "探路"
+    ],
+    "pig-r1-short-legged": [
+      "灵巧",
+      "探路"
+    ],
+    "pig-r1-rainbow": [
+      "交涉",
+      "后勤"
+    ],
+    "pig-r1-benzene": [
+      "机械",
+      "研究"
+    ],
+    "pig-r1-boar": [
+      "搜寻",
+      "探路"
+    ],
+    "pig-r2-wall-street": [
+      "交涉",
+      "后勤"
+    ],
+    "pig-r2-lazy": [
+      "后勤",
+      "搬运"
+    ],
+    "pig-r2-stomach": [
+      "后勤",
+      "搬运"
+    ],
+    "pig-r2-elephant": [
+      "搬运",
+      "采掘"
+    ],
+    "pig-r2-many": [
+      "后勤",
+      "搬运"
+    ],
+    "pig-r2-roadblock": [
+      "搬运",
+      "采掘"
+    ],
+    "pig-r2-computer": [
+      "机械",
+      "研究"
+    ],
+    "pig-r2-inspected": [
+      "交涉",
+      "后勤"
+    ],
+    "pig-r2-bath": [
+      "后勤",
+      "搜寻"
+    ],
+    "pig-r2-tiny": [
+      "灵巧",
+      "探路"
+    ],
+    "pig-r2-bee": [
+      "搜寻",
+      "探路"
+    ],
+    "pig-r2-engineer": [
+      "机械",
+      "研究"
+    ],
+    "pig-r2-resume": [
+      "交涉",
+      "后勤"
+    ],
+    "pig-r2-fat": [
+      "后勤",
+      "搬运"
+    ],
+    "pig-r2-apple": [
+      "后勤",
+      "搜寻"
+    ],
+    "pig-r2-drunk": [
+      "后勤",
+      "搜寻"
+    ],
+    "pig-r2-germanium": [
+      "搬运",
+      "采掘"
+    ],
+    "pig-r2-chive": [
+      "交涉",
+      "后勤"
+    ],
+    "pig-r2-hacker": [
+      "机械",
+      "研究"
+    ],
+    "pig-r2-turtle": [
+      "搜寻",
+      "探路"
+    ],
+    "pig-r3-pigseek": [
+      "机械",
+      "研究"
+    ],
+    "pig-r3-no-answer": [
+      "后勤",
+      "搜寻"
+    ],
+    "pig-r3-oriental-pearl": [
+      "搜寻",
+      "探路"
+    ],
+    "pig-r3-freeloader": [
+      "交涉",
+      "后勤"
+    ],
+    "pig-r3-pixel": [
+      "机械",
+      "研究"
+    ],
+    "pig-r3-ranking": [
+      "灵巧",
+      "交涉"
+    ],
+    "pig-r3-cute-roll": [
+      "灵巧",
+      "探路"
+    ],
+    "pig-r3-turntable": [
+      "音乐器材",
+      "后勤"
+    ],
+    "pig-r3-miner": [
+      "搬运",
+      "采掘"
+    ],
+    "pig-r3-order-taker": [
+      "交涉",
+      "后勤"
+    ],
+    "pig-r3-lemon": [
+      "后勤",
+      "搜寻"
+    ],
+    "pig-r3-doctor": [
+      "机械",
+      "研究"
+    ],
+    "pig-r3-streamer": [
+      "音乐器材",
+      "后勤"
+    ],
+    "pig-r3-red-envelope": [
+      "交涉",
+      "后勤"
+    ],
+    "pig-r3-nonogram": [
+      "灵巧",
+      "研究"
+    ],
+    "pig-r3-awakened": [
+      "搜寻",
+      "探路"
+    ],
+    "pig-r3-golden-wings": [
+      "灵巧",
+      "探路"
+    ],
+    "pig-r3-invisible": [
+      "灵巧",
+      "探路"
+    ],
+    "pig-r3-maimai": [
+      "音乐器材",
+      "后勤"
+    ],
+    "pig-r3-pig-chain": [
+      "音乐器材",
+      "后勤"
+    ],
+    "pig-r4-two-dimensional": [
+      "灵巧",
+      "探路"
+    ],
+    "pig-r4-aggrieved": [
+      "交涉",
+      "后勤"
+    ],
+    "pig-r4-charge": [
+      "后勤",
+      "搬运"
+    ],
+    "pig-r4-van-gogh": [
+      "灵巧",
+      "研究"
+    ],
+    "pig-r4-washing-machine": [
+      "机械",
+      "研究"
+    ],
+    "pig-r4-nagisa-teardrop": [
+      "音乐器材",
+      "后勤"
+    ],
+    "pig-r4-chen-alter": [
+      "灵巧",
+      "研究"
+    ],
+    "pig-r4-sisyphus": [
+      "搬运",
+      "采掘"
+    ],
+    "pig-r4-pearl": [
+      "后勤",
+      "搜寻"
+    ],
+    "pig-r4-token-eater": [
+      "机械",
+      "研究"
+    ],
+    "pig-bandori-saya-bread-drum": [
+      "音乐器材",
+      "后勤"
+    ],
+    "pig-bandori-tae-rabbit-guitar": [
+      "音乐器材",
+      "后勤"
+    ],
+    "pig-bandori-tomoe-drum": [
+      "音乐器材",
+      "后勤"
+    ],
+    "pig-bandori-tsugumi-keyboard": [
+      "音乐器材",
+      "后勤"
+    ],
+    "pig-r4-roll": [
+      "灵巧",
+      "探路"
+    ],
+    "pig-r4-disco": [
+      "音乐器材",
+      "后勤"
+    ],
+    "pig-r4-dragon": [
+      "搜寻",
+      "探路"
+    ],
+    "pig-r5-earth": [
+      "搬运",
+      "采掘"
+    ],
+    "pig-bandori-arisa-tsundere-keyboard": [
+      "音乐器材",
+      "后勤"
+    ],
+    "pig-bandori-rimi-chocolate": [
+      "音乐器材",
+      "后勤"
+    ],
+    "pig-bandori-kasumi-star": [
+      "音乐器材",
+      "后勤"
+    ],
+    "pig-r5-dragonfish-duke": [
+      "交涉",
+      "后勤"
+    ],
+    "pig-r5-magnetofluid": [
+      "搬运",
+      "采掘"
+    ],
+    "pig-bandori-anon-pink-sound": [
+      "音乐器材",
+      "后勤"
+    ],
+    "pig-bandori-himari-daihi": [
+      "音乐器材",
+      "后勤"
+    ],
+    "pig-bandori-moca-bread": [
+      "音乐器材",
+      "后勤"
+    ],
+    "pig-bandori-ran-red-highlight": [
+      "音乐器材",
+      "后勤"
+    ],
+    "pig-bandori-soyo-black-tea": [
+      "音乐器材",
+      "后勤"
+    ],
+    "pig-r5-group": [
+      "交涉",
+      "后勤"
+    ],
+    "pig-g1092931381-1004": [
+      "搜寻",
+      "研究"
+    ],
+    "pig-g1092931381-juejue": [
+      "后勤",
+      "交涉"
+    ],
+    "pig-g1092931381-xiaoma": [
+      "灵巧",
+      "探路"
+    ],
+    "pig-g237716658-1004": [
+      "搜寻",
+      "研究"
+    ],
+    "pig-g237716658-juejue": [
+      "后勤",
+      "交涉"
+    ],
+    "pig-g237716658-xiaoma": [
+      "灵巧",
+      "探路"
+    ],
+    "pig-r4-flat": [
+      "灵巧",
+      "探路"
+    ],
+    "pig-bandori-rui-violin": [
+      "音乐器材",
+      "后勤"
+    ],
+    "pig-bandori-toko-fashion": [
+      "音乐器材",
+      "交涉"
+    ],
+    "pig-bandori-tsukushi-hamster": [
+      "音乐器材",
+      "后勤"
+    ],
+    "pig-bandori-tomori-penguin": [
+      "音乐器材",
+      "探路"
+    ],
+    "pig-bandori-rana-matcha-cat": [
+      "音乐器材",
+      "后勤"
+    ],
+    "pig-bandori-nanami-normal": [
+      "音乐器材",
+      "后勤"
+    ],
+    "pig-bandori-taki-panda-drum": [
+      "音乐器材",
+      "后勤"
+    ],
+    "pig-bandori-mashiro-daydream": [
+      "音乐器材",
+      "后勤"
+    ],
+    "pig-bandori-viola-green-tea": [
+      "音乐器材",
+      "后勤"
+    ],
+    "pig-g1092931381-xiangni-daozao": [
+      "后勤",
+      "搜寻"
+    ],
+    "pig-g1092931381-soft-sakiko": [
+      "音乐器材",
+      "交涉"
+    ],
+    "pig-g237716658-xiangni-daozao": [
+      "后勤",
+      "搜寻"
+    ],
+    "pig-g237716658-soft-sakiko": [
+      "音乐器材",
+      "交涉"
+    ],
+    "pig-bandori-aya-idol": [
+      "音乐器材",
+      "交涉"
+    ],
+    "pig-bandori-hina-genius": [
+      "音乐器材",
+      "后勤"
+    ],
+    "pig-bandori-chisato-lady": [
+      "交涉",
+      "后勤"
+    ],
+    "pig-bandori-maya-equipment": [
+      "机械",
+      "研究"
+    ],
+    "pig-bandori-eve-bushido": [
+      "音乐器材",
+      "后勤"
+    ],
+    "pig-g1092931381-aya-repair": [
+      "机械",
+      "研究"
+    ],
+    "pig-g237716658-aya-repair": [
+      "机械",
+      "研究"
+    ],
+    "pig-bandori-hhw-happy": [
+      "音乐器材",
+      "交涉"
+    ],
+    "pig-bandori-hhw-opera": [
+      "音乐器材",
+      "交涉"
+    ],
+    "pig-bandori-hhw-lost": [
+      "灵巧",
+      "探路"
+    ],
+    "pig-bandori-hhw-misaki": [
+      "音乐器材",
+      "机械"
+    ],
+    "pig-bandori-hhw-korokke": [
+      "音乐器材",
+      "后勤"
+    ],
+    "pig-bandori-hhw-michelle": [
+      "音乐器材",
+      "机械"
+    ],
+    "pig-g1092931381-baogian": [
+      "研究",
+      "探路"
+    ],
+    "pig-g237716658-baogian": [
+      "研究",
+      "探路"
+    ],
+    "pig-bandori-roselia-yukina": [
+      "音乐器材",
+      "后勤"
+    ],
+    "pig-bandori-roselia-lisa": [
+      "音乐器材",
+      "后勤"
+    ],
+    "pig-bandori-roselia-sayo": [
+      "音乐器材",
+      "后勤"
+    ],
+    "pig-bandori-roselia-ako": [
+      "音乐器材",
+      "后勤"
+    ],
+    "pig-bandori-roselia-rinko": [
+      "音乐器材",
+      "后勤"
+    ],
+    "pig-g1092931381-ob-yichuan": [
+      "后勤",
+      "交涉"
+    ],
+    "pig-g237716658-ob-yichuan": [
+      "后勤",
+      "交涉"
+    ],
+    "pig-qo5e5854406d0297d6feae696a13e3a339-ob-yichuan": [
+      "后勤",
+      "交涉"
+    ],
+    "pig-qo9ea2810f378fbd7dc3219c56ceab3520-ob-yichuan": [
+      "后勤",
+      "交涉"
+    ],
+    "pig-qo5e5854406d0297d6feae696a13e3a339-juejue": [
+      "后勤",
+      "交涉"
+    ],
+    "pig-qo5e5854406d0297d6feae696a13e3a339-1004": [
+      "搜寻",
+      "研究"
+    ],
+    "pig-qo5e5854406d0297d6feae696a13e3a339-xiaoma": [
+      "灵巧",
+      "探路"
+    ],
+    "pig-qo5e5854406d0297d6feae696a13e3a339-soft-sakiko": [
+      "音乐器材",
+      "交涉"
+    ],
+    "pig-qo5e5854406d0297d6feae696a13e3a339-xiangni-daozao": [
+      "后勤",
+      "搜寻"
+    ],
+    "pig-qo5e5854406d0297d6feae696a13e3a339-aya-repair": [
+      "机械",
+      "研究"
+    ],
+    "pig-qo5e5854406d0297d6feae696a13e3a339-baogian": [
+      "研究",
+      "探路"
+    ],
+    "pig-qo9ea2810f378fbd7dc3219c56ceab3520-juejue": [
+      "后勤",
+      "交涉"
+    ],
+    "pig-qo9ea2810f378fbd7dc3219c56ceab3520-1004": [
+      "搜寻",
+      "研究"
+    ],
+    "pig-qo9ea2810f378fbd7dc3219c56ceab3520-xiaoma": [
+      "灵巧",
+      "探路"
+    ],
+    "pig-qo9ea2810f378fbd7dc3219c56ceab3520-soft-sakiko": [
+      "音乐器材",
+      "交涉"
+    ],
+    "pig-qo9ea2810f378fbd7dc3219c56ceab3520-xiangni-daozao": [
+      "后勤",
+      "搜寻"
+    ],
+    "pig-qo9ea2810f378fbd7dc3219c56ceab3520-aya-repair": [
+      "机械",
+      "研究"
+    ],
+    "pig-qo9ea2810f378fbd7dc3219c56ceab3520-baogian": [
+      "研究",
+      "探路"
+    ],
+    "pig-bandori-ras-layer": [
+      "音乐器材",
+      "后勤"
+    ],
+    "pig-bandori-ras-lock": [
+      "音乐器材",
+      "后勤"
+    ],
+    "pig-bandori-ras-masking-motor": [
+      "音乐器材",
+      "探路"
+    ],
+    "pig-bandori-ras-pareo": [
+      "音乐器材",
+      "后勤"
+    ],
+    "pig-bandori-ras-chu2": [
+      "音乐器材",
+      "机械"
+    ],
+    "pig-g1092931381-shenlong-hua": [
+      "搬运",
+      "搜寻"
+    ],
+    "pig-g237716658-shenlong-hua": [
+      "搬运",
+      "搜寻"
+    ],
+    "pig-qo5e5854406d0297d6feae696a13e3a339-shenlong-hua": [
+      "搬运",
+      "搜寻"
+    ],
+    "pig-qo9ea2810f378fbd7dc3219c56ceab3520-shenlong-hua": [
+      "搬运",
+      "搜寻"
+    ],
+    "pig-g1092931381-daniya": [
+      "灵巧",
+      "搜寻"
+    ],
+    "pig-g1092931381-asamu": [
+      "后勤",
+      "交涉"
+    ],
+    "pig-g237716658-daniya": [
+      "灵巧",
+      "搜寻"
+    ],
+    "pig-g237716658-asamu": [
+      "后勤",
+      "交涉"
+    ],
+    "pig-qo5e5854406d0297d6feae696a13e3a339-daniya": [
+      "灵巧",
+      "搜寻"
+    ],
+    "pig-qo5e5854406d0297d6feae696a13e3a339-asamu": [
+      "后勤",
+      "交涉"
+    ],
+    "pig-qo9ea2810f378fbd7dc3219c56ceab3520-daniya": [
+      "灵巧",
+      "搜寻"
+    ],
+    "pig-qo9ea2810f378fbd7dc3219c56ceab3520-asamu": [
+      "后勤",
+      "交涉"
+    ],
+    "pig-bandori-avemujica-sakiko": [
+      "音乐器材",
+      "后勤"
+    ],
+    "pig-bandori-avemujica-uika": [
+      "音乐器材",
+      "后勤"
+    ],
+    "pig-bandori-avemujica-umiri": [
+      "音乐器材",
+      "后勤"
+    ],
+    "pig-bandori-avemujica-mutsumi": [
+      "音乐器材",
+      "后勤"
+    ],
+    "pig-bandori-avemujica-mortis": [
+      "音乐器材",
+      "后勤"
+    ],
+    "pig-bandori-avemujica-nyamu": [
+      "音乐器材",
+      "交涉"
+    ],
+    "pig-kfc-crazy-thursday": [
+      "交涉",
+      "后勤"
+    ],
+    "pig-jjk-gojo": [
+      "灵巧",
+      "交涉"
+    ],
+    "pig-jjk-sukuna": [
+      "搬运",
+      "研究"
+    ]
+  }
+}

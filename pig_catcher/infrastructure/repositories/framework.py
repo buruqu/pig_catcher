@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from ...domain.models import CommandIdentity, ScopeKey
 from ..database import DatabaseSession
+from .dispatch import DispatchRepository
 
 
 class FrameworkRepository:
@@ -89,3 +90,5 @@ class FrameworkRepository:
             now=now,
         )
         await self.ensure_player(session, identity=identity, now=now)
+        # 每次相关操作最多推进三趟旅行；与业务共用事务，到期后先释放猪猪。
+        await DispatchRepository().settle_elapsed(session, identity.player_id, now)

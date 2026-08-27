@@ -1,8 +1,9 @@
 # MaiBot 抓猪插件
 
 这是“抓猪插件”的独立 MaiBot 插件仓库。当前线上正式版本仍为 `1.29.1`；本工作树是隔离开发的
-`2.0.0.dev2`，尚未部署到 MaiBot 或官方群。2.0 第一轮已经实现数据驱动的 PiG Dream! 成就系统，
-第二轮已经实现可扩展周冲榜与第一期“抓猪冲刺！！！”；当前 1.29.1 正式版中伏魔御厨子接管五条猪时
+`2.0.0.dev3`，尚未部署到 MaiBot 或官方群。已有数据驱动的 PiG Dream! 成就系统和可扩展周冲榜，
+第一期活动为“抓猪冲刺！！！”；接下来的四轮开发中，第一轮“猪猪派遣”已完整实现并通过离线验收。
+当前 1.29.1 正式版中伏魔御厨子接管五条猪时
 会固定做出苍蓝与赫焰两道专属雪山；发动者本人抓到时两道都归发动者，其他群友抓到时再随机
 选出两名不同获得者；本版继续
 保留宿傩猪和五条猪普通做菜专属五星菜合计 `20%` 的命中率，以及五档一次性猪币里程碑；
@@ -40,7 +41,7 @@ QQ 官方 OpenID；底层稳定身份仍保留用于审计和幂等。
 [抓猪 2.0 隔离开发与大版本上线方案](docs/16-v2-development-and-release-plan.md)。
 
 派遣、巡演、对战已汇总为 [2.0 三大新机制总方案](docs/21-v2-three-systems-design-summary.md)，
-目前均为设计，尚未实现命令或上线。下一轮先完整开发派遣；巡演保留九团角色特色与自由混团，
+第一轮派遣已在隔离开发线落地，巡演、对战仍为设计；下一轮开发巡演。巡演保留九团角色特色与自由混团，
 对战已记录无限核心、败者五星 30%／六星 20% 基础分布及永久成长兼容，养成成本按派遣产出反推。
 完整细则见 [派遣](docs/19-pig-dispatch-system-design.md)、[巡演](docs/20-pig-tour-system-design.md)
 与 [对战 r2](docs/18-pig-battle-system-design.md)。
@@ -49,16 +50,30 @@ QQ 官方 OpenID；底层稳定身份仍保留用于审计和幂等。
 34 项公开、14 项隐藏，奖励含材料、有限次玩法券和原创外观。接下来按“派遣 → 巡演 → 对战 →
 新增成就与总验收”四轮开发；前三轮先保存成就所需的业务事实，各轮都完成自身图片与测试。
 旧 49 项常规毕业条件不扩张；当前已实现目录仍是 82 项，130 项是接入后的目标，不表示已完成或上线。
-完整设计稿含隐藏条件，不应原样发到群里；本轮仅归档设计，不推送、不公告。
+完整设计稿含隐藏条件，不应原样发到群里。本轮不部署、不推送、不公告。
+
+### 第一轮：猪猪远行社
+
+- 五条路线、4/8/12/24 小时旅行、最多三队；每队 1–3 只，至少一只低星、最多一只高星。
+- 173 个现有猪模板均有旅行特长，包含全部 61 个低星模板；材料加成加法合计最多 30%。
+- 材料零头累计、同区域跨队奇遇保底、四种器具制作与使用、基础材料 3:1 转换、
+  熟练度、20 件纪念品、游记、预览确认、召回和合并返程都已接通。
+- 出行不消耗猪、不消费抓猪或做菜效果；在途猪受做菜、售卖、赠送、交易及批量操作保护。
+  到期后在下一次相关操作前结算，不必先发返程命令；离线奖励不失效。
+
+常用入口：`/猪猪派遣`、`/派遣背包`、`/派遣游记`、`/派遣奇遇`；
+`/猪猪派遣 帮助` 提供可复制指令。编队与出发分别使用 `/猪猪派遣 确认`，不占用吃菜的 `/是`。
+所有主要结果优先图片，仍有幂等文字降级。完整玩法、结构和验收记录见
+[第一轮派遣交付说明](docs/23-dispatch-implementation-and-acceptance.md)。
 
 ## 当前状态
 
 - 插件 ID：`local.pig-catcher`
-- 目标 MaiBot：`1.0.12`
-- 目标 SDK：`maibot-plugin-sdk >=2.7.0,<3.0.0`
-- Python：`>=3.12`，本机验收环境 `3.14.4`
-- 开发数据协议：Schema `36`、Asset Manifest `4`、Ruleset `31`；生产仍为 Schema `34` / Ruleset `29`
-- 交付阶段：`6`；2.0 开发组件为 65 个显式 `COMMAND` 和 1 个管理首页 `HOME_CARD`，不注册普通消息监听、Tool 或 LLM
+- 本机宿主只读核验：MaiBot `1.1.3`；本轮未连接或重启该宿主
+- 目标 SDK：`maibot-plugin-sdk >=2.7.0,<3.0.0`，开发锁定 `2.7.1`
+- Python：`>=3.12`，本轮隔离验收环境 `3.13.12`
+- 开发数据协议：Schema `37`、Asset Manifest `4`、Ruleset `32`；生产仍为 Schema `34` / Ruleset `29`
+- 交付阶段：`6`；2.0 开发组件为 69 个显式 `COMMAND` 和 1 个管理首页 `HOME_CARD`，不注册普通消息监听、Tool 或 LLM
 - 当前群聊命令：`/抓猪帮助`、`/抓猪`（别名 `/抓群友`）、`/抓猪档案`、
   `/猪猪详情`（兼容旧名 `/抓猪详情`）、`/猪猪背包`、`/猪猪图鉴`、`/猪猪纪录`、`/今日巨物`、`/收藏`、`/取消收藏`、`/使用道具`、`/取消道具`、
   `/做菜`、`/批量做菜`、`/美食详情`、`/美食背包`、`/美食图鉴`、`/吃菜`（别名 `/使用美食`）、`/是`、`/否`、
@@ -333,7 +348,7 @@ QQ 官方 OpenID。
 建立独立开发环境并运行：
 
 ```powershell
-uv sync --all-groups --locked
+uv sync --all-groups --locked --default-index https://pypi.tuna.tsinghua.edu.cn/simple
 .\.venv\Scripts\python.exe -m pytest
 .\.venv\Scripts\python.exe -m compileall -q plugin.py pig_catcher tests tools
 .\.venv\Scripts\ruff.exe check plugin.py pig_catcher tests tools
@@ -381,9 +396,11 @@ uv run python .\tools\uat_production_recovery.py `
 - [抓猪成就系统设计与 2.0 第一轮实现记录（尚未上线）](docs/15-achievement-system-design-proposal.md)
 - [PiG Dream! 周冲榜机制与第一期实现记录（尚未上线）](docs/17-weekly-competition-system.md)
 - [猪猪对战设计与已确认轮盘规则（仅设计，未实现）](docs/18-pig-battle-system-design.md)
-- [猪猪远行社完整派遣设计（下一轮开发）](docs/19-pig-dispatch-system-design.md)
+- [猪猪远行社完整派遣设计（已隔离实现）](docs/19-pig-dispatch-system-design.md)
 - [PiG Dream! 自由乐队与巡演设计（未实现）](docs/20-pig-tour-system-design.md)
 - [2.0 派遣、巡演、对战三大机制总方案](docs/21-v2-three-systems-design-summary.md)
+- [48 项新成就与四轮开发方案（成就尚未接入）](docs/22-three-systems-achievement-design.md)
+- [第一轮派遣交付、命令与离线验收](docs/23-dispatch-implementation-and-acceptance.md)
 - [抓猪 2.0 隔离开发与大版本上线方案](docs/16-v2-development-and-release-plan.md)
 
 ## 不变原则

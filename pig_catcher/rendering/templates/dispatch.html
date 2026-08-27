@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <style>
+    :root{--font-family:{{ font_family }};}{{ theme_css|safe }}
+    .dispatch-body{padding:26px 38px 30px;display:grid;gap:20px;background:#fff}
+    .dispatch-banner{border:1px solid #efd7e0;border-left:5px solid #d8648f;border-radius:7px;background:#fff5f9;padding:17px 20px;color:#70405a;font-size:18px;line-height:1.6;overflow-wrap:anywhere}
+    .dispatch-stats{display:grid;grid-template-columns:repeat(var(--stat-columns,3),minmax(0,1fr));border:1px solid #efd7e0;border-radius:9px;overflow:hidden}
+    .dispatch-stat{padding:16px 20px;background:#fffafd;border-right:1px solid #efd7e0}.dispatch-stat:last-child{border-right:0}
+    .dispatch-stat span,.dispatch-stat small{display:block;color:#927681}.dispatch-stat strong{display:block;font-size:25px;margin:5px 0 8px;color:#41343d;overflow-wrap:anywhere}.dispatch-stat small{font-size:14px;line-height:1.5}
+    .dispatch-pigs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+    .dispatch-pig{padding:16px;border:1px solid #ecdde4;border-radius:12px;background:#fffcfd;min-width:0}
+    .dispatch-pig__media{height:184px;border-radius:8px;background:#fff;display:flex;justify-content:center;align-items:center;overflow:hidden;margin-bottom:12px}
+    .dispatch-pig__media img{height:100%;width:100%;object-fit:contain}.dispatch-pig__media span{color:#bd9fae;font-size:40px}
+    .dispatch-pig h2{font-size:22px;margin:8px 0;line-height:1.4;overflow-wrap:anywhere}.dispatch-stars{color:#be5282;letter-spacing:2px}
+    .dispatch-code{color:#937786;font-size:13px;margin:8px 0}.dispatch-tags{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}.dispatch-tags span{font-size:14px;color:#9a4566;background:#fff0f6;border:1px solid #f0d3df;padding:4px 9px;border-radius:4px}.dispatch-pig p{margin:8px 0 0;font-size:14px;color:#89727d;line-height:1.5}
+    .dispatch-panel{border:1px solid #ecd8e1;border-radius:10px;overflow:hidden;break-inside:avoid}
+    .dispatch-panel h2{font-size:21px;line-height:1.4;margin:0;padding:16px 20px;background:#fff3f8;color:#82405d;overflow-wrap:anywhere}
+    .dispatch-row{display:grid;grid-template-columns:200px minmax(0,1fr);padding:13px 20px;border-top:1px solid #f1e5eb;gap:18px;align-items:start}
+    .dispatch-row .label{color:#957583;font-size:16px;line-height:1.6}.dispatch-row strong{font-size:19px;color:#3c3239;line-height:1.55;font-weight:650;white-space:pre-wrap;overflow-wrap:anywhere}.dispatch-row small{display:block;font-size:14px;color:#977f8a;line-height:1.6;margin-top:5px;overflow-wrap:anywhere}
+    .dispatch-caption{margin:0;padding:12px 20px;background:#fffbfd;color:#9a7386;font-size:14px;line-height:1.6;overflow-wrap:anywhere}
+    .dispatch-hints{padding:16px 20px;background:#fdf8fb;border:1px dashed #eacbd8;border-radius:8px}.dispatch-hints p{margin:0 0 8px;font-size:15px;line-height:1.65;color:#856373;overflow-wrap:anywhere}.dispatch-hints p:last-child{margin-bottom:0}
+    .dispatch-header__player{font-size:21px!important;max-width:245px;overflow-wrap:anywhere;line-height:1.4}
+  </style>
+</head>
+<body>
+<main class="game-sheet" data-pig-catcher-root data-render-ready="true">
+  <header class="game-header">
+    <div class="game-header__copy"><p class="game-header__eyebrow">PiG Dream! · {{ view.subtitle }}</p><h1>{{ view.title }}</h1></div>
+    <div class="game-header__meta"><span>远行社成员</span><strong class="dispatch-header__player">{{ view.player_name }}</strong></div>
+  </header>
+  <div class="dispatch-body">
+    {% if view.banner %}<div class="dispatch-banner">{{ view.banner }}</div>{% endif %}
+    {% if view.stats %}<section class="dispatch-stats" style="--stat-columns:{{ [view.stats|length,3]|min }}">{% for stat in view.stats %}<div class="dispatch-stat"><span>{{ stat.label }}</span><strong>{{ stat.value }}</strong>{% if stat.note %}<small>{{ stat.note }}</small>{% endif %}</div>{% endfor %}</section>{% endif %}
+    {% if view.pigs %}<section class="dispatch-pigs">{% for pig in view.pigs %}<article class="dispatch-pig">
+      <div class="dispatch-pig__media">{% if previews.get(pig.short_code) %}<img src="{{ previews[pig.short_code] }}" alt="{{ pig.name }}">{% else %}<span>同行伙伴</span>{% endif %}</div>
+      <div class="dispatch-stars">{{ '★' * pig.rarity }}</div><h2>{{ pig.name }}</h2><div class="dispatch-code">#{{ pig.short_code }}{% if pig.favorite %} · 已收藏保护{% endif %}</div>
+      <div class="dispatch-tags">{% for tag in pig.tags %}<span>{{ tag }}</span>{% endfor %}</div><p>{{ pig.summary }}</p>
+    </article>{% endfor %}</section>{% endif %}
+    {% for panel in view.panels %}<section class="dispatch-panel"><h2>{{ panel.title }}</h2>
+      {% for row in panel.rows %}<div class="dispatch-row"><span class="label">{{ row.label }}</span><div><strong>{{ row.value }}</strong>{% if row.note %}<small>{{ row.note }}</small>{% endif %}</div></div>{% endfor %}
+      {% if panel.caption %}<p class="dispatch-caption">{{ panel.caption }}</p>{% endif %}
+    </section>{% endfor %}
+    {% if view.hints %}<aside class="dispatch-hints">{% for hint in view.hints %}<p>{{ hint }}</p>{% endfor %}</aside>{% endif %}
+  </div>
+  <footer class="game-footer"><span>轻装出发 · 满载而归 · 猪猪不会被消耗</span><strong>{% if view.page_count > 1 %}{{ view.page }}/{{ view.page_count }}{% else %}猪猪远行社{% endif %}</strong></footer>
+</main>
+</body>
+</html>

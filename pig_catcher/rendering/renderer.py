@@ -18,6 +18,7 @@ from uuid import uuid4
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
 from PIL import Image, UnidentifiedImageError
 
+from ..domain.dispatch_views import DispatchView
 from ..domain.errors import RenderError
 from .models import (
     AchievementBackfillSummaryViewModel,
@@ -469,6 +470,12 @@ class PigCatcherRenderer:
 
     async def render_weekly_competition_award(self, view: WeeklyCompetitionAwardViewModel) -> RenderedImage:
         return await self._render_template("weekly_competition_award.html", view=view)
+
+    async def render_dispatch(self, view: DispatchView, media_paths: Mapping[str, Path]) -> RenderedImage:
+        previews = await self._list_media_data_urls(
+            ((pig.short_code, bool(pig.image_relpath), False) for pig in view.pigs), media_paths,
+        )
+        return await self._render_template("dispatch.html", view=view, previews=previews)
 
     async def _render_template(
         self,

@@ -112,27 +112,22 @@ async def test_empty_database_migrates_and_passes_integrity_check(tmp_path: Path
 @pytest.mark.asyncio
 async def test_schema_35_database_migrates_to_weekly_competitions(tmp_path: Path) -> None:
     path = tmp_path / "schema-35.sqlite3"
-    database = PigCatcherDatabase(path)
-    await database.open()
-    await database.close()
-
     connection = sqlite3.connect(path)
     connection.execute("PRAGMA foreign_keys = OFF")
-    for table in (
-        "weekly_competition_awards",
-        "weekly_competition_settlements",
-        "weekly_competition_entries",
-        "weekly_competitions",
-    ):
-        connection.execute(f"DROP TABLE {table}")
-    connection.execute("DELETE FROM schema_migrations WHERE version = 36")
+    connection.execute("CREATE TABLE schema_migrations(version INTEGER PRIMARY KEY,name TEXT UNIQUE,applied_at TEXT)")
+    for migration in MIGRATIONS:
+        if migration.version > 35:
+            break
+        for statement in migration.statements:
+            connection.execute(statement)
+        connection.execute("INSERT INTO schema_migrations VALUES(?,?,?)", (migration.version, migration.name, "test"))
     connection.execute("PRAGMA user_version = 35")
     connection.commit()
     connection.close()
 
     migrated = PigCatcherDatabase(path)
     await migrated.open()
-    assert await migrated.schema_version() == 36
+    assert await migrated.schema_version() == SCHEMA_VERSION
     tables = await migrated.fetch_all(
         "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'weekly_competition%'"
     )
@@ -1169,7 +1164,11 @@ async def test_released_v33_source_unique_constraint_is_repaired(tmp_path: Path)
                 reason_code TEXT NOT NULL,
                 created_at TEXT NOT NULL
             );
-            CREATE TABLE food_instances(food_instance_id TEXT PRIMARY KEY);
+                CREATE TABLE food_instances(food_instance_id TEXT PRIMARY KEY);
+                CREATE TABLE scopes(scope_id TEXT PRIMARY KEY);
+                CREATE TABLE pig_instances(
+                    pig_instance_id TEXT PRIMARY KEY,owner_player_id TEXT,scope_id TEXT,state TEXT,locked_trade_id TEXT
+                );
         INSERT INTO players(player_id) VALUES ('qq:100:200');
         INSERT INTO food_instances(food_instance_id) VALUES ('roulette-source');
         CREATE TABLE player_roulette_state(
