@@ -416,7 +416,9 @@ class PigCatcherPlugin(MaiBotPlugin):
             )
             self._regulation_service = regulation_service
             self._battle_service = BattleService(
-                database, catching=settings.catching, regulation_service=regulation_service,
+                database,
+                catching=settings.catching,
+                regulation_service=regulation_service,
                 access_policy_factory=self._access_policy,
             )
             self._social_service = SocialService(
@@ -962,20 +964,38 @@ class PigCatcherPlugin(MaiBotPlugin):
         stream_id: str,
         render: Callable[[], Awaitable[RenderedImage]],
         fallback_text: str,
+        activity_identity: CommandIdentity | None = None,
     ) -> tuple[bool, str, int]:
+        if (
+            activity_identity is not None
+            and self._achievement_service is not None
+            and self.settings.features.achievements_enabled
+        ):
+            try:
+                await self._achievement_service.process_activity_facts(
+                    scope_id=activity_identity.scope.value, receipt_id=f"activity-query:{activity_identity.message_id}"
+                )
+            except Exception:
+                self.ctx.logger.exception("活动成就补录失败，事实仍保留，业务查询继续")
         if self._delivery is None:
-            return await self._reply_text(
+            result = await self._reply_text(
                 stream_id,
                 fallback_text,
                 success=True,
             )
-        sent = await self._delivery.send_image_or_text(
-            stream_id=stream_id,
-            render=render,
-            fallback_text=fallback_text,
-            rendering_enabled=self.settings.rendering.enabled,
-        )
-        return sent, fallback_text, 2 if sent else 1
+        else:
+            sent = await self._delivery.send_image_or_text(
+                stream_id=stream_id,
+                render=render,
+                fallback_text=fallback_text,
+                rendering_enabled=self.settings.rendering.enabled,
+            )
+            result = sent, fallback_text, 2 if sent else 1
+        if result[0] and activity_identity is not None:
+            await self._deliver_activity_notifications(
+                stream_id, activity_identity.scope.value, f"activity-query:{activity_identity.message_id}"
+            )
+        return result
 
     async def _deliver_receipt(
         self,
@@ -1139,21 +1159,30 @@ class PigCatcherPlugin(MaiBotPlugin):
         service = self._achievement_service
         if service is None or not receipt.player_id or not self.settings.features.achievements_enabled:
             return
-        unlocks = await service.pending_unlocks(
-            player_id=receipt.player_id,
-            receipt_id=receipt.receipt_id,
-        )
+        await self._deliver_activity_notifications(stream_id, receipt.scope_id, receipt.receipt_id)
+
+    async def _deliver_activity_notifications(self, stream_id: str, scope_id: str, receipt_id: str) -> None:
+        service = self._achievement_service
+        if service is None or not self.settings.features.achievements_enabled:
+            return
+        players = await service.notification_players(scope_id=scope_id, receipt_id=receipt_id)
+        for player_id in players:
+            await self._deliver_player_achievement_notifications(stream_id, player_id, receipt_id)
+
+    async def _deliver_player_achievement_notifications(self, stream_id: str, player_id: str, receipt_id: str) -> None:
+        service = cast(AchievementService, self._achievement_service)
+        unlocks = await service.pending_unlocks(player_id=player_id, receipt_id=receipt_id)
         if not unlocks:
             return
         unlock_ids = await service.claim_notifications(
-            player_id=receipt.player_id,
-            receipt_id=receipt.receipt_id,
+            player_id=player_id,
+            receipt_id=receipt_id,
         )
         if not unlock_ids:
             return
-        display_name = await service.player_display_name(receipt.player_id)
+        display_name = await service.player_display_name(player_id)
         renderer = cast(PigCatcherRenderer, self._renderer)
-        fallback = format_achievement_unlocks(unlocks)
+        fallback = display_name + "\n" + format_achievement_unlocks(unlocks)
         try:
             if self._delivery is None:
                 sent = await self._send_text_capability(fallback, stream_id)
@@ -1302,6 +1331,7 @@ class PigCatcherPlugin(MaiBotPlugin):
                 view,
                 achievement_title=cosmetics.title_id,
                 achievement_frame=cosmetics.frame_id,
+                achievement_badge=cosmetics.badge_name,
             )
         data_dir = Path(self.ctx.paths.data_dir).resolve()
         source_path = pig_media_path(data_dir, pig)
@@ -1369,6 +1399,7 @@ class PigCatcherPlugin(MaiBotPlugin):
                 view,
                 achievement_title=cosmetics.title_id,
                 achievement_frame=cosmetics.frame_id,
+                achievement_badge=cosmetics.badge_name,
             )
         data_dir = Path(self.ctx.paths.data_dir).resolve()
         source_path = food_media_path(data_dir, food)
@@ -3815,6 +3846,7 @@ class PigCatcherPlugin(MaiBotPlugin):
                     stream_id=identity.stream_id,
                     render=lambda: renderer.render_achievement_overview(achievement_overview_view(result)),
                     fallback_text=fallback,
+                    activity_identity=identity,
                 )
                 await self._deliver_achievement_backfill_summary(
                     stream_id=identity.stream_id,
@@ -3840,6 +3872,7 @@ class PigCatcherPlugin(MaiBotPlugin):
                 stream_id=identity.stream_id,
                 render=lambda: renderer.render_achievement_page(achievement_page_view(result)),
                 fallback_text=fallback,
+                activity_identity=identity,
             )
             await self._deliver_achievement_backfill_summary(
                 stream_id=identity.stream_id,
@@ -3877,6 +3910,7 @@ class PigCatcherPlugin(MaiBotPlugin):
             return await self._deliver_query(
                 stream_id=identity.stream_id,
                 render=lambda: renderer.render_achievement_page(achievement_page_view(result)),
+                activity_identity=identity,
                 fallback_text=(
                     f"【成就详情】{entry.name}\n{entry.description}\n"
                     f"进度 {entry.progress}/{entry.target}，"
@@ -3961,6 +3995,10 @@ class PigCatcherPlugin(MaiBotPlugin):
             return rejected or (False, "", 0)
         try:
             name = matched_group(kwargs, "arguments").strip()
+            from pig_catcher.domain.activity_achievements import ACTIVITY_REWARDS
+
+            if any(item["kind"] == "ticket" and name in {key, item["name"]} for key, item in ACTIVITY_REWARDS.items()):
+                return await self._activity_reward_command(identity, "使用 " + name)
             ticket_id = await cast(AchievementService, self._achievement_service).activate_ticket(identity, name)
             return await self._reply_text(
                 identity.stream_id,
@@ -4193,6 +4231,54 @@ class PigCatcherPlugin(MaiBotPlugin):
                 error=exc,
             )
 
+    @Command(
+        "pig_catcher_activity_rewards",
+        description="查看成就奖励、选择专用券并确认材料自选",
+        pattern=r"^/成就奖励(?:\s+(?P<arguments>.*?))?\s*$",
+    )
+    async def handle_activity_rewards(self, stream_id: str = "", **kwargs: Any) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_command(
+            stream_id, kwargs, feature_enabled=self.settings.features.achievements_enabled, feature_label="成就奖励"
+        )
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            return await self._activity_reward_command(identity, matched_group(kwargs, "arguments"))
+        except Exception as exc:
+            return await self._command_error(stream_id=identity.stream_id, operation="成就奖励", error=exc)
+
+    async def _activity_reward_command(self, identity: CommandIdentity, text: str) -> tuple[bool, str, int]:
+        from pig_catcher.services.achievement_rewards import AchievementRewardService
+
+        result = await AchievementRewardService(cast(AchievementService, self._achievement_service)).execute(
+            identity, text
+        )
+        renderer = cast(PigCatcherRenderer, self._renderer)
+        if result.receipt:
+            return await self._deliver_receipt(
+                stream_id=identity.stream_id,
+                receipt=result.receipt,
+                render=lambda: renderer.render_dispatch(result.view, {}),
+                fallback_text=result.view.text(),
+            )
+        return await self._deliver_query(
+            stream_id=identity.stream_id,
+            render=lambda: renderer.render_dispatch(result.view, {}),
+            fallback_text=result.view.text(),
+            activity_identity=identity,
+        )
+
+    async def _activity_view_cosmetics(self, identity: CommandIdentity, view: DispatchView) -> DispatchView:
+        if self._achievement_service is None or not self.settings.features.achievements_enabled:
+            return view
+        cosmetics = await self._achievement_service.cosmetics_for_player(identity.player_id)
+        return replace(
+            view,
+            achievement_title=cosmetics.title_id,
+            achievement_frame=cosmetics.frame_id,
+            achievement_badge=cosmetics.badge_name,
+        )
+
     async def _dispatch_command(self, stream_id: str, kwargs: Mapping[str, Any], section: str) -> tuple[bool, str, int]:
         identity, rejected = await self._prepare_command(
             stream_id,
@@ -4216,7 +4302,7 @@ class PigCatcherPlugin(MaiBotPlugin):
             }
 
             async def render() -> RenderedImage:
-                return await renderer.render_dispatch(result.view, paths)
+                return await renderer.render_dispatch(await self._activity_view_cosmetics(identity, result.view), paths)
 
             if result.receipt is not None:
                 return await self._deliver_receipt(
@@ -4229,6 +4315,7 @@ class PigCatcherPlugin(MaiBotPlugin):
                 stream_id=identity.stream_id,
                 render=render,
                 fallback_text=result.view.text(),
+                activity_identity=identity,
             )
         except PigCatcherError as exc:
             if self._renderer is None:
@@ -4314,7 +4401,7 @@ class PigCatcherPlugin(MaiBotPlugin):
             }
 
             async def render() -> RenderedImage:
-                return await renderer.render_tour(result.view, paths)
+                return await renderer.render_tour(await self._activity_view_cosmetics(identity, result.view), paths)
 
             if result.receipt is not None:
                 return await self._deliver_receipt(
@@ -4324,7 +4411,10 @@ class PigCatcherPlugin(MaiBotPlugin):
                     fallback_text=result.view.text(),
                 )
             return await self._deliver_query(
-                stream_id=identity.stream_id, render=render, fallback_text=result.view.text()
+                stream_id=identity.stream_id,
+                render=render,
+                fallback_text=result.view.text(),
+                activity_identity=identity,
             )
         except PigCatcherError as exc:
             if renderer is None:
@@ -4420,7 +4510,7 @@ class PigCatcherPlugin(MaiBotPlugin):
             }
 
             async def render() -> RenderedImage:
-                return await renderer.render_battle(result.view, paths)
+                return await renderer.render_battle(await self._activity_view_cosmetics(identity, result.view), paths)
 
             if result.receipt:
                 return await self._deliver_receipt(
@@ -4430,7 +4520,10 @@ class PigCatcherPlugin(MaiBotPlugin):
                     fallback_text=result.view.text(),
                 )
             return await self._deliver_query(
-                stream_id=identity.stream_id, render=render, fallback_text=result.view.text()
+                stream_id=identity.stream_id,
+                render=render,
+                fallback_text=result.view.text(),
+                activity_identity=identity,
             )
         except PigCatcherError as exc:
             if renderer is None:

@@ -278,6 +278,12 @@ class BattleService:
             snapshots = [await self.repo.snapshot(session, pid, identity.scope.value, now_ms) for pid in ids]
             if [self.repo.fingerprint(snap) for snap in snapshots] != loads(match["invitation_json"]):
                 raise BattleError("邀请后战斗猪、强化或器具设置发生变化，请取消后重新邀请。")
+            from ..infrastructure.repositories.achievement_coupons import AchievementCouponRepository
+
+            for snap in snapshots:
+                snap["achievement_entry"] = await AchievementCouponRepository().consume(
+                    session, snap["player_id"], "battle-visual", match["battle_id"], iso_ms(now_ms)
+                )
             state = new_state(snapshots)
             day = beijing_day(now_ms)
             await session.execute(

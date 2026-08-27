@@ -702,7 +702,7 @@ async def test_tour_receipt_does_not_add_catches_or_weekly_catch_value(world):
     achievements = AchievementService(world.db, clock=world.clock)
     await achievements.process_receipt(receipt)
     assert (await world.db.fetch_one("SELECT COUNT(*) FROM weekly_competition_entries"))[0] == 0
-    assert (await world.db.fetch_one("SELECT COUNT(*) FROM achievement_definition_snapshots"))[0] == 82
+    assert (await world.db.fetch_one("SELECT COUNT(*) FROM achievement_definition_snapshots"))[0] == 130
 
 
 async def test_schema_37_migration_preserves_existing_assets_materials_and_economy(world, tmp_path):
@@ -742,7 +742,7 @@ async def test_schema_37_migration_preserves_existing_assets_materials_and_econo
     migrated = PigCatcherDatabase(path)
     await migrated.open()
     try:
-        assert await migrated.schema_version() == 39
+        assert await migrated.schema_version() == 40
         schema = {
             r["name"]: r["sql"]
             for r in await migrated.fetch_all("SELECT name,sql FROM sqlite_master WHERE type='table'")

@@ -316,7 +316,7 @@ async def test_schema38_migration_preserves_every_old_table(world, tmp_path):
     db = PigCatcherDatabase(path)
     await db.open()
     try:
-        assert await db.schema_version() == 39
+        assert await db.schema_version() == 40
         for table, rows in original.items():
             assert [tuple(r) for r in await db.fetch_all(f'SELECT * FROM "{table}" ORDER BY rowid')] == rows
         assert set(TABLES) <= {r[0] for r in await db.fetch_all("SELECT name FROM sqlite_master WHERE type='table'")}

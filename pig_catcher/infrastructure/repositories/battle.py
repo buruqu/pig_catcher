@@ -12,6 +12,7 @@ from ...domain.dispatch import MATERIAL_SCALE, safe_display_name
 from ...domain.models import CommandIdentity
 from ...domain.selectors import parse_asset_selector
 from ..database import DatabaseSession
+from .achievement_coupons import AchievementCouponRepository
 from .dispatch import DispatchRepository, iso_ms, timestamp_ms
 from .economy import EconomyRepository
 from .materials import MaterialRepository
@@ -116,6 +117,8 @@ class BattleRepository:
             "player_name": safe_display_name(row["display_name"], row["platform_user_id"]),
             "tool_id": tool,
             "profile_revision": profile["revision"],
+            "achievement_coupons": await AchievementCouponRepository().selected(session, player_id, ("battle-visual",)),
+            "coupon_preview": await AchievementCouponRepository().preview(session, player_id, ("battle-visual",)),
         }
 
     @staticmethod
@@ -131,6 +134,7 @@ class BattleRepository:
                 "weight_value",
                 "tool_id",
                 "profile_revision",
+                "achievement_coupons",
             )
         }
 

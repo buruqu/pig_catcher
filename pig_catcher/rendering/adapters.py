@@ -1740,6 +1740,8 @@ def _achievement_reward_text(rewards: Sequence[object]) -> str:
 
 
 def achievement_row_view(entry: object) -> AchievementRowViewModel:
+    from .cosmetics import cosmetic_cards
+
     return AchievementRowViewModel(
         achievement_id=entry.achievement_id,
         name=entry.name,
@@ -1751,8 +1753,9 @@ def achievement_row_view(entry: object) -> AchievementRowViewModel:
         progress=entry.progress,
         target=entry.target,
         points=entry.points,
-        reward_text=_achievement_reward_text(entry.rewards),
+        reward_text="解锁后揭晓" if entry.hidden and not entry.unlocked else _achievement_reward_text(entry.rewards),
         unlocked_at=entry.unlocked_at,
+        cosmetics=cosmetic_cards(entry.rewards),
     )
 
 
@@ -1793,8 +1796,11 @@ def achievement_page_view(result: object) -> AchievementPageViewModel:
 
 
 def achievement_unlock_view(display_name: str, unlocks: Sequence[object]) -> AchievementUnlockViewModel:
+    from ..domain.achievements import UNLOCK_SUMMARY_LIMIT
+    from .cosmetics import cosmetic_cards
+
     rows = []
-    for unlock in unlocks:
+    for unlock in unlocks[:UNLOCK_SUMMARY_LIMIT]:
         rows.append(
             AchievementRowViewModel(
                 achievement_id=unlock.achievement_id,
@@ -1809,9 +1815,12 @@ def achievement_unlock_view(display_name: str, unlocks: Sequence[object]) -> Ach
                 points=unlock.points,
                 reward_text=_achievement_reward_text(unlock.rewards),
                 unlocked_at=unlock.unlocked_at,
+                cosmetics=cosmetic_cards(unlock.rewards),
             )
         )
-    return AchievementUnlockViewModel(display_name, sum(item.points for item in unlocks), tuple(rows))
+    return AchievementUnlockViewModel(
+        display_name, sum(item.points for item in unlocks), tuple(rows), max(0, len(unlocks) - UNLOCK_SUMMARY_LIMIT)
+    )
 
 
 def achievement_backfill_summary_view(result: object) -> AchievementBackfillSummaryViewModel:

@@ -94,6 +94,9 @@ class PigCatcherRenderer:
             enable_async=False,
         )
         self._theme_css = (self.templates_root / "theme.css").read_text(encoding="utf-8")
+        from .cosmetics import cosmetic_detail
+
+        self._environment.globals["cosmetic_detail"] = cosmetic_detail
         self.preview_cache_root = Path(preview_cache_root).resolve() if preview_cache_root is not None else None
         self._preview_cache: OrderedDict[tuple[object, ...], str] = OrderedDict()
         self._preview_cache_size = 0

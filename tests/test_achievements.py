@@ -20,7 +20,7 @@ from .test_plugin import _command_kwargs, _install_test_pig
 
 def test_v2_registry_contains_the_frozen_first_season_shape() -> None:
     ids = [item.achievement_id for item in ACHIEVEMENT_DEFINITIONS]
-    assert len(ids) == len(set(ids)) == 82
+    assert len(ids) == len(set(ids)) == 130
     categories = Counter(item.category for item in ACHIEVEMENT_DEFINITIONS)
     assert (
         sum(
@@ -40,8 +40,8 @@ def test_v2_registry_contains_the_frozen_first_season_shape() -> None:
     assert categories["联动印章"] == 11
     assert categories["隐藏彩蛋"] == 20
     assert categories["终极收藏"] == 2
-    assert SCHEMA_VERSION == 39
-    assert RULESET_VERSION == 34
+    assert SCHEMA_VERSION == 40
+    assert RULESET_VERSION == 35
 
 
 @pytest.mark.asyncio
@@ -74,7 +74,7 @@ async def test_first_catch_unlock_is_atomic_rendered_and_idempotent(tmp_path: Pa
     reward = await plugin.database.fetch_one(
         """
         SELECT amount FROM currency_ledger
-        WHERE idempotency_key='achievement:catch-total-1:coin'
+        WHERE idempotency_key='achievement:catch-total-1:qq:10001:20001:coin'
         """
     )
     assert reward is not None and int(reward["amount"]) == 200

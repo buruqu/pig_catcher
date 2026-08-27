@@ -19,13 +19,17 @@ from uuid import uuid4
 
 from ..domain.achievements import (
     ACHIEVEMENT_DEFINITIONS,
+    LEGACY_ACHIEVEMENT_DEFINITIONS,
     TIER_LABELS,
+    UNLOCK_SUMMARY_LIMIT,
     AchievementConditionKind,
     AchievementDefinition,
     AchievementReward,
     AchievementTier,
     AchievementUnlock,
 )
+from ..domain.activity_achievements import ACTIVITY_REWARDS, LEGACY_REGULAR_IDS
+from ..domain.dispatch import MATERIAL_SCALE, safe_display_name
 from ..domain.errors import DomainValidationError
 from ..domain.gameplay import generate_pig_attributes, level_progress
 from ..domain.models import CommandIdentity, CommandReceipt
@@ -112,6 +116,7 @@ _REWARD_NAMES: Mapping[str, str] = {
     "all-minis": "掌上万猪",
     "badge-showcase-3": "三格徽章展示架",
     **WEEKLY_REWARD_NAMES,
+    **{key: value["name"] for key, value in ACTIVITY_REWARDS.items()},
 }
 
 
@@ -210,6 +215,7 @@ class AchievementCosmetics:
     title_id: str
     frame_id: str
     showcase_achievement_id: str
+    badge_name: str = ""
 
 
 class AchievementService:
@@ -266,6 +272,25 @@ class AchievementService:
             )
 
     async def process_receipt(self, receipt: CommandReceipt) -> tuple[AchievementUnlock, ...]:
+        business = await self._process_business_receipt(receipt)
+        activities = await self.process_activity_facts(scope_id=receipt.scope_id, receipt_id=receipt.receipt_id)
+        return business + activities
+
+    async def process_activity_facts(self, *, scope_id: str, receipt_id: str) -> tuple[AchievementUnlock, ...]:
+        from .activity_achievements import ActivityAchievements
+
+        return await ActivityAchievements(self).process_scope(scope_id, receipt_id, _now_text(self.clock))
+
+    async def notification_players(self, *, scope_id: str, receipt_id: str) -> tuple[str, ...]:
+        async with self.database.transaction(immediate=False) as session:
+            rows = await session.fetch_all(
+                "SELECT DISTINCT player_id FROM achievement_unlocks "
+                "WHERE scope_id=? AND source_receipt_id=? AND notification_status='pending'",
+                (scope_id, receipt_id),
+            )
+        return tuple(str(row[0]) for row in rows)
+
+    async def _process_business_receipt(self, receipt: CommandReceipt) -> tuple[AchievementUnlock, ...]:
         if not receipt.player_id:
             return ()
         now = _now_text(self.clock)
@@ -326,7 +351,7 @@ class AchievementService:
                 # not count the same action twice.
                 counter_deltas.clear()
             unlocks: list[AchievementUnlock] = []
-            for definition in ACHIEVEMENT_DEFINITIONS:
+            for definition in LEGACY_ACHIEVEMENT_DEFINITIONS:
                 previous = progress_rows.get(definition.achievement_id, {})
                 if previous.get("unlocked_at"):
                     continue
@@ -490,7 +515,7 @@ class AchievementService:
         sushi_instances = await self.repository.sushi_instance_ids(session, player_id=player_id)
         color_counts = await self.repository.technique_color_counts(session, player_id=player_id)
         reliable_event_metrics = {"blue_red_pair", "millionaire_947947"}
-        for definition in ACHIEVEMENT_DEFINITIONS:
+        for definition in LEGACY_ACHIEVEMENT_DEFINITIONS:
             if (
                 definition.condition.kind is AchievementConditionKind.EVENT
                 and definition.condition.metric not in reliable_event_metrics
@@ -907,11 +932,28 @@ class AchievementService:
                     source_object_type="achievement",
                     source_object_id=source_key,
                     ledger_entry_id=str(uuid4()),
-                    idempotency_key=f"{source_key}:coin",
+                    # The ledger key is globally unique, while each player in
+                    # each scope is entitled to the same achievement reward.
+                    # Old unlock rows still suppress re-grants after upgrading.
+                    idempotency_key=f"{source_key}:{player_id}:coin",
                     now=now,
                 )
                 if balance is None:
                     raise RuntimeError("成就猪币奖励无法写入玩家余额。")
+            elif reward.reward_type == "material":
+                from ..infrastructure.repositories.materials import MaterialRepository
+
+                await MaterialRepository().change(
+                    session,
+                    player_id=player_id,
+                    scope_id=scope_id,
+                    material_id=ACTIVITY_REWARDS[reward.reward_id]["material_id"],
+                    delta_units=reward.quantity * MATERIAL_SCALE,
+                    source_kind="achievement-reward",
+                    source_id=source_key,
+                    entry_key=f"{source_key}:{player_id}:{reward.reward_id}",
+                    now=now,
+                )
             else:
                 await self.repository.grant_reward(
                     session,
@@ -950,20 +992,7 @@ class AchievementService:
         player_id: str,
         now: str,
     ) -> None:
-        regular_ids = tuple(
-            definition.achievement_id
-            for definition in ACHIEVEMENT_DEFINITIONS
-            if definition.category
-            in {
-                "捕猎历程",
-                "高星猎手",
-                "图鉴收藏",
-                "料理品鉴",
-                "巨物纪录",
-                "成长经营",
-                "社交展示",
-            }
-        )
+        regular_ids = LEGACY_REGULAR_IDS
         if await self.repository.regular_unlock_count(
             session,
             player_id=player_id,
@@ -1496,7 +1525,7 @@ class AchievementService:
     async def player_display_name(self, player_id: str) -> str:
         async with self.database.transaction(immediate=False) as session:
             profile = await self.repository.profile_row(session, player_id=player_id)
-        return str(profile["display_name"] if profile else "本群玩家")
+        return safe_display_name(str(profile["display_name"] if profile else "本群玩家"), player_id.rsplit(":", 1)[-1])
 
     async def cosmetics_for_player(self, player_id: str) -> AchievementCosmetics:
         async with self.database.transaction(immediate=False) as session:
@@ -1508,6 +1537,16 @@ class AchievementService:
             ),
             str(profile["equipped_frame_id"] if profile else ""),
             str(profile["showcase_achievement_id"] if profile else ""),
+            next(
+                (
+                    next(
+                        (_REWARD_NAMES.get(r.reward_id, d.name) for r in d.rewards if r.reward_type == "badge"), d.name
+                    )
+                    for d in ACHIEVEMENT_DEFINITIONS
+                    if profile and d.achievement_id == profile["showcase_achievement_id"]
+                ),
+                "",
+            ),
         )
 
     async def ranking(self, identity: CommandIdentity, *, page: int) -> AchievementRanking:
@@ -1549,6 +1588,9 @@ class AchievementService:
                 scope_id=identity.scope.value,
                 now=now,
             )
+        await self.process_activity_facts(
+            scope_id=identity.scope.value, receipt_id=f"activity-query:{identity.message_id}"
+        )
 
     @staticmethod
     def _entry_from_row(row: Mapping[str, object]) -> AchievementEntry:
@@ -1573,10 +1615,10 @@ class AchievementService:
             unlocked,
             description,
             str(row["hint"]),
-            int(row.get("progress_value") or 0),
-            target,
+            int(row.get("progress_value") or 0) if unlocked or not hidden else 0,
+            target if unlocked or not hidden else 1,
             int(row["points"]),
-            rewards,
+            rewards if unlocked or not hidden else (),
             str(row.get("unlocked_at") or ""),
         )
 
@@ -1590,6 +1632,7 @@ def reward_label(reward: AchievementReward) -> str:
         "badge": "徽章",
         "chest": "自选宝箱",
         "cosmetic": "展示外观",
+        "material": "材料",
     }
     display_name = _REWARD_NAMES.get(reward.reward_id, reward.reward_id)
     if reward.reward_type == "coin":
@@ -1599,9 +1642,11 @@ def reward_label(reward: AchievementReward) -> str:
 
 def format_achievement_unlocks(unlocks: tuple[AchievementUnlock, ...]) -> str:
     lines = ["【PiG Dream! 成就已解锁】"]
-    for unlock in unlocks:
+    for unlock in unlocks[:UNLOCK_SUMMARY_LIMIT]:
         rewards = "、".join(reward_label(item) for item in unlock.rewards) or "成就点"
         lines.append(f"{TIER_LABELS[unlock.tier]} · {unlock.name}（+{unlock.points} 点）\n奖励：{rewards}")
+    if len(unlocks) > UNLOCK_SUMMARY_LIMIT:
+        lines.append(f"另有{len(unlocks) - UNLOCK_SUMMARY_LIMIT}项已达成，全部奖励已到账；/猪猪成就 分页查看。")
     return "\n".join(lines)
 
 

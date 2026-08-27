@@ -1,0 +1,1786 @@
+{
+  "version": 1,
+  "modules": {
+    "dispatch": "远行手账",
+    "tour": "巡演纪念",
+    "battle": "比划档案",
+    "journey": "三栖生活"
+  },
+  "fixed_snapshots": {
+    "dispatch-regions-v1": [
+      "grassland",
+      "echo-mine",
+      "old-workshop",
+      "windbell-forest",
+      "old-stage-warehouse"
+    ],
+    "dispatch-tools-v1": [
+      "region-map",
+      "souvenir-camera",
+      "encounter-compass",
+      "sorting-box"
+    ],
+    "dispatch-souvenirs-v1": [
+      "dispatch-souvenir-grassland-1",
+      "dispatch-souvenir-grassland-2",
+      "dispatch-souvenir-grassland-3",
+      "dispatch-souvenir-grassland-4",
+      "dispatch-souvenir-echo-mine-1",
+      "dispatch-souvenir-echo-mine-2",
+      "dispatch-souvenir-echo-mine-3",
+      "dispatch-souvenir-echo-mine-4",
+      "dispatch-souvenir-old-workshop-1",
+      "dispatch-souvenir-old-workshop-2",
+      "dispatch-souvenir-old-workshop-3",
+      "dispatch-souvenir-old-workshop-4",
+      "dispatch-souvenir-windbell-forest-1",
+      "dispatch-souvenir-windbell-forest-2",
+      "dispatch-souvenir-windbell-forest-3",
+      "dispatch-souvenir-windbell-forest-4",
+      "dispatch-souvenir-old-stage-warehouse-1",
+      "dispatch-souvenir-old-stage-warehouse-2",
+      "dispatch-souvenir-old-stage-warehouse-3",
+      "dispatch-souvenir-old-stage-warehouse-4"
+    ],
+    "tour-venues-v1": [
+      "street",
+      "school-festival",
+      "livehouse",
+      "city-theatre",
+      "dream-dome"
+    ],
+    "tour-band-themes-v1": [
+      "poppin-party",
+      "afterglow",
+      "pastel-palettes",
+      "roselia",
+      "hello-happy-world",
+      "morfonica",
+      "raise-a-suilen",
+      "mygo",
+      "ave-mujica"
+    ],
+    "battle-archetypes-v1": [
+      "sukuna",
+      "gojo"
+    ],
+    "battle-sukuna-moves-v1": [
+      "black-flash",
+      "sukuna-dismantle",
+      "sukuna-cleave",
+      "sukuna-furnace",
+      "sukuna-domain",
+      "binding-loan",
+      "reverse-repair",
+      "elbow-strike",
+      "grid-slash"
+    ],
+    "battle-gojo-moves-v1": [
+      "gojo-blue",
+      "gojo-red",
+      "gojo-blue-punch",
+      "infinity-defense",
+      "black-flash",
+      "infinity-teleport",
+      "gojo-purple",
+      "gojo-domain",
+      "reverse-repair",
+      "gojo-unlimited-purple"
+    ],
+    "journey-three-systems-v1": [
+      "dispatch",
+      "tour",
+      "battle"
+    ],
+    "three-systems-public-v1": [
+      "dispatch-first-return",
+      "dispatch-hours-72",
+      "dispatch-hours-720",
+      "dispatch-regions-five",
+      "dispatch-low-team-20",
+      "dispatch-template-20",
+      "dispatch-natural-material-1000",
+      "dispatch-tools-four",
+      "dispatch-own-companion-level5",
+      "dispatch-souvenirs-complete-v1",
+      "tour-first-finale",
+      "tour-ten-finales",
+      "tour-fifty-finales",
+      "tour-mixed-three-band-s",
+      "tour-three-member-all-s",
+      "tour-all-ss",
+      "tour-fifteen-highlights",
+      "tour-own-member-level10",
+      "tour-venues-five",
+      "tour-partners-three",
+      "battle-first-finish",
+      "battle-ten-finishes",
+      "battle-fifty-finishes",
+      "battle-partners-five",
+      "battle-both-roles",
+      "battle-self-train-one",
+      "battle-self-train-five",
+      "battle-self-train-both",
+      "battle-sukuna-movebook",
+      "battle-gojo-movebook"
+    ],
+    "legacy-regular-v1": [
+      "catch-total-1",
+      "catch-total-10",
+      "catch-total-50",
+      "catch-total-200",
+      "catch-total-500",
+      "catch-total-1000",
+      "catch-total-2000",
+      "catch-five-star-1",
+      "catch-five-star-20",
+      "catch-five-star-100",
+      "catch-six-star-1",
+      "catch-six-star-10",
+      "catch-six-star-50",
+      "catch-six-star-100",
+      "pig-catalog-10",
+      "pig-catalog-30",
+      "pig-catalog-60",
+      "pig-catalog-100",
+      "pig-catalog-130",
+      "food-catalog-5",
+      "food-catalog-15",
+      "food-catalog-30",
+      "cook-total-1",
+      "cook-total-10",
+      "cook-total-50",
+      "cook-total-200",
+      "cook-total-500",
+      "cook-five-star-20",
+      "cook-five-star-100",
+      "cook-six-star-1",
+      "cook-six-star-10",
+      "eat-total-100",
+      "giant-size-board",
+      "giant-weight-board",
+      "giant-dual-board",
+      "giant-ten-sightings",
+      "giant-size-record",
+      "giant-weight-record",
+      "level-10",
+      "level-21",
+      "level-31",
+      "level-41",
+      "level-51",
+      "level-61",
+      "earned-coins-100000",
+      "social-showcase",
+      "social-favorites-10",
+      "social-gift-partners-3",
+      "social-trade-partners-3"
+    ]
+  },
+  "rewards": {
+    "pig-coin": {
+      "name": "猪币",
+      "kind": "coin"
+    },
+    "material-supplies": {
+      "name": "旅行补给",
+      "kind": "material",
+      "material_id": "travel-supplies"
+    },
+    "material-stage": {
+      "name": "舞台组件",
+      "kind": "material",
+      "material_id": "stage-components"
+    },
+    "materials-choice": {
+      "name": "基础材料自选份",
+      "kind": "chest",
+      "units_per_quantity": 1,
+      "choices": [
+        "training-ore",
+        "machine-parts",
+        "agility-fiber",
+        "stage-components"
+      ]
+    },
+    "training-choice": {
+      "name": "训练材料自选份",
+      "kind": "chest",
+      "units_per_quantity": 1,
+      "choices": [
+        "training-ore",
+        "machine-parts",
+        "agility-fiber"
+      ]
+    },
+    "dispatch-bill": {
+      "name": "远行路费券",
+      "kind": "ticket",
+      "action": "dispatch",
+      "effect": "一次付费派遣旅费减免，最高120猪币；免费路线不消耗，不兑现猪币。",
+      "max_coin_saving": 120,
+      "benefit_slot": "dispatch-achievement"
+    },
+    "dispatch-luggage": {
+      "name": "口袋行李券",
+      "kind": "ticket",
+      "action": "dispatch",
+      "effect": "出发前选定；下次正常完成至少4小时派遣，额外获得3份本路线主产物，近郊为补给，不乘人数或产出加成；提前召回不返券。",
+      "extra_route_primary_units": 3,
+      "benefit_slot": "dispatch-achievement"
+    },
+    "dispatch-story": {
+      "name": "旅行惊喜券",
+      "kind": "ticket",
+      "action": "dispatch",
+      "effect": "下一次正常返程多一段原创小支线与专属纪念卡；不加奇遇次数，不推进地区自然纪念品收集。",
+      "benefit_slot": "visual"
+    },
+    "tour-date": {
+      "name": "巡演档期券",
+      "kind": "ticket",
+      "action": "tour",
+      "effect": "使用后补1张档期，仍受7张存量上限约束；满额不消耗。",
+      "extra_tour_slots": 1,
+      "benefit_slot": "economy"
+    },
+    "tour-steady-stage": {
+      "name": "安可稳场券",
+      "kind": "ticket",
+      "action": "tour",
+      "effect": "指定下一站，现场小波动若为负则按0处理；原随机值保留、不重抽，最多挽回3分，不改评分上限。",
+      "max_score_correction": 3,
+      "benefit_slot": "tour-achievement"
+    },
+    "tour-encore-photo": {
+      "name": "安可留影券",
+      "kind": "ticket",
+      "action": "tour",
+      "effect": "下一趟完成后额外生成与阵容对应的返场小故事和纪念合照；不额外给分、粉丝、猪币或抓猪收益。",
+      "benefit_slot": "visual"
+    },
+    "training-rebate": {
+      "name": "训练热身券",
+      "kind": "ticket",
+      "action": "battle-training",
+      "effect": "下一次本人战斗猪强化减免最多300猪币，材料不减；不能兑换猪币，不影响战斗轮盘。",
+      "max_coin_saving": 300,
+      "benefit_slot": "training-achievement"
+    },
+    "battle-banner": {
+      "name": "整活入场券",
+      "kind": "ticket",
+      "action": "battle",
+      "effect": "下场正式接受的对战采用原创入场台词与海报姿势；初始权重仍为5，未开战不消耗。",
+      "benefit_slot": "visual"
+    },
+    "badge-five-postmarks": {
+      "name": "五地邮戳",
+      "kind": "badge",
+      "visual_only": true
+    },
+    "title-old-travel-companion": {
+      "name": "远行老搭档",
+      "kind": "title",
+      "visual_only": true
+    },
+    "title-traveler": {
+      "name": "远行家",
+      "kind": "title",
+      "visual_only": true
+    },
+    "frame-five-postmarks": {
+      "name": "五地邮戳边框",
+      "kind": "frame",
+      "visual_only": true
+    },
+    "title-small-big-world": {
+      "name": "个子小，世界大",
+      "kind": "title",
+      "visual_only": true
+    },
+    "title-three-route-leader": {
+      "name": "三路远行总管",
+      "kind": "title",
+      "visual_only": true
+    },
+    "badge-big-small-travel": {
+      "name": "巨小同游",
+      "kind": "badge",
+      "visual_only": true
+    },
+    "title-my-own-band": {
+      "name": "自由组团人",
+      "kind": "title",
+      "visual_only": true
+    },
+    "title-encore-everywhere": {
+      "name": "全场安可",
+      "kind": "title",
+      "visual_only": true
+    },
+    "title-stage-companion": {
+      "name": "舞台老搭档",
+      "kind": "title",
+      "visual_only": true
+    },
+    "frame-five-city-lights": {
+      "name": "五城灯海边框",
+      "kind": "frame",
+      "visual_only": true
+    },
+    "title-co-produced": {
+      "name": "联合出品",
+      "kind": "title",
+      "visual_only": true
+    },
+    "badge-duet-tickets": {
+      "name": "双人票根",
+      "kind": "badge",
+      "visual_only": true
+    },
+    "title-double-drums": {
+      "name": "双鼓开道",
+      "kind": "title",
+      "visual_only": true
+    },
+    "frame-nine-colors": {
+      "name": "九色巡演边框",
+      "kind": "frame",
+      "visual_only": true
+    },
+    "badge-front-backstage": {
+      "name": "幕前幕后",
+      "kind": "badge",
+      "visual_only": true
+    },
+    "title-back-to-rehearsal": {
+      "name": "回到练习室",
+      "kind": "title",
+      "visual_only": true
+    },
+    "badge-first-bout": {
+      "name": "初次比划",
+      "kind": "badge",
+      "visual_only": true
+    },
+    "title-bout-regular": {
+      "name": "比划常客",
+      "kind": "title",
+      "visual_only": true
+    },
+    "frame-arena-notebook": {
+      "name": "竞技手账边框",
+      "kind": "frame",
+      "visual_only": true
+    },
+    "badge-five-opponents": {
+      "name": "五方切磋",
+      "kind": "badge",
+      "visual_only": true
+    },
+    "title-host-and-guest": {
+      "name": "来者是客",
+      "kind": "title",
+      "visual_only": true
+    },
+    "title-five-level-coach": {
+      "name": "五级教练",
+      "kind": "title",
+      "visual_only": true
+    },
+    "frame-training-graduation": {
+      "name": "训练结业边框",
+      "kind": "frame",
+      "visual_only": true
+    },
+    "badge-two-paths": {
+      "name": "双修",
+      "kind": "badge",
+      "visual_only": true
+    },
+    "badge-nine-moves": {
+      "name": "九式研习",
+      "kind": "badge",
+      "visual_only": true
+    },
+    "badge-ten-moves": {
+      "name": "十式研习",
+      "kind": "badge",
+      "visual_only": true
+    },
+    "title-presence-remains": {
+      "name": "气势还在",
+      "kind": "title",
+      "visual_only": true
+    },
+    "title-pay-next-round": {
+      "name": "还款日是下一回合",
+      "kind": "title",
+      "visual_only": true
+    },
+    "badge-three-loans": {
+      "name": "借三还三",
+      "kind": "badge",
+      "visual_only": true
+    },
+    "title-can-learn-again": {
+      "name": "我还能再领悟",
+      "kind": "title",
+      "visual_only": true
+    },
+    "frame-triple-realization": {
+      "name": "三重顿悟边框",
+      "kind": "frame",
+      "visual_only": true
+    },
+    "title-last-echo": {
+      "name": "绝地回响",
+      "kind": "title",
+      "visual_only": true
+    },
+    "title-three-world-player": {
+      "name": "三栖玩家",
+      "kind": "title",
+      "visual_only": true
+    },
+    "title-three-world-master": {
+      "name": "PiG Dream! 三栖达人",
+      "kind": "title",
+      "visual_only": true
+    },
+    "frame-three-books": {
+      "name": "三章合订本边框",
+      "kind": "frame",
+      "visual_only": true
+    },
+    "title-my-old-companion": {
+      "name": "我的老伙计",
+      "kind": "title",
+      "visual_only": true
+    },
+    "title-keep-my-word": {
+      "name": "愿赌服输",
+      "kind": "title",
+      "visual_only": true
+    }
+  },
+  "entries": [
+    {
+      "id": "dispatch-first-return",
+      "code": "D01",
+      "name": "第一次远行",
+      "category": "远行手账",
+      "hidden": false,
+      "tier": "normal",
+      "condition": {
+        "kind": "threshold",
+        "metric": "dispatch.completed_trips",
+        "target": 1,
+        "description": "首次正常完成并结算一趟至少4小时的派遣；召回不算。"
+      },
+      "rewards": [
+        {
+          "reward_id": "pig-coin",
+          "quantity": 200
+        },
+        {
+          "reward_id": "material-supplies",
+          "quantity": 6
+        }
+      ],
+      "hint": "首次正常完成并结算一趟至少4小时的派遣；召回不算。"
+    },
+    {
+      "id": "dispatch-hours-72",
+      "code": "D02",
+      "name": "三队，出发！",
+      "category": "远行手账",
+      "hidden": false,
+      "tier": "fine",
+      "condition": {
+        "kind": "threshold",
+        "metric": "dispatch.effective_hours",
+        "target": 72,
+        "description": "有效派遣累计72小时；按本人已结算时间区间并集，不叠加多队同一小时。"
+      },
+      "rewards": [
+        {
+          "reward_id": "pig-coin",
+          "quantity": 600
+        },
+        {
+          "reward_id": "materials-choice",
+          "quantity": 12
+        }
+      ],
+      "hint": "有效派遣累计72小时；按本人已结算时间区间并集，不叠加多队同一小时。"
+    },
+    {
+      "id": "dispatch-hours-720",
+      "code": "D03",
+      "name": "把日子走成地图",
+      "category": "远行手账",
+      "hidden": false,
+      "tier": "epic",
+      "condition": {
+        "kind": "threshold",
+        "metric": "dispatch.effective_hours",
+        "target": 720,
+        "description": "有效派遣累计720小时，按并集计时而非三队工时相加。"
+      },
+      "rewards": [
+        {
+          "reward_id": "pig-coin",
+          "quantity": 2500
+        },
+        {
+          "reward_id": "materials-choice",
+          "quantity": 40
+        },
+        {
+          "reward_id": "dispatch-bill",
+          "quantity": 2
+        }
+      ],
+      "hint": "有效派遣累计720小时，按并集计时而非三队工时相加。"
+    },
+    {
+      "id": "dispatch-regions-five",
+      "code": "D04",
+      "name": "五地来信",
+      "category": "远行手账",
+      "hidden": false,
+      "tier": "rare",
+      "condition": {
+        "kind": "set",
+        "metric": "dispatch.completed_regions",
+        "target": 5,
+        "description": "首期五个区域各正常完成至少一趟派遣。",
+        "snapshot": "dispatch-regions-v1"
+      },
+      "rewards": [
+        {
+          "reward_id": "pig-coin",
+          "quantity": 1000
+        },
+        {
+          "reward_id": "materials-choice",
+          "quantity": 20
+        },
+        {
+          "reward_id": "badge-five-postmarks",
+          "quantity": 1
+        }
+      ],
+      "hint": "首期五个区域各正常完成至少一趟派遣。"
+    },
+    {
+      "id": "dispatch-low-team-20",
+      "code": "D05",
+      "name": "低星也有大远方",
+      "category": "远行手账",
+      "hidden": false,
+      "tier": "rare",
+      "condition": {
+        "kind": "threshold",
+        "metric": "dispatch.low_full_team_trips",
+        "target": 20,
+        "description": "三只1至3星猪组成的满编队，累计正常完成20趟派遣。"
+      },
+      "rewards": [
+        {
+          "reward_id": "pig-coin",
+          "quantity": 1000
+        },
+        {
+          "reward_id": "materials-choice",
+          "quantity": 20
+        }
+      ],
+      "hint": "三只1至3星猪组成的满编队，累计正常完成20趟派遣。"
+    },
+    {
+      "id": "dispatch-template-20",
+      "code": "D06",
+      "name": "每只猪都有长处",
+      "category": "远行手账",
+      "hidden": false,
+      "tier": "rare",
+      "condition": {
+        "kind": "set",
+        "metric": "dispatch.completed_templates",
+        "target": 20,
+        "description": "让20种不同猪模板各参与正常完成至少一趟派遣；同名多只不重复计种类。"
+      },
+      "rewards": [
+        {
+          "reward_id": "pig-coin",
+          "quantity": 1000
+        },
+        {
+          "reward_id": "materials-choice",
+          "quantity": 20
+        }
+      ],
+      "hint": "让20种不同猪模板各参与正常完成至少一趟派遣；同名多只不重复计种类。"
+    },
+    {
+      "id": "dispatch-natural-material-1000",
+      "code": "D07",
+      "name": "远行社的第一仓库",
+      "category": "远行手账",
+      "hidden": false,
+      "tier": "epic",
+      "condition": {
+        "kind": "threshold",
+        "metric": "dispatch.natural_main_materials",
+        "target": 1000,
+        "description": "累计获得1000份派遣自然产出的矿石、零件、纤维、舞台组件；不含补给、转换、成就奖励和券的额外份额。"
+      },
+      "rewards": [
+        {
+          "reward_id": "pig-coin",
+          "quantity": 2500
+        },
+        {
+          "reward_id": "materials-choice",
+          "quantity": 40
+        }
+      ],
+      "hint": "累计获得1000份派遣自然产出的矿石、零件、纤维、舞台组件；不含补给、转换、成就奖励和券的额外份额。"
+    },
+    {
+      "id": "dispatch-tools-four",
+      "code": "D08",
+      "name": "行李箱里有办法",
+      "category": "远行手账",
+      "hidden": false,
+      "tier": "rare",
+      "condition": {
+        "kind": "set",
+        "metric": "dispatch.completed_tool_types",
+        "target": 4,
+        "description": "分别携带地图、相机、罗盘、整理箱正常完成派遣；每种记一次，不要求随机效果命中。",
+        "snapshot": "dispatch-tools-v1"
+      },
+      "rewards": [
+        {
+          "reward_id": "pig-coin",
+          "quantity": 1000
+        },
+        {
+          "reward_id": "materials-choice",
+          "quantity": 20
+        }
+      ],
+      "hint": "分别携带地图、相机、罗盘、整理箱正常完成派遣；每种记一次，不要求随机效果命中。"
+    },
+    {
+      "id": "dispatch-own-companion-level5",
+      "code": "D09",
+      "name": "老伙计，认路了",
+      "category": "远行手账",
+      "hidden": false,
+      "tier": "epic",
+      "condition": {
+        "kind": "event",
+        "metric": "dispatch.own_companion_level5",
+        "target": 1,
+        "description": "同一猪实例在本人名下累计正常完成192小时派遣，并达到熟练度5；买来的熟练度不直接计自己的培养。"
+      },
+      "rewards": [
+        {
+          "reward_id": "pig-coin",
+          "quantity": 2500
+        },
+        {
+          "reward_id": "materials-choice",
+          "quantity": 40
+        },
+        {
+          "reward_id": "title-old-travel-companion",
+          "quantity": 1
+        }
+      ],
+      "hint": "同一猪实例在本人名下累计正常完成192小时派遣，并达到熟练度5；买来的熟练度不直接计自己的培养。"
+    },
+    {
+      "id": "dispatch-souvenirs-complete-v1",
+      "code": "D10",
+      "name": "把远方寄回猪圈",
+      "category": "远行手账",
+      "hidden": false,
+      "tier": "legendary",
+      "condition": {
+        "kind": "set",
+        "metric": "dispatch.natural_souvenirs",
+        "target": 20,
+        "description": "自然旅行获得首期固定20种地区纪念品；每种一次，后来新增不抬高本期分母。",
+        "snapshot": "dispatch-souvenirs-v1"
+      },
+      "rewards": [
+        {
+          "reward_id": "pig-coin",
+          "quantity": 5000
+        },
+        {
+          "reward_id": "materials-choice",
+          "quantity": 60
+        },
+        {
+          "reward_id": "title-traveler",
+          "quantity": 1
+        },
+        {
+          "reward_id": "frame-five-postmarks",
+          "quantity": 1
+        }
+      ],
+      "hint": "自然旅行获得首期固定20种地区纪念品；每种一次，后来新增不抬高本期分母。"
+    },
+    {
+      "id": "hidden-dispatch-solo-tiny",
+      "code": "D11",
+      "name": "小小的我，大大的地图",
+      "category": "远行手账",
+      "hidden": true,
+      "tier": "rare",
+      "condition": {
+        "kind": "event",
+        "metric": "dispatch.solo_tiny_mine_24h",
+        "target": 1,
+        "description": "仅派一只特小猪，独自正常完成24小时回声矿洞旅行。",
+        "template_ids": [
+          "pig-r2-tiny"
+        ]
+      },
+      "rewards": [
+        {
+          "reward_id": "pig-coin",
+          "quantity": 600
+        },
+        {
+          "reward_id": "dispatch-luggage",
+          "quantity": 3
+        },
+        {
+          "reward_id": "title-small-big-world",
+          "quantity": 1
+        }
+      ],
+      "hint": "行李里，也许会多一段故事。"
+    },
+    {
+      "id": "hidden-dispatch-tenth-letter",
+      "code": "D12",
+      "name": "第十封信终于到了",
+      "category": "远行手账",
+      "hidden": true,
+      "tier": "rare",
+      "condition": {
+        "kind": "event",
+        "metric": "dispatch.pity_tenth_hit",
+        "target": 1,
+        "description": "在真实第十次探索保底中遇到奇遇；只认保底标记，不按玩家领取次数猜测。"
+      },
+      "rewards": [
+        {
+          "reward_id": "pig-coin",
+          "quantity": 600
+        },
+        {
+          "reward_id": "dispatch-story",
+          "quantity": 1
+        }
+      ],
+      "hint": "行李里，也许会多一段故事。"
+    },
+    {
+      "id": "hidden-dispatch-three-routes",
+      "code": "D13",
+      "name": "三路人马，一起回家",
+      "category": "远行手账",
+      "hidden": true,
+      "tier": "epic",
+      "condition": {
+        "kind": "event",
+        "metric": "dispatch.three_route_cohort",
+        "target": 1,
+        "description": "三支全低星满编队在15分钟内出发，各去不同区域、各计划至少8小时，最后全部正常返程。"
+      },
+      "rewards": [
+        {
+          "reward_id": "pig-coin",
+          "quantity": 1200
+        },
+        {
+          "reward_id": "dispatch-bill",
+          "quantity": 2
+        },
+        {
+          "reward_id": "title-three-route-leader",
+          "quantity": 1
+        }
+      ],
+      "hint": "行李里，也许会多一段故事。"
+    },
+    {
+      "id": "hidden-dispatch-elephant-tiny",
+      "code": "D14",
+      "name": "大象和口袋里的队友",
+      "category": "远行手账",
+      "hidden": true,
+      "tier": "epic",
+      "condition": {
+        "kind": "event",
+        "metric": "dispatch.elephant_tiny_forest",
+        "target": 1,
+        "description": "大象与特小猪在同一支三只低星队中，正常完成至少12小时风铃林地旅行。",
+        "template_ids": [
+          "pig-r2-elephant",
+          "pig-r2-tiny"
+        ]
+      },
+      "rewards": [
+        {
+          "reward_id": "pig-coin",
+          "quantity": 1200
+        },
+        {
+          "reward_id": "dispatch-story",
+          "quantity": 2
+        },
+        {
+          "reward_id": "badge-big-small-travel",
+          "quantity": 1
+        }
+      ],
+      "hint": "行李里，也许会多一段故事。"
+    },
+    {
+      "id": "tour-first-finale",
+      "code": "T01",
+      "name": "第一张演出票",
+      "category": "巡演纪念",
+      "hidden": false,
+      "tier": "normal",
+      "condition": {
+        "kind": "threshold",
+        "metric": "tour.completed_tours",
+        "target": 1,
+        "description": "完成第一趟三站正式巡演，免费排练不算。"
+      },
+      "rewards": [
+        {
+          "reward_id": "pig-coin",
+          "quantity": 200
+        },
+        {
+          "reward_id": "material-stage",
+          "quantity": 8
+        }
+      ],
+      "hint": "完成第一趟三站正式巡演，免费排练不算。"
+    },
+    {
+      "id": "tour-ten-finales",
+      "code": "T02",
+      "name": "把舞台搬到下一座城",
+      "category": "巡演纪念",
+      "hidden": false,
+      "tier": "fine",
+      "condition": {
+        "kind": "threshold",
+        "metric": "tour.completed_tours",
+        "target": 10,
+        "description": "累计完成10趟三站正式巡演；一键和逐站是同一种计数。"
+      },
+      "rewards": [
+        {
+          "reward_id": "pig-coin",
+          "quantity": 600
+        },
+        {
+          "reward_id": "material-stage",
+          "quantity": 16
+        }
+      ],
+      "hint": "累计完成10趟三站正式巡演；一键和逐站是同一种计数。"
+    },
+    {
+      "id": "tour-fifty-finales",
+      "code": "T03",
+      "name": "巡演日历写满了",
+      "category": "巡演纪念",
+      "hidden": false,
+      "tier": "epic",
+      "condition": {
+        "kind": "threshold",
+        "metric": "tour.completed_tours",
+        "target": 50,
+        "description": "累计完成50趟三站正式巡演。"
+      },
+      "rewards": [
+        {
+          "reward_id": "pig-coin",
+          "quantity": 2500
+        },
+        {
+          "reward_id": "material-stage",
+          "quantity": 40
+        },
+        {
+          "reward_id": "tour-date",
+          "quantity": 1
+        }
+      ],
+      "hint": "累计完成50趟三站正式巡演。"
+    },
+    {
+      "id": "tour-mixed-three-band-s",
+      "code": "T04",
+      "name": "我的乐队，我来定义",
+      "category": "巡演纪念",
+      "hidden": false,
+      "tier": "rare",
+      "condition": {
+        "kind": "event",
+        "metric": "tour.mixed_three_band_all_s",
+        "target": 1,
+        "description": "同一趟巡演每站阵容都来自至少三个原乐队，三站均达到S；不要求同一原团。"
+      },
+      "rewards": [
+        {
+          "reward_id": "pig-coin",
+          "quantity": 1000
+        },
+        {
+          "reward_id": "material-stage",
+          "quantity": 20
+        },
+        {
+          "reward_id": "title-my-own-band",
+          "quantity": 1
+        }
+      ],
+      "hint": "同一趟巡演每站阵容都来自至少三个原乐队，三站均达到S；不要求同一原团。"
+    },
+    {
+      "id": "tour-three-member-all-s",
+      "code": "T05",
+      "name": "三个人也能撑起舞台",
+      "category": "巡演纪念",
+      "hidden": false,
+      "tier": "rare",
+      "condition": {
+        "kind": "event",
+        "metric": "tour.three_member_all_s",
+        "target": 1,
+        "description": "同一趟三个舞台均由恰好三位不同角色出演，并全部达到S。"
+      },
+      "rewards": [
+        {
+          "reward_id": "pig-coin",
+          "quantity": 1000
+        },
+        {
+          "reward_id": "material-stage",
+          "quantity": 20
+        }
+      ],
+      "hint": "同一趟三个舞台均由恰好三位不同角色出演，并全部达到S。"
+    },
+    {
+      "id": "tour-all-ss",
+      "code": "T06",
+      "name": "三站全场安可",
+      "category": "巡演纪念",
+      "hidden": false,
+      "tier": "epic",
+      "condition": {
+        "kind": "event",
+        "metric": "tour.three_stage_ss",
+        "target": 1,
+        "description": "同一趟三站全部达到SS；不能拼接不同巡演的最好成绩。"
+      },
+      "rewards": [
+        {
+          "reward_id": "pig-coin",
+          "quantity": 2500
+        },
+        {
+          "reward_id": "material-stage",
+          "quantity": 40
+        },
+        {
+          "reward_id": "title-encore-everywhere",
+          "quantity": 1
+        }
+      ],
+      "hint": "同一趟三站全部达到SS；不能拼接不同巡演的最好成绩。"
+    },
+    {
+      "id": "tour-fifteen-highlights",
+      "code": "T07",
+      "name": "每个人都有聚光灯",
+      "category": "巡演纪念",
+      "hidden": false,
+      "tier": "rare",
+      "condition": {
+        "kind": "set",
+        "metric": "tour.highlight_characters",
+        "target": 15,
+        "description": "完成的正式巡演中，15位不同角色实际担任过高光位；同角色形态合并计数。"
+      },
+      "rewards": [
+        {
+          "reward_id": "pig-coin",
+          "quantity": 1000
+        },
+        {
+          "reward_id": "material-stage",
+          "quantity": 20
+        }
+      ],
+      "hint": "完成的正式巡演中，15位不同角色实际担任过高光位；同角色形态合并计数。"
+    },
+    {
+      "id": "tour-own-member-level10",
+      "code": "T08",
+      "name": "从排练室到主舞台",
+      "category": "巡演纪念",
+      "hidden": false,
+      "tier": "epic",
+      "condition": {
+        "kind": "event",
+        "metric": "tour.own_member_level10",
+        "target": 1,
+        "description": "同一实例在本人名下累计获得2200点有效演出或付费练习经验，且演出训练达到10级。"
+      },
+      "rewards": [
+        {
+          "reward_id": "pig-coin",
+          "quantity": 2500
+        },
+        {
+          "reward_id": "material-stage",
+          "quantity": 40
+        },
+        {
+          "reward_id": "title-stage-companion",
+          "quantity": 1
+        }
+      ],
+      "hint": "同一实例在本人名下累计获得2200点有效演出或付费练习经验，且演出训练达到10级。"
+    },
+    {
+      "id": "tour-venues-five",
+      "code": "T09",
+      "name": "街角通向巨蛋",
+      "category": "巡演纪念",
+      "hidden": false,
+      "tier": "legendary",
+      "condition": {
+        "kind": "set",
+        "metric": "tour.completed_venues",
+        "target": 5,
+        "description": "在首期五类场地各完成正式演出，且所在三站巡演最终完整结束。",
+        "snapshot": "tour-venues-v1"
+      },
+      "rewards": [
+        {
+          "reward_id": "pig-coin",
+          "quantity": 5000
+        },
+        {
+          "reward_id": "material-stage",
+          "quantity": 60
+        },
+        {
+          "reward_id": "frame-five-city-lights",
+          "quantity": 1
+        }
+      ],
+      "hint": "在首期五类场地各完成正式演出，且所在三站巡演最终完整结束。"
+    },
+    {
+      "id": "tour-partners-three",
+      "code": "T10",
+      "name": "这一站，一起演",
+      "category": "巡演纪念",
+      "hidden": false,
+      "tier": "rare",
+      "condition": {
+        "kind": "set",
+        "metric": "tour.coop_partners",
+        "target": 3,
+        "description": "与三名不同玩家各完成一次双方同意、分别消耗本人档期的联演；不发可转移经济奖。"
+      },
+      "rewards": [
+        {
+          "reward_id": "title-co-produced",
+          "quantity": 1
+        },
+        {
+          "reward_id": "badge-duet-tickets",
+          "quantity": 1
+        }
+      ],
+      "hint": "与三名不同玩家各完成一次双方同意、分别消耗本人档期的联演；不发可转移经济奖。"
+    },
+    {
+      "id": "hidden-tour-double-drums",
+      "code": "T11",
+      "name": "双鼓一响，谁还要键盘",
+      "category": "巡演纪念",
+      "hidden": true,
+      "tier": "epic",
+      "condition": {
+        "kind": "event",
+        "metric": "tour.double_drums_layer_all_s",
+        "target": 1,
+        "description": "巴巴猪、魔王猪、LAYER猪同台，LAYER兼贝斯主唱、无键盘位；一站双鼓均担任高光，整趟三站均S。",
+        "template_ids": [
+          "pig-bandori-tomoe-drum",
+          "pig-bandori-roselia-ako",
+          "pig-bandori-ras-layer"
+        ]
+      },
+      "rewards": [
+        {
+          "reward_id": "pig-coin",
+          "quantity": 1200
+        },
+        {
+          "reward_id": "tour-steady-stage",
+          "quantity": 2
+        },
+        {
+          "reward_id": "title-double-drums",
+          "quantity": 1
+        }
+      ],
+      "hint": "有些舞台，只有这群伙伴能演出来。"
+    },
+    {
+      "id": "hidden-tour-nine-colors",
+      "code": "T12",
+      "name": "让九种颜色都响起来",
+      "category": "巡演纪念",
+      "hidden": true,
+      "tier": "legendary",
+      "condition": {
+        "kind": "set",
+        "metric": "tour.nine_band_themes",
+        "target": 9,
+        "description": "首期九个原乐队主题各完整巡演一次，所有对应三站至少A；混团只要符合所选主题规则也可。",
+        "snapshot": "tour-band-themes-v1"
+      },
+      "rewards": [
+        {
+          "reward_id": "pig-coin",
+          "quantity": 3000
+        },
+        {
+          "reward_id": "tour-encore-photo",
+          "quantity": 3
+        },
+        {
+          "reward_id": "frame-nine-colors",
+          "quantity": 1
+        }
+      ],
+      "hint": "有些舞台，只有这群伙伴能演出来。"
+    },
+    {
+      "id": "hidden-tour-front-backstage",
+      "code": "T13",
+      "name": "谢幕之后，换一副面孔",
+      "category": "巡演纪念",
+      "hidden": true,
+      "tier": "epic",
+      "condition": {
+        "kind": "event",
+        "metric": "tour.misaki_michelle_all_s",
+        "target": 1,
+        "description": "同一乐队先后用美咲猪与米歇尔猪担任DJ，分别完成三站全S巡演；它们仍算同一角色身份。",
+        "template_ids": [
+          "pig-bandori-hhw-misaki",
+          "pig-bandori-hhw-michelle"
+        ]
+      },
+      "rewards": [
+        {
+          "reward_id": "pig-coin",
+          "quantity": 1200
+        },
+        {
+          "reward_id": "tour-steady-stage",
+          "quantity": 1
+        },
+        {
+          "reward_id": "badge-front-backstage",
+          "quantity": 1
+        }
+      ],
+      "hint": "有些舞台，只有这群伙伴能演出来。"
+    },
+    {
+      "id": "hidden-tour-first-rehearsal-room",
+      "code": "T14",
+      "name": "最初的练习室，新的终曲",
+      "category": "巡演纪念",
+      "hidden": true,
+      "tier": "legendary",
+      "condition": {
+        "kind": "event",
+        "metric": "tour.crychic_all_s",
+        "target": 1,
+        "description": "企鹅猪、红茶猪、熊猫鼓猪、saki猪、黄瓜猪五人阵容完整演出，三站均S。",
+        "template_ids": [
+          "pig-bandori-tomori-penguin",
+          "pig-bandori-soyo-black-tea",
+          "pig-bandori-taki-panda-drum",
+          "pig-bandori-avemujica-sakiko",
+          "pig-bandori-avemujica-mutsumi"
+        ]
+      },
+      "rewards": [
+        {
+          "reward_id": "pig-coin",
+          "quantity": 3000
+        },
+        {
+          "reward_id": "tour-encore-photo",
+          "quantity": 2
+        },
+        {
+          "reward_id": "title-back-to-rehearsal",
+          "quantity": 1
+        }
+      ],
+      "hint": "有些舞台，只有这群伙伴能演出来。"
+    },
+    {
+      "id": "battle-first-finish",
+      "code": "B01",
+      "name": "请多指教",
+      "category": "比划档案",
+      "hidden": false,
+      "tier": "normal",
+      "condition": {
+        "kind": "threshold",
+        "metric": "battle.natural_finishes",
+        "target": 1,
+        "description": "完成第一场以力竭结果正常结束的对战，双方都可达成；邀请、拒绝、超时作废不算。"
+      },
+      "rewards": [
+        {
+          "reward_id": "badge-first-bout",
+          "quantity": 1
+        }
+      ],
+      "hint": "完成第一场以力竭结果正常结束的对战，双方都可达成；邀请、拒绝、超时作废不算。"
+    },
+    {
+      "id": "battle-ten-finishes",
+      "code": "B02",
+      "name": "有来有回",
+      "category": "比划档案",
+      "hidden": false,
+      "tier": "fine",
+      "condition": {
+        "kind": "threshold",
+        "metric": "battle.natural_finishes",
+        "target": 10,
+        "description": "累计完成10场自然终局对战，不要求获胜。"
+      },
+      "rewards": [
+        {
+          "reward_id": "title-bout-regular",
+          "quantity": 1
+        },
+        {
+          "reward_id": "battle-banner",
+          "quantity": 1
+        }
+      ],
+      "hint": "累计完成10场自然终局对战，不要求获胜。"
+    },
+    {
+      "id": "battle-fifty-finishes",
+      "code": "B03",
+      "name": "五十场，仍想再来",
+      "category": "比划档案",
+      "hidden": false,
+      "tier": "epic",
+      "condition": {
+        "kind": "threshold",
+        "metric": "battle.natural_finishes",
+        "target": 50,
+        "description": "累计完成50场自然终局对战，不设置连胜或必须碾压新人的条件。"
+      },
+      "rewards": [
+        {
+          "reward_id": "frame-arena-notebook",
+          "quantity": 1
+        },
+        {
+          "reward_id": "battle-banner",
+          "quantity": 2
+        }
+      ],
+      "hint": "累计完成50场自然终局对战，不设置连胜或必须碾压新人的条件。"
+    },
+    {
+      "id": "battle-partners-five",
+      "code": "B04",
+      "name": "群里都是练家子",
+      "category": "比划档案",
+      "hidden": false,
+      "tier": "rare",
+      "condition": {
+        "kind": "set",
+        "metric": "battle.finished_opponents",
+        "target": 5,
+        "description": "与五名不同玩家完成自然终局对战；同一对手重复不增加人数。"
+      },
+      "rewards": [
+        {
+          "reward_id": "badge-five-opponents",
+          "quantity": 1
+        }
+      ],
+      "hint": "与五名不同玩家完成自然终局对战；同一对手重复不增加人数。"
+    },
+    {
+      "id": "battle-both-roles",
+      "code": "B05",
+      "name": "攻守都要会",
+      "category": "比划档案",
+      "hidden": false,
+      "tier": "fine",
+      "condition": {
+        "kind": "set",
+        "metric": "battle.finished_roles",
+        "target": 2,
+        "description": "分别以主动挑战者与接受挑战者身份完整参战。"
+      },
+      "rewards": [
+        {
+          "reward_id": "title-host-and-guest",
+          "quantity": 1
+        }
+      ],
+      "hint": "分别以主动挑战者与接受挑战者身份完整参战。"
+    },
+    {
+      "id": "battle-self-train-one",
+      "code": "B06",
+      "name": "第一堂训练课",
+      "category": "比划档案",
+      "hidden": false,
+      "tier": "fine",
+      "condition": {
+        "kind": "event",
+        "metric": "battle.own_upgrade_one",
+        "target": 1,
+        "description": "由本人支付规定成本，成功完成一次战斗猪+1强化；购买已强化猪不算。"
+      },
+      "rewards": [
+        {
+          "reward_id": "pig-coin",
+          "quantity": 600
+        },
+        {
+          "reward_id": "training-choice",
+          "quantity": 8
+        }
+      ],
+      "hint": "由本人支付规定成本，成功完成一次战斗猪+1强化；购买已强化猪不算。"
+    },
+    {
+      "id": "battle-self-train-five",
+      "code": "B07",
+      "name": "五级，不改初心",
+      "category": "比划档案",
+      "hidden": false,
+      "tier": "legendary",
+      "condition": {
+        "kind": "event",
+        "metric": "battle.own_full_training",
+        "target": 1,
+        "description": "同一战斗猪的五次强化均由本人完成，达到+5；不要求保持现有所有权才保留已达成记录。"
+      },
+      "rewards": [
+        {
+          "reward_id": "pig-coin",
+          "quantity": 5000
+        },
+        {
+          "reward_id": "training-choice",
+          "quantity": 50
+        },
+        {
+          "reward_id": "title-five-level-coach",
+          "quantity": 1
+        },
+        {
+          "reward_id": "frame-training-graduation",
+          "quantity": 1
+        }
+      ],
+      "hint": "同一战斗猪的五次强化均由本人完成，达到+5；不要求保持现有所有权才保留已达成记录。"
+    },
+    {
+      "id": "battle-self-train-both",
+      "code": "B08",
+      "name": "最强不是单选题",
+      "category": "比划档案",
+      "hidden": false,
+      "tier": "epic",
+      "condition": {
+        "kind": "set",
+        "metric": "battle.own_trained_archetypes",
+        "target": 2,
+        "description": "本人分别对五条猪和宿傩猪至少完成一次+1强化。",
+        "snapshot": "battle-archetypes-v1"
+      },
+      "rewards": [
+        {
+          "reward_id": "pig-coin",
+          "quantity": 2000
+        },
+        {
+          "reward_id": "training-choice",
+          "quantity": 24
+        },
+        {
+          "reward_id": "badge-two-paths",
+          "quantity": 1
+        }
+      ],
+      "hint": "本人分别对五条猪和宿傩猪至少完成一次+1强化。"
+    },
+    {
+      "id": "battle-sukuna-movebook",
+      "code": "B09",
+      "name": "宿傩战斗笔记",
+      "category": "比划档案",
+      "hidden": false,
+      "tier": "rare",
+      "condition": {
+        "kind": "set",
+        "metric": "battle.sukuna_moves",
+        "target": 9,
+        "description": "在最终正常结束的对战中，亲自抽到过宿傩猪首期九个招式；追加抽取也算。",
+        "snapshot": "battle-sukuna-moves-v1"
+      },
+      "rewards": [
+        {
+          "reward_id": "badge-nine-moves",
+          "quantity": 1
+        }
+      ],
+      "hint": "在最终正常结束的对战中，亲自抽到过宿傩猪首期九个招式；追加抽取也算。"
+    },
+    {
+      "id": "battle-gojo-movebook",
+      "code": "B10",
+      "name": "五条战斗笔记",
+      "category": "比划档案",
+      "hidden": false,
+      "tier": "rare",
+      "condition": {
+        "kind": "set",
+        "metric": "battle.gojo_moves",
+        "target": 10,
+        "description": "在最终正常结束的对战中，亲自抽到过五条猪首期十个招式；不计群术式命令。",
+        "snapshot": "battle-gojo-moves-v1"
+      },
+      "rewards": [
+        {
+          "reward_id": "badge-ten-moves",
+          "quantity": 1
+        }
+      ],
+      "hint": "在最终正常结束的对战中，亲自抽到过五条猪首期十个招式；不计群术式命令。"
+    },
+    {
+      "id": "hidden-battle-zero-action-win",
+      "code": "B11",
+      "name": "不出手，也有胜算",
+      "category": "比划档案",
+      "hidden": true,
+      "tier": "epic",
+      "condition": {
+        "kind": "event",
+        "metric": "battle.zero_action_round_win",
+        "target": 1,
+        "description": "因上回合贷款，本回合实际出招为0且没有抽取任何招式，仍凭累计权重赢下回合；整场随后自然结束。"
+      },
+      "rewards": [
+        {
+          "reward_id": "training-rebate",
+          "quantity": 1
+        },
+        {
+          "reward_id": "title-presence-remains",
+          "quantity": 1
+        }
+      ],
+      "hint": "胜负之外，也有值得记录的一招。"
+    },
+    {
+      "id": "hidden-battle-nested-loan",
+      "code": "B12",
+      "name": "套娃式贷款",
+      "category": "比划档案",
+      "hidden": true,
+      "tier": "epic",
+      "condition": {
+        "kind": "event",
+        "metric": "battle.three_consecutive_loans",
+        "target": 1,
+        "description": "同一行动连锁连续三次抽中贷款，随后数值招式只消费一次×2；整场正常结束。"
+      },
+      "rewards": [
+        {
+          "reward_id": "training-rebate",
+          "quantity": 1
+        },
+        {
+          "reward_id": "title-pay-next-round",
+          "quantity": 1
+        },
+        {
+          "reward_id": "badge-three-loans",
+          "quantity": 1
+        }
+      ],
+      "hint": "胜负之外，也有值得记录的一招。"
+    },
+    {
+      "id": "hidden-battle-core-three",
+      "code": "B13",
+      "name": "核心的核心，还是核心",
+      "category": "比划档案",
+      "hidden": true,
+      "tier": "legendary",
+      "condition": {
+        "kind": "event",
+        "metric": "battle.three_cores_in_match",
+        "target": 1,
+        "description": "同一场对战中本人至少三次抽中掌握核心，且整场自然结束；三层只是成就门槛，不是玩法叠层上限。"
+      },
+      "rewards": [
+        {
+          "reward_id": "dispatch-luggage",
+          "quantity": 3
+        },
+        {
+          "reward_id": "title-can-learn-again",
+          "quantity": 1
+        },
+        {
+          "reward_id": "frame-triple-realization",
+          "quantity": 1
+        }
+      ],
+      "hint": "胜负之外，也有值得记录的一招。"
+    },
+    {
+      "id": "hidden-battle-heavy-comeback",
+      "code": "B14",
+      "name": "倒下之前，还有下一轮",
+      "category": "比划档案",
+      "hidden": true,
+      "tier": "epic",
+      "condition": {
+        "kind": "event",
+        "metric": "battle.heavy_risk_match_win",
+        "target": 1,
+        "description": "本场历史伤势风险达到重伤后档位，最终仍获整场胜利；期间核心治疗可以存在。"
+      },
+      "rewards": [
+        {
+          "reward_id": "dispatch-bill",
+          "quantity": 1
+        },
+        {
+          "reward_id": "title-last-echo",
+          "quantity": 1
+        }
+      ],
+      "hint": "胜负之外，也有值得记录的一招。"
+    },
+    {
+      "id": "journey-three-worlds",
+      "code": "X01",
+      "name": "猪圈之外，还有世界",
+      "category": "三栖生活",
+      "hidden": false,
+      "tier": "rare",
+      "condition": {
+        "kind": "set",
+        "metric": "journey.three_systems",
+        "target": 3,
+        "description": "同一玩家分别完整体验一次正常派遣、三站巡演和自然终局对战；不要求用同一只猪。",
+        "snapshot": "journey-three-systems-v1"
+      },
+      "rewards": [
+        {
+          "reward_id": "pig-coin",
+          "quantity": 1500
+        },
+        {
+          "reward_id": "materials-choice",
+          "quantity": 20
+        },
+        {
+          "reward_id": "title-three-world-player",
+          "quantity": 1
+        }
+      ],
+      "hint": "同一玩家分别完整体验一次正常派遣、三站巡演和自然终局对战；不要求用同一只猪。"
+    },
+    {
+      "id": "journey-mine-to-arena",
+      "code": "X02",
+      "name": "从矿洞走向赛场",
+      "category": "三栖生活",
+      "hidden": false,
+      "tier": "epic",
+      "condition": {
+        "kind": "event",
+        "metric": "journey.mine_upgrade_battle",
+        "target": 1,
+        "description": "先亲自派遣产出至少60矿石，再亲自把某战斗猪强化到+1，最后用该实例完成一场自然终局对战。"
+      },
+      "rewards": [
+        {
+          "reward_id": "pig-coin",
+          "quantity": 2500
+        },
+        {
+          "reward_id": "training-choice",
+          "quantity": 30
+        }
+      ],
+      "hint": "先亲自派遣产出至少60矿石，再亲自把某战斗猪强化到+1，最后用该实例完成一场自然终局对战。"
+    },
+    {
+      "id": "journey-build-the-stage",
+      "code": "X03",
+      "name": "亲手搭起聚光灯",
+      "category": "三栖生活",
+      "hidden": false,
+      "tier": "epic",
+      "condition": {
+        "kind": "event",
+        "metric": "journey.dispatch_gear_tour",
+        "target": 1,
+        "description": "先自然派遣获得足够覆盖一次巡演器材升级成本的舞台组件，再实际支付该组件升级，最后带该器材完成三站全S巡演。"
+      },
+      "rewards": [
+        {
+          "reward_id": "pig-coin",
+          "quantity": 2500
+        },
+        {
+          "reward_id": "material-stage",
+          "quantity": 30
+        }
+      ],
+      "hint": "先自然派遣获得足够覆盖一次巡演器材升级成本的舞台组件，再实际支付该组件升级，最后带该器材完成三站全S巡演。"
+    },
+    {
+      "id": "journey-public-graduation-v1",
+      "code": "X04",
+      "name": "远行、舞台与比划的毕业册",
+      "category": "三栖生活",
+      "hidden": false,
+      "tier": "legendary",
+      "condition": {
+        "kind": "set",
+        "metric": "journey.public_pack_complete",
+        "target": 30,
+        "description": "完成本次派遣、巡演、对战三个模块的30项公开成就；不要求隐藏成就，不改变旧49项毕业条件。",
+        "snapshot": "three-systems-public-v1"
+      },
+      "rewards": [
+        {
+          "reward_id": "pig-coin",
+          "quantity": 8000
+        },
+        {
+          "reward_id": "materials-choice",
+          "quantity": 80
+        },
+        {
+          "reward_id": "title-three-world-master",
+          "quantity": 1
+        },
+        {
+          "reward_id": "frame-three-books",
+          "quantity": 1
+        }
+      ],
+      "hint": "完成本次派遣、巡演、对战三个模块的30项公开成就；不要求隐藏成就，不改变旧49项毕业条件。"
+    },
+    {
+      "id": "hidden-journey-old-companion",
+      "code": "X05",
+      "name": "从行李箱到聚光灯",
+      "category": "三栖生活",
+      "hidden": true,
+      "tier": "epic",
+      "condition": {
+        "kind": "event",
+        "metric": "journey.same_companion_dispatch_tour",
+        "target": 1,
+        "description": "同一音乐角色猪实例在本人名下正常派遣累计48小时后，继续陪本人完成三趟正式巡演。"
+      },
+      "rewards": [
+        {
+          "reward_id": "pig-coin",
+          "quantity": 1200
+        },
+        {
+          "reward_id": "dispatch-luggage",
+          "quantity": 2
+        },
+        {
+          "reward_id": "title-my-old-companion",
+          "quantity": 1
+        }
+      ],
+      "hint": "旧伙伴走进新故事，会发生什么呢？"
+    },
+    {
+      "id": "hidden-journey-five-delivered",
+      "code": "X06",
+      "name": "认输认得很有排面",
+      "category": "三栖生活",
+      "hidden": true,
+      "tier": "epic",
+      "condition": {
+        "kind": "event",
+        "metric": "journey.five_trophies_delivered",
+        "target": 1,
+        "description": "作为败者亲自用完同一场五次战利品抓猪，并全部按规则交付给该场胜者；不能用别场次数拼凑。"
+      },
+      "rewards": [
+        {
+          "reward_id": "dispatch-bill",
+          "quantity": 1
+        },
+        {
+          "reward_id": "title-keep-my-word",
+          "quantity": 1
+        }
+      ],
+      "hint": "旧伙伴走进新故事，会发生什么呢？"
+    }
+  ]
+}

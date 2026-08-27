@@ -13,6 +13,10 @@ from enum import StrEnum
 from types import MappingProxyType
 from typing import Any
 
+from .activity_achievements import definitions as _activity_definitions
+
+UNLOCK_SUMMARY_LIMIT = 8
+
 
 class AchievementTier(StrEnum):
     NORMAL = "normal"
@@ -559,9 +563,10 @@ def _ultimate_definitions() -> list[AchievementDefinition]:
     ]
 
 
-ACHIEVEMENT_DEFINITIONS: tuple[AchievementDefinition, ...] = tuple(
+LEGACY_ACHIEVEMENT_DEFINITIONS: tuple[AchievementDefinition, ...] = tuple(
     _regular_definitions() + _stamp_definitions() + _hidden_definitions() + _ultimate_definitions()
 )
+ACHIEVEMENT_DEFINITIONS = LEGACY_ACHIEVEMENT_DEFINITIONS + _activity_definitions()
 ACHIEVEMENT_BY_ID: Mapping[str, AchievementDefinition] = MappingProxyType(
     {definition.achievement_id: definition for definition in ACHIEVEMENT_DEFINITIONS}
 )

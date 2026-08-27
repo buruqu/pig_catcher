@@ -21,8 +21,9 @@
 .battle-caption{margin:0;padding:13px 20px;background:#fffbfd;color:#987084;font-size:14px;line-height:1.65;overflow-wrap:anywhere}.battle-hints{padding:16px 20px;background:#fdf8fb;border:1px dashed #eacbd8;border-radius:8px}.battle-hints p{margin:0 0 8px;font-size:15px;line-height:1.65;color:#856373;overflow-wrap:anywhere}.battle-hints p:last-child{margin-bottom:0}
 .battle-player{font-size:20px!important;max-width:230px;overflow-wrap:anywhere;line-height:1.5}.battle-celebration{border-top:5px double #d77da7}
 </style></head>
-<body><main class="game-sheet{% if view.celebration %} battle-celebration{% endif %}" data-pig-catcher-root data-render-ready="true">
+<body><main class="game-sheet{% if view.celebration %} battle-celebration{% endif %}" data-achievement-frame="{{ view.achievement_frame }}" data-pig-catcher-root data-render-ready="true">
 <header class="game-header"><div class="game-header__copy"><p class="game-header__eyebrow">PiG Dream! · {{ view.subtitle }}</p><h1>{{ view.title }}</h1></div><div class="game-header__meta"><span>本群对战</span><strong class="battle-player">{{ view.player_name }}</strong></div></header>
+{% include 'achievement_strip.html' %}
 <div class="battle-body">
 {% if view.battle_id %}<div class="battle-meta"><span>{{ view.battle_id }}</span><span>{{ view.round_label }}</span></div>{% endif %}
 {% if view.banner %}<div class="battle-banner">{{ view.banner }}</div>{% endif %}

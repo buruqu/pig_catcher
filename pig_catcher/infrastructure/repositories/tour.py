@@ -21,6 +21,7 @@ from ...domain.tour_catalog import (
     grade,
 )
 from ..database import DatabaseSession
+from .achievement_coupons import AchievementCouponRepository
 from .dispatch import DispatchRepository, encode, iso_ms
 from .economy import EconomyRepository
 from .materials import MaterialRepository
@@ -344,6 +345,7 @@ class TourRepository:
         for plan in plans:
             validate_plan(plan, members, fans=profile["fans"])
         run_id = "T" + uuid4().hex[:10].upper()
+        coupon = await AchievementCouponRepository().consume(session, player_id, "tour-visual", run_id, iso_ms(now_ms))
         await self.ticket_change(
             session, player_id, -1, key=f"tour-start:{run_id}", reason="tour-start", source=run_id, now_ms=now_ms
         )
@@ -358,7 +360,9 @@ class TourRepository:
                 TOUR_VERSION,
                 encode(plans),
                 seed,
-                encode({"roster": roster, "members": members, "band_name": profile["name"]}),
+                encode(
+                    {"roster": roster, "members": members, "band_name": profile["name"], "achievement_coupon": coupon}
+                ),
                 now_ms,
                 joint_id,
             ),
@@ -370,7 +374,14 @@ class TourRepository:
             run_id,
             "started",
             now_ms,
-            {"members": members, "roster": roster, "plans": plans, "ticket_cost": 1, "joint_id": joint_id},
+            {
+                "members": members,
+                "roster": roster,
+                "plans": plans,
+                "ticket_cost": 1,
+                "joint_id": joint_id,
+                "achievement_coupon": coupon,
+            },
         )
         return await self.active_run(session, player_id)
 
@@ -418,6 +429,9 @@ class TourRepository:
             )
             if change.rowcount != 1:
                 raise TourError("本站器具不足，请补做器具或调整尚未演出的站点。")
+        coupon = await AchievementCouponRepository().consume(
+            session, player_id, "tour-stage", f"{run_id}:stage:{number}", iso_ms(now_ms)
+        )
         result = score_stage(
             members,
             plan,
@@ -427,6 +441,7 @@ class TourRepository:
             previous=previous,
             center=roster["center_id"],
             seed=run["random_seed"],
+            steady_coupon=bool(coupon),
         )
         prior_members = previous["members"] if previous else json.loads(run["initial_roster_json"])["members"]
         result.update(
@@ -439,6 +454,7 @@ class TourRepository:
             occurred_ms=now_ms,
             new_collections=[],
             training_gain=20,
+            achievement_coupon=coupon,
         )
         for member in canonical_members(members):
             await self.train(
@@ -555,6 +571,26 @@ class TourRepository:
             "joint_id": run["joint_id"],
             "completed_ms": now_ms,
         }
+        coupon = json.loads(run["initial_roster_json"]).get("achievement_coupon", {})
+        if coupon:
+            names = "、".join(m["name"] for m in stages[-1]["members"])
+            story = {
+                "title": "安可之后，留一盏灯",
+                "text": f"{names}回到舞台中央，为{profile['name']}留下这张谢幕合照。"
+                "三张票根拼成一条路，最后一束灯光留给彼此。下一站，还要一起出发。",
+                "coupon": coupon,
+            }
+            summary["achievement_story"] = story
+            await self.collect(
+                session,
+                player_id,
+                run_id,
+                f"achievement-photo:{run_id}",
+                "成就留影",
+                story["title"],
+                {"story": story, "members": stages[-1]["members"]},
+                now_ms,
+            )
         await session.execute(
             "UPDATE tour_runs SET status='completed',completed_ms=?,summary_json=? WHERE run_id=? AND status='active'",
             (now_ms, encode(summary), run_id),

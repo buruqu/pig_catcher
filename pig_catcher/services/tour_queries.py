@@ -36,6 +36,7 @@ from ..domain.tour_catalog import (
 )
 from ..domain.tour_views import TourScoreCard, TourView
 from ..infrastructure.database import DatabaseSession
+from ..infrastructure.repositories.achievement_coupons import AchievementCouponRepository
 from ..infrastructure.repositories.tour import TourRepository
 from .dispatch_queries import local_time
 
@@ -79,6 +80,12 @@ def stage_score(stage: dict, *, prefix: str = "") -> TourScoreCard:
     )
     if stage.get("lineup_changed"):
         note += " · 本站阵容已变更，按本站成员结算"
+    if stage.get("achievement_coupon"):
+        coupon = stage["achievement_coupon"]
+        note += (
+            f" · {coupon['name']}挽回{stage.get('coupon_recovery', 0)}分，剩余{coupon['remaining']}张；"
+            f"原始波动{stage['variation_raw']:+d}"
+        )
     return TourScoreCard(
         f"{prefix}第{stage['stage_number']}站 · {venue.name}",
         f"{stage['score']:.2f}",
@@ -238,6 +245,9 @@ class TourQueries:
             song_plays=await self.repo.songs(session, identity.player_id),
             center=roster["center_id"],
         )
+        coupons = await AchievementCouponRepository().preview(
+            session, identity.player_id, ("tour-stage", "tour-visual")
+        )
         return self.view(
             identity,
             "出发前确认" if confirmation else "三站免费排练",
@@ -248,6 +258,11 @@ class TourQueries:
             scorecards=tuple(stage_score(stage) for stage in results),
             pigs=tuple(tour_pig(m, position=i) for i, m in enumerate(members, 1)),
             panels=(
+                Panel(
+                    "已选成就券 · 预览不消耗",
+                    tuple(Line(c["name"], f"库存{c['quantity']}张", c["effect"]) for c in coupons),
+                    "正式开始才绑定视觉券；稳场券在下一次正式站点使用，不自动连吃库存。",
+                ),
                 Panel(
                     "三站安排",
                     tuple(
@@ -310,6 +325,22 @@ class TourQueries:
             for stage in summary["stages"]
         )
         additions = summary["new_collections"] + [c for stage in summary["stages"] for c in stage["new_collections"]]
+        story_panels = ()
+        if summary.get("achievement_story"):
+            story = summary["achievement_story"]
+            coupon = story["coupon"]
+            story_panels = (
+                Panel(
+                    story["title"],
+                    (
+                        Line(
+                            "原创返场留影",
+                            story["text"],
+                            f"{coupon['name']} · 剩余{coupon['remaining']}张 · 不额外增加分数或经济奖励",
+                        ),
+                    ),
+                ),
+            )
         return self.view(
             identity,
             "三站落幕 · 谢谢每一次合奏",
@@ -326,6 +357,7 @@ class TourQueries:
             pigs=tuple(tour_pig(m) for m in grown_members(summary["stages"][-1])),
             panels=(
                 Panel("三站高光", highlights),
+                *story_panels,
                 Panel(
                     "巡演纪念", (Line("新获得", "、".join(additions) or "本次没有新的收藏，成长和整趟奖励照常入账。"),)
                 ),
@@ -630,6 +662,12 @@ class TourQueries:
                 for view, profile in zip(views, profiles, strict=True)
                 for pig in view.pigs
             ),
-            panels=(Panel("共同纪念", (Line("联演海报", "已分别保存到双方收藏册"),)),),
+            panels=(Panel("共同纪念", (Line("联演海报", "已分别保存到双方收藏册"),)),)
+            + tuple(
+                replace(panel, title=profile["name"] + " · " + panel.title)
+                for view, profile, summary in zip(views, profiles, summaries, strict=True)
+                for panel in view.panels
+                if panel.title == summary.get("achievement_story", {}).get("title")
+            ),
             hints=("/巡演游记 查看自己三站的详细高光与结算",),
         )

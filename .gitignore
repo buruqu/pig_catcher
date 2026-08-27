@@ -15,6 +15,7 @@ data/
 !pig_catcher/domain/data/
 !pig_catcher/domain/data/dispatch_specialties.json
 !pig_catcher/domain/data/tour_characters.json
+!pig_catcher/domain/data/activity_achievements_v1.json
 artifacts/
 config_back/
 asset_library/current-v*/

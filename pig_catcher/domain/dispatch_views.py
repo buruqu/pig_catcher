@@ -44,6 +44,9 @@ class DispatchView:
     hints: tuple[str, ...] = ()
     page: int = 1
     page_count: int = 1
+    achievement_title: str = ""
+    achievement_frame: str = ""
+    achievement_badge: str = ""
 
     def payload(self) -> dict[str, Any]:
         return asdict(self)
@@ -68,6 +71,9 @@ class DispatchView:
             hints=tuple(data["hints"]),
             page=data["page"],
             page_count=data["page_count"],
+            achievement_title=data.get("achievement_title", ""),
+            achievement_frame=data.get("achievement_frame", ""),
+            achievement_badge=data.get("achievement_badge", ""),
         )
 
     def text(self) -> str:

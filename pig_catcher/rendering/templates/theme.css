@@ -2531,3 +2531,21 @@ footer strong {
 .group-event__footer {
   background: rgba(255, 247, 250, 0.92);
 }
+
+/* Original achievement identities. Insets avoid changing existing media slots. */
+.game-sheet[data-achievement-frame^="frame-"] { position:relative; outline:none!important; }
+.game-sheet[data-achievement-frame^="frame-"]::after { content:""; position:absolute; inset:0; pointer-events:none; z-index:9; box-sizing:border-box; }
+.game-sheet[data-achievement-frame="frame-five-postmarks"] { outline:6px dashed #87b0a1!important; outline-offset:-7px!important; }
+.game-sheet[data-achievement-frame="frame-five-city-lights"]::after { box-shadow:inset 0 0 0 7px #cfa5c9,inset 0 0 0 12px #fff4cd; }
+.game-sheet[data-achievement-frame="frame-nine-colors"]::after { border:7px solid transparent; border-image:linear-gradient(135deg,#e891ae,#d48b8b,#e9bd77,#b0c689,#93c9cb,#9eafd8,#bca5dc,#d5a2c9,#dda2b7) 1; }
+.game-sheet[data-achievement-frame="frame-arena-notebook"] { outline:7px double #8199b4!important; outline-offset:-8px!important; }
+.game-sheet[data-achievement-frame="frame-training-graduation"] { outline:8px double #bb984d!important; outline-offset:-9px!important; }
+.game-sheet[data-achievement-frame="frame-triple-realization"]::after { box-shadow:inset 0 0 0 4px #b99bd1,inset 0 0 0 8px #f2eaf7,inset 0 0 0 12px #b99bd1; }
+.game-sheet[data-achievement-frame="frame-three-books"]::after { box-shadow:inset 5px 0 #8db4a8,inset 10px 0 #e0b5c7,inset 15px 0 #9aaec6; }
+.achievement-strip { margin:0; padding:13px 38px; display:flex; flex-wrap:wrap; gap:10px; background:#fffafd; border-bottom:1px solid #efdae4; }
+.achievement-token { --token-color:#af5a80; display:inline-flex; align-items:center; gap:9px; padding:7px 13px; border:1px solid var(--token-color); border-radius:8px; color:var(--token-color); background:#fff; font-size:14px; line-height:1.5; overflow-wrap:anywhere; max-width:100%; }
+.achievement-token b { flex-shrink:0; width:25px; height:25px; display:grid; place-items:center; border:1px dashed currentColor; border-radius:50%; font-size:16px; }
+.achievement-keepsakes { display:flex; flex-wrap:wrap; gap:8px; margin-top:13px; }
+.ach-item > *, .ach-row > * { min-width:0; overflow-wrap:anywhere; }
+.unlock-row header { flex-wrap:wrap; gap:12px; }
+.unlock-row h2 { overflow-wrap:anywhere; }

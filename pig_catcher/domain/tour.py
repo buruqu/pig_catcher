@@ -101,6 +101,7 @@ def score_stage(
     plan: dict,
     *,
     equipment: int = 0,
+    steady_coupon: bool = False,
     song_plays: dict[str, int] | None = None,
     stage_number: int = 1,
     previous: dict | None = None,
@@ -251,6 +252,9 @@ def score_stage(
         variation = min(0, variation + stability)
         if plan["tool"] == "cable" and incident == "equipment":
             variation = 0
+    coupon_recovery = -variation if steady_coupon and variation < 0 else 0
+    if steady_coupon:
+        variation = max(0, variation)
     components = {key: round(min(SCORE_CAPS[key], value), 3) for key, value in components.items()}
     base_score = round(sum(components.values()), 2)
     total = round(min(100, max(0, base_score + variation)), 2)
@@ -269,6 +273,7 @@ def score_stage(
         "base_score": base_score,
         "variation_raw": raw_variation,
         "variation": variation,
+        "coupon_recovery": coupon_recovery,
         "incident": incident,
         "score": total,
         "grade": grade(total),

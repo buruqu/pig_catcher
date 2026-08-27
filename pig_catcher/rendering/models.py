@@ -145,6 +145,7 @@ class PigCardViewModel:
     achievement_firework: bool = False
     achievement_title: str = ""
     achievement_frame: str = ""
+    achievement_badge: str = ""
     activity_label: str = ""
 
 
@@ -434,6 +435,7 @@ class FoodCardViewModel:
     achievement_firework: bool = False
     achievement_title: str = ""
     achievement_frame: str = ""
+    achievement_badge: str = ""
     excluded_summaries: tuple[str, ...] = ()
     probability_line: str = ""
     probability_sources: str = ""
@@ -706,6 +708,7 @@ class AchievementRowViewModel:
     points: int
     reward_text: str
     unlocked_at: str
+    cosmetics: tuple[dict, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -738,6 +741,7 @@ class AchievementUnlockViewModel:
     display_name: str
     total_points: int
     entries: tuple[AchievementRowViewModel, ...]
+    additional_count: int = 0
 
 
 @dataclass(frozen=True, slots=True)

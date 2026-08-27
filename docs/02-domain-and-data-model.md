@@ -401,3 +401,16 @@ PENDING -> EXPIRED
 战利品仅来自自然力竭结局、必须按序交给胜者，奖励、归属和回执同事务。
 任意精度整数使用带标记 JSON，读对战快照必须经过 `domain.battle.loads`。
 `activity_facts` 保存版本、本人升级/自然材料、双方回合与终局和双向交付，供第四轮成就消费。
+
+## 2.0 新成就数据增量（Schema 40，仅隔离开发）
+
+新增 `achievement_activity_queue`、`achievement_activity_state`、`achievement_coupon_selection`、
+`achievement_coupon_uses`、`achievement_material_choices` 五表。原有表、资产和账本不改写。
+事实写入触发器自动按提交顺序入队；迁移前事实标记 `historical=1`，首次处理只作个人历史汇总。
+玩家条件投影与事实处理标记、成就解锁、点数、奖励在同一事务提交，失败全部回滚并留队。
+
+选券按玩家/用途槽唯一，仅选择不扣库存；实际业务确认后扣券并写不可变使用记录，来源和槽联合去重。
+材料自选单独 30 秒确认，1 份兑换 1 材料，自选/奖励/券产物不冒充自然材料。
+币奖幂等键包含玩家 ID，解决同一成就多人发奖冲突；不因此改写历史或重发已领取奖励。
+目录 130 项，旧 49 项与新 30 项毕业集合分别冻结；复杂条件状态仍存声明版本，未知事实版本拒绝猜测。
+完整字段、代码与恢复验证见 [第四轮交付](26-activity-achievements-and-v2-acceptance.md)。

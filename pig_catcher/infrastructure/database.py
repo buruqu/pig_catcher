@@ -208,6 +208,8 @@ class PigCatcherDatabase:
 
         from .migrations.v0039_battles import GUARDS as BATTLE_GUARDS
         from .migrations.v0039_battles import TABLES as BATTLE_TABLES
+        from .migrations.v0040_activity_achievements import GUARDS as ACTIVITY_GUARDS
+        from .migrations.v0040_activity_achievements import TABLES as ACTIVITY_TABLES
 
         required_tables = {
             "player_food_effects",
@@ -259,6 +261,7 @@ class PigCatcherDatabase:
             "tour_joint_reservations",
         }
         required_tables.update(BATTLE_TABLES)
+        required_tables.update(ACTIVITY_TABLES)
         table_rows = await (
             await connection.execute(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name IN ("
@@ -315,6 +318,7 @@ class PigCatcherDatabase:
             "idx_tour_joint_reservation",
         }
         required_guards.update(BATTLE_GUARDS)
+        required_guards.update(ACTIVITY_GUARDS)
         guard_rows = await (
             await connection.execute("SELECT name FROM sqlite_master WHERE type IN ('trigger','index')")
         ).fetchall()

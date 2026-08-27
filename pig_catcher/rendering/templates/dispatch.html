@@ -25,11 +25,12 @@
   </style>
 </head>
 <body>
-<main class="game-sheet" data-pig-catcher-root data-render-ready="true">
+<main class="game-sheet" data-achievement-frame="{{ view.achievement_frame }}" data-pig-catcher-root data-render-ready="true">
   <header class="game-header">
     <div class="game-header__copy"><p class="game-header__eyebrow">PiG Dream! · {{ view.subtitle }}</p><h1>{{ view.title }}</h1></div>
     <div class="game-header__meta"><span>远行社成员</span><strong class="dispatch-header__player">{{ view.player_name }}</strong></div>
   </header>
+  {% include 'achievement_strip.html' %}
   <div class="dispatch-body">
     {% if view.banner %}<div class="dispatch-banner">{{ view.banner }}</div>{% endif %}
     {% if view.stats %}<section class="dispatch-stats" style="--stat-columns:{{ [view.stats|length,3]|min }}">{% for stat in view.stats %}<div class="dispatch-stat"><span>{{ stat.label }}</span><strong>{{ stat.value }}</strong>{% if stat.note %}<small>{{ stat.note }}</small>{% endif %}</div>{% endfor %}</section>{% endif %}

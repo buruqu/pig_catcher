@@ -28,6 +28,7 @@ from ..domain.tour_catalog import (
     training_level,
 )
 from ..infrastructure.database import DatabaseSession
+from ..infrastructure.repositories.achievement_coupons import AchievementCouponRepository
 from ..infrastructure.repositories.dispatch import encode, iso_ms
 from ..infrastructure.repositories.tour import TourRepository, beijing_day
 from .tour_queries import TourQueries, cost_text, tour_pig
@@ -157,14 +158,21 @@ class TourSetup:
             "plans": plans,
             "equipment": profile["equipment"],
             "songs": await self.repo.songs(session, profile["player_id"]),
+            "coupons": await AchievementCouponRepository().selected(
+                session, profile["player_id"], ("tour-stage", "tour-visual")
+            ),
         }
 
     @staticmethod
     def same_ready(before: dict, after: dict) -> bool:
-        return all(before[key] == after[key] for key in ("revision", "roster", "plans", "equipment", "songs")) and (
-            [member_fingerprint(m) for m in before["members"]] == [member_fingerprint(m) for m in after["members"]]
-            and (member_fingerprint(before["guest"]) if before["guest"] else None)
-            == (member_fingerprint(after["guest"]) if after["guest"] else None)
+        return (
+            before.get("coupons", {}) == after.get("coupons", {})
+            and all(before[key] == after[key] for key in ("revision", "roster", "plans", "equipment", "songs"))
+            and (
+                [member_fingerprint(m) for m in before["members"]] == [member_fingerprint(m) for m in after["members"]]
+                and (member_fingerprint(before["guest"]) if before["guest"] else None)
+                == (member_fingerprint(after["guest"]) if after["guest"] else None)
+            )
         )
 
     async def preview(

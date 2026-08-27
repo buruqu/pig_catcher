@@ -1,6 +1,34 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><style>:root{--font-family:{{ font_family }};}{{ theme_css|safe }}
-.ach-body{padding:32px 38px}.ach-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.ach-stat,.ach-row{border:1px solid #efd7e0;border-radius:10px;background:#fff;padding:18px}.ach-stat span,.ach-row span{display:block;color:#896f79;font-size:15px}.ach-stat strong{display:block;margin-top:6px;font-size:26px}.ach-progress{height:14px;background:#f6e7ed;border-radius:8px;overflow:hidden;margin:22px 0}.ach-progress i{display:block;height:100%;background:linear-gradient(90deg,#e85d94,#f0a4c1)}.ach-section{margin-top:26px}.ach-section h2{font-size:24px}.ach-list{display:grid;gap:10px}.ach-row{display:grid;grid-template-columns:120px 1fr 150px;align-items:center}.ach-row b{font-size:20px}.ach-row em{font-style:normal;text-align:right;color:#b23f70;font-weight:700}</style></head><body>
-<main class="game-sheet" data-pig-catcher-root data-render-ready="true"><header class="game-header"><div class="game-header__copy"><p class="game-header__eyebrow">PiG Dream! · 成就总览</p><h1>{{ view.display_name }}</h1></div><div class="game-header__meta"><span>成就点</span><strong>{{ view.points }}</strong></div></header>
-<section class="ach-body"><div class="ach-stats"><div class="ach-stat"><span>完成数量</span><strong>{{ view.unlocked_count }}/{{ view.total_count }}</strong></div><div class="ach-stat"><span>完成率</span><strong>{{ '%.1f'|format(view.completion_percent) }}%</strong></div><div class="ach-stat"><span>下一里程碑</span><strong>{{ view.next_milestone_text }}</strong></div><div class="ach-stat"><span>佩戴称号</span><strong style="font-size:18px">{{ view.title_text }}</strong></div></div><div class="ach-progress"><i style="width:{{ view.completion_percent }}%"></i></div>
-<div class="ach-section"><h2>徽章展示</h2><p style="line-height:1.7;color:#765d68">{{ view.showcase_text }}</p></div><div class="ach-section"><h2>最近解锁</h2><div class="ach-list">{% for item in view.recent %}<div class="ach-row"><span>{{ item.tier_label }}</span><b>{{ item.name }}</b><em>+{{ item.points }} 点</em></div>{% else %}<div class="empty-state">尚未解锁成就，完成一次抓猪就会开始记录。</div>{% endfor %}</div></div>
-<div class="ach-section"><h2>奖励库存</h2><p style="line-height:1.7;color:#765d68">{{ view.reward_inventory_text }}</p></div></section><footer class="game-footer"><span>/猪猪成就 分类 页码 · /成就详情 名称</span><strong>{{ view.frame_text }}</strong></footer></main></body></html>
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><style>
+:root{--font-family:{{ font_family }};}{{ theme_css|safe }}
+.ach-body{padding:32px 38px}.ach-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.ach-stat,.ach-row{border:1px solid #efd7e0;border-radius:10px;background:#fff;padding:18px;overflow-wrap:anywhere;min-width:0}
+.ach-stat span,.ach-row span{display:block;color:#896f79;font-size:15px}.ach-stat strong{display:block;margin-top:6px;font-size:26px}
+.ach-progress{height:14px;background:#f6e7ed;border-radius:8px;overflow:hidden;margin:22px 0}
+.ach-progress i{display:block;height:100%;background:linear-gradient(90deg,#e85d94,#f0a4c1)}
+.ach-section{margin-top:26px}.ach-section h2{font-size:24px}.ach-list{display:grid;gap:10px}
+.ach-row{display:grid;grid-template-columns:120px minmax(0,1fr) 150px;align-items:center;gap:10px}
+.ach-row b{font-size:20px}.ach-row em{font-style:normal;text-align:right;color:#b23f70;font-weight:700}
+.ach-prose{line-height:1.8;color:#765d68;overflow-wrap:anywhere}
+</style></head><body>
+<main class="game-sheet" data-pig-catcher-root data-render-ready="true" data-achievement-frame="{{ view.frame_text }}">
+<header class="game-header"><div class="game-header__copy"><p class="game-header__eyebrow">PiG Dream! · 成就总览</p><h1>{{ view.display_name }}</h1></div><div class="game-header__meta"><span>成就点</span><strong>{{ view.points }}</strong></div></header>
+{% set frame = cosmetic_detail(view.frame_text) %}
+<aside class="achievement-strip"><span class="achievement-token" style="--token-color:{{ frame.color }}"><b>{{ frame.glyph }}</b>{{ frame.name }}</span><span class="achievement-token"><b>✦</b>{{ view.title_text }}</span></aside>
+<section class="ach-body">
+<div class="ach-stats">
+  <div class="ach-stat"><span>完成数量</span><strong>{{ view.unlocked_count }}/{{ view.total_count }}</strong></div>
+  <div class="ach-stat"><span>完成率</span><strong>{{ '%.1f'|format(view.completion_percent) }}%</strong></div>
+  <div class="ach-stat"><span>下一里程碑</span><strong>{{ view.next_milestone_text }}</strong></div>
+  <div class="ach-stat"><span>展示成就</span><strong style="font-size:18px">{{ view.showcase_text }}</strong></div>
+</div>
+<div class="ach-progress"><i style="width:{{ view.completion_percent }}%"></i></div>
+<div class="ach-section"><h2>最近解锁</h2><div class="ach-list">
+{% for item in view.recent %}
+  <div class="ach-row"><span>{{ item.tier_label }}</span><b>{{ item.name }}</b><em>+{{ item.points }} 点</em></div>
+{% else %}<div class="empty-state">尚未解锁成就，完成一次抓猪就会开始记录。</div>{% endfor %}
+</div></div>
+<div class="ach-section"><h2>奖励库存</h2><p class="ach-prose">{{ view.reward_inventory_text }}</p><p class="ach-prose">/成就奖励 查看三系统材料与专用券，预览、确认后使用。</p></div>
+</section>
+<footer class="game-footer"><span>/猪猪成就 分类 页码 · /成就详情 名称</span><strong>三章同行 · 原创纪念</strong></footer>
+</main></body></html>

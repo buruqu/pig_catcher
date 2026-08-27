@@ -5,7 +5,9 @@ from ..domain.battle_catalog import CONFIRM_TTL_MS, MATERIAL_IDS, TOOLS_BY_ID, U
 from ..domain.dispatch import MATERIAL_SCALE
 from ..domain.dispatch_views import DispatchLine as Line
 from ..domain.dispatch_views import DispatchPanel as Panel
+from ..infrastructure.repositories.achievement_coupons import AchievementCouponRepository
 from ..infrastructure.repositories.battle import BattleRepository, beijing_day
+from ..infrastructure.repositories.dispatch import iso_ms
 from .battle_views import cost_text, pig_card, view
 
 
@@ -170,7 +172,15 @@ class BattleSetup:
             operation = action.removesuffix("_preview")
             if operation == "upgrade" and member["level"] >= 5:
                 raise BattleError("该猪已强化+5，不再消耗材料。")
-            payload = {"member": member, "revision": profile["revision"]}
+            coupon_plan = (
+                await AchievementCouponRepository().selected(session, identity.player_id, ("battle-training",))
+                if operation == "upgrade"
+                else {}
+            )
+            costs = dict(UPGRADE_COSTS[member["level"]]) if operation == "upgrade" else {}
+            if coupon_plan:
+                costs["coins"] = max(0, costs["coins"] - 300)
+            payload = {"member": member, "revision": profile["revision"], "coupons": coupon_plan}
             await self.pending(session, identity.player_id, operation, payload, now_ms)
             banner = {
                 "assign": "设为战斗猪并添加保护；原战斗猪的保护不会自动解除。",
@@ -188,7 +198,8 @@ class BattleSetup:
                         (
                             Line(
                                 "本次成本",
-                                cost_text(UPGRADE_COSTS[member["level"]]) if operation == "upgrade" else "无",
+                                cost_text(costs) if operation == "upgrade" else "无",
+                                "训练热身券减免最多300猪币，材料不减；确认成功才扣券。" if coupon_plan else "",
                             ),
                         ),
                     ),
@@ -228,7 +239,24 @@ class BattleSetup:
                 (identity.player_id, pig_id),
             )
         else:
-            costs = UPGRADE_COSTS[member["level"]]
+            costs = dict(UPGRADE_COSTS[member["level"]])
+            coupons = AchievementCouponRepository()
+            selected = await coupons.selected(session, identity.player_id, ("battle-training",))
+            if selected != payload.get("coupons", {}):
+                raise BattleError("训练成就券已变化，请重新预览。")
+            usage = {}
+            if selected:
+                saving = min(300, costs["coins"])
+                usage = await coupons.consume(
+                    session,
+                    identity.player_id,
+                    "battle-training",
+                    key,
+                    iso_ms(now_ms),
+                    expected=selected["battle-training"],
+                    effect={"coin_saving": saving},
+                )
+                costs["coins"] -= saving
             natural = await session.fetch_one(
                 """SELECT COALESCE(SUM(delta_units),0) FROM material_ledger
                 WHERE player_id=? AND material_id='training-ore' AND delta_units>0
@@ -261,6 +289,8 @@ class BattleSetup:
                     "costs": {MATERIAL_IDS[k]: v for k, v in costs.items()},
                     "natural_ore_units_before": natural[0],
                     "material_scale": MATERIAL_SCALE,
+                    "archetype": member["fighter_id"],
+                    "achievement_coupon": usage,
                 },
             )
             member["level"] += 1
@@ -269,6 +299,11 @@ class BattleSetup:
             identity,
             {"assign": "战斗猪已设置", "retire": "已解除战斗保护", "upgrade": "战斗强化成功"}[operation],
             pigs=(pig_card(member),),
-            banner="操作已完成。强化随实例保留，不会因为转让而让接收者获得本人付费训练记录。",
+            banner="操作已完成。强化随实例保留，不会因为转让而让接收者获得本人付费训练记录。"
+            + (
+                f" {usage['name']}减免{usage['coin_saving']}猪币，剩余{usage['remaining']}张。"
+                if operation == "upgrade" and usage
+                else ""
+            ),
             hints=("/战斗猪 查看当前设置；/比划比划 @群友。",),
         )

@@ -257,6 +257,19 @@ class DispatchQueries:
             if "preference" in options:
                 text += f" 默认选择{options['preference']}。"
             rows.append(Line("器具设置", text))
+        from ..infrastructure.repositories.achievement_coupons import AchievementCouponRepository
+
+        rows.append(
+            Line(
+                "成就券",
+                AchievementCouponRepository.description(snapshot.get("coupons", {})),
+                "路费/行李占同一数值槽；惊喜券独立。免费路线不消耗路费券，提前召回不返已用券。",
+            )
+        )
+        for usage in snapshot.get("coupon_uses", []):
+            rows.append(
+                Line(usage["name"], f"剩余{usage['remaining']}张", f"本次旅费减免{usage.get('coin_saving', 0)}猪币")
+            )
         panels = (
             Panel("出发快照 · 基础预期，不含奇遇与器具转换", tuple(rows), "零头会保存到材料账户，不会逐块向上取整。"),
             Panel("产出加成", tuple(Line(_BONUS_NAMES[key], f"+{value / 10_000:g}%") for key, value in bonus.items())),
@@ -348,7 +361,7 @@ class DispatchQueries:
             ),
             hints=(
                 "所有四张旅行配方现已可用；奇遇中发现的配方附送一件成品。",
-                "派遣材料可先积攒；战斗养成、巡演设施将在后续开发轮次开放。",
+                "派遣材料可用于战斗猪强化与巡演养成；分别在 /战斗猪 帮助 和 /猪猪巡演 帮助 查看。",
             ),
         )
 
@@ -412,6 +425,18 @@ class DispatchQueries:
                 else "返程或召回时统一入账。已完成块的随机结果固定，不因查看而改变。",
             )
         ]
+        if state.get("achievement_story"):
+            story = state["achievement_story"]
+            panels.append(
+                Panel(story["title"], (Line(story["region"], story["text"], "原创旅行纪念 · 不增加奇遇或自然纪念品"),))
+            )
+        if snapshot.get("coupon_uses"):
+            panels.append(
+                Panel(
+                    "本趟成就券",
+                    tuple(Line(u["name"], f"使用后剩余{u['remaining']}张") for u in snapshot["coupon_uses"]),
+                )
+            )
         for event in state["events"]:
             rows = []
             for index, option in enumerate(event["options"], 1):

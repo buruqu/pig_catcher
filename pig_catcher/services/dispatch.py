@@ -29,6 +29,7 @@ from ..domain.models import CommandIdentity, CommandReceipt
 from ..domain.ports import Clock, MessageKeyFactory, SystemClock
 from ..domain.selectors import parse_asset_selector
 from ..infrastructure.database import DatabaseSession, PigCatcherDatabase
+from ..infrastructure.repositories.achievement_coupons import AchievementCouponRepository
 from ..infrastructure.repositories.dispatch import DispatchRepository, encode, iso_ms, timestamp_ms
 from ..infrastructure.repositories.economy import EconomyRepository
 from ..infrastructure.repositories.framework import FrameworkRepository
@@ -305,6 +306,13 @@ class DispatchService:
             "fee": region.fee * (args["hours"] // 4),
             "team_revision": team["revision"],
         }
+        coupons = await AchievementCouponRepository().selected(
+            session, identity.player_id, ("dispatch-numeric", "dispatch-visual")
+        )
+        snapshot["coupons"] = coupons
+        snapshot["original_fee"] = snapshot["fee"]
+        if coupons.get("dispatch-numeric", {}).get("ticket_id") == "dispatch-bill":
+            snapshot["fee"] = max(0, snapshot["fee"] - 120)
         await self._check_resources(session, identity, snapshot)
         await self._pending(session, identity, "start", snapshot, now_ms)
         return self.queries.start_preview(identity, snapshot, now_ms)
@@ -409,7 +417,31 @@ class DispatchService:
         if json.loads(team["member_ids_json"]) != [m["pig_instance_id"] for m in members]:
             raise DispatchError("预览队员与当前队伍不一致，请重新预览。")
         team_bonus(members, REGIONS_BY_ID[snapshot["region_id"]])
+        coupon_repo = AchievementCouponRepository()
+        current_coupons = await coupon_repo.selected(
+            session, identity.player_id, ("dispatch-numeric", "dispatch-visual")
+        )
+        if current_coupons != snapshot.get("coupons", {}):
+            raise DispatchError("成就券选择已变化，请重新预览出发。")
         await self._check_resources(session, identity, snapshot)
+        snapshot["coupon_uses"] = []
+        for coupon_slot, selected in current_coupons.items():
+            if selected["ticket_id"] == "dispatch-bill" and not snapshot.get("original_fee"):
+                continue  # 免费近郊不吃掉路费券，仍可选择下一趟付费旅行。
+            usage = await coupon_repo.consume(
+                session,
+                identity.player_id,
+                coupon_slot,
+                key,
+                iso_ms(now_ms),
+                expected=selected,
+                effect={
+                    "coin_saving": snapshot.get("original_fee", snapshot["fee"]) - snapshot["fee"]
+                    if selected["ticket_id"] == "dispatch-bill"
+                    else 0
+                },
+            )
+            snapshot["coupon_uses"].append(usage)
         now = iso_ms(now_ms)
         # 遗留选择、扣款、器具、旅行和占用全部同事务；失败时无部分领奖或扣费。
         old_choices = await self.repository.claim_old_choices(session, identity.player_id, now_ms)
@@ -596,6 +628,16 @@ class DispatchService:
                     f"奇遇{len(state['events'])}次 · /派遣游记 {trip['trip_id']}",
                 )
             )
+            if state.get("achievement_story"):
+                story = state["achievement_story"]
+                panels.append(Panel(story["title"], (Line(story["region"], story["text"], "原创旅行纪念"),)))
+            if snapshot.get("coupon_uses"):
+                panels.append(
+                    Panel(
+                        f"第{trip['slot']}队 · 成就券记录",
+                        tuple(Line(c["name"], f"使用后剩余{c['remaining']}张") for c in snapshot["coupon_uses"]),
+                    )
+                )
             await session.execute("UPDATE dispatch_trips SET viewed=1 WHERE trip_id=?", (trip["trip_id"],))
         return self.queries.view(
             identity,

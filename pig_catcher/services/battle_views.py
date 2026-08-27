@@ -90,6 +90,28 @@ def matchup(
     cards, panels = [], list(extra_panels)
     for side in display_sides:
         snap, turn = side["snapshot"], side["turn"]
+        if match["status"] == "pending" and snap.get("coupon_preview"):
+            panels.append(
+                Panel(
+                    f"{snap['player_name']} · 已选成就券",
+                    tuple(Line(c["name"], f"库存{c['quantity']}张", c["effect"]) for c in snap["coupon_preview"]),
+                    "等待应战，不扣券；接受后只制作入场外观，不改变出招与胜利权重。",
+                )
+            )
+        if snap.get("achievement_entry"):
+            coupon = snap["achievement_entry"]
+            panels.append(
+                Panel(
+                    f"{snap['player_name']} · 原创入场海报",
+                    (
+                        Line(
+                            "今天的主角，先站稳再说！",
+                            f"{snap['name']}将训练手账翻到空白的一页：这场比划，由我们写下。",
+                            f"{coupon['name']} · 剩余{coupon['remaining']}张 · 仅外观，初始胜利权重仍为5",
+                        ),
+                    ),
+                )
+            )
         raw = turn["raw"]
         count = (
             "等待 /出招数"

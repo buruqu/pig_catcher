@@ -27,8 +27,9 @@
   </style>
 </head>
 <body>
-<main class="game-sheet" data-pig-catcher-root data-render-ready="true">
+<main class="game-sheet" data-achievement-frame="{{ view.achievement_frame }}" data-pig-catcher-root data-render-ready="true">
   <header class="game-header"><div class="game-header__copy"><p class="game-header__eyebrow">PiG Dream! · {{ view.subtitle }}</p><h1>{{ view.title }}</h1></div><div class="game-header__meta"><span>乐队主理人</span><strong class="tour-player">{{ view.player_name }}</strong></div></header>
+  {% include 'achievement_strip.html' %}
   <div class="tour-body">
     <section class="tour-band{% if view.costume %} costumed{% endif %}{% if view.celebration %} celebration{% endif %}"><div class="tour-emblem" aria-hidden="true">{{ view.emblem }}</div><div><h2>{{ view.band_name }}</h2><p>{{ view.costume or '每一种声部，都有自己的高光' }}{% if view.costume %} · 原创主题舞台装扮{% endif %}</p></div></section>
     {% if view.banner %}<div class="tour-banner">{{ view.banner }}</div>{% endif %}

@@ -440,6 +440,22 @@ class DispatchRepository:
                     )
                 )
         hours = trip["processed_blocks"] * 4
+        if not recalled and hours >= 4:
+            for usage in snapshot.get("coupon_uses", []):
+                if usage["ticket_id"] == "dispatch-luggage":
+                    rewards.append(
+                        await self.credit(
+                            session, trip, region.material, 3 * MATERIAL_SCALE, "achievement-coupon", "luggage", now
+                        )
+                    )
+                elif usage["ticket_id"] == "dispatch-story":
+                    state["achievement_story"] = {
+                        "title": "口袋里的第六张明信片",
+                        "text": f"{'、'.join(m['name'] for m in snapshot['members'])}在归途把一路的脚印画成了地图。"
+                        "这一张寄给出发前的自己：远方并不总是更大的奖品，也可以是值得一起记住的一天。",
+                        "region": region.name,
+                        "visual_only": True,
+                    }
         for member in snapshot["members"]:
             await session.execute(
                 """INSERT INTO dispatch_proficiency VALUES(?,?) ON CONFLICT(pig_instance_id)
