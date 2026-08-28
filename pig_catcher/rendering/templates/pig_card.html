@@ -10,7 +10,9 @@
   </style>
 </head>
 <body>
-  <main class="game-sheet pig-card rarity-{{ view.rarity }}{% if view.description|length > 160 %} pig-card--long{% endif %}{% if view.probability_line %} pig-card--probability{% endif %}{% if view.display_tags and view.media_visible %} pig-card--tagged{% endif %}"{% if view.achievement_frame %} style="outline:6px solid {% if 'purple' in view.achievement_frame %}#76539c{% elif 'gold' in view.achievement_frame %}#d3a52c{% else %}#dc8aaa{% endif %};outline-offset:-6px"{% endif %} data-achievement-frame="{{ view.achievement_frame }}" data-pig-catcher-root data-render-ready="true">
+  {% from 'cosmetic_components.html' import cosmetic_plate, cosmetic_badge, cosmetic_frame %}
+  <main class="game-sheet pig-card rarity-{{ view.rarity }}{% if view.description|length > 160 %} pig-card--long{% endif %}{% if view.probability_line %} pig-card--probability{% endif %}{% if view.display_tags and view.media_visible %} pig-card--tagged{% endif %}" data-achievement-frame="{{ view.achievement_frame }}" data-pig-catcher-root data-render-ready="true">
+    {{ cosmetic_frame(view.achievement_frame) }}
     {% if view.achievement_firework %}<div class="achievement-firework"><span>✦ ✧ ✦</span><span>PiG Dream!</span><span>✦ ✧ ✦</span></div>{% endif %}
     <header class="game-header pig-card__header">
       <div class="game-header__copy">
@@ -45,9 +47,8 @@
         {% if view.global_size_record %}<span class="pill pill--blue">全群体型最高</span>{% endif %}
         {% if view.global_weight_record %}<span class="pill pill--gold">全群重量最高</span>{% endif %}
         {% if view.giant_sighting %}<span class="pill pill--pink">巨物目击留档</span>{% endif %}
-        {% if view.achievement_badge|default('') %}{% set badge = cosmetic_detail(view.achievement_badge) %}<span class="achievement-token"><b>{{ badge.glyph }}</b>{{ badge.name }}</span>{% endif %}
-        {% if view.achievement_title %}<span class="pill pill--gold">成就称号 · {{ view.achievement_title }}</span>{% endif %}
       </div>
+      {% if view.achievement_title or view.achievement_badge %}<div class="result-cosmetics">{{ cosmetic_plate(view.achievement_title) }}{{ cosmetic_badge(view.achievement_badge) }}</div>{% endif %}
       {% if view.display_tags and view.media_visible %}
       <div class="asset-display-tags" aria-label="猪猪主题标签">
         {% for tag in view.display_tags %}<span class="asset-display-tag">{{ tag }}</span>{% endfor %}
@@ -86,8 +87,6 @@
       <p class="pig-card__subline">
         {% if view.collection_name %}{{ view.collection_name }}{% if view.character_name %} · {{ view.character_name }}{% endif %} · {% endif %}
         获得于 {{ view.acquired_at }}
-        {% if view.effect_summaries %}<br>美食加成：{{ view.effect_summaries | join("；") }}{% endif %}
-        {% if view.excluded_summaries %}<br>互斥未叠加：{{ view.excluded_summaries | join("；") }}{% endif %}
       </p>
     </section>
 
@@ -121,10 +120,10 @@
         {% if view.quota_exempt_catch %}<small>六星菜专属次数 · 本次未扣正常额度</small>{% endif %}
       </div>
       {% if view.probability_line %}
-      <div class="pig-card__receipt-item" style="grid-column: 1 / -1;flex-direction:column;gap:2px">
+      <div class="pig-card__receipt-item result-probability" data-catch-probability>
         <span>本次最终概率</span>
-        <strong style="font-size:15px;line-height:1.5;white-space:normal">{{ view.probability_line }}</strong>
-        <small style="font-size:12px;color:#888">{{ view.probability_sources }}</small>
+        <strong>{{ view.probability_line }}</strong>
+        <small>{{ view.probability_sources }}</small>
       </div>
       {% endif %}
       {% else %}
@@ -145,6 +144,8 @@
         <strong>{{ "可见" if media_data_url else ("授权已撤回" if not view.media_visible else "文件暂缺") }}</strong>
       </div>
       {% endif %}
+      {% if view.effect_summaries %}<div class="result-audit"><span>本次加成与剩余次数</span><p>{{ view.effect_summaries | join("；") }}</p></div>{% endif %}
+      {% if view.excluded_summaries %}<div class="result-audit result-audit--muted"><span>互斥未叠加</span><p>{{ view.excluded_summaries | join("；") }}</p></div>{% endif %}
     </section>
 
     <footer class="game-footer" style="position:absolute;left:0;right:0;bottom:0">

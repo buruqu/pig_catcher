@@ -9,17 +9,10 @@
   </style>
 </head>
 <body>
+  {% from 'feature_components.html' import header %}
   <main class="game-sheet store-sheet" data-pig-catcher-root data-render-ready="true">
-    <header class="game-header">
-      <div class="game-header__copy">
-        <p class="game-header__eyebrow">猪猪商城 · 道具与永久升级</p>
-        <h1 style="font-size: {% if view.display_name|length > 60 %}16{% elif view.display_name|length > 40 %}20{% elif view.display_name|length > 24 %}31{% else %}42{% endif %}px">{{ view.display_name }}</h1>
-      </div>
-      <div class="game-header__meta">
-        <span>猪币余额</span>
-        <strong>{{ view.coin_balance }}</strong>
-      </div>
-    </header>
+    {{ header('collection', 'PiG Dream! · ' ~ view.display_name, '猪猪商城', view.coin_balance, '猪币余额', 'coin') }}
+    <section class="feature-store-intro">{{ feature_icon('box') }}<div><h2>每一次准备，都有自己的用场</h2><p>消耗品与永久升级同页展示；售价和效果均来自当前规则，已购库存可在 /道具背包 查看。</p></div></section>
 
     <section class="store-summary">
       <div>
@@ -40,6 +33,34 @@
       </div>
     </section>
 
+    {% if view.products %}
+    <section class="store-list">
+      {% for product in view.products %}
+      <article class="store-row feature-product">
+        {{ feature_icon(product.display_name) }}
+        <div class="store-row__copy">
+          <span>{{ product.category }}</span>
+          <h2 style="font-size: {% if product.display_name|length > 40 %}17{% elif product.display_name|length > 24 %}22{% else %}27{% endif %}px">{{ product.display_name }}</h2>
+          <p>{{ product.effect_summary }}</p>
+          <p style="color:#9b516d;font-weight:800">{{ product.command }}</p>
+        </div>
+        <div class="store-row__price">
+          {% if product.unit_price > 0 %}
+          <strong>{{ product.unit_price }}</strong>
+          <span>猪币</span>
+          {% else %}
+          <strong>MAX</strong>
+          <span>已满级</span>
+          {% endif %}
+        </div>
+      </article>
+      {% endfor %}
+    </section>
+    {% else %}
+    <section style="padding:32px 38px"><div class="empty-state">当前分类没有商品</div></section>
+    {% endif %}
+
+    <section class="feature-store-intro">{{ feature_icon('radar') }}<div><h2>概率参考 · 逐星对照</h2><p>以下是当前规则提供的基准计算，不是把已有装备重复叠加。</p></div></section>
     <section class="store-probability">
       <div class="store-probability__group">
         <div class="store-probability__heading">
@@ -147,32 +168,6 @@
         <p class="store-probability__note">主厨香料向高一档转移最多 18 个百分点；超级主厨香料把六星菜概率从 10% 提至 20%。普通五星菜“一猪六吃”可继续叠加，六星菜独占效果触发时香料保留且不参与。</p>
       </div>
     </section>
-
-    {% if view.products %}
-    <section class="store-list">
-      {% for product in view.products %}
-      <article class="store-row">
-        <div class="store-row__copy">
-          <span>{{ product.category }}</span>
-          <h2 style="font-size: {% if product.display_name|length > 40 %}17{% elif product.display_name|length > 24 %}22{% else %}27{% endif %}px">{{ product.display_name }}</h2>
-          <p>{{ product.effect_summary }}</p>
-          <p style="color:#9b516d;font-weight:800">{{ product.command }}</p>
-        </div>
-        <div class="store-row__price">
-          {% if product.unit_price > 0 %}
-          <strong>{{ product.unit_price }}</strong>
-          <span>猪币</span>
-          {% else %}
-          <strong>MAX</strong>
-          <span>已满级</span>
-          {% endif %}
-        </div>
-      </article>
-      {% endfor %}
-    </section>
-    {% else %}
-    <section style="padding:32px 38px"><div class="empty-state">当前分类没有商品</div></section>
-    {% endif %}
 
     <footer class="game-footer">
       <span>消耗品用 /购买；永久成长用 /升级</span>

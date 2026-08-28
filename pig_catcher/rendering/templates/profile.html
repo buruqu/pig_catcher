@@ -20,10 +20,11 @@
         <strong>{{ view.total_catches }} 次</strong>
       </div>
     </header>
+    {% include 'achievement_strip.html' %}
 
     <section class="profile-sheet__level">
       <div>
-        <h2>Lv.{{ view.level }} · {{ view.title }}</h2>
+        <h2 class="asset-caption">{{ asset_icon('level') }}Lv.{{ view.level }} · {{ view.title }}</h2>
         <p>
           {{ view.total_experience }} 经验 ·
           {% if view.next_threshold is none %}已达当前最高等级{% else %}下一等级 {{ view.next_threshold }} EXP{% endif %}
@@ -55,30 +56,30 @@
         </div>
       </div>
       <div class="profile-sheet__balance">
-        <span>猪币余额</span>
+        <span class="asset-caption">{{ asset_icon('coin') }}猪币余额</span>
         <strong>{{ view.coin_balance }}</strong>
       </div>
     </section>
 
     <section class="profile-sheet__stats">
-      <div class="profile-stat"><span>当前持有</span><strong>{{ view.active_pigs }} 只</strong></div>
-      <div class="profile-stat"><span>猪猪图鉴</span><strong>{{ view.catalog_count }}/{{ view.visible_catalog_total }}</strong></div>
-      <div class="profile-stat"><span>累计做菜</span><strong>{{ view.total_cooks }} 次</strong></div>
-      <div class="profile-stat"><span>当前美食</span><strong>{{ view.active_foods }} 份</strong></div>
-      <div class="profile-stat"><span>美食图鉴</span><strong>{{ view.food_catalog_count }}/{{ view.visible_food_catalog_total }}</strong></div>
-      <div class="profile-stat"><span>持有群纪录</span><strong>{{ view.held_records }} 项</strong></div>
-      <div class="profile-stat"><span>猪饲料</span><strong>Lv.{{ view.feed_level }}</strong></div>
-      <div class="profile-stat"><span>厨具</span><strong>Lv.{{ view.cookware_level }}</strong></div>
-      <div class="profile-stat"><span>本时段抓猪</span><strong>{{ view.daily_count }}/{{ view.daily_limit }}</strong></div>
-      <div class="profile-stat"><span>当前冷却</span><strong>{{ view.cooldown_remaining_seconds }} 秒</strong></div>
-      <div class="profile-stat"><span>抓猪道具</span><strong>{{ (view.armed_item_name ~ " · 剩余 " ~ view.armed_item_quantity ~ " 次") if view.armed_item_name else "无" }}</strong></div>
-      <div class="profile-stat"><span>做菜道具</span><strong>{{ (view.armed_cooking_item_name ~ " · 剩余 " ~ view.armed_cooking_item_quantity ~ " 次") if view.armed_cooking_item_name else "无" }}</strong></div>
-      <div class="profile-stat"><span>猪猪展示</span><strong style="font-size:17px">{{ view.showcase_pig or "未设置" }}</strong></div>
-      <div class="profile-stat"><span>美食展示</span><strong style="font-size:17px">{{ view.showcase_food or "未设置" }}</strong></div>
+      <div class="profile-stat"><span class="asset-caption">{{ asset_icon('pig') }}当前持有</span><strong>{{ view.active_pigs }} 只</strong></div>
+      <div class="profile-stat"><span class="asset-caption">{{ asset_icon('catalog') }}猪猪图鉴</span><strong>{{ view.catalog_count }}/{{ view.visible_catalog_total }}</strong></div>
+      <div class="profile-stat"><span class="asset-caption">{{ asset_icon('food') }}累计做菜</span><strong>{{ view.total_cooks }} 次</strong></div>
+      <div class="profile-stat"><span class="asset-caption">{{ asset_icon('food') }}当前美食</span><strong>{{ view.active_foods }} 份</strong></div>
+      <div class="profile-stat"><span class="asset-caption">{{ asset_icon('catalog') }}美食图鉴</span><strong>{{ view.food_catalog_count }}/{{ view.visible_food_catalog_total }}</strong></div>
+      <div class="profile-stat"><span class="asset-caption">{{ asset_icon('record') }}持有群纪录</span><strong>{{ view.held_records }} 项</strong></div>
+      <div class="profile-stat"><span class="asset-caption">{{ asset_icon('feed') }}猪饲料</span><strong>Lv.{{ view.feed_level }}</strong></div>
+      <div class="profile-stat"><span class="asset-caption">{{ asset_icon('cookware') }}厨具</span><strong>Lv.{{ view.cookware_level }}</strong></div>
+      <div class="profile-stat"><span class="asset-caption">{{ asset_icon('catching') }}本时段抓猪</span><strong>{{ view.daily_count }}/{{ view.daily_limit }}</strong></div>
+      <div class="profile-stat"><span class="asset-caption">{{ asset_icon('busy') }}当前冷却</span><strong>{{ view.cooldown_remaining_seconds }} 秒</strong></div>
+      <div class="profile-stat"><span class="asset-caption">{{ asset_icon('catching') }}抓猪道具</span><strong>{{ (view.armed_item_name ~ " · 剩余 " ~ view.armed_item_quantity ~ " 次") if view.armed_item_name else "无" }}</strong></div>
+      <div class="profile-stat"><span class="asset-caption">{{ asset_icon('cookware') }}做菜道具</span><strong>{{ (view.armed_cooking_item_name ~ " · 剩余 " ~ view.armed_cooking_item_quantity ~ " 次") if view.armed_cooking_item_name else "无" }}</strong></div>
+      <div class="profile-stat"><span class="asset-caption">{{ asset_icon('showcase') }}猪猪展示</span><strong style="font-size:17px">{{ view.showcase_pig or "未设置" }}</strong></div>
+      <div class="profile-stat"><span class="asset-caption">{{ asset_icon('showcase') }}美食展示</span><strong style="font-size:17px">{{ view.showcase_food or "未设置" }}</strong></div>
     </section>
 
     <section class="profile-sheet__collections">
-      <h2 class="section-title">联动收藏</h2>
+      <h2 class="section-title asset-caption">{{ asset_icon('collection') }}联动收藏</h2>
       {% if view.collections %}
       <div class="collection-list">
         {% for collection in view.collections %}

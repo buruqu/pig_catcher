@@ -10,19 +10,10 @@
 </head>
 <body>
   <main class="game-sheet inventory-sheet" data-pig-catcher-root data-render-ready="true">
-    <header class="game-header">
-      <div class="game-header__copy">
-        <p class="game-header__eyebrow">批量做菜 · 一次产出全部美食</p>
-        <h1 style="font-size: {% if view.display_name|length > 60 %}16{% elif view.display_name|length > 40 %}20{% elif view.display_name|length > 24 %}31{% else %}42{% endif %}px">{{ view.display_name }}</h1>
-      </div>
-      <div class="game-header__meta">
-        <span>本次产出</span>
-        <strong>{{ view.food_count }} 份</strong>
-      </div>
-    </header>
+{% from 'feature_components.html' import header %}{{ header('collection', '厨房出餐单 · ' ~ view.display_name, '批量做菜', view.food_count ~ ' 份', '本次产出', 'pot') }}
 
     <section class="list-summary">
-      <p>消耗 {{ view.pig_count }} 只原料猪 · 按品质从高到低排列</p>
+      <div class="feature-batch-note">{{ feature_icon('pot') }}<p>消耗 {{ view.pig_count }} 只原料猪 · 按品质从高到低排列</p></div>
       <div class="pill-row">
         <span class="pill">{{ view.rarity ~ " 星" if view.rarity is not none else "全部 1-5 星" }}</span>
         <span class="pill pill--strong">每种联动猪留一只 · 六星猪不参与</span>

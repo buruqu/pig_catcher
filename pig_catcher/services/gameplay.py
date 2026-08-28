@@ -47,6 +47,7 @@ from ..domain.food_effects import (
 from ..domain.gameplay import (
     CATCH_COIN_REWARDS,
     CATCH_EXPERIENCE_REWARDS,
+    COIN_BOUNTY_REWARD_MULTIPLIER,
     PIG_RARITY_NAMES,
     ItemDefinition,
     LevelProgress,
@@ -378,6 +379,7 @@ class RecordEntry:
     rarity: int
     short_code: str
     holder_display_name: str
+    player_id: str = ""
 
     @property
     def record_label(self) -> str:
@@ -416,6 +418,7 @@ class GiantSightingEntry:
     size_qualified: bool
     weight_qualified: bool
     achieved_at: str
+    player_id: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -1630,7 +1633,7 @@ class GameplayService:
             coin_reward = CATCH_COIN_REWARDS[rarity]
             experience_reward = CATCH_EXPERIENCE_REWARDS[rarity]
             if armed_item is not None and armed_item.item_id == "coin-bounty-tag":
-                coin_reward *= 2
+                coin_reward *= COIN_BOUNTY_REWARD_MULTIPLIER
                 experience_reward = (experience_reward * 3 + 1) // 2
             coin_reward += effect_application.coin_bonus
             experience_reward = math.ceil(experience_reward * effect_application.experience_multiplier)
@@ -2992,6 +2995,7 @@ class GameplayService:
                     rarity=int(row["rarity"]),
                     short_code=str(row["short_code"]),
                     holder_display_name=str(row["holder_display_name"]),
+                    player_id=str(row["player_id"]),
                 )
                 for row in rows
             ),
@@ -3004,6 +3008,7 @@ class GameplayService:
                     rarity=int(row["rarity"]),
                     short_code=str(row["short_code"]),
                     holder_display_name=str(row["holder_display_name"]),
+                    player_id=str(row["player_id"]),
                 )
                 for row in global_rows
             ),
@@ -3019,6 +3024,7 @@ class GameplayService:
                     size_qualified=bool(row["size_qualified"]),
                     weight_qualified=bool(row["weight_qualified"]),
                     achieved_at=str(row["achieved_at"]),
+                    player_id=str(row["player_id"]),
                 )
                 for row in sighting_rows
             ),

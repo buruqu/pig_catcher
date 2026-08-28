@@ -254,6 +254,7 @@ class AchievementRewardService:
             "成就奖励行李箱",
             safe_display_name(identity.display_name, identity.user_id),
             subtitle="PiG Dream! · 三章同行",
+            presentation="item-bag",
             panels=panels,
             hints=HELP,
             page=page,

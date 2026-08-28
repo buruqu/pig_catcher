@@ -1,7 +1,9 @@
+{% from 'cosmetic_components.html' import cosmetic_plate, cosmetic_badge, cosmetic_frame %}
 {% if view.achievement_title|default('') or view.achievement_badge|default('') or view.achievement_frame|default('') %}
-<aside class="achievement-strip">
-  {% if view.achievement_frame|default('') %}{% set frame = cosmetic_detail(view.achievement_frame) %}<span class="achievement-token" style="--token-color:{{ frame.color }}"><b>{{ frame.glyph }}</b>{{ frame.name }}</span>{% endif %}
-  {% if view.achievement_title|default('') %}<span class="achievement-token"><b>✦</b>{{ view.achievement_title }}</span>{% endif %}
-  {% if view.achievement_badge|default('') %}{% set badge = cosmetic_detail(view.achievement_badge) %}<span class="achievement-token"><b>{{ badge.glyph }}</b>{{ badge.name }}</span>{% endif %}
+{{ cosmetic_frame(view.achievement_frame|default('')) }}
+<aside class="achievement-strip" aria-label="已佩戴外观">
+  {{ cosmetic_plate(view.achievement_title|default('')) }}
+  {{ cosmetic_badge(view.achievement_badge|default('')) }}
+  {% if view.achievement_frame|default('') %}{% set frame = cosmetic_detail(view.achievement_frame, kind='frame') %}{% if frame.name %}<span class="achievement-strip__frame">{{ frame.name }}</span>{% endif %}{% endif %}
 </aside>
 {% endif %}

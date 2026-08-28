@@ -23,6 +23,9 @@ from ..domain.dispatch_views import DispatchView
 from ..domain.display import format_length, format_measurement, format_weight
 from ..domain.errors import RenderError
 from ..domain.tour_views import TourView
+from .asset_icons import asset_icon
+from .cosmetics import clear_cosmetic_cache, cosmetic_detail
+from .feature_art import clear_feature_art_cache, feature_backdrop, feature_icon, feature_scene, feature_wheel
 from .models import (
     AchievementBackfillSummaryViewModel,
     AchievementOverviewViewModel,
@@ -95,9 +98,18 @@ class PigCatcherRenderer:
             enable_async=False,
         )
         self._theme_css = (self.templates_root / "theme.css").read_text(encoding="utf-8")
-        from .cosmetics import cosmetic_detail
-
-        self._environment.globals["cosmetic_detail"] = cosmetic_detail
+        for stylesheet in ("cosmetic.css", "feature.css", "result_cards.css", "asset_icons.css"):
+            path = self.templates_root / stylesheet
+            if path.is_file():
+                self._theme_css += "\n" + path.read_text(encoding="utf-8")
+        self._environment.globals.update(
+            asset_icon=asset_icon,
+            cosmetic_detail=cosmetic_detail,
+            feature_icon=feature_icon,
+            feature_scene=feature_scene,
+            feature_wheel=feature_wheel,
+            feature_backdrop=feature_backdrop,
+        )
         self._environment.filters.update(
             physical_weight=format_weight,
             physical_length=format_length,
@@ -414,6 +426,8 @@ class PigCatcherRenderer:
         self,
         view: GroupEventViewModel,
         source_path: Path | None = None,
+        *,
+        media_paths: Mapping[str, Path] | None = None,
     ) -> RenderedImage:
         """Render a high-impact group-wide announcement with bounded food media."""
 
@@ -425,10 +439,15 @@ class PigCatcherRenderer:
                 max_side=_COMPACT_PREVIEW_MAX_SIDE,
                 quality=_COMPACT_PREVIEW_WEBP_QUALITY,
             )
+        event_previews = await self._list_media_data_urls(
+            ((item.key, item.media_visible, item.is_animated) for item in view.assets[:6]),
+            media_paths or {},
+        )
         return await self._render_template(
             "group_event.html",
             view=view,
             media_data_url=media_data_url,
+            event_previews=event_previews,
         )
 
     async def render_ledger(self, view: LedgerViewModel) -> RenderedImage:
@@ -487,7 +506,21 @@ class PigCatcherRenderer:
             ((pig.short_code, bool(pig.image_relpath), False) for pig in view.pigs),
             media_paths,
         )
-        return await self._render_template("dispatch.html", view=view, previews=previews)
+        template = (
+            "cosmetic_receipt.html"
+            if view.presentation == "cosmetics"
+            else "item_bag.html"
+            if view.presentation == "item-bag"
+            or view.subtitle == "道具与奖励"
+            or view.title == "成就奖励行李箱"
+            else "dispatch.html"
+        )
+        return await self._render_template(template, view=view, previews=previews)
+
+    def clear_art_cache(self) -> None:
+        """Release bounded generated-art caches when the plugin is unloaded."""
+        clear_cosmetic_cache()
+        clear_feature_art_cache()
 
     async def render_food_rewards(self, view: Any, media_paths: Mapping[str, Path]) -> RenderedImage:
         """Receipt-backed rewards, with a bounded single-render 947 reveal."""

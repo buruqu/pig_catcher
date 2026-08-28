@@ -1,2 +1,22 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><style>:root{--font-family:{{ font_family }};}{{ theme_css|safe }}
-.unlock-body{padding:38px}.unlock-mark{width:86px;height:86px;display:grid;place-items:center;margin:0 auto 24px;border-radius:50%;background:linear-gradient(145deg,#f4b0c8,#d84f83);color:white;font-size:43px;box-shadow:0 10px 28px #e8b2c5}.unlock-list{display:grid;gap:14px}.unlock-row{border:1px solid #e7afc4;border-radius:12px;background:#fff8fb;padding:22px}.unlock-row header{display:flex;justify-content:space-between;align-items:center}.unlock-row h2{font-size:27px;margin:0}.unlock-row b{color:#b23868}.unlock-row p{margin:12px 0 0;color:#765d68;line-height:1.6}</style></head><body><main class="game-sheet" data-pig-catcher-root data-render-ready="true"><header class="game-header"><div class="game-header__copy"><p class="game-header__eyebrow">PiG Dream! · Achievement Unlocked</p><h1>成就已解锁</h1></div><div class="game-header__meta"><span>本次获得</span><strong>+{{ view.total_points }} 点</strong></div></header><section class="unlock-body"><div class="unlock-mark">★</div><div class="unlock-list">{% for item in view.entries %}<article class="unlock-row"><header><h2>{{ item.name }}</h2><b>{{ item.tier_label }} · +{{ item.points }}</b></header><p>奖励：{{ item.reward_text }}</p><div class="achievement-keepsakes">{% for cosmetic in item.cosmetics %}<span class="achievement-token" style="--token-color:{{ cosmetic.color }}"><b>{{ cosmetic.glyph }}</b>{{ cosmetic.name }}</span>{% endfor %}</div></article>{% endfor %}</div>{% if view.additional_count %}<p class="unlock-more">另有 {{ view.additional_count }} 项成就已解锁，全部奖励已到账。<br>/猪猪成就 查看完整成就册 · /成就奖励 查看奖励库存</p>{% endif %}</section><footer class="game-footer"><span>玩家：{{ view.display_name }} · 奖励已原子到账</span><strong>PiG Dream!</strong></footer></main></body></html>
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><style>
+:root{--font-family:{{ font_family }};}{{ theme_css|safe }}
+.unlock-body{padding:26px 38px 38px}.unlock-list{display:grid;gap:22px}
+.unlock-row{border:1px solid #dca7bf;border-radius:18px;background:linear-gradient(125deg,#fff8fc,#fff);padding:24px}
+.unlock-row header{display:flex;justify-content:space-between;align-items:center;gap:20px}
+.unlock-row h2{font-size:29px;margin:0;overflow-wrap:anywhere}.unlock-row b{color:#ac4c76;white-space:nowrap}
+.unlock-row p,.unlock-more{margin:14px 0 0;color:#765d68;font-size:18px;line-height:1.8;overflow-wrap:anywhere}
+.unlock-hero{padding:0 38px 8px;position:relative}.unlock-hero img{max-height:215px}
+.unlock-hero__copy{position:absolute;top:73px;left:52%;width:290px;text-align:center;color:#675273}
+.unlock-hero__copy b{display:block;font-size:30px;letter-spacing:4px}.unlock-hero__copy span{display:block;font-size:15px;margin-top:10px}
+</style></head><body>
+{% from 'cosmetic_components.html' import cosmetic_preview %}
+<main class="game-sheet" data-pig-catcher-root data-render-ready="true">
+<header class="game-header"><div class="game-header__copy"><p class="game-header__eyebrow">PiG Dream! · Achievement Unlocked</p><h1>成就已解锁</h1></div><div class="game-header__meta"><span>本次获得</span><strong>+{{ view.total_points }} 点</strong></div></header>
+{% set hero = feature_backdrop('ultimate' if view.total_points >= 50 else 'collection') %}{% if hero %}<div class="unlock-hero"><img class="achievement-hero" src="{{ hero }}" alt=""><div class="unlock-hero__copy"><b>纪念时刻</b><span>每一步，都值得收藏</span></div></div>{% endif %}
+<section class="unlock-body"><div class="unlock-list">
+{% for item in view.entries %}<article class="unlock-row"><header><h2>{{ item.name }}</h2><b>{{ item.tier_label }} · +{{ item.points }}</b></header><p>奖励：{{ item.reward_text }}</p>
+<div class="cosmetic-gallery">{% for cosmetic in item.cosmetics %}{{ cosmetic_preview(cosmetic) }}{% endfor %}</div></article>{% endfor %}
+</div>{% if view.additional_count %}<p class="unlock-more">另有 {{ view.additional_count }} 项成就已解锁，全部奖励已到账。<br>/猪猪成就 查看完整成就册 · /成就奖励 查看奖励库存</p>{% endif %}
+</section><footer class="game-footer"><span>玩家：{{ view.display_name }} · 奖励已原子到账</span><strong>PiG Dream!</strong></footer>
+</main></body></html>

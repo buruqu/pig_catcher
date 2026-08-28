@@ -303,6 +303,7 @@ class TourQueries:
             identity,
             f"第{stage['stage_number']}站 · 演出完成",
             profile,
+            scene_key=stage["plan"]["venue"],
             banner=THEMES_BY_ID[stage["plan"]["theme"]].story,
             scorecards=(stage_score(stage),),
             pigs=tuple(tour_pig(m) for m in grown_members(stage)),

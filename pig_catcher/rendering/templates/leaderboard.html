@@ -9,6 +9,7 @@
   </style>
 </head>
 <body>
+  {% from 'cosmetic_components.html' import cosmetic_plate, cosmetic_badge %}
   <main class="game-sheet ranking-sheet" data-pig-catcher-root data-render-ready="true">
     <header class="game-header">
       <div class="game-header__copy">
@@ -43,6 +44,7 @@
         </div>
         <div class="ranking-row__player">
           <strong style="font-size:{% if item.display_name|length > 40 %}14{% elif item.display_name|length > 24 %}17{% else %}22{% endif %}px">{{ item.display_name }}</strong>
+          {% if item.achievement_title or item.achievement_badge %}<div class="title-inline">{{ cosmetic_plate(item.achievement_title) }}{{ cosmetic_badge(item.achievement_badge) }}</div>{% endif %}
           <span>
             猪图鉴 {{ item.pig_progress }} · 美食图鉴 {{ item.food_progress }} ·
             持有 {{ item.asset_count }} · {{ item.coin_balance }} 猪币

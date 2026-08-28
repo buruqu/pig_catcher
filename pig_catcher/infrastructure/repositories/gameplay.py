@@ -932,6 +932,7 @@ class GameplayRepository:
                 record.record_type,
                 record.record_value,
                 record.achieved_at,
+                record.player_id,
                 instance.display_name_snapshot AS display_name,
                 instance.rarity,
                 instance.short_code,

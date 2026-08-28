@@ -651,6 +651,20 @@ class AchievementRepository:
         )
         return dict(row) if row is not None else None
 
+    async def cosmetic_rows(self, session: DatabaseSession, *, player_ids: tuple[str, ...]) -> dict[str, dict]:
+        """Read one bounded leaderboard page without N+1 profile/count queries."""
+        if not player_ids:
+            return {}
+        if len(player_ids) > 50:
+            raise ValueError("外观批量查询最多50名玩家")
+        placeholders = ",".join("?" for _ in player_ids)
+        rows = await session.fetch_all(
+            f"SELECT player_id,equipped_title_id,equipped_frame_id,showcase_achievement_id "
+            f"FROM achievement_profiles WHERE player_id IN ({placeholders})",
+            player_ids,
+        )
+        return {str(row["player_id"]): dict(row) for row in rows}
+
     async def list_achievement_rows(
         self,
         session: DatabaseSession,

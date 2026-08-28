@@ -43,6 +43,8 @@ class TourView(DispatchView):
             achievement_title=base.achievement_title,
             achievement_frame=base.achievement_frame,
             achievement_badge=base.achievement_badge,
+            presentation=base.presentation,
+            scene_key=base.scene_key,
             band_name=data["band_name"],
             color=data["color"],
             emblem=data["emblem"],

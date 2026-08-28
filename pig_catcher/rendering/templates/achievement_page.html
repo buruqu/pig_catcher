@@ -1,3 +1,37 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><style>:root{--font-family:{{ font_family }};}{{ theme_css|safe }}
-.ach-item .achievement-keepsakes{grid-column:2/-1}.ach-main{min-width:0}.ach-main p{overflow-wrap:anywhere}
-.ach-list{padding:24px 38px;display:grid;gap:11px}.ach-item{display:grid;grid-template-columns:92px 1fr 210px;gap:16px;align-items:center;border:1px solid #efd7e0;border-radius:10px;background:#fff;padding:16px 18px}.ach-item.done{background:#fff8fb;border-color:#e8afc5}.ach-tier{color:#a14268;font-weight:800}.ach-main b{font-size:20px}.ach-main p{margin:5px 0;color:#765d68;font-size:15px}.bar{height:7px;background:#f3e6eb;border-radius:5px;overflow:hidden}.bar i{display:block;height:100%;background:#df5b8d}.ach-reward{text-align:right;color:#7c6470;font-size:14px}.ach-reward strong{display:block;color:#b23868;font-size:17px;margin-bottom:4px}</style></head><body><main class="game-sheet" data-pig-catcher-root data-render-ready="true"><header class="game-header"><div class="game-header__copy"><p class="game-header__eyebrow">PiG Dream! · {{ view.category }}</p><h1>{{ view.display_name }}的成就册</h1></div><div class="game-header__meta"><span>本类条目</span><strong>{{ view.total_count }}</strong></div></header><section class="ach-list">{% for item in view.entries %}<article class="ach-item{% if item.unlocked %} done{% endif %}"><div class="ach-tier">{{ item.tier_label }}<br>{% if item.unlocked %}已解锁{% else %}进行中{% endif %}</div><div class="ach-main"><b>{{ item.name }}</b><p>{{ item.description }}</p><div class="bar"><i style="width:{{ [100, (item.progress * 100 / item.target)]|min }}%"></i></div><small>{% if item.hidden and not item.unlocked %}尚未揭晓{% else %}{{ item.progress }}/{{ item.target }}{% endif %}</small></div><div class="ach-reward"><strong>+{{ item.points }} 成就点</strong>{{ item.reward_text }}</div><div class="achievement-keepsakes">{% for cosmetic in item.cosmetics %}<span class="achievement-token" style="--token-color:{{ cosmetic.color }}"><b>{{ cosmetic.glyph }}</b>{{ cosmetic.name }}</span>{% endfor %}</div></article>{% endfor %}</section><footer class="game-footer"><span>隐藏条目在解锁前不会公开准确条件</span><strong>{{ view.page }}/{{ view.page_count }}</strong></footer></main></body></html>
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><style>
+:root{--font-family:{{ font_family }};}{{ theme_css|safe }}
+.ach-list{padding:26px 38px;display:grid;gap:18px}
+.ach-item{padding:24px;border:1px solid #ead4de;border-radius:16px;background:#fff}
+.ach-item.done{border-color:#d89bb6;background:linear-gradient(115deg,#fff8fb,#fff)}
+.ach-item header{display:flex;align-items:center;gap:15px;justify-content:space-between}
+.ach-item h2{margin:0;font-size:26px;overflow-wrap:anywhere}
+.ach-tier{font-size:16px;color:#a35073;font-weight:700;white-space:nowrap}
+.ach-description{font-size:18px;line-height:1.7;color:#776270;overflow-wrap:anywhere}
+.ach-progress{display:flex;gap:14px;align-items:center;margin:16px 0}
+.ach-progress .bar{height:10px;flex:1;overflow:hidden;border-radius:9px;background:#f1e6ec}
+.ach-progress i{display:block;height:100%;background:linear-gradient(90deg,#c96896,#ecc4d9)}
+.ach-reward{margin:12px 0 0;padding-top:14px;border-top:1px solid #efdee6;font-size:17px;line-height:1.8;color:#76576b;overflow-wrap:anywhere}
+.ach-state{font-size:16px;color:#93808a}
+</style></head><body>
+{% from 'cosmetic_components.html' import cosmetic_preview %}
+<main class="game-sheet" data-pig-catcher-root data-render-ready="true">
+<header class="game-header"><div class="game-header__copy"><p class="game-header__eyebrow">PiG Dream! · {{ view.category }}</p><h1>{{ view.display_name }}的成就册</h1></div><div class="game-header__meta"><span>本类条目</span><strong>{{ view.total_count }}</strong></div></header>
+{% include 'achievement_strip.html' %}
+<section class="ach-list">
+{% for item in view.entries %}
+<article class="ach-item{% if item.unlocked %} done{% endif %}">
+<header><h2>{{ item.name }}</h2><span class="ach-tier">{{ item.tier_label }} · +{{ item.points }}点</span></header>
+<p class="ach-description">{{ item.description }}</p>
+{% if item.hidden and not item.unlocked %}
+<p class="ach-state">条件与奖励将在解锁后揭晓</p>
+{% else %}
+<div class="ach-progress"><div class="bar"><i style="width:{{ [100, (item.progress * 100 / ([1, item.target]|max))]|min }}%"></i></div><span>{{ item.progress }}/{{ item.target }}</span></div>
+<div class="ach-state">{{ '已解锁' if item.unlocked else '进行中' }}{% if item.unlocked_at %} · {{ item.unlocked_at }}{% endif %}</div>
+<p class="ach-reward">{{ item.reward_text }}</p>
+{% if item.cosmetics %}<div class="cosmetic-gallery" aria-label="{{ '已获得纪念外观' if item.unlocked else '完成奖励预览' }}">{% for cosmetic in item.cosmetics %}{{ cosmetic_preview(cosmetic) }}{% endfor %}</div>{% endif %}
+{% endif %}
+</article>
+{% else %}<div class="empty-state">当前分类还没有可展示的条目</div>{% endfor %}
+</section><footer class="game-footer"><span>隐藏条目在解锁前不会公开准确条件或奖励图案</span><strong>{{ view.page }}/{{ view.page_count }}</strong></footer>
+</main></body></html>

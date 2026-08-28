@@ -1,4 +1,6 @@
 <!doctype html>
+{% from 'cosmetic_components.html' import cosmetic_plate %}
+{% from 'asset_components.html' import asset_media_state %}
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
@@ -30,7 +32,7 @@
     {% macro ranking(title, subtitle, items, metric) %}
     <section class="daily-giants-board daily-giants-board--{{ metric }}">
       <div class="daily-giants-board__heading">
-        <div><span>{{ title }}</span><strong>{{ subtitle }}</strong></div>
+        <div><span class="asset-caption">{{ asset_icon('length' if metric == 'size' else 'weight') }}{{ title }}</span><strong>{{ subtitle }}</strong></div>
         <b>TOP {{ items|length }}</b>
       </div>
       {% if items %}
@@ -39,25 +41,28 @@
         <article class="daily-giant-row daily-giant-row--{{ item.rank if item.rank <= 3 else 'standard' }} rarity-{{ item.rarity }}">
           <div class="daily-giant-row__rank">{{ item.rank }}</div>
           <div class="daily-giant-row__media">
-            {% if media_data_urls.get(item.key) %}
+            {% if not item.media_visible %}
+            {{ asset_media_state('private') }}
+            {% elif media_data_urls.get(item.key) %}
             <img src="{{ media_data_urls[item.key] }}" alt="{{ item.display_name }}" style="object-fit:{{ item.image_fit }}">
             {% elif item.is_animated %}
-            <span>GIF<br>动态猪猪</span>
+            {{ asset_media_state('animated') }}
             {% else %}
-            <span>{{ "★" * item.rarity }}<br>猪猪</span>
+            {{ asset_media_state('missing') }}
             {% endif %}
           </div>
           <div class="daily-giant-row__copy">
-            <strong style="font-size:{% if item.holder_display_name|length > 40 %}14{% elif item.holder_display_name|length > 24 %}17{% else %}21{% endif %}px">{{ item.holder_display_name }}</strong>
+            <strong class="asset-holder-name" style="font-size:{% if item.holder_display_name|length > 40 %}14{% elif item.holder_display_name|length > 24 %}17{% else %}21{% endif %}px">{{ item.holder_display_name }}</strong>
             <span>{{ "★" * item.rarity }} {{ item.display_name }} #{{ item.short_code }}</span>
             <small>{{ item.acquired_at }}</small>
+            {{ cosmetic_plate(item.achievement_title) }}
           </div>
           <div class="daily-giant-row__metric">
             {% if metric == "size" %}
-            <strong>{{ item.size_value|physical_length }}</strong>
+            <strong class="asset-caption">{{ asset_icon('length') }}{{ item.size_value|physical_length }}</strong>
             <span>{{ item.weight_value|physical_weight }}</span>
             {% else %}
-            <strong>{{ item.weight_value|physical_weight }}</strong>
+            <strong class="asset-caption">{{ asset_icon('weight') }}{{ item.weight_value|physical_weight }}</strong>
             <span>{{ item.size_value|physical_length }}</span>
             {% endif %}
           </div>
@@ -65,7 +70,7 @@
         {% endfor %}
       </div>
       {% else %}
-      <div class="empty-state daily-giants-empty">今天还没有抓到猪猪</div>
+      <div class="empty-state daily-giants-empty"><div class="asset-empty-icon">{{ asset_icon('giant') }}</div>今天还没有抓到猪猪</div>
       {% endif %}
     </section>
     {% endmacro %}

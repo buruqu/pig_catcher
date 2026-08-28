@@ -23,6 +23,23 @@ class FighterCard:
 
 
 @dataclass(frozen=True, slots=True)
+class BattleWheelSegment:
+    label: str
+    weight: int
+
+
+@dataclass(frozen=True, slots=True)
+class BattleWheelCard:
+    """静态权重图及已提交的落点；None表示只有规则、尚未抽取。"""
+
+    kind: str
+    title: str
+    segments: tuple[BattleWheelSegment, ...]
+    selected_index: int | None = None
+    note: str = ""
+
+
+@dataclass(frozen=True, slots=True)
 class BattleView(DispatchView):
     subtitle: str = "猪猪对战 · 轮盘交锋"
     fighters: tuple[FighterCard, ...] = ()
@@ -30,6 +47,7 @@ class BattleView(DispatchView):
     round_label: str = ""
     win_percent: str = "50"
     celebration: bool = False
+    wheels: tuple[BattleWheelCard, ...] = ()
 
     @classmethod
     def from_payload(cls, data: dict) -> "BattleView":
@@ -41,6 +59,16 @@ class BattleView(DispatchView):
             round_label=data.get("round_label", ""),
             win_percent=data.get("win_percent", "50"),
             celebration=data.get("celebration", False),
+            wheels=tuple(
+                BattleWheelCard(
+                    kind=card["kind"],
+                    title=card["title"],
+                    segments=tuple(BattleWheelSegment(**segment) for segment in card["segments"]),
+                    selected_index=card.get("selected_index"),
+                    note=card.get("note", ""),
+                )
+                for card in data.get("wheels", ())
+            ),
         )
 
     def text(self) -> str:

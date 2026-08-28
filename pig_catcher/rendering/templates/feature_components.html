@@ -1,0 +1,33 @@
+{# 纯展示组件：标题/行文由公开view提供，图形只走白名单helper。 #}
+{% macro header(family, eyebrow, title, name, label='玩家', icon='pig') -%}
+<header class="game-header feature-header feature-header--{{ family }}">
+  {% set backdrop = feature_backdrop(family) %}{% if backdrop %}<img class="feature-header__art" src="{{ backdrop }}" alt="">{% endif %}
+  <div class="game-header__copy"><p class="game-header__eyebrow">{{ eyebrow }}</p><h1 style="font-size:{{ 30 if title|length > 26 else 36 if title|length > 18 else 44 }}px">{{ title }}</h1></div>
+  <div class="game-header__meta feature-header__meta"><span>{{ label }}</span><strong>{{ name }}</strong></div>
+  <div class="feature-header__emblem">{{ feature_icon(icon) }}</div>
+</header>
+{%- endmacro %}
+{% macro stats(rows) -%}
+{% if rows %}<section class="feature-stats" style="--stat-columns:{{ [rows|length,3]|min }}">{% for row in rows %}<div class="feature-stat"><span>{{ row.label }}</span><strong>{{ row.value }}</strong>{% if row.note %}<small>{{ row.note }}</small>{% endif %}</div>{% endfor %}</section>{% endif %}
+{%- endmacro %}
+{% macro pigs(cards, previews, columns=3, label='同行伙伴') -%}
+{% if cards %}<section class="feature-pigs" style="--pig-columns:{{ [cards|length,columns]|min }}">{% for pig in cards %}<article class="feature-pig rarity-{{ pig.rarity }}">
+  <div class="feature-pig__media">{% if previews.get(pig.short_code) %}<img src="{{ previews[pig.short_code] }}" alt="{{ pig.name }}">{% else %}<div class="feature-pig__missing">{{ feature_icon('pig') }}<span>{{ label }} · 图片暂缺</span></div>{% endif %}</div>
+  <div class="feature-pig__rarity">{{ '★' * pig.rarity }}</div><h2>{{ pig.name }}</h2><div class="feature-code">#{{ pig.short_code }}{% if pig.favorite %} · ♥ 已收藏{% endif %}</div>
+  <div class="feature-tags">{% for tag in pig.tags %}<span>{{ feature_icon(tag) }}{{ tag }}</span>{% endfor %}</div><p>{{ pig.summary }}</p>
+</article>{% endfor %}</section>{% endif %}
+{%- endmacro %}
+{% macro panels(items, family='collection', bag=False) -%}
+<div class="feature-panels{% if bag %} feature-panels--bag{% endif %}">{% for panel in items %}
+  <section class="feature-panel"><div class="feature-panel__heading"><div class="feature-panel__icon">{{ feature_icon(panel.title) }}</div><h2>{{ panel.title }}</h2>{% set scene=feature_scene(panel.title) %}{% if scene %}<div class="feature-panel__scene">{{ scene }}</div>{% endif %}</div>
+  {% for row in panel.rows %}<div class="feature-row"><span class="feature-row__label">{{ feature_icon(row.label) }}<span>{{ row.label }}</span></span><div class="feature-row__copy"><strong>{{ row.value }}</strong>{% if row.note %}<small>{{ row.note }}</small>{% endif %}</div></div>{% endfor %}
+  {% if panel.caption %}<p class="feature-caption">{{ panel.caption }}</p>{% endif %}</section>
+{% endfor %}</div>
+{%- endmacro %}
+{% macro hints(lines) -%}
+{% if lines %}<aside class="feature-hints"><div class="feature-hints__heading">{{ feature_icon('notes') }}<strong>下一步 · 可复制指令</strong></div>{% for line in lines %}<p>{{ line }}</p>{% endfor %}</aside>{% endif %}
+{%- endmacro %}
+{% macro wheel(card) -%}
+<article class="feature-wheel-card" data-wheel-kind="{{ card.kind }}"><h3>{{ card.title }}</h3><div class="feature-wheel-card__body">{{ feature_wheel(card.segments, card.selected_index) }}
+  <ol class="feature-wheel-legend">{% for segment in card.segments %}<li{% if card.selected_index == loop.index0 %} class="is-selected"{% endif %}><span>{{ loop.index }}</span><strong>{{ segment.label }}</strong><small>权重 {{ segment.weight }}{% if card.selected_index == loop.index0 %} · 已抽中{% endif %}</small></li>{% endfor %}</ol></div>{% if card.note %}<p>{{ card.note }}</p>{% endif %}</article>
+{%- endmacro %}

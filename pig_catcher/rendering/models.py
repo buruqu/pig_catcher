@@ -161,8 +161,17 @@ class CollectionProgressViewModel:
     total_count: int
 
 
+@dataclass(frozen=True, slots=True, kw_only=True)
+class CosmeticViewModel:
+    """Owned, currently equipped cosmetics; never populated from untrusted text."""
+
+    achievement_title: str = ""
+    achievement_frame: str = ""
+    achievement_badge: str = ""
+
+
 @dataclass(frozen=True, slots=True)
-class ProfileViewModel:
+class ProfileViewModel(CosmeticViewModel):
     """Player profile image."""
 
     display_name: str
@@ -227,10 +236,11 @@ class InventoryItemViewModel:
     is_favorite: bool = False
     activity_label: str = ""
     display_tags: tuple[str, ...] = ()
+    extreme_label: str = ""
 
 
 @dataclass(frozen=True, slots=True)
-class InventoryViewModel:
+class InventoryViewModel(CosmeticViewModel):
     """One filtered pig inventory page."""
 
     display_name: str
@@ -262,7 +272,7 @@ class CatalogItemViewModel:
 
 
 @dataclass(frozen=True, slots=True)
-class CatalogViewModel:
+class CatalogViewModel(CosmeticViewModel):
     """One complete pig catalog."""
 
     display_name: str
@@ -276,7 +286,7 @@ class CatalogViewModel:
 
 
 @dataclass(frozen=True, slots=True)
-class RecordItemViewModel:
+class RecordItemViewModel(CosmeticViewModel):
     """One current group record row."""
 
     record_label: str
@@ -287,6 +297,7 @@ class RecordItemViewModel:
     short_code: str
     holder_display_name: str
     achieved_at: str
+    player_id: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -303,7 +314,7 @@ class RecordsViewModel:
 
 
 @dataclass(frozen=True, slots=True)
-class GiantSightingViewModel:
+class GiantSightingViewModel(CosmeticViewModel):
     """One recent group-wide giant sighting."""
 
     display_name: str
@@ -315,10 +326,11 @@ class GiantSightingViewModel:
     giant_score: float
     qualification_label: str
     achieved_at: str
+    player_id: str = ""
 
 
 @dataclass(frozen=True, slots=True)
-class DailyGiantItemViewModel:
+class DailyGiantItemViewModel(CosmeticViewModel):
     """One player's best pig in a daily size or weight ranking."""
 
     key: str
@@ -333,6 +345,7 @@ class DailyGiantItemViewModel:
     media_visible: bool
     is_animated: bool
     image_fit: str
+    player_id: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -354,6 +367,22 @@ class GroupEventRowViewModel:
     label: str
     value: str
     detail: str
+
+
+@dataclass(frozen=True, slots=True)
+class GroupEventAssetViewModel:
+    """A committed event asset; identity and ownership come from the receipt."""
+
+    key: str
+    name: str
+    short_code: str
+    rarity: int
+    kind_label: str
+    owner_name: str = ""
+    detail: str = ""
+    image_fit: str = "contain"
+    media_visible: bool = True
+    is_animated: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -383,6 +412,8 @@ class GroupEventViewModel:
     time_label: str = "发动时间"
     committed_note: str = "本次事件已经提交；重复消息不会重复结算或通告"
     pending_note: str = "本次只取得发动资格；奖励将在正式发动时原子结算"
+    assets: tuple[GroupEventAssetViewModel, ...] = ()
+    roulette_outcome: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -462,7 +493,7 @@ class FoodInventoryItemViewModel:
 
 
 @dataclass(frozen=True, slots=True)
-class FoodInventoryViewModel:
+class FoodInventoryViewModel(CosmeticViewModel):
     """One filtered food inventory page."""
 
     display_name: str
@@ -491,7 +522,7 @@ class FoodCatalogItemViewModel:
 
 
 @dataclass(frozen=True, slots=True)
-class FoodCatalogViewModel:
+class FoodCatalogViewModel(CosmeticViewModel):
     """One complete food catalog."""
 
     display_name: str
@@ -665,7 +696,7 @@ class TradeListViewModel:
 
 
 @dataclass(frozen=True, slots=True)
-class RankingItemViewModel:
+class RankingItemViewModel(CosmeticViewModel):
     """One group leaderboard row with one optional showcase asset."""
 
     key: str
@@ -715,7 +746,7 @@ class AchievementRowViewModel:
 
 
 @dataclass(frozen=True, slots=True)
-class AchievementOverviewViewModel:
+class AchievementOverviewViewModel(CosmeticViewModel):
     display_name: str
     points: int
     unlocked_count: int
@@ -730,7 +761,7 @@ class AchievementOverviewViewModel:
 
 
 @dataclass(frozen=True, slots=True)
-class AchievementPageViewModel:
+class AchievementPageViewModel(CosmeticViewModel):
     display_name: str
     category: str
     page: int

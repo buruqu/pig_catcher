@@ -999,7 +999,7 @@ async def test_third_round_templates_render_all_business_views(
     await renderer.render_inventory(inventory, {"static": source})
     inventory_html, _ = capability.calls[-1]
     assert "动态猪猪" in inventory_html
-    assert "♥ 已收藏" in inventory_html
+    assert "已收藏" in inventory_html and 'class="asset-icon asset-icon--favorite"' in inventory_html
     assert inventory_html.count("data:image/webp;base64,") == 1
 
     catalog = CatalogViewModel(
@@ -1292,7 +1292,7 @@ async def test_fourth_round_templates_render_food_and_economy_views(
     await renderer.render_food_inventory(inventory, {"static": source})
     inventory_html, _ = capability.calls[-1]
     assert "动态美食" in inventory_html
-    assert "♥ 已收藏" in inventory_html
+    assert "已收藏" in inventory_html and 'class="asset-icon asset-icon--favorite"' in inventory_html
     assert inventory_html.count("data:image/webp;base64,") == 1
 
     catalog = FoodCatalogViewModel(
@@ -1529,7 +1529,10 @@ async def test_group_event_templates_render_three_distinct_major_announcements(
     reset_html, _ = capability.calls[-1]
     assert "全群额度重置完成" in reset_html
     assert "每人 10 次" in reset_html
-    assert "★★★★★★<br>全群大事件" in reset_html
+    reset_media = reset_html.split('<div class="group-event__media">', 1)[1].split("</div>", 1)[0]
+    assert '<svg class="feature-icon"' in reset_media
+    assert "aria-label=" in reset_media
+    assert "<img" not in reset_media  # 无素材也展示安全的事件图形，而不是伪造六星图片。
     assert "1455722694" not in reset_html
 
 

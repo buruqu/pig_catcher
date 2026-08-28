@@ -1,0 +1,2870 @@
+{
+  "schema_version": 1,
+  "art_version": "pig-dream-cosmetics-v1",
+  "origin": "原创无字AI插画母版 + 原生SVG徽记 + 本地Chromium精确文字；没有官方队标素材",
+  "source_policy": "母版按实际PNG模式保留；白底不冒充透明插画。成品外轮廓和徽章/边框有alpha。",
+  "build": {
+    "browser": "151.0.7922.174",
+    "font_filename": "msyhbd.ttc",
+    "font_sha256": "4508821b3dffe01f0ef5e5326a3e60df705a44633858811f67b6982dce3f6ee6"
+  },
+  "sources": [
+    {
+      "path": "pig_catcher/rendering/assets/ui/masters/collection.png",
+      "sha256": "51cf2ac78f7458828b73dbb8619591223e679e082c3d6eec8c59ef0930f6458e"
+    },
+    {
+      "path": "pig_catcher/rendering/assets/ui/masters/travel.png",
+      "sha256": "a2a28f1d489d62316606e73002bdedf7728bb7841cbd68a4da479417cc721b61"
+    },
+    {
+      "path": "pig_catcher/rendering/assets/ui/masters/stage.png",
+      "sha256": "0b6bcec239d92d5d8d314af293c92d8486a320f40d51aee76d7b288c86ead78e"
+    },
+    {
+      "path": "pig_catcher/rendering/assets/ui/masters/battle.png",
+      "sha256": "86730f05347ab0ec30299e7702683bed0f5f4fbb94ac1f30413e92033fbb9b2f"
+    },
+    {
+      "path": "pig_catcher/rendering/assets/ui/masters/rain.png",
+      "sha256": "fac9e3669f352ac947e144cdc5505a5922daf15052dcf0c0135e8d586d17f9e3"
+    },
+    {
+      "path": "pig_catcher/rendering/assets/ui/masters/ultimate.png",
+      "sha256": "760b246062f88177675c3b796960aa4be13cd0c2c4d4caed3bdb6912f7aa2ff3"
+    },
+    {
+      "path": "pig_catcher/rendering/assets/ui/masters/weekly-001.png",
+      "sha256": "84a11cd36cb9ba41cfa26464046fb95e637087b439e3a34482a0fe7d556bf204"
+    },
+    {
+      "path": "pig_catcher/rendering/assets/ui/cosmetics/definitions.json",
+      "sha256": "90ecce43ece0e05174fca1387f8e546a748fcf3885dfb2876b2b5e7ad78fabc7"
+    },
+    {
+      "path": "tools/build_cosmetic_art.py",
+      "sha256": "4dc77fd031746eb70421d754b5a958b1bf58d167e0ae51d755ac9d359407674f"
+    }
+  ],
+  "counts": {
+    "badge": 35,
+    "title": 31,
+    "frame": 16,
+    "cosmetic": 1
+  },
+  "entries": [
+    {
+      "id": "three-gift-partners",
+      "kind": "badge",
+      "files": {
+        "emblem": {
+          "path": "three-gift-partners/emblem.svg",
+          "sha256": "a56df845e20a16853e2a07d47b0e4b7f56b9312c058e24895d1ed131d1af8ac9",
+          "bytes": 332
+        },
+        "png": {
+          "path": "three-gift-partners/art.png",
+          "sha256": "5639602467eb2ff6c3d5aaba2ca23c87f10e177dd243e5cb1f32fc995b814589",
+          "bytes": 19170,
+          "width": 256,
+          "height": 256,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "three-gift-partners/compact.webp",
+          "sha256": "c1913a90f6a146406acc4ba3d44df702ea3c36d41d7de094a20c9ac6084eb38a",
+          "bytes": 4614,
+          "width": 128,
+          "height": 128,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "three-trade-partners",
+      "kind": "badge",
+      "files": {
+        "emblem": {
+          "path": "three-trade-partners/emblem.svg",
+          "sha256": "01764efee5ea84fbf430eefdd2cc8bb29f750c16f47bf0b57816ac77fc087f83",
+          "bytes": 330
+        },
+        "png": {
+          "path": "three-trade-partners/art.png",
+          "sha256": "d4ea6fa767d09c9b911e99371309b0d4c9487d5595f9a354dbe1535d61c344ff",
+          "bytes": 18819,
+          "width": 256,
+          "height": 256,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "three-trade-partners/compact.webp",
+          "sha256": "3a719f5cfee9b4d971ed86502dfb3f5f9057773130861f224bdc97569c61aca4",
+          "bytes": 4510,
+          "width": 128,
+          "height": 128,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "stamp-poppin-party",
+      "kind": "badge",
+      "files": {
+        "emblem": {
+          "path": "stamp-poppin-party/emblem.svg",
+          "sha256": "1c4e5d74e00a64c947c9b8323234dd2ec98469010d3eef22219be9c71716bdb1",
+          "bytes": 427
+        },
+        "png": {
+          "path": "stamp-poppin-party/art.png",
+          "sha256": "bc94732ee632492087a8cfcba7da5b35477fd8ab0872a20c60a10e509fda6a81",
+          "bytes": 20422,
+          "width": 256,
+          "height": 256,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "stamp-poppin-party/compact.webp",
+          "sha256": "20293547c68b2f5448a4f25d2a255a4e01f98e3db45966085782a14075fc939e",
+          "bytes": 4718,
+          "width": 128,
+          "height": 128,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "stamp-afterglow",
+      "kind": "badge",
+      "files": {
+        "emblem": {
+          "path": "stamp-afterglow/emblem.svg",
+          "sha256": "deec4d76262cf038023d183642eb848641bbb3796744934e98935bbd96784858",
+          "bytes": 359
+        },
+        "png": {
+          "path": "stamp-afterglow/art.png",
+          "sha256": "533b7ac0c0b03e2cb7f2c8da6a16124f35dd79b236a6969b3ca52fe46c6ffd4b",
+          "bytes": 19444,
+          "width": 256,
+          "height": 256,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "stamp-afterglow/compact.webp",
+          "sha256": "28fca9e872adc151cb4491f6b5abce85026f7ac7510b56a794cd5cf15d2a6de9",
+          "bytes": 4604,
+          "width": 128,
+          "height": 128,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "stamp-mygo",
+      "kind": "badge",
+      "files": {
+        "emblem": {
+          "path": "stamp-mygo/emblem.svg",
+          "sha256": "f45d1514187aa21ca306340c434b60b70342408bbc8f0b703de00e83811656b8",
+          "bytes": 390
+        },
+        "png": {
+          "path": "stamp-mygo/art.png",
+          "sha256": "e8f6172696aca2f09ecfa909b5c4cff0456e44f8eab9f3a390839a4c9ad731d4",
+          "bytes": 22303,
+          "width": 256,
+          "height": 256,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "stamp-mygo/compact.webp",
+          "sha256": "a2e67347458a7035833d8f4239a515de28bcee4cac67ee73deaf8f9acff10764",
+          "bytes": 4956,
+          "width": 128,
+          "height": 128,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "stamp-morfonica",
+      "kind": "badge",
+      "files": {
+        "emblem": {
+          "path": "stamp-morfonica/emblem.svg",
+          "sha256": "04b127910a9dd86ff781f75df9433af5b7e7ca42ad14cb09d844feccdfcadebf",
+          "bytes": 359
+        },
+        "png": {
+          "path": "stamp-morfonica/art.png",
+          "sha256": "3835b226740a260b32e96b6d022e122f0f73e450a4104782e1daddb19802cf66",
+          "bytes": 20630,
+          "width": 256,
+          "height": 256,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "stamp-morfonica/compact.webp",
+          "sha256": "52e1144a86ff69d1408a6ea6b2f6946d0fd5c580f9c7e00ada303d0f39c4a97c",
+          "bytes": 4798,
+          "width": 128,
+          "height": 128,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "stamp-mugendai",
+      "kind": "badge",
+      "files": {
+        "emblem": {
+          "path": "stamp-mugendai/emblem.svg",
+          "sha256": "b81b66eecfb75e707f099367504ccb59cdf501c4391b14e86468b90f65c15f99",
+          "bytes": 416
+        },
+        "png": {
+          "path": "stamp-mugendai/art.png",
+          "sha256": "89432e62479cd04fc2743d29e338e1ca42473372115a2eafbade5ecb408887b6",
+          "bytes": 20342,
+          "width": 256,
+          "height": 256,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "stamp-mugendai/compact.webp",
+          "sha256": "82a6ad381bfd74f0bad3f75b25a9275eb97cef03dd82e83b46df4b48fa7c92f1",
+          "bytes": 4700,
+          "width": 128,
+          "height": 128,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "stamp-pastel-palettes",
+      "kind": "badge",
+      "files": {
+        "emblem": {
+          "path": "stamp-pastel-palettes/emblem.svg",
+          "sha256": "7e83d1b91c818023b82fa46f8423dfe13290e6fde4ff78dd83f7a99d77fa11b0",
+          "bytes": 664
+        },
+        "png": {
+          "path": "stamp-pastel-palettes/art.png",
+          "sha256": "eaeafb737a970ad3cc03152f3b9105eff3966336cbe82b08764ba4c305106d29",
+          "bytes": 22832,
+          "width": 256,
+          "height": 256,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "stamp-pastel-palettes/compact.webp",
+          "sha256": "ffddd3bbe315eb49c71e2e97713fccdf64b842a5753c11f836154dabecf472a6",
+          "bytes": 4830,
+          "width": 128,
+          "height": 128,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "stamp-hello-happy-world",
+      "kind": "badge",
+      "files": {
+        "emblem": {
+          "path": "stamp-hello-happy-world/emblem.svg",
+          "sha256": "4b32383ed0a2da4ea46b983c89093119a8611032d4e8928094fa4e7cc6eed99b",
+          "bytes": 366
+        },
+        "png": {
+          "path": "stamp-hello-happy-world/art.png",
+          "sha256": "ba96e932a60c6c410d036701ece4b771fcb395a7eb0dfd397ab3635af6b1983b",
+          "bytes": 22266,
+          "width": 256,
+          "height": 256,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "stamp-hello-happy-world/compact.webp",
+          "sha256": "99ee67ccb5f72791a3ff3892f1786b04957e7f54c2d596e75114623c7c648e51",
+          "bytes": 4882,
+          "width": 128,
+          "height": 128,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "stamp-roselia",
+      "kind": "badge",
+      "files": {
+        "emblem": {
+          "path": "stamp-roselia/emblem.svg",
+          "sha256": "a75c12f55475854c0ac33b4fa47a36a29fc64fe2e7d5e541e1bf1f4de5694160",
+          "bytes": 407
+        },
+        "png": {
+          "path": "stamp-roselia/art.png",
+          "sha256": "5c89f6d41569ba11ef8177ddbca56366c888d0b341c092100883dda07fd5665a",
+          "bytes": 21009,
+          "width": 256,
+          "height": 256,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "stamp-roselia/compact.webp",
+          "sha256": "f1ce8711f80eff2c82bca5f526524403f7da6f8078994c38a82b69b8ac32e8a7",
+          "bytes": 4824,
+          "width": 128,
+          "height": 128,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "stamp-raise-a-suilen",
+      "kind": "badge",
+      "files": {
+        "emblem": {
+          "path": "stamp-raise-a-suilen/emblem.svg",
+          "sha256": "e0b1c98abe4d83b52d6e27ab84b976862ef94809ef7161dc0f70bc19223d32c9",
+          "bytes": 338
+        },
+        "png": {
+          "path": "stamp-raise-a-suilen/art.png",
+          "sha256": "fa482f985cd93aa79be61cb51bd710f5d9eac0b87fcc53c55424e161915022aa",
+          "bytes": 23597,
+          "width": 256,
+          "height": 256,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "stamp-raise-a-suilen/compact.webp",
+          "sha256": "1fdb937c635a996958f7aca91f1c1a6ab020a770fbb3a9d330942eb0f5c54e31",
+          "bytes": 5062,
+          "width": 128,
+          "height": 128,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "stamp-ave-mujica",
+      "kind": "badge",
+      "files": {
+        "emblem": {
+          "path": "stamp-ave-mujica/emblem.svg",
+          "sha256": "091bc09f8e086dbbe1026e66cf4e1aa071cbd115a7df745e85bd65cf760efb30",
+          "bytes": 377
+        },
+        "png": {
+          "path": "stamp-ave-mujica/art.png",
+          "sha256": "893adb251b1d586c1a822034576bb2aef095a0112cefdc2c0a8dac7931cde945",
+          "bytes": 21714,
+          "width": 256,
+          "height": 256,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "stamp-ave-mujica/compact.webp",
+          "sha256": "3a63333ef8aeda16f8ff36594ecfad5906a7dc0ca89d062f93e5238527244a0e",
+          "bytes": 5028,
+          "width": 128,
+          "height": 128,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "stamp-jujutsu-kaisen",
+      "kind": "badge",
+      "files": {
+        "emblem": {
+          "path": "stamp-jujutsu-kaisen/emblem.svg",
+          "sha256": "76ecf491229bdfc5d56e2489dc95d79bfb46b1882899e61631633e4a6d186ccb",
+          "bytes": 417
+        },
+        "png": {
+          "path": "stamp-jujutsu-kaisen/art.png",
+          "sha256": "b93d57d49311c1504f032600324eb496fa5ce848d48e3382d510df4c774e15e3",
+          "bytes": 21214,
+          "width": 256,
+          "height": 256,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "stamp-jujutsu-kaisen/compact.webp",
+          "sha256": "8231867aaa2f9eef9f51bd63bef72e0b154a4f4233681be8a47125d640dc30c4",
+          "bytes": 4596,
+          "width": 128,
+          "height": 128,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "kfc-thursday",
+      "kind": "badge",
+      "files": {
+        "emblem": {
+          "path": "kfc-thursday/emblem.svg",
+          "sha256": "b956bf391f00a80efb09e56f7822fa205d1aa68761b514a7fc12935771834c7f",
+          "bytes": 456
+        },
+        "png": {
+          "path": "kfc-thursday/art.png",
+          "sha256": "e654332615716ba90f811a6ee5a72834d2a4b1ae56e9815846063d8301378411",
+          "bytes": 20392,
+          "width": 256,
+          "height": 256,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "kfc-thursday/compact.webp",
+          "sha256": "8215c11552cfa79450cbd1cd9906223ecbee7922a7ef00d530ccdeffb29b9856",
+          "bytes": 4860,
+          "width": 128,
+          "height": 128,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "roulette-omniscient",
+      "kind": "title",
+      "files": {
+        "emblem": {
+          "path": "roulette-omniscient/emblem.svg",
+          "sha256": "cc3f2504eb94c40e72980c3f5284c2b574418b5dc304171ba02989a19ae57e80",
+          "bytes": 782
+        },
+        "png": {
+          "path": "roulette-omniscient/art.png",
+          "sha256": "ed9699d11662ee1dab8bf7db205e92c4a04f286c2d0d538797d5e94c02ef8064",
+          "bytes": 495859,
+          "width": 1200,
+          "height": 360,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "roulette-omniscient/compact.webp",
+          "sha256": "21c0f94fe43e3ef25c48a21d61666fe7dcd9447846a335aa2b51389f6dd2ebc0",
+          "bytes": 27580,
+          "width": 600,
+          "height": 180,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "technique-observer",
+      "kind": "title",
+      "files": {
+        "emblem": {
+          "path": "technique-observer/emblem.svg",
+          "sha256": "d670d11a2c3488d7ae0d537591d90448822a7b63910b72d2f09348477318bd2c",
+          "bytes": 324
+        },
+        "png": {
+          "path": "technique-observer/art.png",
+          "sha256": "7858afec7407b9d2435927bd28efbaf7d38b5994e1c19d44200be1dfe8ba8078",
+          "bytes": 497288,
+          "width": 1200,
+          "height": 360,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "technique-observer/compact.webp",
+          "sha256": "738a210d4091581ec306a812f57faf0ffc54061030cc30c5346ea49a8ea0f033",
+          "bytes": 27500,
+          "width": 600,
+          "height": 180,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "hollow-purple",
+      "kind": "frame",
+      "files": {
+        "emblem": {
+          "path": "hollow-purple/emblem.svg",
+          "sha256": "76ecf491229bdfc5d56e2489dc95d79bfb46b1882899e61631633e4a6d186ccb",
+          "bytes": 417
+        },
+        "border": {
+          "path": "hollow-purple/border.png",
+          "sha256": "738c22dfd723ce199273889a669650bc62ef554ea3f280676e639a945426fd84",
+          "bytes": 6784,
+          "width": 192,
+          "height": 192,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "border_source": {
+          "path": "hollow-purple/border.svg",
+          "sha256": "3b5e3562ddd3f6c23d6ff037af01de3035d5e975e4c5125170c3455dfd27c45b",
+          "bytes": 2193
+        },
+        "png": {
+          "path": "hollow-purple/art.png",
+          "sha256": "324daf603cfc953b8a5bf9842eae23a918d0364f5de8dc95cd7b27277a0bbeb3",
+          "bytes": 20708,
+          "width": 480,
+          "height": 600,
+          "format": "PNG",
+          "alpha": false,
+          "transparent": false
+        },
+        "compact": {
+          "path": "hollow-purple/compact.webp",
+          "sha256": "f47f77f9320498fa830e84a6d7237bc11850d6fef42ba6e091d3c72b95a8b490",
+          "bytes": 4160,
+          "width": 240,
+          "height": 300,
+          "format": "WEBP",
+          "alpha": false,
+          "transparent": false
+        }
+      }
+    },
+    {
+      "id": "sugar-1004",
+      "kind": "badge",
+      "files": {
+        "emblem": {
+          "path": "sugar-1004/emblem.svg",
+          "sha256": "294a28ef2fdf30356d3538cc6bf6efca315f1164d3756d6ac4cce8594b2344b5",
+          "bytes": 461
+        },
+        "png": {
+          "path": "sugar-1004/art.png",
+          "sha256": "67dd022a078889a83f03b22badd7cfe52ec46cfecbf898e01d80ee44b4babd8e",
+          "bytes": 19959,
+          "width": 256,
+          "height": 256,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "sugar-1004/compact.webp",
+          "sha256": "ba9f84cf8d0c65c839a751655b75e19cb0d3fb016546fa72a3c842448745263b",
+          "bytes": 4650,
+          "width": 128,
+          "height": 128,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "dragon-feast",
+      "kind": "badge",
+      "files": {
+        "emblem": {
+          "path": "dragon-feast/emblem.svg",
+          "sha256": "ad7dba498695e1e2b73138ede46f46757f77c2f35db100771bbdc3547a2cc78a",
+          "bytes": 349
+        },
+        "png": {
+          "path": "dragon-feast/art.png",
+          "sha256": "236728ad193f9b4ce448e064ab803b7635c4064a133ecf2c46b351481a6371b2",
+          "bytes": 19637,
+          "width": 256,
+          "height": 256,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "dragon-feast/compact.webp",
+          "sha256": "4f9e76a533a6ab394de4dee71318a3dc2231cb977bf0a379327c4a35aa8f278c",
+          "bytes": 4952,
+          "width": 128,
+          "height": 128,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "assam-mist",
+      "kind": "badge",
+      "files": {
+        "emblem": {
+          "path": "assam-mist/emblem.svg",
+          "sha256": "63c67fb92cd1f24ab68355a7b2d4530543f2e39f15c7c7d7d3758db9dc03b1ad",
+          "bytes": 338
+        },
+        "png": {
+          "path": "assam-mist/art.png",
+          "sha256": "a9f4dc5df02b40bdfa1145ddc7728b18395a9586e720de67360dd857b2bd757b",
+          "bytes": 19101,
+          "width": 256,
+          "height": 256,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "assam-mist/compact.webp",
+          "sha256": "b413d2381398378e4caf76d279a61c17648ca19612e9f0f0c40880e08eeea7ff",
+          "bytes": 4564,
+          "width": 128,
+          "height": 128,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "double-copy",
+      "kind": "badge",
+      "files": {
+        "emblem": {
+          "path": "double-copy/emblem.svg",
+          "sha256": "701151fdcbe78d0042d6951053e5b030e81563e3eda3515dae7e6ea06d4e0455",
+          "bytes": 427
+        },
+        "png": {
+          "path": "double-copy/art.png",
+          "sha256": "affee4c855d93bd8b638e46a4aa1a5ad9db2c0996e0a43bf7f615c235ef080ef",
+          "bytes": 19264,
+          "width": 256,
+          "height": 256,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "double-copy/compact.webp",
+          "sha256": "51eada25ff32d6a4652fe380e421c99014e46a4dc9b6d42486351af69a552f53",
+          "bytes": 4816,
+          "width": 128,
+          "height": 128,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "aya-repair",
+      "kind": "badge",
+      "files": {
+        "emblem": {
+          "path": "aya-repair/emblem.svg",
+          "sha256": "7be05f18383c0567089f1a4a9c7d90c19d2fb7bf271b92515b27acaad8e1a0a0",
+          "bytes": 342
+        },
+        "png": {
+          "path": "aya-repair/art.png",
+          "sha256": "b41b662d9c440ee4cdd05e8e7766efbafe200f3ddfe3c77634937aa1a2de5eb4",
+          "bytes": 20249,
+          "width": 256,
+          "height": 256,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "aya-repair/compact.webp",
+          "sha256": "b534673a6de4caf6e830c7bda6055d0eeb34aa677701835cf77f0f9a1d431be9",
+          "bytes": 4882,
+          "width": 128,
+          "height": 128,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "rain-love",
+      "kind": "title",
+      "files": {
+        "emblem": {
+          "path": "rain-love/emblem.svg",
+          "sha256": "c687d1eaa041e946e53fa507f53c434f6bd2d62e8acc0efda214e186edfbb492",
+          "bytes": 367
+        },
+        "png": {
+          "path": "rain-love/art.png",
+          "sha256": "ee715934b05123d6a6ff30684ee74e200a337e1c4d0aa15134fa2fc604a48b0a",
+          "bytes": 505434,
+          "width": 1200,
+          "height": 360,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "rain-love/compact.webp",
+          "sha256": "875e23676b05ccb9f5af6c840f3a1d588929caeb5215bc91c25e5c0b4c052010",
+          "bytes": 25482,
+          "width": 600,
+          "height": 180,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "domain-gojo",
+      "kind": "badge",
+      "files": {
+        "emblem": {
+          "path": "domain-gojo/emblem.svg",
+          "sha256": "2f7ede4390460dc8ef4fb3ff88163bf4f75dc2a56bd3b0012a0550a841133fb1",
+          "bytes": 388
+        },
+        "png": {
+          "path": "domain-gojo/art.png",
+          "sha256": "51b3980fce41f128d1be00e36390c742818d8e9e89a10dece402942e55059432",
+          "bytes": 20807,
+          "width": 256,
+          "height": 256,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "domain-gojo/compact.webp",
+          "sha256": "f6f932d74687d0212c233fb09c80eb63a16736a5b119b6c30e53d81e3b91eaa2",
+          "bytes": 4790,
+          "width": 128,
+          "height": 128,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "five-rainbows",
+      "kind": "frame",
+      "files": {
+        "emblem": {
+          "path": "five-rainbows/emblem.svg",
+          "sha256": "641f90dc47c2c4745e932247739fb7825666fe7ab473b49d6a1ccb796b86cbe0",
+          "bytes": 431
+        },
+        "border": {
+          "path": "five-rainbows/border.png",
+          "sha256": "360eec42fc7004993a668a96ead5928db8830156428fcec040ed27b8cc496dfd",
+          "bytes": 5894,
+          "width": 192,
+          "height": 192,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "border_source": {
+          "path": "five-rainbows/border.svg",
+          "sha256": "d07173e21286a2d93cc7c12b5d8b205974aad021ef6f393e53eee3a2fd941648",
+          "bytes": 2249
+        },
+        "png": {
+          "path": "five-rainbows/art.png",
+          "sha256": "1be37d2bd97e93ee6df044129a2705bc63dc4165d2ef5807d55dac8a4209522c",
+          "bytes": 18744,
+          "width": 480,
+          "height": 600,
+          "format": "PNG",
+          "alpha": false,
+          "transparent": false
+        },
+        "compact": {
+          "path": "five-rainbows/compact.webp",
+          "sha256": "fc52101b92cc9afcd8a5c9348cbaa0fd21c4a338855908b1591317f67ca491a9",
+          "bytes": 4362,
+          "width": 240,
+          "height": 300,
+          "format": "WEBP",
+          "alpha": false,
+          "transparent": false
+        }
+      }
+    },
+    {
+      "id": "sushi-commander",
+      "kind": "title",
+      "files": {
+        "emblem": {
+          "path": "sushi-commander/emblem.svg",
+          "sha256": "31d6f5132d652301d2f2affe82080eb02d1e3f1d71b45df799628dbafdf9269f",
+          "bytes": 386
+        },
+        "png": {
+          "path": "sushi-commander/art.png",
+          "sha256": "ec8fa31ba356f1378b9c1521d3d7b8e171b8cc8570b864ea69a3a91176acdf94",
+          "bytes": 396526,
+          "width": 1200,
+          "height": 360,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "sushi-commander/compact.webp",
+          "sha256": "56c2ba2cce1ba06255890c9e5512d0004f0f57a473d98d3cccef94c74b0222c7",
+          "bytes": 19892,
+          "width": 600,
+          "height": 180,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "pure-chef",
+      "kind": "title",
+      "files": {
+        "emblem": {
+          "path": "pure-chef/emblem.svg",
+          "sha256": "07c35b829927e6b3fa02178262962cbafe7b7fabb2f522155dcebc705114f6bf",
+          "bytes": 357
+        },
+        "png": {
+          "path": "pure-chef/art.png",
+          "sha256": "f37f09d85b57d19776c8682baca485ba3fe980412c59de9bf02e8fc354c754af",
+          "bytes": 393910,
+          "width": 1200,
+          "height": 360,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "pure-chef/compact.webp",
+          "sha256": "de2a1ea1b4d46507de3474a1e757f7e6ac7c38961f10c903d729d1eeceef56b9",
+          "bytes": 19490,
+          "width": 600,
+          "height": 180,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "947947",
+      "kind": "title",
+      "files": {
+        "emblem": {
+          "path": "947947/emblem.svg",
+          "sha256": "71d2eae50cab1f661a52cf9936d5d512b5ec1bf0f63903609a4bae63b2073b43",
+          "bytes": 471
+        },
+        "png": {
+          "path": "947947/art.png",
+          "sha256": "396a2d889f59491860bdc6946f91a3fa4845b32f32664925aed70c455ef65363",
+          "bytes": 533330,
+          "width": 1200,
+          "height": 360,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "947947/compact.webp",
+          "sha256": "0badaf49bfe7983136c5d0efc34b753bfee369f0d4b31fba4e39e466d33c6ba1",
+          "bytes": 25432,
+          "width": 600,
+          "height": 180,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "gold-pig-coin",
+      "kind": "frame",
+      "files": {
+        "emblem": {
+          "path": "gold-pig-coin/emblem.svg",
+          "sha256": "71d2eae50cab1f661a52cf9936d5d512b5ec1bf0f63903609a4bae63b2073b43",
+          "bytes": 471
+        },
+        "border": {
+          "path": "gold-pig-coin/border.png",
+          "sha256": "f7fd4ac33a9e94a7eab57271483b9c9d7cf978ef6a259b0a6e36b78375ce2198",
+          "bytes": 9628,
+          "width": 192,
+          "height": 192,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "border_source": {
+          "path": "gold-pig-coin/border.svg",
+          "sha256": "fbd1ac82b7631ac95c2ce9c63adc1c12633c4769882a24eb563260d32dc37fe2",
+          "bytes": 2409
+        },
+        "png": {
+          "path": "gold-pig-coin/art.png",
+          "sha256": "a210b0b3fe9e2377490f5c0dd8e8dfe7cad606d67a865609957b47d15fbcd5c2",
+          "bytes": 24048,
+          "width": 480,
+          "height": 600,
+          "format": "PNG",
+          "alpha": false,
+          "transparent": false
+        },
+        "compact": {
+          "path": "gold-pig-coin/compact.webp",
+          "sha256": "e71aed0cde72fd78cf8781007e05f6844809236fdd49c6f195789edb18f127d1",
+          "bytes": 4606,
+          "width": 240,
+          "height": 300,
+          "format": "WEBP",
+          "alpha": false,
+          "transparent": false
+        }
+      }
+    },
+    {
+      "id": "all-giants-dynamic",
+      "kind": "frame",
+      "files": {
+        "emblem": {
+          "path": "all-giants-dynamic/emblem.svg",
+          "sha256": "897252a37c15b801e9232073991f359e0495da4ea02e97adea2e11c10bca961c",
+          "bytes": 448
+        },
+        "border": {
+          "path": "all-giants-dynamic/border.png",
+          "sha256": "5a43086a17fb1af4f60e8ff03a6bb5588e909e77a6456a4d9a537f3c3ac1c5bf",
+          "bytes": 6278,
+          "width": 192,
+          "height": 192,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "border_source": {
+          "path": "all-giants-dynamic/border.svg",
+          "sha256": "5636984bbfe82c2538ba3980fdc32b22aae79b12aec3f8ea0a361b4dca01e99f",
+          "bytes": 2317
+        },
+        "png": {
+          "path": "all-giants-dynamic/art.png",
+          "sha256": "b7bea65d29902c180dbeaab79dd4e4dc2c3395999985b0e05d2efc99f4b8e546",
+          "bytes": 18796,
+          "width": 480,
+          "height": 600,
+          "format": "PNG",
+          "alpha": false,
+          "transparent": false
+        },
+        "compact": {
+          "path": "all-giants-dynamic/compact.webp",
+          "sha256": "bf054b0a76b81f8980f45da604cdd6e918e58a2d7c1adb6a0d0efc3dd72e5745",
+          "bytes": 4168,
+          "width": 240,
+          "height": 300,
+          "format": "WEBP",
+          "alpha": false,
+          "transparent": false
+        }
+      }
+    },
+    {
+      "id": "all-giants",
+      "kind": "title",
+      "files": {
+        "emblem": {
+          "path": "all-giants/emblem.svg",
+          "sha256": "897252a37c15b801e9232073991f359e0495da4ea02e97adea2e11c10bca961c",
+          "bytes": 448
+        },
+        "png": {
+          "path": "all-giants/art.png",
+          "sha256": "fcb89403b578fbb6190dda9c849e430f5c80e56c9b86ec4e9893095e40365259",
+          "bytes": 533480,
+          "width": 1200,
+          "height": 360,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "all-giants/compact.webp",
+          "sha256": "041eeebdf89943cda943ec68f1383af30d3708a6e2b393733f36381402ae8a92",
+          "bytes": 26118,
+          "width": 600,
+          "height": 180,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "all-minis-dynamic",
+      "kind": "frame",
+      "files": {
+        "emblem": {
+          "path": "all-minis-dynamic/emblem.svg",
+          "sha256": "bf0b17c6c6d2fd10308e2880c217d171dd57a5bdee01ef4e034e1b0dcd6793a8",
+          "bytes": 496
+        },
+        "border": {
+          "path": "all-minis-dynamic/border.png",
+          "sha256": "2b56178021b216a9c3dd971d2dac1e130d5bf66ec541fb61a4b9219bfe586725",
+          "bytes": 6972,
+          "width": 192,
+          "height": 192,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "border_source": {
+          "path": "all-minis-dynamic/border.svg",
+          "sha256": "a24127f2aedc11b4fc85144ff2114834d69f840a2a5ca4d30b4c0debbaae33c2",
+          "bytes": 2509
+        },
+        "png": {
+          "path": "all-minis-dynamic/art.png",
+          "sha256": "b04cdf7436b8ade6cbf836d46766e6d49008f044f52e7118aae999d421cb1388",
+          "bytes": 20021,
+          "width": 480,
+          "height": 600,
+          "format": "PNG",
+          "alpha": false,
+          "transparent": false
+        },
+        "compact": {
+          "path": "all-minis-dynamic/compact.webp",
+          "sha256": "0b079d5e4c114f849a56ac4df2869505b5993945a5e6e4adb7ed0d6554888ea0",
+          "bytes": 4474,
+          "width": 240,
+          "height": 300,
+          "format": "WEBP",
+          "alpha": false,
+          "transparent": false
+        }
+      }
+    },
+    {
+      "id": "all-minis",
+      "kind": "title",
+      "files": {
+        "emblem": {
+          "path": "all-minis/emblem.svg",
+          "sha256": "bf0b17c6c6d2fd10308e2880c217d171dd57a5bdee01ef4e034e1b0dcd6793a8",
+          "bytes": 496
+        },
+        "png": {
+          "path": "all-minis/art.png",
+          "sha256": "2ede7307da5958299c9e95f084f6bc590fc06a6bb522c73cc13d3925a5535b12",
+          "bytes": 531582,
+          "width": 1200,
+          "height": 360,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "all-minis/compact.webp",
+          "sha256": "fbec81b4e9bbb0125b973798c72e43126967112ba8172186055400d3992c408e",
+          "bytes": 25756,
+          "width": 600,
+          "height": 180,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "badge-five-postmarks",
+      "kind": "badge",
+      "files": {
+        "emblem": {
+          "path": "badge-five-postmarks/emblem.svg",
+          "sha256": "2db5a0993cd18f19e4530eea1aa8db2b3cf1e6f68e8098687ab4fb5549829581",
+          "bytes": 479
+        },
+        "png": {
+          "path": "badge-five-postmarks/art.png",
+          "sha256": "84e627f3fbbeaed65aa9aa218aa9b54c7c2244b887ca550f038eafc542113421",
+          "bytes": 22843,
+          "width": 256,
+          "height": 256,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "badge-five-postmarks/compact.webp",
+          "sha256": "650f0b947174326d66424ca370fc923dba9d3d278f61c59f266c06bbad694f46",
+          "bytes": 5114,
+          "width": 128,
+          "height": 128,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "title-old-travel-companion",
+      "kind": "title",
+      "files": {
+        "emblem": {
+          "path": "title-old-travel-companion/emblem.svg",
+          "sha256": "0fb24eb4d93fd463fdfa6490f833e78f4471fa8bf830d80a6a948a397558ab25",
+          "bytes": 339
+        },
+        "png": {
+          "path": "title-old-travel-companion/art.png",
+          "sha256": "529369f1dd487f13addd831f19652d781ab550f3f486f130e82eeb2b127fd57b",
+          "bytes": 525540,
+          "width": 1200,
+          "height": 360,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "title-old-travel-companion/compact.webp",
+          "sha256": "eca50d08f03d117a53d1493488b9cf26efedb839791ac81701360448e4f09b4f",
+          "bytes": 25952,
+          "width": 600,
+          "height": 180,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "title-traveler",
+      "kind": "title",
+      "files": {
+        "emblem": {
+          "path": "title-traveler/emblem.svg",
+          "sha256": "7e0f90af9527f92eef4927f70144eb87fbff55b5190541a27ab60d5bb769f1e3",
+          "bytes": 348
+        },
+        "png": {
+          "path": "title-traveler/art.png",
+          "sha256": "e5af0391ed176d7deec76d42e92ca474110fb43a4336f209c060c3e8f2d656cd",
+          "bytes": 522077,
+          "width": 1200,
+          "height": 360,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "title-traveler/compact.webp",
+          "sha256": "fdf6876050fbe815fddaaa26a6874794404d9e27084314c1b056253ed51e91bf",
+          "bytes": 24616,
+          "width": 600,
+          "height": 180,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "frame-five-postmarks",
+      "kind": "frame",
+      "files": {
+        "emblem": {
+          "path": "frame-five-postmarks/emblem.svg",
+          "sha256": "2db5a0993cd18f19e4530eea1aa8db2b3cf1e6f68e8098687ab4fb5549829581",
+          "bytes": 479
+        },
+        "border": {
+          "path": "frame-five-postmarks/border.png",
+          "sha256": "001442fc61bdf266c0e27c95fe6160036bce86e095dfc86c6e40275136f6482a",
+          "bytes": 8501,
+          "width": 192,
+          "height": 192,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "border_source": {
+          "path": "frame-five-postmarks/border.svg",
+          "sha256": "fab55baf5f59da5bd2ad3f73093dc78ce63053d4476eda4432217d364bc0670e",
+          "bytes": 2441
+        },
+        "png": {
+          "path": "frame-five-postmarks/art.png",
+          "sha256": "16a514bdef9be8a3a02231c31f5cbf1cad08132ff1be1187bb5bb7d961006b2a",
+          "bytes": 22633,
+          "width": 480,
+          "height": 600,
+          "format": "PNG",
+          "alpha": false,
+          "transparent": false
+        },
+        "compact": {
+          "path": "frame-five-postmarks/compact.webp",
+          "sha256": "3fdb31d37e32838a5ba354e4a9eef0c780b6a480497af0ba91f84798faa68153",
+          "bytes": 4482,
+          "width": 240,
+          "height": 300,
+          "format": "WEBP",
+          "alpha": false,
+          "transparent": false
+        }
+      }
+    },
+    {
+      "id": "title-small-big-world",
+      "kind": "title",
+      "files": {
+        "emblem": {
+          "path": "title-small-big-world/emblem.svg",
+          "sha256": "ce32e70f062c7e96524857f10dbb8c41b06065d7f233ee7818247bddfd4e061a",
+          "bytes": 368
+        },
+        "png": {
+          "path": "title-small-big-world/art.png",
+          "sha256": "b1d053458516a27f810c9045fc2edc2ddcf06bba2a3fb08851c2d107a0e59332",
+          "bytes": 522031,
+          "width": 1200,
+          "height": 360,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "title-small-big-world/compact.webp",
+          "sha256": "f5b23575001aafeb8798c6590373f6bb0b2d3f8c1f0c2646e6a6f06ddf360cba",
+          "bytes": 25508,
+          "width": 600,
+          "height": 180,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "title-three-route-leader",
+      "kind": "title",
+      "files": {
+        "emblem": {
+          "path": "title-three-route-leader/emblem.svg",
+          "sha256": "9bd29d5410d18f2895ef5898171ffee401933f0330cc4209003a011cdf2ae168",
+          "bytes": 343
+        },
+        "png": {
+          "path": "title-three-route-leader/art.png",
+          "sha256": "2fdf8ca0eb8d9a495a9d08fff201c3933b2c273b6dfea6d5b420578e2de9b32e",
+          "bytes": 522012,
+          "width": 1200,
+          "height": 360,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "title-three-route-leader/compact.webp",
+          "sha256": "b7a5adfbf8093971bfad7b312326650990a6447ececc674c4be9b6c37e9f5396",
+          "bytes": 25804,
+          "width": 600,
+          "height": 180,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "badge-big-small-travel",
+      "kind": "badge",
+      "files": {
+        "emblem": {
+          "path": "badge-big-small-travel/emblem.svg",
+          "sha256": "9d62fa8c40d5076364ea63f1258531302a0bf692c2d95a17199f477ef7582ed5",
+          "bytes": 574
+        },
+        "png": {
+          "path": "badge-big-small-travel/art.png",
+          "sha256": "b5534e68e3e3fd83fe8bfac4ce26e7559df262e8abf519537cb7e7329dd6940f",
+          "bytes": 22477,
+          "width": 256,
+          "height": 256,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "badge-big-small-travel/compact.webp",
+          "sha256": "9af661e559de7c866e32e0b207ce4c673bd29edf3da914daad1355cbb146ede2",
+          "bytes": 4932,
+          "width": 128,
+          "height": 128,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "title-my-own-band",
+      "kind": "title",
+      "files": {
+        "emblem": {
+          "path": "title-my-own-band/emblem.svg",
+          "sha256": "43353fe933c2e959be9f862f33de18fa5a4af8c013adab540ea2bb6f16d4524f",
+          "bytes": 482
+        },
+        "png": {
+          "path": "title-my-own-band/art.png",
+          "sha256": "05033bbb4bec8e14644975c59087bf159b5ef433128dded2e9f75fd0b503fbc9",
+          "bytes": 490921,
+          "width": 1200,
+          "height": 360,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "title-my-own-band/compact.webp",
+          "sha256": "f669e0b2fb23e56ffe1227f92865cb7dca5fbae5f6df3e0774ec1c58878317ec",
+          "bytes": 25356,
+          "width": 600,
+          "height": 180,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "title-encore-everywhere",
+      "kind": "title",
+      "files": {
+        "emblem": {
+          "path": "title-encore-everywhere/emblem.svg",
+          "sha256": "41531c874f73568c694009d95dc71ec09930ad327ac9d83e7e5b9dfaa284b74e",
+          "bytes": 394
+        },
+        "png": {
+          "path": "title-encore-everywhere/art.png",
+          "sha256": "98cf852a812f94fc70c1b1fa2deac279141acaf4db3e499f540d395c8d1299ff",
+          "bytes": 490564,
+          "width": 1200,
+          "height": 360,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "title-encore-everywhere/compact.webp",
+          "sha256": "9e252d71754b30ad5d37b2de08a91823afd9fb773bc3aeecfebf1d7d43ea1ec9",
+          "bytes": 25198,
+          "width": 600,
+          "height": 180,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "title-stage-companion",
+      "kind": "title",
+      "files": {
+        "emblem": {
+          "path": "title-stage-companion/emblem.svg",
+          "sha256": "1b8c0c4cc20bb2c953933a1ad2ca70b6a9b70462a9e969a0a83796ff1de4723a",
+          "bytes": 422
+        },
+        "png": {
+          "path": "title-stage-companion/art.png",
+          "sha256": "ce33328260ff37b72fdd806f32d0cd2e61edc346b7f65a10d2061ec107eb7e67",
+          "bytes": 493162,
+          "width": 1200,
+          "height": 360,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "title-stage-companion/compact.webp",
+          "sha256": "b2f53b67cf6fe56993f16abaf31e03ae25baccddbe6dd956dda3b93821b0eb2f",
+          "bytes": 26278,
+          "width": 600,
+          "height": 180,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "frame-five-city-lights",
+      "kind": "frame",
+      "files": {
+        "emblem": {
+          "path": "frame-five-city-lights/emblem.svg",
+          "sha256": "41531c874f73568c694009d95dc71ec09930ad327ac9d83e7e5b9dfaa284b74e",
+          "bytes": 394
+        },
+        "border": {
+          "path": "frame-five-city-lights/border.png",
+          "sha256": "f9df59377df5dff7e7037c51673701faf73ca34f3b3d6508b774b09f7af7e318",
+          "bytes": 6627,
+          "width": 192,
+          "height": 192,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "border_source": {
+          "path": "frame-five-city-lights/border.svg",
+          "sha256": "77c7ae6f564a9bb082345fb0f9572627a2ec10f14de1b9aeeaa84df67d985ddb",
+          "bytes": 2101
+        },
+        "png": {
+          "path": "frame-five-city-lights/art.png",
+          "sha256": "6207c85ce44b09a18ab92cc808baf7312124119df3733014007e0df1627f2baf",
+          "bytes": 19530,
+          "width": 480,
+          "height": 600,
+          "format": "PNG",
+          "alpha": false,
+          "transparent": false
+        },
+        "compact": {
+          "path": "frame-five-city-lights/compact.webp",
+          "sha256": "d828c6b86b3ee34f09c3ac67fd1f6a5cccc100c5de7532215931164073d5b6bb",
+          "bytes": 4350,
+          "width": 240,
+          "height": 300,
+          "format": "WEBP",
+          "alpha": false,
+          "transparent": false
+        }
+      }
+    },
+    {
+      "id": "title-co-produced",
+      "kind": "title",
+      "files": {
+        "emblem": {
+          "path": "title-co-produced/emblem.svg",
+          "sha256": "1ff0cdea80d3edfa18569b0ff72b736f4afebd971493e365f015662c2bf2b615",
+          "bytes": 333
+        },
+        "png": {
+          "path": "title-co-produced/art.png",
+          "sha256": "e63fff0081eab12e00d8cb8c494def95d9d41622a82b362aa11744e19d74792a",
+          "bytes": 487294,
+          "width": 1200,
+          "height": 360,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "title-co-produced/compact.webp",
+          "sha256": "4a232c8e257b2d541bd0b47c1bce85069eb49448f1b4bf114e8da60ef990c819",
+          "bytes": 25016,
+          "width": 600,
+          "height": 180,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "badge-duet-tickets",
+      "kind": "badge",
+      "files": {
+        "emblem": {
+          "path": "badge-duet-tickets/emblem.svg",
+          "sha256": "1ff0cdea80d3edfa18569b0ff72b736f4afebd971493e365f015662c2bf2b615",
+          "bytes": 333
+        },
+        "png": {
+          "path": "badge-duet-tickets/art.png",
+          "sha256": "efe51c76fd674721609bfdc40e11b02401982d561a71e3d0219fd1d8f6458030",
+          "bytes": 19002,
+          "width": 256,
+          "height": 256,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "badge-duet-tickets/compact.webp",
+          "sha256": "9781fb0ad1276a10da0d68ff7da344b09df1316ed9c7c1a45964c6ae6688fa07",
+          "bytes": 4718,
+          "width": 128,
+          "height": 128,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "title-double-drums",
+      "kind": "title",
+      "files": {
+        "emblem": {
+          "path": "title-double-drums/emblem.svg",
+          "sha256": "328df10c433466c5fae35330e544138db40b26ec6530db4bd6d686fc626399f0",
+          "bytes": 408
+        },
+        "png": {
+          "path": "title-double-drums/art.png",
+          "sha256": "9c223bef86e1b9b8ce41a395d1029e41830c6f464d760e857a9e51830ebb738e",
+          "bytes": 494051,
+          "width": 1200,
+          "height": 360,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "title-double-drums/compact.webp",
+          "sha256": "db177ee4b8e97cbc9f6da46c237dd3ec13d99a7b8575ec7c46c54e8f7fc619d8",
+          "bytes": 25612,
+          "width": 600,
+          "height": 180,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "frame-nine-colors",
+      "kind": "frame",
+      "files": {
+        "emblem": {
+          "path": "frame-nine-colors/emblem.svg",
+          "sha256": "eec76870829c9d8eceb0456983830a49021ecfce0731da057d068870e29523a8",
+          "bytes": 886
+        },
+        "border": {
+          "path": "frame-nine-colors/border.png",
+          "sha256": "4a1f071fdfff22779b3ca5d3f6715697e2b118f5f5004d80f1ae9cd18932ece4",
+          "bytes": 11648,
+          "width": 192,
+          "height": 192,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "border_source": {
+          "path": "frame-nine-colors/border.svg",
+          "sha256": "c4aef61f349afb249b37a8846f89a29cdfa4fd467dfde7f710259d3ef7628b60",
+          "bytes": 4069
+        },
+        "png": {
+          "path": "frame-nine-colors/art.png",
+          "sha256": "a24de5cc6f37a63dc7a68166f9bf915aa6df7dd19a0dcc0204225ee4c3bc51e6",
+          "bytes": 26900,
+          "width": 480,
+          "height": 600,
+          "format": "PNG",
+          "alpha": false,
+          "transparent": false
+        },
+        "compact": {
+          "path": "frame-nine-colors/compact.webp",
+          "sha256": "83ebd7633a5635be4f0aa64ecb33df794dde4cf8157be62da6366e90f0ab3727",
+          "bytes": 5022,
+          "width": 240,
+          "height": 300,
+          "format": "WEBP",
+          "alpha": false,
+          "transparent": false
+        }
+      }
+    },
+    {
+      "id": "badge-front-backstage",
+      "kind": "badge",
+      "files": {
+        "emblem": {
+          "path": "badge-front-backstage/emblem.svg",
+          "sha256": "e8d94f9f37d10d97496f18e7e55fd5639bba87b2519de766e5f80760142af82a",
+          "bytes": 442
+        },
+        "png": {
+          "path": "badge-front-backstage/art.png",
+          "sha256": "6bcfc740023565947ede6b5fb927cf8f205c63c9dde434eafe672a371627d74c",
+          "bytes": 20065,
+          "width": 256,
+          "height": 256,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "badge-front-backstage/compact.webp",
+          "sha256": "3f82b0b2ffb6191be309a20f078c97fd4d1675532cf18b6ff78bae14c3b101ec",
+          "bytes": 4892,
+          "width": 128,
+          "height": 128,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "title-back-to-rehearsal",
+      "kind": "title",
+      "files": {
+        "emblem": {
+          "path": "title-back-to-rehearsal/emblem.svg",
+          "sha256": "78a3e3f5b0174e65266e848ccf84cb9d56bbc70abea6f7d7068aec6c3d5be9d5",
+          "bytes": 402
+        },
+        "png": {
+          "path": "title-back-to-rehearsal/art.png",
+          "sha256": "76fd8495a31d0db682b63a7ca8997579ca7d845f8fffd4372c8e9a924fe815c9",
+          "bytes": 491861,
+          "width": 1200,
+          "height": 360,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "title-back-to-rehearsal/compact.webp",
+          "sha256": "6e08a4c0fc069691051d7d2ecc7ad9f12fbecd2566795ec58df2a6072e82d2ec",
+          "bytes": 25740,
+          "width": 600,
+          "height": 180,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "badge-first-bout",
+      "kind": "badge",
+      "files": {
+        "emblem": {
+          "path": "badge-first-bout/emblem.svg",
+          "sha256": "78a7079c55e5e209e579111e1a3f25945b84b09e669b00237b1ab592d10fe7c1",
+          "bytes": 343
+        },
+        "png": {
+          "path": "badge-first-bout/art.png",
+          "sha256": "e20fc73979983c6e6c1c66f59150933f5d20cdfbe1d753e891a74e35b47823da",
+          "bytes": 19915,
+          "width": 256,
+          "height": 256,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "badge-first-bout/compact.webp",
+          "sha256": "5017c033856c3cbc00a9bf14732f6adad0c3d92ce8c866689b96f18ba3d666f9",
+          "bytes": 4860,
+          "width": 128,
+          "height": 128,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "title-bout-regular",
+      "kind": "title",
+      "files": {
+        "emblem": {
+          "path": "title-bout-regular/emblem.svg",
+          "sha256": "78a7079c55e5e209e579111e1a3f25945b84b09e669b00237b1ab592d10fe7c1",
+          "bytes": 343
+        },
+        "png": {
+          "path": "title-bout-regular/art.png",
+          "sha256": "cbd86511ee16742c0f9087dc1dea54d27f7b42eee6040bb76893634d7a5f979a",
+          "bytes": 493798,
+          "width": 1200,
+          "height": 360,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "title-bout-regular/compact.webp",
+          "sha256": "71caab1134442eb2325cab13faa1f42a09a1da8c0c9ce87e0fa10ce2d6266d22",
+          "bytes": 26908,
+          "width": 600,
+          "height": 180,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "frame-arena-notebook",
+      "kind": "frame",
+      "files": {
+        "emblem": {
+          "path": "frame-arena-notebook/emblem.svg",
+          "sha256": "044b67ff872165d823eefa274dd7d316f15218bdfb7f3fe12ffa2aff6b0c054e",
+          "bytes": 434
+        },
+        "border": {
+          "path": "frame-arena-notebook/border.png",
+          "sha256": "d9eccbdd5118725cf580ae5e14188d1ce07595de5570a6f212ca92f3f5ff1f9c",
+          "bytes": 5569,
+          "width": 192,
+          "height": 192,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "border_source": {
+          "path": "frame-arena-notebook/border.svg",
+          "sha256": "3fffca27eec1e537add8e20adb6261c501cfd9749f509ee07f4bd5d69a8d3e5b",
+          "bytes": 2261
+        },
+        "png": {
+          "path": "frame-arena-notebook/art.png",
+          "sha256": "9700495602a87d76ac48bd9431d46925671886be71cad071486d973d415380db",
+          "bytes": 17797,
+          "width": 480,
+          "height": 600,
+          "format": "PNG",
+          "alpha": false,
+          "transparent": false
+        },
+        "compact": {
+          "path": "frame-arena-notebook/compact.webp",
+          "sha256": "02e8d820cb739c9cfa01ddd395ed02b9c8225fa7a695a98c081d5478eca4ad76",
+          "bytes": 4200,
+          "width": 240,
+          "height": 300,
+          "format": "WEBP",
+          "alpha": false,
+          "transparent": false
+        }
+      }
+    },
+    {
+      "id": "badge-five-opponents",
+      "kind": "badge",
+      "files": {
+        "emblem": {
+          "path": "badge-five-opponents/emblem.svg",
+          "sha256": "4db1ce04cd5c9b3261e4a5f11a5c4379cc85bb2f4c7351dc12016459e2381cdc",
+          "bytes": 546
+        },
+        "png": {
+          "path": "badge-five-opponents/art.png",
+          "sha256": "541a238bb13abf6cc1bf9df8bf4ef98fa136e2bc3fe623f5bd4b30dcf7612e23",
+          "bytes": 20866,
+          "width": 256,
+          "height": 256,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "badge-five-opponents/compact.webp",
+          "sha256": "1c3721c1d33ecb6d3d6e22682dc18453102dac5d86e9bcc93ebe05f018fad307",
+          "bytes": 5026,
+          "width": 128,
+          "height": 128,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "title-host-and-guest",
+      "kind": "title",
+      "files": {
+        "emblem": {
+          "path": "title-host-and-guest/emblem.svg",
+          "sha256": "8b46ee262018e041472aaa3daa3b957b03d9ad13297b38ab3eccc8810f5177b9",
+          "bytes": 311
+        },
+        "png": {
+          "path": "title-host-and-guest/art.png",
+          "sha256": "65f2291cad00d833b142c5cc72a6f81bee70a5a2eb9523697110d72a0de8b135",
+          "bytes": 491828,
+          "width": 1200,
+          "height": 360,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "title-host-and-guest/compact.webp",
+          "sha256": "439ce4ecc4af47683875c8fd152195d105f1bb384b5c5ede7aea078f96e4a730",
+          "bytes": 26754,
+          "width": 600,
+          "height": 180,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "title-five-level-coach",
+      "kind": "title",
+      "files": {
+        "emblem": {
+          "path": "title-five-level-coach/emblem.svg",
+          "sha256": "40bc7c70dc58c91f9911b9e64624f4ab454ce9cc6a0423460f94b427de1abcd9",
+          "bytes": 1050
+        },
+        "png": {
+          "path": "title-five-level-coach/art.png",
+          "sha256": "364581b40e8e538cdcab31f3125d6ae4b8134fec9f1bb20087ec484927ad1007",
+          "bytes": 499637,
+          "width": 1200,
+          "height": 360,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "title-five-level-coach/compact.webp",
+          "sha256": "9bc4f89e8638b641c5bd0c60b982223cc03eee92c05c1598ed5d374c2e4e33a4",
+          "bytes": 27252,
+          "width": 600,
+          "height": 180,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "frame-training-graduation",
+      "kind": "frame",
+      "files": {
+        "emblem": {
+          "path": "frame-training-graduation/emblem.svg",
+          "sha256": "40bc7c70dc58c91f9911b9e64624f4ab454ce9cc6a0423460f94b427de1abcd9",
+          "bytes": 1050
+        },
+        "border": {
+          "path": "frame-training-graduation/border.png",
+          "sha256": "79521afdb95272904235f7dda8543f9f78443a5a41b09177e8cf8c8417ca0c79",
+          "bytes": 10157,
+          "width": 192,
+          "height": 192,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "border_source": {
+          "path": "frame-training-graduation/border.svg",
+          "sha256": "43ae5159ee94b3f9b4171bebcc12c7c947d0c3aab2f8a37ab173b8e66c0f11db",
+          "bytes": 4725
+        },
+        "png": {
+          "path": "frame-training-graduation/art.png",
+          "sha256": "d434bb09d7ad34727a875fc6efcd8aeaf1ca7157e917a767581667743424ff23",
+          "bytes": 24946,
+          "width": 480,
+          "height": 600,
+          "format": "PNG",
+          "alpha": false,
+          "transparent": false
+        },
+        "compact": {
+          "path": "frame-training-graduation/compact.webp",
+          "sha256": "2c314329fbcfbcb2180f7b09b49fa8d74fdc9cc0b7ba34c37e2bac89ab37756b",
+          "bytes": 4794,
+          "width": 240,
+          "height": 300,
+          "format": "WEBP",
+          "alpha": false,
+          "transparent": false
+        }
+      }
+    },
+    {
+      "id": "badge-two-paths",
+      "kind": "badge",
+      "files": {
+        "emblem": {
+          "path": "badge-two-paths/emblem.svg",
+          "sha256": "2775ac27896d6aac2c4747017cc356caaabe6403cc88648072ecfe59ff881c06",
+          "bytes": 325
+        },
+        "png": {
+          "path": "badge-two-paths/art.png",
+          "sha256": "bb7359980fad2129058753a20ae72089b632c31ebf460bc455c34d870a4d8d81",
+          "bytes": 18939,
+          "width": 256,
+          "height": 256,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "badge-two-paths/compact.webp",
+          "sha256": "a7112ef43f89c77568046134add3b90d73148fb57d2f71cd461719d2e5652de8",
+          "bytes": 4548,
+          "width": 128,
+          "height": 128,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "badge-nine-moves",
+      "kind": "badge",
+      "files": {
+        "emblem": {
+          "path": "badge-nine-moves/emblem.svg",
+          "sha256": "34114e2bf157607e646ec2c2f05013f01f2c1ead9e8c431a2a346ea70ced1c78",
+          "bytes": 751
+        },
+        "png": {
+          "path": "badge-nine-moves/art.png",
+          "sha256": "8362466104f71fff445ada8ae3cb67dabed8e433b549daacb1884a3a5baad71c",
+          "bytes": 21470,
+          "width": 256,
+          "height": 256,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "badge-nine-moves/compact.webp",
+          "sha256": "eb6a1a4c3278de8838efc19d94a0fd4e4a0a40877878817f23b2b778380d7604",
+          "bytes": 5224,
+          "width": 128,
+          "height": 128,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "badge-ten-moves",
+      "kind": "badge",
+      "files": {
+        "emblem": {
+          "path": "badge-ten-moves/emblem.svg",
+          "sha256": "c54d8bb80b46cdc378b283fb8814fe81a404e204081cd624aa2751450aee30b7",
+          "bytes": 869
+        },
+        "png": {
+          "path": "badge-ten-moves/art.png",
+          "sha256": "51b46c09b2803d771618e116623e26ad1e4d01c3a41a835619372d9f87c9e59c",
+          "bytes": 24524,
+          "width": 256,
+          "height": 256,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "badge-ten-moves/compact.webp",
+          "sha256": "d6e694ddcb966092bc43d350aad3e35c8e1f1938325c9ef7a4892f38c3de9562",
+          "bytes": 5286,
+          "width": 128,
+          "height": 128,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "title-presence-remains",
+      "kind": "title",
+      "files": {
+        "emblem": {
+          "path": "title-presence-remains/emblem.svg",
+          "sha256": "fb348e4e701a61d82443727ae9ee17c1d0925d6b1ce210c0e6f01c82f22b911a",
+          "bytes": 347
+        },
+        "png": {
+          "path": "title-presence-remains/art.png",
+          "sha256": "06391e88602405f7f5539845615a9dde47b6340c6e657dc0a9c36f8ffe1f9ca1",
+          "bytes": 494940,
+          "width": 1200,
+          "height": 360,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "title-presence-remains/compact.webp",
+          "sha256": "edbbc3a0148b77251d1604209bb47df7265fa7e034d56862221612e8f6c2af40",
+          "bytes": 26828,
+          "width": 600,
+          "height": 180,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "title-pay-next-round",
+      "kind": "title",
+      "files": {
+        "emblem": {
+          "path": "title-pay-next-round/emblem.svg",
+          "sha256": "b01ad344d28fe8c8c9c587184fd69e8a2dfc7eec00ac3dfc3f2b7bece41dd3a5",
+          "bytes": 346
+        },
+        "png": {
+          "path": "title-pay-next-round/art.png",
+          "sha256": "283f4e7b1f5b4a75903108353ef38f72c8964f15f344e1416384af23f3f2f44e",
+          "bytes": 490063,
+          "width": 1200,
+          "height": 360,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "title-pay-next-round/compact.webp",
+          "sha256": "4c36d6b0f95c2d7a9316857ca90f9c0870dbcc5fab5a61288be14a01629609c1",
+          "bytes": 27772,
+          "width": 600,
+          "height": 180,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "badge-three-loans",
+      "kind": "badge",
+      "files": {
+        "emblem": {
+          "path": "badge-three-loans/emblem.svg",
+          "sha256": "96c3336bb9c6f6b0ca1df9bc360ce61addebe49466d1f59896db11858efe35e5",
+          "bytes": 481
+        },
+        "png": {
+          "path": "badge-three-loans/art.png",
+          "sha256": "8375e9d04c78d532e279da724bbecf5813a7c737e7f7f132d6b9a70da3c5e264",
+          "bytes": 19902,
+          "width": 256,
+          "height": 256,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "badge-three-loans/compact.webp",
+          "sha256": "c34fd0aa4b1e05dd171a3bda962d1547578d4e239c5091d690f87180900acd79",
+          "bytes": 4612,
+          "width": 128,
+          "height": 128,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "title-can-learn-again",
+      "kind": "title",
+      "files": {
+        "emblem": {
+          "path": "title-can-learn-again/emblem.svg",
+          "sha256": "7c83e4b5cfcc42cc4fbaefa78e9caa92d46a8d8c55b276e498146fb6c0b17426",
+          "bytes": 450
+        },
+        "png": {
+          "path": "title-can-learn-again/art.png",
+          "sha256": "417444439a914c82b5d7abfbd620334906928c5172d35f2775f1f4c5a7559cc7",
+          "bytes": 499553,
+          "width": 1200,
+          "height": 360,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "title-can-learn-again/compact.webp",
+          "sha256": "3477aa7aaf331cad38b5fed6da0096c5f665e2c5e335b0c952f18108a8d0854b",
+          "bytes": 28626,
+          "width": 600,
+          "height": 180,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "frame-triple-realization",
+      "kind": "frame",
+      "files": {
+        "emblem": {
+          "path": "frame-triple-realization/emblem.svg",
+          "sha256": "7c83e4b5cfcc42cc4fbaefa78e9caa92d46a8d8c55b276e498146fb6c0b17426",
+          "bytes": 450
+        },
+        "border": {
+          "path": "frame-triple-realization/border.png",
+          "sha256": "fabd9fcd78aada15ec566fd0284d6b38acf9cd0d0a6f4ab7c69b454e07122b63",
+          "bytes": 6943,
+          "width": 192,
+          "height": 192,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "border_source": {
+          "path": "frame-triple-realization/border.svg",
+          "sha256": "0ed47793f53ab0d6fd837a031df6f067a7bbe2ad7006389fd26cb3e2c8a294bb",
+          "bytes": 2325
+        },
+        "png": {
+          "path": "frame-triple-realization/art.png",
+          "sha256": "269a2603cedc25780e73f7a81a17bdba8aa9299b1e2afede82c62864d906dba4",
+          "bytes": 20119,
+          "width": 480,
+          "height": 600,
+          "format": "PNG",
+          "alpha": false,
+          "transparent": false
+        },
+        "compact": {
+          "path": "frame-triple-realization/compact.webp",
+          "sha256": "306ac27f87eda51040c5c9c339336f1c71d707b707d098759a5a82c7e4d6ab69",
+          "bytes": 4822,
+          "width": 240,
+          "height": 300,
+          "format": "WEBP",
+          "alpha": false,
+          "transparent": false
+        }
+      }
+    },
+    {
+      "id": "title-last-echo",
+      "kind": "title",
+      "files": {
+        "emblem": {
+          "path": "title-last-echo/emblem.svg",
+          "sha256": "2572bc54f9ac4723028b1534af1814d46927d0e87a624d12aa95b089d16fb0bc",
+          "bytes": 287
+        },
+        "png": {
+          "path": "title-last-echo/art.png",
+          "sha256": "21f047199464ae1c8b21841d1c19500f301115afab830db029cbcf6e0a0ea6c2",
+          "bytes": 490838,
+          "width": 1200,
+          "height": 360,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "title-last-echo/compact.webp",
+          "sha256": "3f4716a77fa33c7e18b0cc128f735f8125ab90569cdda5dde58af014c12244f1",
+          "bytes": 26598,
+          "width": 600,
+          "height": 180,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "title-three-world-player",
+      "kind": "title",
+      "files": {
+        "emblem": {
+          "path": "title-three-world-player/emblem.svg",
+          "sha256": "0e7ce603ca40c2f69f71a9fb87291962ce74dc50dedf6bbbcafe0202a3146efd",
+          "bytes": 314
+        },
+        "png": {
+          "path": "title-three-world-player/art.png",
+          "sha256": "b33cb1a2795fed2bfd29635dd5dcbb15d4d3fd774c252ddf4336c170daf873a2",
+          "bytes": 390898,
+          "width": 1200,
+          "height": 360,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "title-three-world-player/compact.webp",
+          "sha256": "cbd7c170c74faf4ced958611f00ad6e4d2c302611be4a032957bbe36fdbfb44b",
+          "bytes": 19124,
+          "width": 600,
+          "height": 180,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "title-three-world-master",
+      "kind": "title",
+      "files": {
+        "emblem": {
+          "path": "title-three-world-master/emblem.svg",
+          "sha256": "d6844af5e51cf910f5cb1eefece484970613ad5cec81a071007a0c17e6a58916",
+          "bytes": 685
+        },
+        "png": {
+          "path": "title-three-world-master/art.png",
+          "sha256": "fc1a2a7c6295363f2bb6512909272e50b8ca315870813ba499a89e8728998740",
+          "bytes": 530544,
+          "width": 1200,
+          "height": 360,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "title-three-world-master/compact.webp",
+          "sha256": "c7b729ef53924e7ceaa88e17cec801c7906a4efa1dc24a2394aca7a8eb5e2bad",
+          "bytes": 27420,
+          "width": 600,
+          "height": 180,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "frame-three-books",
+      "kind": "frame",
+      "files": {
+        "emblem": {
+          "path": "frame-three-books/emblem.svg",
+          "sha256": "0e7ce603ca40c2f69f71a9fb87291962ce74dc50dedf6bbbcafe0202a3146efd",
+          "bytes": 314
+        },
+        "border": {
+          "path": "frame-three-books/border.png",
+          "sha256": "9e12b5f80d15742a415e79af5003f4f38f303662c3433d15337ff41233b669a2",
+          "bytes": 4118,
+          "width": 192,
+          "height": 192,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "border_source": {
+          "path": "frame-three-books/border.svg",
+          "sha256": "41e647dd6ae8491bce8bf5577d3be6a3481bbb794e42484f3bbc68c94cd5be11",
+          "bytes": 1781
+        },
+        "png": {
+          "path": "frame-three-books/art.png",
+          "sha256": "a730a8ea92276681d3fc1a597cd707b95c99c06cedfb2f6d7e88d225b6994755",
+          "bytes": 14866,
+          "width": 480,
+          "height": 600,
+          "format": "PNG",
+          "alpha": false,
+          "transparent": false
+        },
+        "compact": {
+          "path": "frame-three-books/compact.webp",
+          "sha256": "f7ad1233fb8103c505e5512eb263d481b75c343b9aa2f360836315b4385f16da",
+          "bytes": 3744,
+          "width": 240,
+          "height": 300,
+          "format": "WEBP",
+          "alpha": false,
+          "transparent": false
+        }
+      }
+    },
+    {
+      "id": "title-my-old-companion",
+      "kind": "title",
+      "files": {
+        "emblem": {
+          "path": "title-my-old-companion/emblem.svg",
+          "sha256": "feb3b653c6fcdb85cc0f38a4ea6d9d7b87618e5a9b689c6edc721ce99beb199f",
+          "bytes": 437
+        },
+        "png": {
+          "path": "title-my-old-companion/art.png",
+          "sha256": "b9f3f954f5befaaa6afa1c5011487c46d31231170453cbdbe75c0ff928f062e1",
+          "bytes": 400287,
+          "width": 1200,
+          "height": 360,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "title-my-old-companion/compact.webp",
+          "sha256": "e7214c31a9df2b08ec69821af431aecd1ad8279062e82c3564662729a03ae5aa",
+          "bytes": 20212,
+          "width": 600,
+          "height": 180,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "title-keep-my-word",
+      "kind": "title",
+      "files": {
+        "emblem": {
+          "path": "title-keep-my-word/emblem.svg",
+          "sha256": "4f3052be9816bfc74e886dadb6afe0ad2af51c3cbf0aa91894ef154fb130a437",
+          "bytes": 333
+        },
+        "png": {
+          "path": "title-keep-my-word/art.png",
+          "sha256": "f75c028cdc434b48638cdb5a738cccbaf79c0244b54444e04145af4eba5ce4a7",
+          "bytes": 396695,
+          "width": 1200,
+          "height": 360,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "title-keep-my-word/compact.webp",
+          "sha256": "64d3af54d6c5dafcd7650bf7383944b7e3f4b082fa32d538fd7d8993960e8888",
+          "bytes": 19802,
+          "width": 600,
+          "height": 180,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "achievement-pale-pink",
+      "kind": "frame",
+      "files": {
+        "emblem": {
+          "path": "achievement-pale-pink/emblem.svg",
+          "sha256": "3d3704fc9555463d3ca3a2213454c7381349d31a3d3c2d6925c9268106a5d73a",
+          "bytes": 636
+        },
+        "border": {
+          "path": "achievement-pale-pink/border.png",
+          "sha256": "5502f04a414e1d5cdb7f29be0a195b8a9ce7cacc70819212a87725c35af6bb5b",
+          "bytes": 8838,
+          "width": 192,
+          "height": 192,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "border_source": {
+          "path": "achievement-pale-pink/border.svg",
+          "sha256": "3cfe0fbbda220ea13423093710bf27fe6aa6ae1f4649f173c1d9430896666d15",
+          "bytes": 3069
+        },
+        "png": {
+          "path": "achievement-pale-pink/art.png",
+          "sha256": "d86171b05323ee260c6c1f0a6f4db9785271cd264c6ba78f3aa01efb9819e984",
+          "bytes": 23582,
+          "width": 480,
+          "height": 600,
+          "format": "PNG",
+          "alpha": false,
+          "transparent": false
+        },
+        "compact": {
+          "path": "achievement-pale-pink/compact.webp",
+          "sha256": "9b8aad910aced0c477fa3f31e2ea71e046ee439d7d64af45a1bec409dab15997",
+          "bytes": 4746,
+          "width": 240,
+          "height": 300,
+          "format": "WEBP",
+          "alpha": false,
+          "transparent": false
+        }
+      }
+    },
+    {
+      "id": "badge-showcase-3",
+      "kind": "cosmetic",
+      "files": {
+        "emblem": {
+          "path": "badge-showcase-3/emblem.svg",
+          "sha256": "344b669057a05966c51eef9edaf65897a9ef330c91b7072a3faeb256ff482a98",
+          "bytes": 381
+        },
+        "png": {
+          "path": "badge-showcase-3/art.png",
+          "sha256": "ebe085af07fd8a12827108c2a94eaf8b01707d2bb44623705745aff3263caa1a",
+          "bytes": 21201,
+          "width": 256,
+          "height": 256,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "badge-showcase-3/compact.webp",
+          "sha256": "8ac7fb661b0aa3f48bcbfa032ffcbcaca3e6a1fdc8b55a14e660f8de63d17520",
+          "bytes": 4780,
+          "width": 128,
+          "height": 128,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "achievement-gold",
+      "kind": "frame",
+      "files": {
+        "emblem": {
+          "path": "achievement-gold/emblem.svg",
+          "sha256": "21497b39e34e49a84d3e934fe0555c84b4c61734efe0b3d9a78328ad20510fef",
+          "bytes": 1123
+        },
+        "border": {
+          "path": "achievement-gold/border.png",
+          "sha256": "478764e3fd2fc27de32a24c3cb6637d855dae70a8409373e89b991b4695c04d3",
+          "bytes": 11132,
+          "width": 192,
+          "height": 192,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "border_source": {
+          "path": "achievement-gold/border.svg",
+          "sha256": "d347e84ec20aff2a7ccb519d21072668aca65a28e01c02952db080db51fd209f",
+          "bytes": 5017
+        },
+        "png": {
+          "path": "achievement-gold/art.png",
+          "sha256": "bb9d6a700d67be143bbdb1d3fea397707ad7bb13280d9c993e8ad568519a7551",
+          "bytes": 26073,
+          "width": 480,
+          "height": 600,
+          "format": "PNG",
+          "alpha": false,
+          "transparent": false
+        },
+        "compact": {
+          "path": "achievement-gold/compact.webp",
+          "sha256": "039536c3c6c1bfb6e30cefbcd6887f63f90e24690b75ae2838015ec91622ae5a",
+          "bytes": 5020,
+          "width": 240,
+          "height": 300,
+          "format": "WEBP",
+          "alpha": false,
+          "transparent": false
+        }
+      }
+    },
+    {
+      "id": "achievement-legend",
+      "kind": "title",
+      "files": {
+        "emblem": {
+          "path": "achievement-legend/emblem.svg",
+          "sha256": "7994cea4e6e5e7801c4ec62cdfdb194d9a853e85fdcc2f473ac663a759c9d308",
+          "bytes": 373
+        },
+        "png": {
+          "path": "achievement-legend/art.png",
+          "sha256": "ffc680b0c556fa0238ebc0de511cc402d47c17dae9c4853b7b0c9d60d929c297",
+          "bytes": 538861,
+          "width": 1200,
+          "height": 360,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "achievement-legend/compact.webp",
+          "sha256": "136f30151f14a1e05368351bdb96d2afc4c5f163d5c5b95c2794cd3f500cc815",
+          "bytes": 27622,
+          "width": 600,
+          "height": 180,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "weekly-001-catch-value-title",
+      "kind": "title",
+      "files": {
+        "emblem": {
+          "path": "weekly-001-catch-value-title/emblem.svg",
+          "sha256": "c93660464b7ddb7f3ff5940e0b9b554b1777e84bbccf4b3fd647ee5f11c247ae",
+          "bytes": 525
+        },
+        "png": {
+          "path": "weekly-001-catch-value-title/art.png",
+          "sha256": "494114644cf2e346aa078c419ee0cedc106c8aa93d30fa0496f8890d69cd6bea",
+          "bytes": 477336,
+          "width": 1200,
+          "height": 360,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "weekly-001-catch-value-title/compact.webp",
+          "sha256": "c1a47cbb8f8dc9fa2a1cfb01320b0acb205d9c2f6d1feb797da81241b4cc2b6d",
+          "bytes": 25684,
+          "width": 600,
+          "height": 180,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "weekly-001-catch-value-frame",
+      "kind": "frame",
+      "files": {
+        "emblem": {
+          "path": "weekly-001-catch-value-frame/emblem.svg",
+          "sha256": "c93660464b7ddb7f3ff5940e0b9b554b1777e84bbccf4b3fd647ee5f11c247ae",
+          "bytes": 525
+        },
+        "border": {
+          "path": "weekly-001-catch-value-frame/border.png",
+          "sha256": "1c6723915fa98e9de4c93e504efda60606b8b0f5a07b4b99455a461f239c5f7e",
+          "bytes": 5087,
+          "width": 192,
+          "height": 192,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "border_source": {
+          "path": "weekly-001-catch-value-frame/border.svg",
+          "sha256": "a401ad8d6b5ecaeafcf4e854f92e0fcb0c4f477f89f2c0e0bca6aa79a1ba9e54",
+          "bytes": 2625
+        },
+        "png": {
+          "path": "weekly-001-catch-value-frame/art.png",
+          "sha256": "4754505f142bde5e94de8902ecc4f14c3aa3b7b90c17f5a86149c0b15bb5e43d",
+          "bytes": 18220,
+          "width": 480,
+          "height": 600,
+          "format": "PNG",
+          "alpha": false,
+          "transparent": false
+        },
+        "compact": {
+          "path": "weekly-001-catch-value-frame/compact.webp",
+          "sha256": "f3299fe40b98c6eb3acf285f4fbad6d7dfdc54f73f86ff8acc659a60930cd087",
+          "bytes": 4390,
+          "width": 240,
+          "height": 300,
+          "format": "WEBP",
+          "alpha": false,
+          "transparent": false
+        }
+      }
+    },
+    {
+      "id": "weekly-001-catch-value-rank-1",
+      "kind": "badge",
+      "files": {
+        "emblem": {
+          "path": "weekly-001-catch-value-rank-1/emblem.svg",
+          "sha256": "545309f5a2edcb1b1144414cb89714a29d39292cf2628407db2fec8dab6a0be4",
+          "bytes": 373
+        },
+        "png": {
+          "path": "weekly-001-catch-value-rank-1/art.png",
+          "sha256": "b0fd848f6e33bae7df4aa0dfce2946f8ad3e89458d37f35bdd04f1c93259fe4c",
+          "bytes": 475851,
+          "width": 1200,
+          "height": 360,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "weekly-001-catch-value-rank-1/compact.webp",
+          "sha256": "1550cbbb3993bbc4734631f65e03cf490fb2cc9dec7d3c7bcbc0d1b237016a9a",
+          "bytes": 25780,
+          "width": 600,
+          "height": 180,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "weekly-001-catch-value-rank-2",
+      "kind": "badge",
+      "files": {
+        "emblem": {
+          "path": "weekly-001-catch-value-rank-2/emblem.svg",
+          "sha256": "82deefbef7b2bfc40355bb6380bfe14e4de7bfa189ddb0ca29fde8aee0c2f9ad",
+          "bytes": 343
+        },
+        "png": {
+          "path": "weekly-001-catch-value-rank-2/art.png",
+          "sha256": "479a0e446d47132ff0f83e3a9efb5ec21b54d592681859524aa6d5022b0c4ae6",
+          "bytes": 484379,
+          "width": 1200,
+          "height": 360,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "weekly-001-catch-value-rank-2/compact.webp",
+          "sha256": "c5ac6a2b0e3a07c3555ff4a5f8626a6159adc022dd3666a31dff915b426a1f38",
+          "bytes": 27014,
+          "width": 600,
+          "height": 180,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "weekly-001-catch-value-rank-3",
+      "kind": "badge",
+      "files": {
+        "emblem": {
+          "path": "weekly-001-catch-value-rank-3/emblem.svg",
+          "sha256": "a4ade8f746a59b6ecd2c90b2d7f1e6b0cebb7dd8c137b80e3b96dea49e4a4a04",
+          "bytes": 1123
+        },
+        "png": {
+          "path": "weekly-001-catch-value-rank-3/art.png",
+          "sha256": "1e4fdef384bf495b99ec32724c8c8ef8794a1639f949292229e415eb12a6d063",
+          "bytes": 494116,
+          "width": 1200,
+          "height": 360,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "weekly-001-catch-value-rank-3/compact.webp",
+          "sha256": "a7b2eb4af8997dd3e417fcd04a91a84bc4b0c63b91792f32077c6a3fd2be7b8e",
+          "bytes": 27572,
+          "width": 600,
+          "height": 180,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "weekly-001-catch-value-rank-10",
+      "kind": "badge",
+      "files": {
+        "emblem": {
+          "path": "weekly-001-catch-value-rank-10/emblem.svg",
+          "sha256": "0cd460bef43ae84f8b6e94973d48d530fc74d8b48ad2233cecfb021bfcd55d97",
+          "bytes": 525
+        },
+        "png": {
+          "path": "weekly-001-catch-value-rank-10/art.png",
+          "sha256": "e7e2617c610cc47eb392f325a844d5c3dda5c0bca3fbbd58e471b1ef898ecc8f",
+          "bytes": 478476,
+          "width": 1200,
+          "height": 360,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "weekly-001-catch-value-rank-10/compact.webp",
+          "sha256": "01036a5937a71ede62cfc8dad414c84ac75276504bfda896d0c70cb303cfddc9",
+          "bytes": 26006,
+          "width": 600,
+          "height": 180,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "achievement-choice-pink",
+      "kind": "frame",
+      "files": {
+        "emblem": {
+          "path": "achievement-choice-pink/emblem.svg",
+          "sha256": "b4cefa2ae5d73abaed59f061143d4995f5457e03275172a294754d478a4607cf",
+          "bytes": 330
+        },
+        "border": {
+          "path": "achievement-choice-pink/border.png",
+          "sha256": "5f5ab5e44dd94aace79560973522c03763237782f1d6469deeea47bd2f63a3b9",
+          "bytes": 4409,
+          "width": 192,
+          "height": 192,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "border_source": {
+          "path": "achievement-choice-pink/border.svg",
+          "sha256": "1b0c962f0e07f61e1605358f84f88fc1db5eb0c97a947a3a274506956d6ce96f",
+          "bytes": 1845
+        },
+        "png": {
+          "path": "achievement-choice-pink/art.png",
+          "sha256": "b3119611b7ffd4dfe2a38ee05c903d74969d43a10913758239b2d4f9d66f5bcc",
+          "bytes": 16624,
+          "width": 480,
+          "height": 600,
+          "format": "PNG",
+          "alpha": false,
+          "transparent": false
+        },
+        "compact": {
+          "path": "achievement-choice-pink/compact.webp",
+          "sha256": "56e14a77e92087525d27dcb2ad34471c5cc017d99dc55140fd85f8139f26eecf",
+          "bytes": 3886,
+          "width": 240,
+          "height": 300,
+          "format": "WEBP",
+          "alpha": false,
+          "transparent": false
+        }
+      }
+    },
+    {
+      "id": "achievement-choice",
+      "kind": "badge",
+      "files": {
+        "emblem": {
+          "path": "achievement-choice/emblem.svg",
+          "sha256": "b4cefa2ae5d73abaed59f061143d4995f5457e03275172a294754d478a4607cf",
+          "bytes": 330
+        },
+        "png": {
+          "path": "achievement-choice/art.png",
+          "sha256": "5e8dd1abbb88ee47f32033bd6d6e426270400b2cafeb2427263a3c31363ac179",
+          "bytes": 18931,
+          "width": 256,
+          "height": 256,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "achievement-choice/compact.webp",
+          "sha256": "a9667fbbb9c6b87e3ff8d6f7220300af1c6d3ae0b891e8f60c7ff1cf5342202a",
+          "bytes": 4550,
+          "width": 128,
+          "height": 128,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    }
+  ]
+}

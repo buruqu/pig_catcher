@@ -47,6 +47,9 @@ class DispatchView:
     achievement_title: str = ""
     achievement_frame: str = ""
     achievement_badge: str = ""
+    # 仅影响模板路由和插画；不参与旅行、库存或经济结算。旧回执无字段仍可读。
+    presentation: str = "dispatch"
+    scene_key: str = ""
 
     def payload(self) -> dict[str, Any]:
         return asdict(self)
@@ -74,6 +77,8 @@ class DispatchView:
             achievement_title=data.get("achievement_title", ""),
             achievement_frame=data.get("achievement_frame", ""),
             achievement_badge=data.get("achievement_badge", ""),
+            presentation=data.get("presentation", "dispatch"),
+            scene_key=data.get("scene_key", ""),
         )
 
     def text(self) -> str:

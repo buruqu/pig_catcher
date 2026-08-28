@@ -13,8 +13,7 @@
 </style></head><body>
 <main class="game-sheet" data-pig-catcher-root data-render-ready="true" data-achievement-frame="{{ view.frame_text }}">
 <header class="game-header"><div class="game-header__copy"><p class="game-header__eyebrow">PiG Dream! · 成就总览</p><h1>{{ view.display_name }}</h1></div><div class="game-header__meta"><span>成就点</span><strong>{{ view.points }}</strong></div></header>
-{% set frame = cosmetic_detail(view.frame_text) %}
-<aside class="achievement-strip"><span class="achievement-token" style="--token-color:{{ frame.color }}"><b>{{ frame.glyph }}</b>{{ frame.name }}</span><span class="achievement-token"><b>✦</b>{{ view.title_text }}</span></aside>
+{% include 'achievement_strip.html' %}
 <section class="ach-body">
 <div class="ach-stats">
   <div class="ach-stat"><span>完成数量</span><strong>{{ view.unlocked_count }}/{{ view.total_count }}</strong></div>
@@ -26,6 +25,7 @@
 <div class="ach-section"><h2>最近解锁</h2><div class="ach-list">
 {% for item in view.recent %}
   <div class="ach-row"><span>{{ item.tier_label }}</span><b>{{ item.name }}</b><em>+{{ item.points }} 点</em></div>
+  {% if item.cosmetics %}{% from 'cosmetic_components.html' import cosmetic_preview %}<div class="cosmetic-gallery">{% for art in item.cosmetics %}{{ cosmetic_preview(art) }}{% endfor %}</div>{% endif %}
 {% else %}<div class="empty-state">尚未解锁成就，完成一次抓猪就会开始记录。</div>{% endfor %}
 </div></div>
 <div class="ach-section"><h2>奖励库存</h2><p class="ach-prose">{{ view.reward_inventory_text }}</p><p class="ach-prose">/成就奖励 查看三系统材料与专用券，预览、确认后使用。</p></div>

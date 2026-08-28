@@ -1,0 +1,13 @@
+{# 媒体与事实由调用方先做授权；本文件仅提供原生图标与准确文字。 #}
+{% macro asset_chip(key, label) -%}
+<span class="asset-state-chip">{{ asset_icon(key) }}<span>{{ label }}</span></span>
+{%- endmacro %}
+
+{% macro asset_media_state(state, kind='猪猪') -%}
+<div class="asset-media-state">{{ asset_icon(state) }}<span>{% if state == 'private' %}授权已撤回{% elif state == 'hidden' %}群专属 · 尚未发现{% elif state == 'unseen' %}尚未发现{% elif state == 'animated' %}动态{{ kind }}<br>详情查看{% else %}图片暂缺{% endif %}</span></div>
+{%- endmacro %}
+
+{% macro asset_body(body_label, extreme_label='') -%}
+{% if body_label %}{{ asset_chip(body_label, body_label) }}{% endif %}
+{% if extreme_label %}{{ asset_chip(extreme_label, extreme_label) }}{% endif %}
+{%- endmacro %}

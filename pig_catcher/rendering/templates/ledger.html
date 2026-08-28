@@ -10,16 +10,7 @@
 </head>
 <body>
   <main class="game-sheet ledger-sheet" data-pig-catcher-root data-render-ready="true">
-    <header class="game-header">
-      <div class="game-header__copy">
-        <p class="game-header__eyebrow">猪币账本 · 当前群个人流水</p>
-        <h1 style="font-size: {% if view.display_name|length > 60 %}16{% elif view.display_name|length > 40 %}20{% elif view.display_name|length > 24 %}31{% else %}42{% endif %}px">{{ view.display_name }}</h1>
-      </div>
-      <div class="game-header__meta">
-        <span>当前余额</span>
-        <strong>{{ view.coin_balance }}</strong>
-      </div>
-    </header>
+{% from 'feature_components.html' import header %}{{ header('collection', '当前群个人流水 · ' ~ view.display_name, '猪币账本', view.coin_balance, '当前余额', 'coin') }}
 
     <section class="ledger-summary">
       <div><span>流水合计</span><strong>{{ view.ledger_total }}</strong></div>
@@ -33,9 +24,9 @@
       {% for item in view.items %}
       <article class="ledger-row">
         <div class="ledger-row__amount {% if item.positive %}ledger-row__amount--positive{% endif %}">{{ item.amount_text }}</div>
-        <div class="ledger-row__copy">
-          <strong>{{ item.reason_text }}</strong>
-          <span>{{ item.created_at }}</span>
+        <div class="ledger-row__copy feature-ledger-reason">
+          {{ feature_icon('coin' if item.positive else 'receipt') }}<div><strong>{{ item.reason_text }}</strong>
+          <span>{{ item.created_at }}</span></div>
         </div>
         <div class="ledger-row__balance">
           <span>结余</span>

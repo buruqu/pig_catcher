@@ -54,6 +54,31 @@ def normalize_weights(weights: Sequence[float]) -> tuple[float, ...]:
     return tuple(value * 100.0 / total for value in normalized)
 
 
+def shift_original_probability_up_one_tier(
+    weights: Sequence[float],
+    *,
+    shift_percent: float,
+) -> tuple[float, ...]:
+    """按原概率由低档逐档搬移，每份概率最多上移一个可达星级。"""
+
+    original = normalize_weights(weights)
+    budget = float(shift_percent)
+    if not 0.0 <= budget <= 100.0:
+        raise DomainValidationError("升档概率预算必须位于 0 至 100 个百分点。")
+    adjusted = list(original)
+    for index in range(5):
+        if budget <= 0.0:
+            break
+        # 上一档刚搬来的质量不能继续搬走；原本不可达的目标档也不能被新增。
+        if original[index] <= 0.0 or original[index + 1] <= 0.0:
+            continue
+        moved = min(original[index], budget)
+        adjusted[index] -= moved
+        adjusted[index + 1] += moved
+        budget -= moved
+    return normalize_weights(adjusted)
+
+
 def feed_rarity_multipliers(feed_level: int) -> tuple[float, ...]:
     """返回猪饲料对六档抓猪权重的逐级相对乘数。"""
 

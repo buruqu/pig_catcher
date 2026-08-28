@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 import math
 import random
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -1249,12 +1249,16 @@ class AchievementService:
         )
 
     async def clear_equipped_cosmetics(self, identity: CommandIdentity) -> None:
-        await self._ensure_identity_profile(identity)
+        # Removing a cosmetic is not an achievement query. In particular, a
+        # weekly-only installation must not backfill or award disabled achievements.
+        now = _now_text(self.clock)
         async with self.database.transaction() as session:
+            await self.framework_repository.touch_identity(session, identity=identity, now=now)
+            await self.repository.ensure_profile(session, player_id=identity.player_id, now=now)
             await self.repository.clear_equipped_cosmetics(
                 session,
                 player_id=identity.player_id,
-                now=_now_text(self.clock),
+                now=now,
             )
 
     async def open_choice_chest(self, identity: CommandIdentity, choice: str) -> tuple[AchievementReward, ...]:
@@ -1537,6 +1541,16 @@ class AchievementService:
     async def cosmetics_for_player(self, player_id: str) -> AchievementCosmetics:
         async with self.database.transaction(immediate=False) as session:
             profile = await self.repository.profile_row(session, player_id=player_id)
+        return self._cosmetics_from_profile(profile)
+
+    async def cosmetics_for_players(self, player_ids: Sequence[str]) -> dict[str, AchievementCosmetics]:
+        keys = tuple(dict.fromkeys(player_ids))
+        async with self.database.transaction(immediate=False) as session:
+            rows = await self.repository.cosmetic_rows(session, player_ids=keys)
+        return {key: self._cosmetics_from_profile(rows.get(key)) for key in keys}
+
+    @staticmethod
+    def _cosmetics_from_profile(profile: Mapping[str, object] | None) -> AchievementCosmetics:
         return AchievementCosmetics(
             _REWARD_NAMES.get(
                 str(profile["equipped_title_id"] if profile else ""),
@@ -1547,12 +1561,12 @@ class AchievementService:
             next(
                 (
                     next(
-                        (_REWARD_NAMES.get(r.reward_id, d.name) for r in d.rewards if r.reward_type == "badge"), d.name
+                        (_REWARD_NAMES.get(r.reward_id, r.reward_id) for r in d.rewards if r.reward_type == "badge"), ""
                     )
                     for d in ACHIEVEMENT_DEFINITIONS
                     if profile and d.achievement_id == profile["showcase_achievement_id"]
                 ),
-                "",
+                WEEKLY_REWARD_NAMES.get(str(profile["showcase_achievement_id"] if profile else ""), ""),
             ),
         )
 

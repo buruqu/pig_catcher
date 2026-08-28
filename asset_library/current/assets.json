@@ -4616,7 +4616,7 @@
       "effect_id": "next-pig-stature",
       "effect_params": {
         "mode": "mini",
-        "strength": 0.22
+        "strength": 0.5
       },
       "paired_food_template_id": "",
       "collection": null

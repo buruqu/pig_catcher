@@ -1,4 +1,5 @@
 <!doctype html>
+{% from 'asset_components.html' import asset_chip, asset_media_state, asset_body %}
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
@@ -20,6 +21,7 @@
         <strong>{{ view.total_count }} 只</strong>
       </div>
     </header>
+    {% include 'achievement_strip.html' %}
 
     <section class="list-summary">
       <p>第 {{ view.page }}/{{ view.page_count }} 页 · 排序：{{ view.sort }}</p>
@@ -34,30 +36,36 @@
       {% for item in view.items %}
       <article class="inventory-item rarity-{{ item.rarity }}">
         <div class="inventory-item__media">
-          {% if media_data_urls.get(item.key) %}
+          {% if item.media_visible and media_data_urls.get(item.key) %}
           <img src="{{ media_data_urls[item.key] }}" alt="{{ item.display_name }}" style="object-fit: {{ item.image_fit }}">
           {% elif item.is_animated and item.media_visible %}
-          <span>动态猪猪<br>详情查看</span>
+          {{ asset_media_state('animated') }}
           {% elif not item.media_visible %}
-          <span>授权已撤回</span>
+          {{ asset_media_state('private') }}
           {% else %}
-          <span>暂无预览</span>
+          {{ asset_media_state('missing') }}
           {% endif %}
         </div>
         <h2 style="font-size: {% if item.display_name|length > 45 %}12{% elif item.display_name|length > 28 %}15{% elif item.display_name|length > 18 %}18{% else %}21{% endif %}px">{{ item.display_name }}</h2>
-        <div class="inventory-item__code">{{ "★" * item.rarity }} · #{{ item.short_code }}{% if item.is_favorite %} · ♥ 已收藏{% endif %}{% if item.activity_label %} · {{ item.activity_label }}{% endif %}</div>
+        <div class="inventory-item__code">{{ "★" * item.rarity }} · #{{ item.short_code }}</div>
+        {% if item.is_favorite or item.activity_label or (item.media_visible and (item.body_label or item.extreme_label)) %}
+        <div class="asset-state-row">
+          {% if item.is_favorite %}{{ asset_chip('favorite', '已收藏') }}{% endif %}
+          {% if item.activity_label %}{{ asset_chip('busy', item.activity_label) }}{% endif %}
+          {% if item.media_visible %}{{ asset_body(item.body_label, item.extreme_label) }}{% endif %}
+        </div>
+        {% endif %}
         {% if item.display_tags and item.media_visible %}
         <div class="asset-display-tags asset-display-tags--compact">
-          {% for tag in item.display_tags[:2] %}<span class="asset-display-tag">{{ tag }}</span>{% endfor %}
+          {% for tag in item.display_tags[:2] %}<span class="asset-display-tag">{{ asset_icon(tag) }}{{ tag }}</span>{% endfor %}
           {% if item.display_tags|length > 2 %}<span class="asset-display-tag asset-display-tag--more">+{{ item.display_tags|length - 2 }}</span>{% endif %}
         </div>
         {% endif %}
         <div class="inventory-item__facts">
-          <span>{{ item.size_value|physical_length }}</span>
-          <span>{{ item.weight_value|physical_weight }}</span>
+          <span class="asset-caption">{{ asset_icon('length') }}{{ item.size_value|physical_length }}</span>
+          <span class="asset-caption">{{ asset_icon('weight') }}{{ item.weight_value|physical_weight }}</span>
           <span>{{ item.fat_label }}</span>
           <span class="inventory-item__value">{{ item.official_value }} 猪币</span>
-          {% if item.body_label %}<span class="inventory-item__value">{{ item.body_label }}</span>{% endif %}
         </div>
       </article>
       {% endfor %}
@@ -67,7 +75,7 @@
     {% endif %}
 
     <footer class="game-footer">
-      <span>名称直选会处理最低价值未收藏实例；♥ 收藏资产不会被自动或批量处理</span>
+      <span>名称直选会处理最低价值未收藏实例；{{ asset_icon('favorite') }} 收藏资产不会被自动或批量处理</span>
       <strong>{{ view.page }}/{{ view.page_count }}</strong>
     </footer>
   </main>

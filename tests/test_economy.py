@@ -1351,7 +1351,7 @@ async def test_store_purchase_upgrade_insufficient_balance_and_ledger(
     database = await _database_with_catalog(tmp_path)
     clock = FixedClock()
     seed_identity = _identity(message_id="seed")
-    await _grant_coins(database, seed_identity, 2000)
+    await _grant_coins(database, seed_identity, 1600)
     service = EconomyService(
         database,
         CookingSection(cook_cooldown_seconds=0),
@@ -1362,11 +1362,11 @@ async def test_store_purchase_upgrade_insufficient_balance_and_ledger(
         ).__next__,
     )
     store = await service.store(seed_identity, page=1, category="全部")
-    assert store.coin_balance == 2000
+    assert store.coin_balance == 1600
     assert len(store.products) == 18
     products = {product.display_name: product for product in store.products}
-    assert products["超级幸运猪哨"].unit_price == 1320
-    assert products["超级主厨香料"].unit_price == 1180
+    assert products["超级幸运猪哨"].unit_price == 850
+    assert products["超级主厨香料"].unit_price == 2600
     store_card = store_view(store)
     assert tuple(row.value for row in store_card.feed_probability_rows) == (
         "13.00%",
@@ -1399,10 +1399,10 @@ async def test_store_purchase_upgrade_insufficient_balance_and_ledger(
     )
     assert tuple(row.after for row in store_card.chef_spice_rows) == (
         "1★ 57% · 2★ 40% · 3★ 3%",
-        "2★ 80% · 3★ 18% · 4★ 2%",
+        "2★ 77% · 3★ 21% · 4★ 2%",
         "2★ 2% · 3★ 78% · 4★ 18% · 5★ 2%",
-        "3★ 30% · 4★ 60% · 5★ 10%",
-        "4★ 30% · 5★ 70%",
+        "3★ 17% · 4★ 73% · 5★ 10%",
+        "4★ 17% · 5★ 83%",
     )
     assert store_card.super_chef_spice_rows[0].after == "5★ 80% · 6★ 20%"
     store_text = format_store_summary(store)
@@ -1416,7 +1416,7 @@ async def test_store_purchase_upgrade_insufficient_balance_and_ledger(
 
     item_identity = _identity(message_id="buy-item")
     item = await service.purchase(item_identity, "幸运猪哨", quantity=3)
-    assert item.balance_after == 560
+    assert item.balance_after == 520
     assert item.inventory_quantity == 3
     assert (await service.purchase(item_identity, "幸运猪哨", quantity=3)).receipt_created is False
 
@@ -1425,7 +1425,7 @@ async def test_store_purchase_upgrade_insufficient_balance_and_ledger(
         "厨具",
     )
     assert upgrade.upgrade_level == 1
-    assert upgrade.balance_after == 60
+    assert upgrade.balance_after == 220
     with pytest.raises(InsufficientBalanceError):
         await service.upgrade(
             _identity(message_id="buy-too-expensive"),
@@ -1437,7 +1437,7 @@ async def test_store_purchase_upgrade_insufficient_balance_and_ledger(
     )
     assert inventory is not None and inventory["quantity"] == 3
     ledger = await service.ledger(seed_identity, page=1)
-    assert ledger.coin_balance == ledger.ledger_total == 60
+    assert ledger.coin_balance == ledger.ledger_total == 220
     assert ledger.total_count == 3
     await database.close()
 

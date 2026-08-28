@@ -640,14 +640,14 @@ class EconomySection(PluginConfigBase):
         json_schema_extra=_ui("升级最高等级", "猪饲料和厨具均固定为 5 级", disabled=True),
     )
     feed_upgrade_prices: list[int] = Field(
-        default_factory=lambda: [500, 1200, 2800, 6500, 15000],
+        default_factory=lambda: [300, 800, 1800, 4000, 8000],
         min_length=5,
         max_length=5,
         description="猪饲料从一级到五级的购买价格",
         json_schema_extra=_ui("饲料升级价格", "按一级到五级顺序填写五个正整数"),
     )
     cookware_upgrade_prices: list[int] = Field(
-        default_factory=lambda: [500, 1200, 2800, 6500, 15000],
+        default_factory=lambda: [300, 700, 1600, 3500, 7000],
         min_length=5,
         max_length=5,
         description="厨具从一级到五级的购买价格",

@@ -24,12 +24,12 @@
 .reward-hint { margin: 22px 0 0; line-height: 1.6; font-size: 14px; color: #967887; }
 </style></head><body>
 <main class="game-sheet" data-pig-catcher-root data-render-ready="true">
-<header class="game-header"><div class="game-header__copy"><p class="game-header__eyebrow">{{ view.player_name }} · {{ view.food_name }}</p><h1>{{ view.title }}</h1></div><div class="game-header__meta"><span>奖励归属</span><strong style="font-size: 24px">本人领取</strong></div></header>
+{% from 'feature_components.html' import header %}{{ header('ultimate' if view.animation else 'collection', view.player_name ~ ' · ' ~ view.food_name, view.title, '本人领取', '奖励归属', 'ticket') }}
 <section class="rewards-body">
 {% if artwork %}<img class="reward-art" src="{{ artwork }}" alt="947奖励揭晓插画">{% endif %}
-<div class="reward-banner">{% if view.prize_label %}<strong>{{ view.prize_label }}</strong>{% endif %}<p>{{ view.summary }}</p></div>
+<div class="reward-banner{% if view.animation %} feature-jackpot-banner{% endif %}">{% if view.prize_label %}<strong>{{ view.prize_label }}</strong>{% endif %}<p>{{ view.summary }}</p></div>
 <div class="reward-grid">{% for item in view.items %}<article class="reward-item rarity-{{ item.rarity }}">
-{% if previews.get(item.key) and item.media_visible %}<img src="{{ previews[item.key] }}" alt="{{ item.name }}">{% else %}<div class="reward-token reward-token--{{ item.tone }}">{{ item.token_label }}</div>{% endif %}
+{% if previews.get(item.key) and item.media_visible %}<img src="{{ previews[item.key] }}" alt="{{ item.name }}">{% else %}<div class="reward-token reward-token--{{ item.tone }}">{{ feature_icon(item.name if item.tone in ['material','ticket'] else 'box' if item.tone == 'chest' else 'pig') }}</div>{% endif %}
 <div class="reward-copy"><p class="reward-kind">{% if item.rarity %}{{ '★' * item.rarity }} · {% endif %}{{ item.kind_label }}</p><h3>{{ item.name }}{% if item.quantity > 1 %} ×{{ item.quantity }}{% endif %}</h3>{% if item.short_code %}<p class="reward-code">#{{ item.short_code }}</p>{% endif %}<p>{{ item.detail }}</p>{% if item.balance_after is not none %}<p class="reward-balance">到账后库存 {{ '{:,}'.format(item.balance_after) }}</p>{% endif %}</div>
 </article>{% endfor %}</div>
 <div class="reward-stats"><span>当前猪币 {{ '{:,}'.format(view.coin_balance) }}</span><span>品鉴经验 +{{ view.experience }}</span>{% if view.coin_bonus %}<span>本次额外猪币 +{{ '{:,}'.format(view.coin_bonus) }}</span>{% endif %}</div>

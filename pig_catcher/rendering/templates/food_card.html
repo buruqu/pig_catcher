@@ -10,8 +10,10 @@
   </style>
 </head>
 <body>
+  {% from 'cosmetic_components.html' import cosmetic_plate, cosmetic_badge, cosmetic_frame %}
   {% set has_probability = view.coin_reward is not none and (view.probability_line or view.probability_summary) %}
-  <main class="game-sheet pig-card food-card rarity-{{ view.rarity }}{% if view.description|length > 160 %} pig-card--long{% endif %}{% if has_probability %} pig-card--probability{% endif %}"{% if view.achievement_frame %} style="outline:6px solid {% if 'purple' in view.achievement_frame %}#76539c{% elif 'gold' in view.achievement_frame %}#d3a52c{% else %}#dc8aaa{% endif %};outline-offset:-6px"{% endif %} data-achievement-frame="{{ view.achievement_frame }}" data-pig-catcher-root data-render-ready="true">
+  <main class="game-sheet pig-card food-card rarity-{{ view.rarity }}{% if view.description|length > 160 %} pig-card--long{% endif %}{% if has_probability %} pig-card--probability{% endif %}" data-achievement-frame="{{ view.achievement_frame }}" data-pig-catcher-root data-render-ready="true">
+    {{ cosmetic_frame(view.achievement_frame) }}
     {% if view.achievement_firework %}<div class="achievement-firework"><span>✦ ✧ ✦</span><span>PiG Dream!</span><span>✦ ✧ ✦</span></div>{% endif %}
     <header class="game-header pig-card__header">
       <div class="game-header__copy">
@@ -40,9 +42,8 @@
         <span class="pill">{{ view.media_format }}{% if view.is_animated %} · 动态{% endif %}</span>
         {% if view.catalog_new_count %}<span class="pill pill--mint">新图鉴 {{ view.catalog_new_count }}</span>{% endif %}
         {% if view.bonus_selector %}<span class="pill pill--gold">大份餐盒加餐</span>{% endif %}
-        {% if view.achievement_badge|default('') %}{% set badge = cosmetic_detail(view.achievement_badge) %}<span class="achievement-token"><b>{{ badge.glyph }}</b>{{ badge.name }}</span>{% endif %}
-        {% if view.achievement_title %}<span class="pill pill--gold">成就称号 · {{ view.achievement_title }}</span>{% endif %}
       </div>
+      {% if view.achievement_title or view.achievement_badge %}<div class="result-cosmetics">{{ cosmetic_plate(view.achievement_title) }}{{ cosmetic_badge(view.achievement_badge) }}</div>{% endif %}
       <div class="pig-card__facts">
         <div class="pig-card__fact">
           <span>出餐份量</span>

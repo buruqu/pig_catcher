@@ -1,4 +1,5 @@
 <!doctype html>
+{% from 'cosmetic_components.html' import cosmetic_plate %}
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
@@ -14,6 +15,15 @@
     .weekly-player{min-width:0}.weekly-player strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:21px}.weekly-player span{display:block;margin-top:4px;color:#896f79;font-size:13px}
     .weekly-score{text-align:right;color:#a14568;font-size:22px;font-weight:900}.weekly-catches,.weekly-best{text-align:right;color:#725f68;font-size:15px}.weekly-best strong{display:block;color:#3c3038;font-size:17px}
     .weekly-self{margin:0 38px 24px;padding:15px 18px;border-left:5px solid #d84f83;background:#fff0f5;color:#713d52;font-size:17px;font-weight:800}
+    .weekly-event-art{padding:16px 38px 22px;background:#fff9fc;border-bottom:1px solid #efd7e0}
+    .weekly-identity{display:flex;align-items:center;gap:26px}.weekly-identity .cosmetic-plate{width:650px;margin:0;flex-shrink:0}
+    .weekly-identity p{font-size:17px;line-height:1.65;color:#8e5d73;margin:0;overflow-wrap:anywhere}
+    .weekly-reward-gallery{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:12px}
+    .weekly-reward-gallery article{min-width:0;text-align:center}.weekly-reward-gallery .cosmetic-plate{width:100%;margin:0}
+    .weekly-reward-gallery span{font-size:15px;line-height:1.5;color:#7c5d6d;display:block;margin-top:6px}
+    .weekly-art-note{padding:16px 38px;margin:0;background:#fffafd;color:#806b77;font-size:16px;line-height:1.6}
+    .weekly-player strong{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;line-height:1.35}
+    .weekly-score,.weekly-best,.weekly-meta strong{overflow-wrap:anywhere}
   </style>
 </head>
 <body>
@@ -22,6 +32,16 @@
     <div class="game-header__copy"><p class="game-header__eyebrow">PiG Dream! · 第 {{ view.season_number }} 期周冲榜</p><h1>{{ view.name }}</h1></div>
     <div class="game-header__meta"><span>{{ view.group_name }}</span><strong>{{ view.status_label }}</strong></div>
   </header>
+  {% if view.season_number == 1 %}
+  <section class="weekly-event-art" aria-label="本期收藏外观预览">
+    <div class="weekly-identity">{{ cosmetic_plate('weekly-001-catch-value-title', compact=False) }}<p>本期专属收藏外观<br>前三名获得对应色段<br>第4–10名共享10牌<br>预览不代表已经获奖</p></div>
+    <div class="weekly-reward-gallery">
+      {% for rank, label in [(1,'第1名 · 冠军色段'),(2,'第2名 · 亚军色段'),(3,'第3名 · 季军色段'),(10,'第4–10名 · TOP 10')] %}
+      <article>{{ cosmetic_plate('weekly-001-catch-value-rank-' ~ rank) }}<span>{{ label }}</span></article>
+      {% endfor %}
+    </div>
+  </section>
+  {% else %}<p class="weekly-art-note">本期使用独立赛事信息；其他期的活动牌不会混用。名次与奖励以本期结算规则为准。</p>{% endif %}
   <section class="weekly-meta">
     <article><span>活动周期</span><strong>{{ view.period_text }}</strong></article>
     <article><span>排名指标</span><strong>{{ view.metric_label }}</strong></article>

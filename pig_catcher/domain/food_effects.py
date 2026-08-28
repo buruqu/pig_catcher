@@ -840,7 +840,7 @@ def resolve_food_effect(
             (
                 f"接下来{uses}次抓猪更容易出现{label}个体，体型偏移{'+' if mode == 'giant' else '-'}{strength:g}。"
                 if uses > 1
-                else f"下一次抓猪更容易出现{label}个体。"
+                else f"下一次抓猪更容易出现{label}个体，体型偏移{'+' if mode == 'giant' else '-'}{strength:g}。"
             ),
         )
     if normalized_id == NEXT_GIANT_FIVE_STAR_CATCH:

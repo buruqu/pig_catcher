@@ -1,4 +1,5 @@
 <!doctype html>
+{% from 'cosmetic_components.html' import cosmetic_plate %}
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
@@ -24,27 +25,27 @@
     <section class="list-summary">
       <p>第 {{ view.page }}/{{ view.page_count }} 页</p>
       <div class="pill-row">
-        <span class="pill pill--blue">体型 cm / m</span>
-        <span class="pill pill--gold">重量 kg / t</span>
+        <span class="pill pill--blue asset-caption">{{ asset_icon('length') }}体型 cm / m</span>
+        <span class="pill pill--gold asset-caption">{{ asset_icon('weight') }}重量 kg / t</span>
       </div>
     </section>
 
     {% if view.global_items %}
     <section class="record-feature">
       <div class="record-feature__heading">
-        <div><span>全群绝对纪录</span><strong>不分品种的体型与重量最高值</strong></div>
+        <div><span class="asset-caption">{{ asset_icon('record') }}全群绝对纪录</span><strong>不分品种的体型与重量最高值</strong></div>
         <b>{{ view.global_items|length }} 项</b>
       </div>
       <div class="records-list records-list--feature">
         {% for item in view.global_items %}
         <div class="record-row rarity-{{ item.rarity }}">
-          <div class="record-row__type">{{ item.record_label }}最高</div>
+          <div class="record-row__type">{{ asset_icon('length' if item.unit == 'cm' else 'weight') }}{{ item.record_label }}最高</div>
           <div class="record-row__pig">
             <strong>{{ "★" * item.rarity }} {{ item.display_name }}</strong>
             <span>#{{ item.short_code }} · {{ item.achieved_at }}</span>
           </div>
           <div class="record-row__value">{{ item.record_value|physical_measurement(item.unit) }}</div>
-          <div class="record-row__holder">{{ item.holder_display_name }}</div>
+          <div class="record-row__holder"><span class="asset-holder-name">{{ item.holder_display_name }}</span>{{ cosmetic_plate(item.achievement_title) }}</div>
         </div>
         {% endfor %}
       </div>
@@ -54,7 +55,7 @@
     {% if view.giant_sightings %}
     <section class="record-feature record-feature--sightings">
       <div class="record-feature__heading">
-        <div><span>最近巨物目击</span><strong>达到绝对体型或重量门槛后永久留档</strong></div>
+        <div><span class="asset-caption">{{ asset_icon('giant') }}最近巨物目击</span><strong>达到绝对体型或重量门槛后永久留档</strong></div>
         <b>{{ view.giant_sightings|length }} 条</b>
       </div>
       <div class="giant-sighting-list">
@@ -62,8 +63,9 @@
         <div class="giant-sighting-row rarity-{{ item.rarity }}">
           <div class="giant-sighting-row__score">{{ "%.1f"|format(item.giant_score) }}</div>
           <div>
-            <strong>{{ item.qualification_label }} · {{ "★" * item.rarity }} {{ item.display_name }}</strong>
-            <span>#{{ item.short_code }} · {{ item.holder_display_name }} · {{ item.achieved_at }}</span>
+            <strong class="asset-sighting-qualification">{{ asset_icon(item.qualification_label) }}{{ item.qualification_label }} · {{ "★" * item.rarity }} {{ item.display_name }}</strong>
+            <span class="asset-holder-line">#{{ item.short_code }} · {{ item.holder_display_name }} · {{ item.achieved_at }}</span>
+            {{ cosmetic_plate(item.achievement_title) }}
           </div>
           <b>{{ item.size_value|physical_length }}<br>{{ item.weight_value|physical_weight }}</b>
         </div>
@@ -76,18 +78,18 @@
     <section class="records-list">
       {% for item in view.items %}
       <div class="record-row rarity-{{ item.rarity }}">
-        <div class="record-row__type">{{ item.record_label }}</div>
+        <div class="record-row__type">{{ asset_icon('length' if item.unit == 'cm' else 'weight') }}{{ item.record_label }}</div>
         <div class="record-row__pig">
           <strong style="font-size: {% if item.display_name|length > 48 %}12{% elif item.display_name|length > 28 %}15{% else %}19{% endif %}px">{{ "★" * item.rarity }} {{ item.display_name }}</strong>
           <span>#{{ item.short_code }} · {{ item.achieved_at }}</span>
         </div>
         <div class="record-row__value">{{ item.record_value|physical_measurement(item.unit) }}</div>
-        <div class="record-row__holder">{{ item.holder_display_name }}</div>
+        <div class="record-row__holder"><span class="asset-holder-name">{{ item.holder_display_name }}</span>{{ cosmetic_plate(item.achievement_title) }}</div>
       </div>
       {% endfor %}
     </section>
     {% else %}
-    <section style="padding:32px 38px"><div class="empty-state">本群还没有猪猪纪录</div></section>
+    <section style="padding:32px 38px"><div class="empty-state"><div class="asset-empty-icon">{{ asset_icon('record') }}</div>本群还没有猪猪纪录</div></section>
     {% endif %}
 
     <footer class="game-footer">

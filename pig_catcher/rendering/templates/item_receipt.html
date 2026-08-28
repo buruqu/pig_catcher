@@ -9,22 +9,15 @@
   </style>
 </head>
 <body>
+  {% from 'feature_components.html' import header %}
   <main class="game-sheet item-receipt" data-pig-catcher-root data-render-ready="true">
-    <header class="game-header">
-      <div class="game-header__copy">
-        <p class="game-header__eyebrow">连续使用道具 · 成功动作时才消耗</p>
-        <h1>{{ "道具已装备" if view.operation == "armed" else "道具已取消" }}</h1>
-      </div>
-      <div class="game-header__meta">
-        <span>适用动作</span>
-        <strong>{{ view.action_label }}</strong>
-      </div>
-    </header>
+{{ header('collection', '连续使用道具 · 成功动作时才消耗', '道具已装备' if view.operation == 'armed' else '道具已取消', view.action_label, '适用动作', view.item_name) }}
 
     <section class="item-receipt__body">
-      <div class="item-receipt__mark">{{ "✓" if view.operation == "armed" else "×" }}</div>
+      <div class="feature-item-emblem">{{ feature_icon(view.item_name) }}</div>
       <div class="item-receipt__copy">
         <h2 style="font-size: {% if view.item_name|length > 45 %}18{% elif view.item_name|length > 28 %}24{% else %}34{% endif %}px">{{ view.item_name }}</h2>
+        <div class="feature-item-queue"><div><span>当前库存</span><strong>{{ view.quantity }}</strong></div><div><span>{{ '已排队 / 剩余' if view.operation == 'armed' else '已取消队列' }}</span><strong>{{ view.armed_uses }} 次</strong></div></div>
         <p>
           {% if view.operation == "armed" %}
           已安排连续 {{ view.armed_uses }} 次兼容的 {{ view.action_label }}。参数错误、冷却或结算失败都不会消耗。

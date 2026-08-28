@@ -12,7 +12,7 @@ from ..domain.battle_catalog import (
     MATERIAL_IDS,
     TOOLS_BY_ID,
 )
-from ..domain.battle_views import BattleView, FighterCard
+from ..domain.battle_views import BattleView, BattleWheelCard, BattleWheelSegment, FighterCard
 from ..domain.dispatch import MATERIALS, safe_display_name
 from ..domain.dispatch_views import DispatchLine as Line
 from ..domain.dispatch_views import DispatchPanel as Panel
@@ -74,6 +74,17 @@ def move_line(event: dict) -> Line:
     return Line(f"{event['ordinal']}. {event['name']}", value, note)
 
 
+def wheel_card(kind: str, title: str, options: tuple, selected=None, note: str = "") -> BattleWheelCard:
+    """只投影给定的权重与已抽结果，不执行任何抽签。"""
+    return BattleWheelCard(
+        kind,
+        title,
+        tuple(BattleWheelSegment(str(label), weight) for label, weight in options),
+        next((i for i, (label, _weight) in enumerate(options) if label == selected), None),
+        note,
+    )
+
+
 def matchup(
     identity: CommandIdentity,
     match: dict,
@@ -88,7 +99,22 @@ def matchup(
 ) -> BattleView:
     display_sides = round_result["after"] if round_result else state["sides"]
     total = sum(side["weight"] for side in display_sides)
-    cards, panels = [], list(extra_panels)
+    cards, panels, wheel_cards = [], list(extra_panels), []
+    # 伤势结算后可能已治愈；出招数图必须使用抽取时(before)的盘，而非刚变化的伤势。
+    count_sides = round_result["before"] if round_result else display_sides
+    for count_side in count_sides:
+        turn = count_side["turn"]
+        if turn["raw"] is not None:
+            options = HEAVY_COUNT_WHEEL if count_side["heavy"] else COUNT_WHEEL
+            wheel_cards.append(
+                wheel_card(
+                    "count",
+                    count_side["snapshot"]["player_name"] + " · 出招数落点",
+                    tuple((f"{number}招", weight) for number, weight in options),
+                    f"{turn['raw']}招",
+                    f"原始{turn['raw']}招 - 贷款{weight_label(turn['debt'])}招 = 实际{turn['effective']}招。",
+                )
+            )
     for side in display_sides:
         snap, turn = side["snapshot"], side["turn"]
         if match["status"] == "pending" and snap.get("coupon_preview"):
@@ -143,6 +169,17 @@ def matchup(
             )
         )
     if events:
+        last = events[-1]
+        moves = FIGHTERS_BY_ID[last["fighter_id"]].moves
+        wheel_cards.append(
+            wheel_card(
+                "move",
+                FIGHTERS_BY_ID[last["fighter_id"]].name + " · 第" + str(last["ordinal"]) + "招落点",
+                tuple((move.name, move.draw_weight) for move in moves),
+                last["name"],
+                "本图展示本次最后一招的真实落点；下方保留逐招数值，不重新抽取。",
+            )
+        )
         panels.append(
             Panel(
                 "本次招式结算",
@@ -154,6 +191,15 @@ def matchup(
     if round_result:
         winner = display_sides[round_result["winner"]]["snapshot"]["player_name"]
         loser = display_sides[round_result["loser"]]["snapshot"]["player_name"]
+        wheel_cards.append(
+            wheel_card(
+                "injury",
+                loser + " · 伤势盘落点",
+                tuple((INJURY_NAMES[key], weight) for key, weight in round_result["injury_wheel"]),
+                INJURY_NAMES[round_result["injury"]],
+                "扇区按本轮抽取时的风险权重绘制；标记是已经保存的结果。",
+            )
+        )
         panel_note = (
             "整场结束，败者获得5次额外战利品抓猪，全部归胜者。"
             if round_result["natural_end"]
@@ -212,6 +258,7 @@ def matchup(
         win_percent=f"{display_sides[0]['weight'] * 10000 // total / 100:.2f}",
         panels=tuple(panels),
         hints=hints,
+        wheels=tuple(wheel_cards),
         celebration=state["status"] == "completed"
         or (
             state["status"] == "active"
@@ -237,6 +284,25 @@ def wheels(identity: CommandIdentity, fighter_id: str, level: int = 0) -> Battle
         identity,
         definition.name + " · 战斗轮盘",
         banner=f"展示强化+{level}的数值。功能招式不强化，抽中概率不随升级变化。",
+        wheels=(
+            wheel_card(
+                "move",
+                definition.name + " · 等权招式盘",
+                tuple((move.name, move.draw_weight) for move in definition.moves),
+                note="规则预览；没有抽取，强化只增加数值招式的胜利权重。",
+            ),
+            wheel_card("count", "正常出招数", tuple((f"{number}招", weight) for number, weight in COUNT_WHEEL)),
+            wheel_card("count", "重伤出招数", tuple((f"{number}招", weight) for number, weight in HEAVY_COUNT_WHEEL)),
+            *(
+                wheel_card(
+                    "injury",
+                    ("初始风险", "轻伤风险", "重伤风险")[i],
+                    tuple((INJURY_NAMES[key], weight) for key, weight in options),
+                    note="扇区面积为抽取权重占比；不是胜利概率。",
+                )
+                for i, options in enumerate(INJURY_WHEELS)
+            ),
+        ),
         panels=(
             Panel("等权招式盘", tuple(moves)),
             Panel(

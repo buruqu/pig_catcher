@@ -188,7 +188,7 @@ class ItemBagService:
             panels=panels or (Panel("背包空空", (Line("暂无道具", "去 /猪猪商城 查看，或通过吃菜与成就获得奖励。"),)),),
             hints=(
                 "/道具背包 [页码]；/使用道具 道具名 [数量]；/取消道具 抓猪|做菜。",
-                "/成就奖励 查看活动券/自选材料份；/派遣背包 查看原料；/抓猪成就 查看外观收藏。",
+                "/成就奖励 查看活动券/自选材料份；/派遣背包 查看原料；/猪猪成就 查看外观收藏。",
                 *COUPON_HELP,
             ),
             page=page,
@@ -467,6 +467,7 @@ class ItemBagService:
             title,
             safe_display_name(identity.display_name, identity.user_id),
             subtitle="道具与奖励",
+            presentation="item-bag",
             **kwargs,
         )
 

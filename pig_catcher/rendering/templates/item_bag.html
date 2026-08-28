@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><style>:root{--font-family:{{ font_family }};}{{ theme_css|safe }}</style></head><body>
+{% from 'feature_components.html' import header, stats, pigs, panels, hints %}
+<main class="game-sheet feature-item-bag" data-achievement-frame="{{ view.achievement_frame }}" data-pig-catcher-root data-render-ready="true">
+{{ header('collection', 'PiG Dream! · 道具与奖励', view.title, view.player_name, '道具持有人', 'box') }}
+{% include 'achievement_strip.html' %}
+<div class="feature-body">
+{% if view.title == '道具背包' %}<section class="feature-bag-guide">{{ feature_icon('box') }}<div><h2>把好运，整齐放进行李箱</h2><p>装备、排队、待命都来自同一份库存；下面显示的是当前可用状态。</p></div></section>{% endif %}
+{% if view.banner %}<div class="feature-banner">{{ view.banner }}</div>{% endif %}
+{{ stats(view.stats) }}{{ pigs(view.pigs, previews, 3, '自选猪猪') }}{{ panels(view.panels, 'collection', view.title == '道具背包') }}{{ hints(view.hints) }}
+</div><footer class="game-footer"><span>按群独立 · 先确认后结算 · 不重复扣券</span><strong>{% if view.page_count > 1 %}{{ view.page }}/{{ view.page_count }}{% else %}道具与奖励{% endif %}</strong></footer>
+</main></body></html>

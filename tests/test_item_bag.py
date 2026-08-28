@@ -230,7 +230,10 @@ async def test_bag_store_queues_legacy_activation_and_activity_selection_not_dou
 
 async def test_bag_empty_scope_isolation_page_clamp_and_tools(world):
     w = world
-    assert "背包空空" in (await w.service.bag(w.identity)).view.text()
+    empty_text = (await w.service.bag(w.identity)).view.text()
+    assert "背包空空" in empty_text
+    assert "/猪猪成就 查看外观收藏" in empty_text
+    assert "/抓猪成就" not in empty_text
     await w.grant(PIG_CHOICE_COUPON)
     other = _identity(group_id="101")
     assert "背包空空" in (await w.service.bag(other)).view.text()

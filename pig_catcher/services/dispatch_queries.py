@@ -287,6 +287,7 @@ class DispatchQueries:
         return self.view(
             identity,
             f"{'出发啦' if started else '出发预览'} · 第{snapshot['slot']}队",
+            scene_key=region.region_id,
             panels=panels,
             pigs=tuple(pig_card(m) for m in snapshot["members"]),
             stats=(
@@ -464,6 +465,7 @@ class DispatchQueries:
             identity,
             f"{REGIONS_BY_ID[snapshot['region_id']].name} · {_STATUS[trip['status']]}",
             subtitle=f"猪猪游记 · {trip['trip_id']}",
+            scene_key=snapshot["region_id"],
             panels=tuple(panels),
             pigs=tuple(pig_card(m) for m in displayed_members),
             stats=(

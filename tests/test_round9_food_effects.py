@@ -241,7 +241,7 @@ async def test_hot_pig_rewards_stack_with_item_and_stature_but_same_rewards_queu
     for index in range(4):
         result = await gameplay.catch(replace(identity, message_id=f"hot-{index}"))
         assert result.pig.rarity == 1
-        assert result.coin_reward == (24 if index == 0 else 22)
+        assert result.coin_reward == (26 if index == 0 else 22)
         assert result.experience_reward == (12 if index == 0 else 8)
         rows = await _effects(db, identity.player_id)
         assert rows[first]["consumed_uses"] == min(3, index + 1)

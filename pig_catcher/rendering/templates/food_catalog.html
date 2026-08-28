@@ -1,4 +1,5 @@
 <!doctype html>
+{% from 'asset_components.html' import asset_media_state %}
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
@@ -20,6 +21,7 @@
         <strong>{{ view.collected_count }}/{{ view.visible_catalog_total }}</strong>
       </div>
     </header>
+    {% include 'achievement_strip.html' %}
 
     <section class="list-summary">
       <p>按品质完整排列 · 当前显示 {{ view.total_count }} 项</p>
@@ -45,18 +47,22 @@
           <article class="catalog-item rarity-{{ item.rarity }}{% if not item.discovered %} catalog-item--unknown{% endif %}">
             <span class="catalog-item__stars">{{ "★" * item.rarity }}</span>
             <div class="catalog-item__media">
-              {% if item.discovered and media_data_urls.get(item.key) %}
+              {% if not item.discovered %}
+              {{ asset_media_state('hidden' if item.rarity == 6 else 'unseen', '美食') }}
+              {% elif not item.media_visible %}
+              {{ asset_media_state('private', '美食') }}
+              {% elif media_data_urls.get(item.key) %}
               <img src="{{ media_data_urls[item.key] }}" alt="{{ item.display_name }}" style="object-fit: {{ item.image_fit }}">
-              {% elif item.discovered and item.is_animated %}
-              <span>动态美食<br>详情查看</span>
+              {% elif item.is_animated %}
+              {{ asset_media_state('animated', '美食') }}
               {% else %}
-              <span>?</span>
+              {{ asset_media_state('missing', '美食') }}
               {% endif %}
             </div>
             <h2 style="font-size: {% if item.display_name|length > 50 %}9{% elif item.display_name|length > 32 %}11{% elif item.display_name|length > 20 %}13{% else %}16{% endif %}px">{{ item.display_name if item.discovered else "???" }}</h2>
             {% if item.discovered %}
             <div class="catalog-item__facts">获得 {{ item.acquired_count }} 次<br>最大 {{ (item.best_portion_weight or 0)|physical_weight }}</div>
-            {% if item.effect_summary %}
+            {% if item.effect_summary and item.media_visible %}
             <div class="catalog-item__effect">{{ item.effect_summary }}</div>
             {% endif %}
             {% else %}

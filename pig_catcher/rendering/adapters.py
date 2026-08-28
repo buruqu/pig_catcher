@@ -56,6 +56,7 @@ from ..services.gameplay import (
     PlayerProfile,
     RecordsPage,
     TechniqueActivationResult,
+    TechniqueFoodView,
 )
 from ..services.quota import CatchQuotaResetResult
 from ..services.social import (
@@ -90,6 +91,7 @@ from .models import (
     FoodInventoryItemViewModel,
     FoodInventoryViewModel,
     GiantSightingViewModel,
+    GroupEventAssetViewModel,
     GroupEventRowViewModel,
     GroupEventViewModel,
     InventoryItemViewModel,
@@ -357,6 +359,15 @@ def inventory_view(page: InventoryPage) -> InventoryViewModel:
                 is_favorite=pig.is_favorite,
                 activity_label=pig.activity_label,
                 display_tags=pig.display_tags if pig.media_visible else (),
+                # 只标注已存百分位，沿用成就/体格的0.92/0.88与0.08/0.15口径。
+                # 这是物理特征，不代表成就已达成；绝对双项巨物仍单独显示。
+                extreme_label=(
+                    "双顶壮硕"
+                    if pig.media_visible and pig.size_percentile >= 0.92 and pig.weight_percentile >= 0.88
+                    else "双顶迷你"
+                    if pig.media_visible and pig.size_percentile <= 0.08 and pig.weight_percentile <= 0.15
+                    else ""
+                ),
             )
             for pig in page.pigs
         ),
@@ -413,6 +424,7 @@ def records_view(page: RecordsPage) -> RecordsViewModel:
                 short_code=entry.short_code,
                 holder_display_name=entry.holder_display_name,
                 achieved_at=_display_time(entry.achieved_at),
+                player_id=entry.player_id,
             )
             for entry in page.entries
         ),
@@ -426,6 +438,7 @@ def records_view(page: RecordsPage) -> RecordsViewModel:
                 short_code=entry.short_code,
                 holder_display_name=entry.holder_display_name,
                 achieved_at=_display_time(entry.achieved_at),
+                player_id=entry.player_id,
             )
             for entry in page.global_entries
         ),
@@ -446,6 +459,7 @@ def records_view(page: RecordsPage) -> RecordsViewModel:
                     else "重量巨物"
                 ),
                 achieved_at=_display_time(entry.achieved_at),
+                player_id=entry.player_id,
             )
             for entry in page.giant_sightings
         ),
@@ -469,6 +483,7 @@ def daily_giants_view(result: DailyGiants) -> DailyGiantsViewModel:
             media_visible=entry.media_visible,
             is_animated=entry.is_animated,
             image_fit=entry.image_fit,
+            player_id=entry.player_id,
         )
 
     return DailyGiantsViewModel(
@@ -1192,6 +1207,32 @@ def roulette_event_view(
         seal_bottom="结算",
         actor_label="转轮群友",
         committed_note="本次轮盘奖励已经提交；重复消息不会重复抽取",
+        roulette_outcome=result.outcome,
+    )
+
+
+def _group_event_asset(asset: PigView | FoodView | TechniqueFoodView, *, kind_label: str) -> GroupEventAssetViewModel:
+    """Project only a committed asset; do not reveal an out-of-scope media identity."""
+    if not asset.media_visible:
+        detail = "当前群未开放此素材预览"
+    elif isinstance(asset, TechniqueFoodView):
+        detail = "已自动出餐并写入背包"
+    else:
+        detail = f"价值 {asset.official_value:,} 猪币"
+    return GroupEventAssetViewModel(
+        key=asset.short_code,
+        name=asset.display_name if asset.media_visible else "已隐藏的专属资产",
+        short_code=asset.short_code,
+        rarity=asset.rarity,
+        kind_label=kind_label,
+        owner_name=_public_actor_name(
+            display_name=asset.owner_display_name,
+            stable_id=asset.owner_player_id,
+        ),
+        detail=detail,
+        image_fit=asset.image_fit,
+        media_visible=asset.media_visible,
+        is_animated=asset.is_animated,
     )
 
 
@@ -1209,7 +1250,8 @@ def technique_activation_view(
         stable_id=actor_player_id,
     )
     if result.technique_id == TECHNIQUE_HOLLOW_PURPLE:
-        selectors = "、".join(pig.selector for pig in result.granted_pigs)
+        assets = tuple(_group_event_asset(pig, kind_label="猪猪") for pig in result.granted_pigs)
+        selectors = "、".join(f"{asset.name}#{asset.short_code}" for asset in assets)
         preview_pig = result.granted_pigs[0] if result.granted_pigs else None
         return GroupEventViewModel(
             tone="technique",
@@ -1221,21 +1263,19 @@ def technique_activation_view(
             event_time=_display_time(result.receipt.created_at),
             hero_label="本次获得",
             hero_value=f"{len(result.granted_pigs)} 只六星猪",
-            rows=tuple(
-                GroupEventRowViewModel(
-                    f"六星猪 {index + 1}",
-                    pig.selector,
-                    f"价值 {pig.official_value:,} 猪币",
-                )
-                for index, pig in enumerate(result.granted_pigs[:3])
+            rows=(
+                GroupEventRowViewModel("实际入库", f"{len(assets)} 只", "完整清单逐只展示图片、编号与归属"),
+                GroupEventRowViewModel("剩余虚式资格", f"{result.remaining_permits} 次", "重复查看不会再次发放"),
+                GroupEventRowViewModel("发放状态", "已到账", "五只猪猪在同一事务内原子发放"),
             ),
-            note=(f"完整资产编号：{selectors}。剩余虚式资格 {result.remaining_permits} 次。"),
+            note=f"完整资产编号：{selectors}。编号、品质和归属均来自本次已提交回执。",
             footer="虚式奖励已原子发放",
             seal_top="虚式",
             seal_bottom="结算",
             media_visible=bool(preview_pig is not None and preview_pig.media_visible),
             is_animated=bool(preview_pig is not None and preview_pig.is_animated),
             image_fit=(preview_pig.image_fit if preview_pig is not None else "contain"),
+            assets=assets,
         )
     technique_name = TECHNIQUE_DISPLAY_NAMES.get(
         result.technique_id,
@@ -1307,7 +1347,8 @@ def technique_catch_event_view(
             and bool(foods)
             and all(food.owner_player_id == resolution.source_player_id for food in foods)
         )
-        owner_summary = "、".join(f"{food.owner_display_name}：{food.selector}" for food in foods)
+        assets = tuple(_group_event_asset(food, kind_label="美食") for food in foods)
+        owner_summary = "、".join(f"{asset.owner_name}：{asset.name}#{asset.short_code}" for asset in assets)
         return GroupEventViewModel(
             tone="technique",
             eyebrow="伏魔御厨子 · 自动出餐结算",
@@ -1321,7 +1362,10 @@ def technique_catch_event_view(
                 if is_gojo_dual_recipe
                 else "抓猪、消耗原料、做菜与双份发放已在同一事务完成"
             ),
-            actor_name=resolution.source_display_name,
+            actor_name=_public_actor_name(
+                display_name=resolution.source_display_name,
+                stable_id=resolution.source_player_id,
+            ),
             group_name=group_name or "当前群",
             event_time=_display_time(result.receipt.created_at),
             hero_label="本次出餐品质",
@@ -1347,17 +1391,25 @@ def technique_catch_event_view(
             media_visible=bool(preview_food is not None and preview_food.media_visible),
             is_animated=bool(preview_food is not None and preview_food.is_animated),
             image_fit=(preview_food.image_fit if preview_food is not None else "contain"),
+            assets=assets,
         )
+    pig_asset = _group_event_asset(result.pig, kind_label="猪猪")
     return GroupEventViewModel(
         tone="technique",
         eyebrow=f"{resolution.technique_name} · 抓猪归属结算",
         title=f"{result.pig.display_name}归属已改写",
         subtitle="猪猪已经直接进入最终归属者的背包",
-        actor_name=resolution.source_display_name,
+        actor_name=_public_actor_name(
+            display_name=resolution.source_display_name,
+            stable_id=resolution.source_player_id,
+        ),
         group_name=group_name or "当前群",
         event_time=_display_time(result.receipt.created_at),
         hero_label="最终获得者",
-        hero_value=resolution.target_display_name,
+        hero_value=_public_actor_name(
+            display_name=resolution.target_display_name,
+            stable_id=resolution.target_player_id,
+        ),
         rows=(
             GroupEventRowViewModel("抓猪群友", catcher, "本次抓猪的指令发起者"),
             GroupEventRowViewModel(
@@ -1379,6 +1431,7 @@ def technique_catch_event_view(
         media_visible=result.pig.media_visible,
         is_animated=result.pig.is_animated,
         image_fit=result.pig.image_fit,
+        assets=(pig_asset,),
     )
 
 
@@ -1738,8 +1791,16 @@ def daily_giants_media_paths(
 
 def _achievement_reward_text(rewards: Sequence[object]) -> str:
     from ..services.achievements import reward_label
+    from .cosmetics import cosmetic_detail
 
-    return "、".join(reward_label(reward) for reward in rewards) or "成就点"
+    labels = []
+    for reward in rewards:
+        if reward.reward_type in {"title", "frame", "badge", "cosmetic"}:
+            art = cosmetic_detail(reward.reward_id, kind=reward.reward_type)
+            labels.append(f"{art['name'] or '纪念外观'} ×{reward.quantity}")
+        else:
+            labels.append(reward_label(reward))
+    return "、".join(labels) or "成就点"
 
 
 def achievement_row_view(entry: object) -> AchievementRowViewModel:
@@ -1758,19 +1819,18 @@ def achievement_row_view(entry: object) -> AchievementRowViewModel:
         points=entry.points,
         reward_text="解锁后揭晓" if entry.hidden and not entry.unlocked else _achievement_reward_text(entry.rewards),
         unlocked_at=entry.unlocked_at,
-        cosmetics=cosmetic_cards(entry.rewards),
+        cosmetics=cosmetic_cards(entry.rewards, revealed=not entry.hidden or entry.unlocked),
     )
 
 
 def achievement_overview_view(result: object) -> AchievementOverviewViewModel:
-    from ..services.achievements import reward_label
+    from .cosmetics import cosmetic_detail
 
     reward_text = (
-        "、".join(
-            reward_label(AchievementReward(reward_type, reward_id, quantity))
+        _achievement_reward_text(tuple(
+            AchievementReward(reward_type, reward_id, quantity)
             for reward_type, reward_id, quantity in result.rewards
-        )
-        or "暂无库存"
+        )) if result.rewards else "暂无库存"
     )
     return AchievementOverviewViewModel(
         display_name=result.display_name,
@@ -1778,12 +1838,14 @@ def achievement_overview_view(result: object) -> AchievementOverviewViewModel:
         unlocked_count=result.unlocked_count,
         total_count=result.total_count,
         completion_percent=(result.unlocked_count * 100 / result.total_count if result.total_count else 0),
-        title_text=result.equipped_title_id or "未佩戴",
-        frame_text=result.equipped_frame_id or "默认淡粉",
+        title_text=cosmetic_detail(result.equipped_title_id, kind="title")["name"] or "未佩戴",
+        frame_text=cosmetic_detail(result.equipped_frame_id, kind="frame")["name"] or "默认淡粉",
         showcase_text=result.showcase_achievement_name or "未展示",
         next_milestone_text=(f"{result.next_milestone} 点" if result.next_milestone else "已完成全部里程碑"),
         reward_inventory_text=reward_text,
         recent=tuple(achievement_row_view(entry) for entry in result.recent),
+        achievement_title=result.equipped_title_id,
+        achievement_frame=result.equipped_frame_id,
     )
 
 

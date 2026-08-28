@@ -1,0 +1,17 @@
+/* 原创外观层。整卡装饰只占边缘，不参与布局、不改变任何动画媒体槽。 */
+.game-sheet{position:relative}
+.cosmetic-plate{display:block;max-width:100%;width:600px;margin:8px 0;line-height:0;flex:0 1 auto}
+.cosmetic-plate img{display:block;width:100%;height:auto;max-width:100%;object-fit:contain}
+.cosmetic-plate--compact{width:340px;max-width:100%;margin:4px 0}
+.cosmetic-badge{display:inline-flex;align-items:center;gap:9px;max-width:100%;color:#594b55;vertical-align:middle}
+.cosmetic-badge img{display:block;flex:0 0 58px;width:58px;height:58px;object-fit:contain}
+.cosmetic-badge>span{font-size:17px;line-height:1.45;overflow-wrap:anywhere}
+.cosmetic-frame-preview{display:inline-flex;align-items:center;gap:14px;max-width:100%;margin:8px 0}
+.cosmetic-frame-preview img{display:block;width:96px;height:120px;object-fit:contain;flex:0 0 96px}
+.cosmetic-frame-preview figcaption{font-size:18px;line-height:1.5;overflow-wrap:anywhere}
+.cosmetic-edge{position:absolute;inset:0;z-index:7;pointer-events:none;border:20px solid transparent;border-image-slice:64;border-image-repeat:stretch;box-sizing:border-box;background:none!important}
+.cosmetic-missing,.cosmetic-locked{display:inline-block;color:#7b6f77;font-size:15px;line-height:1.5;overflow-wrap:anywhere}
+.cosmetic-locked{border:1px dashed #d5c7ce;padding:6px 12px;background:#fffafb}
+.achievement-keepsakes{display:flex;flex-wrap:wrap;align-items:center;gap:12px 22px;margin-top:10px;min-width:0}
+.achievement-strip .cosmetic-plate--compact{width:310px}
+.achievement-strip .cosmetic-badge img{width:48px;height:48px;flex-basis:48px}

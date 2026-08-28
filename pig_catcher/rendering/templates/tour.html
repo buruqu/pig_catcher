@@ -1,45 +1,16 @@
 <!doctype html>
-<html lang="zh-CN">
-<head>
-  <meta charset="utf-8">
-  <style>
-    :root{--font-family:{{ font_family }};--band-color:{{ view.color }};}{{ theme_css|safe }}
-    .tour-body{padding:26px 38px 30px;display:grid;gap:22px;background:#fff}
-    .tour-banner{padding:17px 20px;background:#fff5f9;border:1px solid #efd7e0;border-left:5px solid var(--band-color);border-radius:8px;font-size:18px;line-height:1.65;color:#70465c;overflow-wrap:anywhere}
-    .tour-band{display:flex;align-items:center;gap:20px;padding:20px 24px;border:1px solid #edd8e1;border-radius:12px;background:linear-gradient(110deg,#fff7fb,#fff);position:relative}
-    .tour-emblem{color:var(--band-color);width:64px;height:64px;flex:none;border:2px solid var(--band-color);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:35px}
-    .tour-band h2{font-size:28px;line-height:1.35;margin:0 0 6px;color:#47323f;overflow-wrap:anywhere}.tour-band p{margin:0;font-size:14px;color:#987483;line-height:1.5}
-    .tour-band.costumed{border-top:5px double var(--band-color)}.tour-band.celebration{background:radial-gradient(circle at 93% 25%,#f8c5da 0 4px,transparent 5px),radial-gradient(circle at 85% 75%,#daccfa 0 4px,transparent 5px),linear-gradient(110deg,#fff4fa,#fff)}
-    .tour-stats{display:grid;grid-template-columns:repeat(var(--stat-columns,3),minmax(0,1fr));border:1px solid #efd7e0;border-radius:10px;overflow:hidden}
-    .tour-stat{padding:16px 20px;background:#fffafd;border-right:1px solid #efd7e0}.tour-stat:last-child{border-right:0}.tour-stat span,.tour-stat small{display:block;color:#927681;overflow-wrap:anywhere}.tour-stat strong{display:block;font-size:25px;margin:6px 0;color:#41343d;overflow-wrap:anywhere}.tour-stat small{font-size:14px;line-height:1.5}
-    .tour-scorecards{display:grid;grid-template-columns:repeat(var(--score-columns,3),minmax(0,1fr));gap:14px}
-    .tour-score{border:1px solid #ebd5df;border-radius:12px;padding:18px;background:#fffbfd;min-width:0}
-    .tour-score h3{font-size:17px;color:#8a6175;margin:0 0 12px;line-height:1.5;overflow-wrap:anywhere}.tour-score__total{display:flex;justify-content:space-between;gap:14px;align-items:center;margin-bottom:16px;flex-wrap:wrap}.tour-score__total strong{font-size:36px;color:#40313b}.tour-grade{font-size:22px;font-weight:750;color:var(--band-color);background:#fff0f6;padding:5px 12px;border-radius:7px}
-    .tour-scoreline{margin:10px 0}.tour-scoreline div{display:flex;justify-content:space-between;font-size:13px;color:#856b79;gap:6px}.tour-scoreline b{font-weight:650;white-space:nowrap}.tour-track{height:5px;border-radius:3px;background:#eee2e9;margin-top:6px;overflow:hidden}.tour-track i{height:100%;display:block;background:var(--band-color);border-radius:3px}
-    .tour-score p{font-size:13px;line-height:1.65;color:#907481;border-top:1px solid #efe0e7;padding-top:10px;margin:14px 0 0;overflow-wrap:anywhere}
-    .tour-pigs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.tour-pig{padding:15px;border:1px solid #ecdde4;border-radius:12px;background:#fffcfd;min-width:0}
-    .tour-pig__media{height:180px;display:flex;align-items:center;justify-content:center;background:#fff;border-radius:9px;overflow:hidden;margin-bottom:12px}.tour-pig__media img{height:100%;width:100%;object-fit:contain}.tour-pig__media span{font-size:30px;color:#c3a3b3}
-    .tour-pig h2{font-size:21px;margin:8px 0;line-height:1.4;overflow-wrap:anywhere}.tour-code{font-size:13px;color:#a17e8e;margin:8px 0}.tour-tags{display:flex;gap:6px;flex-wrap:wrap}.tour-tags span{font-size:13px;color:#964764;background:#fff0f6;padding:5px 9px;border-radius:4px}.tour-pig p{font-size:14px;line-height:1.6;color:#8e7481;margin-bottom:0;overflow-wrap:anywhere}
-    .tour-panel{border:1px solid #ecd8e1;border-radius:10px;overflow:hidden;break-inside:avoid}.tour-panel h2{font-size:21px;line-height:1.4;margin:0;padding:16px 20px;background:#fff3f8;color:#82405d;overflow-wrap:anywhere}
-    .tour-row{display:grid;grid-template-columns:215px minmax(0,1fr);padding:13px 20px;border-top:1px solid #f1e5eb;gap:18px;align-items:start}.tour-row .label{color:#957583;font-size:16px;line-height:1.6;overflow-wrap:anywhere}.tour-row strong{font-size:18px;color:#3c3239;line-height:1.6;font-weight:600;white-space:pre-wrap;overflow-wrap:anywhere}.tour-row small{display:block;font-size:14px;color:#967b89;line-height:1.65;margin-top:5px;overflow-wrap:anywhere}
-    .tour-caption{margin:0;padding:12px 20px;background:#fffbfd;color:#997287;font-size:14px;line-height:1.6;overflow-wrap:anywhere}.tour-hints{padding:16px 20px;background:#fdf8fb;border:1px dashed #eacbd8;border-radius:8px}.tour-hints p{margin:0 0 7px;font-size:15px;line-height:1.65;color:#856373;overflow-wrap:anywhere}.tour-hints p:last-child{margin-bottom:0}
-    .tour-player{font-size:20px!important;max-width:230px;overflow-wrap:anywhere;line-height:1.5}
-  </style>
-</head>
-<body>
-<main class="game-sheet" data-achievement-frame="{{ view.achievement_frame }}" data-pig-catcher-root data-render-ready="true">
-  <header class="game-header"><div class="game-header__copy"><p class="game-header__eyebrow">PiG Dream! · {{ view.subtitle }}</p><h1>{{ view.title }}</h1></div><div class="game-header__meta"><span>乐队主理人</span><strong class="tour-player">{{ view.player_name }}</strong></div></header>
-  {% include 'achievement_strip.html' %}
-  <div class="tour-body">
-    <section class="tour-band{% if view.costume %} costumed{% endif %}{% if view.celebration %} celebration{% endif %}"><div class="tour-emblem" aria-hidden="true">{{ view.emblem }}</div><div><h2>{{ view.band_name }}</h2><p>{{ view.costume or '每一种声部，都有自己的高光' }}{% if view.costume %} · 原创主题舞台装扮{% endif %}</p></div></section>
-    {% if view.banner %}<div class="tour-banner">{{ view.banner }}</div>{% endif %}
-    {% if view.stats %}<section class="tour-stats" style="--stat-columns:{{ [view.stats|length,3]|min }}">{% for stat in view.stats %}<div class="tour-stat"><span>{{ stat.label }}</span><strong>{{ stat.value }}</strong>{% if stat.note %}<small>{{ stat.note }}</small>{% endif %}</div>{% endfor %}</section>{% endif %}
-    {% if view.scorecards %}<section class="tour-scorecards" style="--score-columns:{{ [view.scorecards|length,3]|min }}">{% for card in view.scorecards %}<article class="tour-score"><h3>{{ card.title }}</h3><div class="tour-score__total"><strong>{{ card.score }}</strong><span class="tour-grade">{{ card.grade }}</span></div>{% for row in card.components %}<div class="tour-scoreline"><div><span>{{ row.label }}</span><b>{{ row.value }} {{ row.note }}</b></div><div class="tour-track"><i style="width:{{ [(row.value|float / (row.note|replace('/','')|trim|float) * 100),100]|min }}%"></i></div></div>{% endfor %}<p>{{ card.note }}</p></article>{% endfor %}</section>{% endif %}
-    {% if view.pigs %}<section class="tour-pigs">{% for pig in view.pigs %}<article class="tour-pig"><div class="tour-pig__media">{% if previews.get(pig.short_code) %}<img src="{{ previews[pig.short_code] }}" alt="{{ pig.name }}">{% else %}<span>舞台伙伴</span>{% endif %}</div><h2>{{ pig.name }}</h2><div class="tour-code">#{{ pig.short_code }}{% if pig.favorite %} · 已收藏{% endif %}</div><div class="tour-tags">{% for tag in pig.tags %}<span>{{ tag }}</span>{% endfor %}</div><p>{{ pig.summary }}</p></article>{% endfor %}</section>{% endif %}
-    {% for panel in view.panels %}<section class="tour-panel"><h2>{{ panel.title }}</h2>{% for row in panel.rows %}<div class="tour-row"><span class="label">{{ row.label }}</span><div><strong>{{ row.value }}</strong>{% if row.note %}<small>{{ row.note }}</small>{% endif %}</div></div>{% endfor %}{% if panel.caption %}<p class="tour-caption">{{ panel.caption }}</p>{% endif %}</section>{% endfor %}
-    {% if view.hints %}<aside class="tour-hints">{% for hint in view.hints %}<p>{{ hint }}</p>{% endfor %}</aside>{% endif %}
-  </div>
-  <footer class="game-footer"><span>自由混团 · 独立成长 · 每一站都值得被记住</span><strong>{% if view.page_count > 1 %}{{ view.page }}/{{ view.page_count }}{% else %}PiG Dream! TOUR{% endif %}</strong></footer>
-</main>
-</body>
-</html>
+<html lang="zh-CN"><head><meta charset="utf-8"><style>:root{--font-family:{{ font_family }};--band-color:{{ view.color }};}{{ theme_css|safe }}</style></head><body>
+{% from 'feature_components.html' import header, stats, pigs, panels, hints %}
+<main class="game-sheet feature-tour" data-achievement-frame="{{ view.achievement_frame }}" data-pig-catcher-root data-render-ready="true">
+{{ header('stage', 'PiG Dream! · ' ~ view.subtitle, view.title, view.player_name, '乐队主理人', 'voice') }}
+{% include 'achievement_strip.html' %}
+<div class="feature-body">
+<section class="feature-tour-band{% if view.costume %} costumed{% endif %}{% if view.celebration %} celebration{% endif %}">{{ feature_icon(view.emblem) }}<div><h2>{{ view.band_name }}</h2><p>{{ view.costume or '每一种声部，都有自己的高光' }}{% if view.costume %} · 原创主题舞台装扮{% endif %} · 自由混团原创队标</p></div></section>
+{% if view.scene_key %}<div class="feature-route-ticket">{{ feature_scene(view.scene_key) }}<div class="feature-route-ticket__copy"><span>PiG Dream! TOUR · 本站舞台</span><strong>{{ view.title }}</strong></div><div class="feature-route-ticket__stamp">{{ feature_icon('ticket') }}<span>巡演票根</span></div></div>{% endif %}
+{% if view.banner %}<div class="feature-banner">{{ view.banner }}</div>{% endif %}
+{{ stats(view.stats) }}
+{% if view.scorecards %}<section class="feature-scorecards" style="--score-columns:{{ [view.scorecards|length,3]|min }}">{% for card in view.scorecards %}<article class="feature-scorecard tour-score"><h3>{{ card.title }}</h3><div class="feature-scorecard__total"><strong>{{ card.score }}</strong><span class="feature-scorecard__grade">{{ card.grade }}</span></div>{% for row in card.components %}<div class="feature-scoreline"><div class="feature-scoreline__label"><span>{{ row.label }}</span><b>{{ row.value }} {{ row.note }}</b></div><div class="feature-scoretrack">{% set cap=(row.note|replace('/','')|trim|float) %}<i style="width:{{ [((row.value|float / cap * 100) if cap > 0 else 0),100]|min }}%"></i></div></div>{% endfor %}<p>{{ card.note }}</p></article>{% endfor %}</section>{% endif %}
+<div class="feature-tour-roster">{{ pigs(view.pigs, previews, 5, '舞台伙伴') }}</div>
+{{ panels(view.panels, 'stage') }}{{ hints(view.hints) }}
+</div><footer class="game-footer"><span>自由混团 · 独立成长 · 每一站都值得被记住</span><strong>{% if view.page_count > 1 %}{{ view.page }}/{{ view.page_count }}{% else %}PiG Dream! TOUR{% endif %}</strong></footer>
+</main></body></html>

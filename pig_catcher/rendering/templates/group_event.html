@@ -9,16 +9,22 @@
   </style>
 </head>
 <body>
+  {% import 'feature_components.html' as f with context %}
+  {% set event_identity = view.eyebrow ~ view.title %}
+  {% set event_icon = 'domain' if '伏魔' in event_identity else 'purple' if '茈' in event_identity else 'blue' if '苍' in event_identity else 'red' if '赫' in event_identity else 'roulette' if view.tone == 'roulette' else 'coin' if view.tone == 'tribute' else 'pot' %}
   <main class="game-sheet group-event group-event--{{ view.tone }}" data-pig-catcher-root data-render-ready="true">
     <header class="group-event__header">
+      {% set event_art=feature_backdrop('battle' if view.tone == 'technique' else 'ultimate') %}{% if event_art %}<img class="feature-event-art" src="{{ event_art }}" alt="">{% endif %}
       <div class="group-event__seal">{{ view.seal_top }}<br>{{ view.seal_bottom }}</div>
       <div class="group-event__heading">
         <p>{{ view.eyebrow }}</p>
         <h1 style="font-size:{% if view.title|length > 24 %}36{% elif view.title|length > 16 %}44{% else %}54{% endif %}px">{{ view.title }}</h1>
         <strong>{{ view.subtitle }}</strong>
       </div>
-      <div class="group-event__stars">✦<br>✧</div>
+      <div class="group-event__stars">{{ feature_icon(event_icon) }}</div>
     </header>
+
+    <section class="feature-event-state">{{ feature_icon(event_icon) }}<div><strong>{{ view.seal_top }} · {{ view.seal_bottom }}</strong><span>{{ view.pending_note if not view.settlement_committed else view.subtitle }}</span></div></section>
 
     <section class="group-event__identity">
       <div><span>{{ view.actor_label }}</span><strong style="font-size:{% if view.actor_name|length > 32 %}18{% elif view.actor_name|length > 20 %}22{% else %}28{% endif %}px">{{ view.actor_name }}</strong></div>
@@ -30,10 +36,8 @@
       <div class="group-event__media">
         {% if media_data_url %}
         <img src="{{ media_data_url }}" alt="{{ view.title }}" style="object-fit:{{ view.image_fit }}">
-        {% elif view.is_animated %}
-        <span>GIF<br>六星盛宴</span>
         {% else %}
-        <span>★★★★★★<br>全群大事件</span>
+        {{ feature_icon(event_icon) }}
         {% endif %}
       </div>
       <div class="group-event__hero-copy">
@@ -43,9 +47,40 @@
       </div>
     </section>
 
+    {% if view.assets|default(()) %}
+    {% set event_media = event_previews|default({}) %}
+    <section class="feature-event-assets" style="--event-columns:{{ [view.assets|length,3]|min }}">
+      <h2>本次实际获得 · 完整资产与归属</h2>
+      <div class="feature-event-assets__grid">
+        {% for asset in view.assets %}
+        <article class="feature-event-asset rarity-{{ asset.rarity }}">
+          <div class="feature-event-asset__media">
+            {% if asset.media_visible and event_media.get(asset.key) %}<img src="{{ event_media[asset.key] }}" alt="{{ asset.name }}" style="object-fit:{{ asset.image_fit }}">
+            {% else %}{{ feature_icon('pot' if asset.kind_label == '美食' else 'pig') }}<span>{{ '图片暂缺' if asset.media_visible else '专属素材未开放预览' }}</span>{% endif %}
+          </div>
+          <div class="feature-event-asset__stars">{{ '★' * asset.rarity }} · {{ asset.kind_label }}</div>
+          {% if asset.is_animated|default(false) and asset.media_visible %}<div class="feature-code">动图缩略预览 · 原素材保持不变</div>{% endif %}
+          <h3>{{ asset.name }}</h3><div class="feature-code">#{{ asset.short_code }}</div>
+          {% if asset.owner_name %}<p class="feature-event-asset__owner">{{ feature_icon('exchange') }}<span>归属 · {{ asset.owner_name }}</span></p>{% endif %}
+          {% if asset.detail %}<p>{{ asset.detail }}</p>{% endif %}
+        </article>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+    {% if view.tone == 'roulette' %}
+    {% set outcome = view.roulette_outcome|default(none) %}
+    {% set has_outcome = outcome in [1,2,3,4,5,6] %}
+    <section class="feature-event-roulette">
+      {{ f.wheel({'kind':'reward-roulette','title':'本次已提交的轮盘结果' if has_outcome else '等概率轮盘 · 尚未转动','selected_index':outcome-1 if has_outcome else none,'segments':[{'label':'猪币奖励','weight':1},{'label':'额外转轮机会','weight':1},{'label':'六星做菜加成','weight':1},{'label':'全天抓猪额度','weight':1},{'label':'星级等概率抓猪','weight':1},{'label':'必得六星猪','weight':1}],'note':'标记来自本次真实结算；这里只展示结果，不会重新抽取。' if has_outcome else '这里只展示六面等概率规则；使用 /转轮盘 才会正式结算。'}) }}
+    </section>
+    {% endif %}
+
     <section class="group-event__benefits">
       {% for row in view.rows %}
       <article>
+        <div class="feature-event-benefit-icon">{{ feature_icon(row.label) }}</div>
         <span>{{ row.label }}</span>
         <strong style="font-size:{% if row.value|length > 24 %}20{% elif row.value|length > 16 %}24{% else %}29{% endif %}px">{{ row.value }}</strong>
         <small>{{ row.detail }}</small>
@@ -60,7 +95,7 @@
 
     <footer class="game-footer group-event__footer">
       <span>{{ view.footer }}</span>
-      <strong>★★★★★★</strong>
+      <strong>PiG Dream! EVENT</strong>
     </footer>
   </main>
 </body>

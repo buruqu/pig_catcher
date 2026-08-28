@@ -1,6 +1,6 @@
 [plugin]
 enabled = true
-config_version = "2.0.0.dev9"
+config_version = "2.0.0.dev10"
 framework_phase = "6"
 
 [features]
@@ -80,8 +80,8 @@ cook_cooldown_seconds = 10
 
 [economy]
 max_upgrade_level = 5
-feed_upgrade_prices = [500, 1200, 2800, 6500, 15000]
-cookware_upgrade_prices = [500, 1200, 2800, 6500, 15000]
+feed_upgrade_prices = [300, 800, 1800, 4000, 8000]
+cookware_upgrade_prices = [300, 700, 1600, 3500, 7000]
 store_page_size = 16
 ledger_page_size = 10
 max_purchase_quantity = 99

@@ -8,7 +8,12 @@ from hashlib import sha256
 from .enums import Rarity, UpgradeType
 from .errors import DomainValidationError, StoreProductError
 from .gameplay import ITEM_DEFINITIONS, ItemDefinition
-from .rules import cooking_weights, level_catch_bonus_scale, normalize_weights
+from .rules import (
+    cooking_weights,
+    level_catch_bonus_scale,
+    normalize_weights,
+    shift_original_probability_up_one_tier,
+)
 
 COOKWARE_HIGHER_RARITY_STEP = 0.04
 LEVEL_COOKING_HIGHER_RARITY_STEP = 0.02
@@ -23,11 +28,11 @@ FOOD_RARITY_NAMES: dict[Rarity, str] = {
 }
 
 FOOD_BASE_VALUES: dict[Rarity, int] = {
-    Rarity.ONE: 12,
-    Rarity.TWO: 35,
-    Rarity.THREE: 100,
-    Rarity.FOUR: 320,
-    Rarity.FIVE: 1100,
+    Rarity.ONE: 14,
+    Rarity.TWO: 42,
+    Rarity.THREE: 120,
+    Rarity.FOUR: 420,
+    Rarity.FIVE: 1800,
     Rarity.SIX: 25000,
 }
 
@@ -185,9 +190,7 @@ def adjusted_cooking_weights(
     weights[lowest_index] -= attribute_shift
     weights[target_index] += attribute_shift
     if selected_item == "chef-spice":
-        spice_shift = min(weights[lowest_index], 18.0)
-        weights[lowest_index] -= spice_shift
-        weights[target_index] += spice_shift
+        weights = list(shift_original_probability_up_one_tier(weights, shift_percent=18.0))
 
     higher_multiplier = cookware_multiplier * level_multiplier
     source_index = int(rarity) - 1

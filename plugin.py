@@ -51,8 +51,9 @@ from .pig_catcher.commands.dispatch import DISPATCH_HELP, parse_dispatch_request
 from .pig_catcher.commands.item_bag import ITEM_BAG_PATTERN, REWARD_COUPON_PATTERN, parse_item_bag_request
 from .pig_catcher.commands.tour import TOUR_HELP, parse_tour_request
 from .pig_catcher.config import AccessPolicy, PigCatcherConfig
+from .pig_catcher.domain.achievements import AchievementReward
 from .pig_catcher.domain.battle_views import BattleView
-from .pig_catcher.domain.dispatch_views import DispatchView
+from .pig_catcher.domain.dispatch_views import DispatchLine, DispatchView
 from .pig_catcher.domain.enums import AssetKind
 from .pig_catcher.domain.errors import (
     CommandContextError,
@@ -74,6 +75,8 @@ from .pig_catcher.domain.tour_views import TourView
 from .pig_catcher.infrastructure import PigCatcherDatabase, safe_database_path
 from .pig_catcher.rendering import (
     AnimatedCardComposer,
+    EconomyReceiptRowViewModel,
+    EconomyReceiptViewModel,
     PigCatcherRenderer,
     RenderDelivery,
     RenderedImage,
@@ -124,6 +127,7 @@ from .pig_catcher.rendering import (
     weekly_competition_award_view,
     weekly_competition_view,
 )
+from .pig_catcher.rendering.cosmetics import COSMETIC_DEFINITIONS
 from .pig_catcher.services import (
     AchievementService,
     AdministrationService,
@@ -484,6 +488,8 @@ class PigCatcherPlugin(MaiBotPlugin):
         self._clear_runtime_references()
 
     def _clear_runtime_references(self) -> None:
+        if isinstance(getattr(self, "_renderer", None), PigCatcherRenderer):
+            self._renderer.clear_art_cache()
         self._maintenance = None
         self._delivery = None
         self._animation_composer = None
@@ -963,6 +969,32 @@ class PigCatcherPlugin(MaiBotPlugin):
             return None, rejected
         return identity, None
 
+    async def _deliver_player_status(
+        self,
+        identity: CommandIdentity,
+        view: EconomyReceiptViewModel,
+        *,
+        fallback_text: str,
+        receipt: CommandReceipt | None = None,
+    ) -> tuple[bool, str, int]:
+        """Render a completed setting/reward, never rerun its business action."""
+
+        async def render() -> RenderedImage:
+            return await cast(PigCatcherRenderer, self._renderer).render_economy_receipt(view)
+
+        if receipt is not None:
+            return await self._deliver_receipt(
+                stream_id=identity.stream_id,
+                receipt=receipt,
+                render=render,
+                fallback_text=fallback_text,
+            )
+        return await self._deliver_query(
+            stream_id=identity.stream_id,
+            render=render,
+            fallback_text=fallback_text,
+        )
+
     async def _deliver_query(
         self,
         *,
@@ -1330,7 +1362,9 @@ class PigCatcherPlugin(MaiBotPlugin):
         if renderer is None:
             raise RuntimeError("抓猪渲染器尚未就绪。")
         view = pig_card_view(pig, mode_label=mode_label, catch=catch)
-        if self._achievement_service is not None and self.settings.features.achievements_enabled:
+        if self._achievement_service is not None and (
+            self.settings.features.achievements_enabled or self.settings.features.weekly_competitions_enabled
+        ):
             cosmetics = await self._achievement_service.cosmetics_for_player(pig.owner_player_id)
             view = replace(
                 view,
@@ -1398,7 +1432,9 @@ class PigCatcherPlugin(MaiBotPlugin):
         if renderer is None:
             raise RuntimeError("美食渲染器尚未就绪。")
         view = food_card_view(food, mode_label=mode_label, cooking=cooking)
-        if self._achievement_service is not None and self.settings.features.achievements_enabled:
+        if self._achievement_service is not None and (
+            self.settings.features.achievements_enabled or self.settings.features.weekly_competitions_enabled
+        ):
             cosmetics = await self._achievement_service.cosmetics_for_player(food.owner_player_id)
             view = replace(
                 view,
@@ -2165,13 +2201,21 @@ class PigCatcherPlugin(MaiBotPlugin):
                     )
                 else:
                     source_path = pig_media_path(data_dir, result.pig)
+                event_paths = {}
+                if result.technique_resolution.generated_foods:
+                    for food in result.technique_resolution.generated_foods:
+                        path = food_media_path(data_dir, food)
+                        if path is not None:
+                            event_paths[food.short_code] = path
+                elif source_path is not None:
+                    event_paths[result.pig.short_code] = source_path
                 return await self._deliver_receipt(
                     stream_id=identity.stream_id,
                     receipt=result.receipt,
                     render=lambda: cast(
                         PigCatcherRenderer,
                         self._renderer,
-                    ).render_group_event(view, source_path),
+                    ).render_group_event(view, source_path, media_paths=event_paths),
                     fallback_text=fallback,
                 )
             return await self._deliver_receipt(
@@ -2216,10 +2260,13 @@ class PigCatcherPlugin(MaiBotPlugin):
                 identity,
                 short_code=short_code,
             )
-            return await self._reply_text(
-                identity.stream_id,
-                message,
-                success=count > 0,
+            if count <= 0:
+                return await self._reply_text(identity.stream_id, message, success=False)
+            return await self._deliver_pig_art_toggle(
+                identity,
+                display_name="保千猪",
+                short_code=short_code,
+                message=message,
             )
         except Exception as exc:
             return await self._command_error(
@@ -2247,6 +2294,7 @@ class PigCatcherPlugin(MaiBotPlugin):
         if rejected is not None or identity is None:
             return rejected or (False, "", 0)
         try:
+            short_code = matched_group(kwargs, "code") or None
             count, _, message = await cast(
                 GameplayService,
                 self._gameplay_service,
@@ -2254,12 +2302,15 @@ class PigCatcherPlugin(MaiBotPlugin):
                 identity,
                 display_name="初华猪",
                 alternate_label="戴帽子版立绘",
-                short_code=matched_group(kwargs, "code") or None,
+                short_code=short_code,
             )
-            return await self._reply_text(
-                identity.stream_id,
-                message,
-                success=count > 0,
+            if count <= 0:
+                return await self._reply_text(identity.stream_id, message, success=False)
+            return await self._deliver_pig_art_toggle(
+                identity,
+                display_name="初华猪",
+                short_code=short_code,
+                message=message,
             )
         except Exception as exc:
             return await self._command_error(
@@ -2267,6 +2318,27 @@ class PigCatcherPlugin(MaiBotPlugin):
                 operation="切换初华猪立绘",
                 error=exc,
             )
+
+    async def _deliver_pig_art_toggle(
+        self,
+        identity: CommandIdentity,
+        *,
+        display_name: str,
+        short_code: str | None,
+        message: str,
+    ) -> tuple[bool, str, int]:
+        async def render() -> RenderedImage:
+            # A post-change read is optional presentation work.  If the pig was
+            # moved concurrently or rendering fails, deliver the committed message.
+            selector = f"{display_name}#{short_code}" if short_code else display_name
+            pig = await cast(GameplayService, self._gameplay_service).pig_detail(identity, selector)
+            return await self._render_pig_card(pig, mode_label="立绘已切换")
+
+        return await self._deliver_query(
+            stream_id=identity.stream_id,
+            render=render,
+            fallback_text=message,
+        )
 
     async def _activate_group_technique_command(
         self,
@@ -2396,13 +2468,18 @@ class PigCatcherPlugin(MaiBotPlugin):
             )
             data_dir = Path(self.ctx.paths.data_dir).resolve()
             source_path = pig_media_path(data_dir, result.granted_pigs[0]) if result.granted_pigs else None
+            event_paths = {}
+            for pig in result.granted_pigs:
+                path = pig_media_path(data_dir, pig)
+                if path is not None:
+                    event_paths[pig.short_code] = path
             return await self._deliver_receipt(
                 stream_id=identity.stream_id,
                 receipt=result.receipt,
                 render=lambda: cast(
                     PigCatcherRenderer,
                     self._renderer,
-                ).render_group_event(view, source_path),
+                ).render_group_event(view, source_path, media_paths=event_paths),
                 fallback_text=result.receipt.text_summary,
             )
         except Exception as exc:
@@ -2457,7 +2534,20 @@ class PigCatcherPlugin(MaiBotPlugin):
                 identity,
                 enabled=enabled,
             )
-            return await self._reply_text(identity.stream_id, message, success=True)
+            view = EconomyReceiptViewModel(
+                eyebrow="资产保护 · 批量操作偏好",
+                title="保留设置已更新",
+                badge_label="当前状态",
+                badge_value="已开启" if enabled else "已关闭",
+                summary="已开启批量保留" if enabled else "已关闭批量保留",
+                rows=(
+                    EconomyReceiptRowViewModel("普通猪猪与美食", "每种保留最高价值一只" if enabled else "不额外保留"),
+                    EconomyReceiptRowViewModel("联动猪", "每种始终保留最高价值一只"),
+                    EconomyReceiptRowViewModel("收藏资产", "批量操作始终跳过"),
+                ),
+                note=message,
+            )
+            return await self._deliver_player_status(identity, view, fallback_text=message)
         except Exception as exc:
             return await self._command_error(
                 stream_id=identity.stream_id,
@@ -2494,9 +2584,27 @@ class PigCatcherPlugin(MaiBotPlugin):
                 selector_text=matched_group(kwargs, "selector"),
                 favorite=matched_group(kwargs, "action") == "收藏",
             )
-            return await self._deliver_text_receipt(
-                stream_id=identity.stream_id,
+            view = EconomyReceiptViewModel(
+                eyebrow="资产保护 · 收藏设置",
+                title="收藏保护已开启" if result.favorite else "收藏保护已取消",
+                badge_label="当前状态",
+                badge_value="已收藏" if result.favorite else "未收藏",
+                summary=f"{result.display_name} ×{result.target_count}",
+                rows=(
+                    EconomyReceiptRowViewModel("资产种类", "猪猪" if result.asset_kind == "pig" else "美食"),
+                    EconomyReceiptRowViewModel("匹配数量", str(result.target_count)),
+                    EconomyReceiptRowViewModel("本次变更", str(result.changed_count)),
+                ),
+                note=(
+                    "已收藏的资产不会被批量操作自动选中。"
+                    if result.favorite else "取消收藏后，仍遵循当前批量保留规则。"
+                ),
+            )
+            return await self._deliver_player_status(
+                identity,
+                view,
                 receipt=result.receipt,
+                fallback_text=result.receipt.text_summary,
             )
         except Exception as exc:
             return await self._command_error(
@@ -2526,7 +2634,7 @@ class PigCatcherPlugin(MaiBotPlugin):
         try:
             result = await cast(GameplayService, self._gameplay_service).profile(identity)
             renderer = cast(PigCatcherRenderer, self._renderer)
-            view = profile_view(result)
+            view = await self._activity_view_cosmetics(identity, profile_view(result))
             return await self._deliver_query(
                 stream_id=identity.stream_id,
                 render=lambda: renderer.render_profile(view),
@@ -2605,7 +2713,7 @@ class PigCatcherPlugin(MaiBotPlugin):
                 sort=query.sort,
             )
             renderer = cast(PigCatcherRenderer, self._renderer)
-            view = inventory_view(result)
+            view = await self._activity_view_cosmetics(identity, inventory_view(result))
             data_dir = Path(self.ctx.paths.data_dir).resolve()
             return await self._deliver_query(
                 stream_id=identity.stream_id,
@@ -2648,7 +2756,7 @@ class PigCatcherPlugin(MaiBotPlugin):
                 undiscovered_only=query.undiscovered_only,
             )
             renderer = cast(PigCatcherRenderer, self._renderer)
-            view = catalog_view(result)
+            view = await self._activity_view_cosmetics(identity, catalog_view(result))
             data_dir = Path(self.ctx.paths.data_dir).resolve()
             return await self._deliver_query(
                 stream_id=identity.stream_id,
@@ -2691,6 +2799,27 @@ class PigCatcherPlugin(MaiBotPlugin):
             )
             renderer = cast(PigCatcherRenderer, self._renderer)
             view = records_view(result)
+            if self._achievement_service is not None and (
+                self.settings.features.achievements_enabled or self.settings.features.weekly_competitions_enabled
+            ):
+                holder_ids = tuple(dict.fromkeys(
+                    item.player_id
+                    for item in (*view.items, *view.global_items, *view.giant_sightings)
+                    if item.player_id
+                ))
+                # 同一页三个纪录区一次只读批查，只使用纪录的稳定持有者身份。
+                equipped = await self._achievement_service.cosmetics_for_players(holder_ids) if holder_ids else {}
+
+                def decorated(item: Any) -> Any:
+                    outfit = equipped.get(item.player_id)
+                    return replace(item, achievement_title=outfit.title_id) if outfit is not None else item
+
+                view = replace(
+                    view,
+                    items=tuple(decorated(item) for item in view.items),
+                    global_items=tuple(decorated(item) for item in view.global_items),
+                    giant_sightings=tuple(decorated(item) for item in view.giant_sightings),
+                )
             return await self._deliver_query(
                 stream_id=identity.stream_id,
                 render=lambda: renderer.render_records(view),
@@ -2725,10 +2854,29 @@ class PigCatcherPlugin(MaiBotPlugin):
             result = await cast(GameplayService, self._gameplay_service).daily_giants(identity)
             renderer = cast(PigCatcherRenderer, self._renderer)
             data_dir = Path(self.ctx.paths.data_dir).resolve()
+            view = daily_giants_view(result)
+            if self._achievement_service is not None and (
+                self.settings.features.achievements_enabled or self.settings.features.weekly_competitions_enabled
+            ):
+                holder_ids = tuple(dict.fromkeys(
+                    item.player_id for item in (*view.size_items, *view.weight_items) if item.player_id
+                ))
+                # 每人可能同时进入两个榜，先去重再做一次查询；不按当前资产所有者改归属。
+                equipped = await self._achievement_service.cosmetics_for_players(holder_ids) if holder_ids else {}
+
+                def decorated(item: Any) -> Any:
+                    outfit = equipped.get(item.player_id)
+                    return replace(item, achievement_title=outfit.title_id) if outfit is not None else item
+
+                view = replace(
+                    view,
+                    size_items=tuple(decorated(item) for item in view.size_items),
+                    weight_items=tuple(decorated(item) for item in view.weight_items),
+                )
             return await self._deliver_query(
                 stream_id=identity.stream_id,
                 render=lambda: renderer.render_daily_giants(
-                    daily_giants_view(result),
+                    view,
                     daily_giants_media_paths(data_dir, result),
                 ),
                 fallback_text=format_daily_giants_summary(result),
@@ -2990,7 +3138,7 @@ class PigCatcherPlugin(MaiBotPlugin):
                 sort=query.sort,
             )
             renderer = cast(PigCatcherRenderer, self._renderer)
-            view = food_inventory_view(result)
+            view = await self._activity_view_cosmetics(identity, food_inventory_view(result))
             data_dir = Path(self.ctx.paths.data_dir).resolve()
             return await self._deliver_query(
                 stream_id=identity.stream_id,
@@ -3036,7 +3184,7 @@ class PigCatcherPlugin(MaiBotPlugin):
                 undiscovered_only=query.undiscovered_only,
             )
             renderer = cast(PigCatcherRenderer, self._renderer)
-            view = food_catalog_view(result)
+            view = await self._activity_view_cosmetics(identity, food_catalog_view(result))
             data_dir = Path(self.ctx.paths.data_dir).resolve()
             return await self._deliver_query(
                 stream_id=identity.stream_id,
@@ -3855,6 +4003,7 @@ class PigCatcherPlugin(MaiBotPlugin):
             arguments = matched_group(kwargs, "arguments").strip()
             if not arguments:
                 result = await service.overview(identity)
+                view = await self._activity_view_cosmetics(identity, achievement_overview_view(result))
                 fallback = (
                     f"【PiG Dream! 成就总览】\n{result.display_name}："
                     f"{result.unlocked_count}/{result.total_count} 项，"
@@ -3862,7 +4011,7 @@ class PigCatcherPlugin(MaiBotPlugin):
                 )
                 delivered = await self._deliver_query(
                     stream_id=identity.stream_id,
-                    render=lambda: renderer.render_achievement_overview(achievement_overview_view(result)),
+                    render=lambda: renderer.render_achievement_overview(view),
                     fallback_text=fallback,
                     activity_identity=identity,
                 )
@@ -3879,6 +4028,7 @@ class PigCatcherPlugin(MaiBotPlugin):
             if tokens:
                 category = " ".join(tokens)
             result = await service.page(identity, category=category, page=page)
+            view = await self._activity_view_cosmetics(identity, achievement_page_view(result))
             fallback = "\n".join(
                 [f"【{result.category}成就 · {result.page}/{result.page_count}】"]
                 + [
@@ -3888,7 +4038,7 @@ class PigCatcherPlugin(MaiBotPlugin):
             )
             delivered = await self._deliver_query(
                 stream_id=identity.stream_id,
-                render=lambda: renderer.render_achievement_page(achievement_page_view(result)),
+                render=lambda: renderer.render_achievement_page(view),
                 fallback_text=fallback,
                 activity_identity=identity,
             )
@@ -3923,11 +4073,12 @@ class PigCatcherPlugin(MaiBotPlugin):
             if not name:
                 raise CommandContextError("请填写完整成就名，例如：/成就详情 第一次伸手")
             result = await cast(AchievementService, self._achievement_service).detail_page(identity, name)
+            view = await self._activity_view_cosmetics(identity, achievement_page_view(result))
             entry = result.entries[0]
             renderer = cast(PigCatcherRenderer, self._renderer)
             return await self._deliver_query(
                 stream_id=identity.stream_id,
-                render=lambda: renderer.render_achievement_page(achievement_page_view(result)),
+                render=lambda: renderer.render_achievement_page(view),
                 activity_identity=identity,
                 fallback_text=(
                     f"【成就详情】{entry.name}\n{entry.description}\n"
@@ -3937,6 +4088,40 @@ class PigCatcherPlugin(MaiBotPlugin):
             )
         except Exception as exc:
             return await self._command_error(stream_id=identity.stream_id, operation="成就详情", error=exc)
+
+    async def _deliver_equipped_cosmetics(
+        self,
+        identity: CommandIdentity,
+        *,
+        source_name: str,
+        source_label: str,
+        equipped_count: int,
+    ) -> tuple[bool, str, int]:
+        view = DispatchView(
+            title="外观佩戴成功",
+            player_name=identity.display_name,
+            subtitle="称号、边框与徽章",
+            banner=f"已佩戴“{source_name}”的{source_label}外观。",
+            stats=(
+                DispatchLine("外观来源", source_label),
+                DispatchLine("已更新", f"{equipped_count} 个部位"),
+            ),
+            hints=("相关玩法图片会展示当前佩戴外观。", "/取消佩戴成就 可卸下外观，奖励仍保留。"),
+            presentation="cosmetics",
+            scene_key="",
+        )
+
+        async def render() -> RenderedImage:
+            # Read the already-equipped profile inside the render callback so an
+            # optional preview failure cannot report the completed setting as failed.
+            decorated = await self._activity_view_cosmetics(identity, view)
+            return await cast(PigCatcherRenderer, self._renderer).render_dispatch(decorated, {})
+
+        return await self._deliver_query(
+            stream_id=identity.stream_id,
+            render=render,
+            fallback_text=view.text(),
+        )
 
     @Command(
         "pig_catcher_achievement_equip",
@@ -3962,20 +4147,22 @@ class PigCatcherPlugin(MaiBotPlugin):
             if weekly_service is not None and self.settings.features.weekly_competitions_enabled:
                 weekly_cosmetics = await weekly_service.equip_competition_cosmetics(identity, name)
                 if weekly_cosmetics is not None:
-                    return await self._reply_text(
-                        identity.stream_id,
-                        "已佩戴周冲榜外观：" + "、".join(weekly_cosmetics),
-                        success=True,
+                    return await self._deliver_equipped_cosmetics(
+                        identity,
+                        source_name=name,
+                        source_label="周冲榜",
+                        equipped_count=len(weekly_cosmetics),
                     )
             if not self.settings.features.achievements_enabled:
                 raise CommandContextError("成就系统当前未启用，且没有找到可佩戴的周冲榜奖励。")
             cosmetics = await cast(AchievementService, self._achievement_service).equip_cosmetics_by_achievement(
                 identity, name
             )
-            return await self._reply_text(
-                identity.stream_id,
-                "已佩戴成就外观：" + "、".join(cosmetics),
-                success=True,
+            return await self._deliver_equipped_cosmetics(
+                identity,
+                source_name=name,
+                source_label="成就",
+                equipped_count=len(cosmetics),
             )
         except Exception as exc:
             return await self._command_error(stream_id=identity.stream_id, operation="佩戴成就", error=exc)
@@ -3987,13 +4174,28 @@ class PigCatcherPlugin(MaiBotPlugin):
     )
     async def handle_achievement_unequip(self, stream_id: str = "", **kwargs: Any) -> tuple[bool, str, int]:
         identity, rejected = await self._prepare_command(
-            stream_id, kwargs, feature_enabled=self.settings.features.achievements_enabled, feature_label="取消佩戴成就"
+            stream_id,
+            kwargs,
+            feature_enabled=(
+                self.settings.features.achievements_enabled or self.settings.features.weekly_competitions_enabled
+            ),
+            feature_label="取消佩戴成就",
         )
         if rejected is not None or identity is None:
             return rejected or (False, "", 0)
         try:
             await cast(AchievementService, self._achievement_service).clear_equipped_cosmetics(identity)
-            return await self._reply_text(identity.stream_id, "已取消全部成就外观。", success=True)
+            message = "已取消全部成就与周冲榜外观；已拥有的外观奖励仍然保留。"
+            view = EconomyReceiptViewModel(
+                eyebrow="外观管理 · 保留已解锁奖励",
+                title="外观已卸下",
+                badge_label="当前状态",
+                badge_value="未佩戴",
+                summary="称号、边框与徽章已卸下",
+                rows=(EconomyReceiptRowViewModel("外观库存", "完整保留"),),
+                note="使用 /佩戴成就 成就名或活动名，可重新佩戴已拥有的外观。",
+            )
+            return await self._deliver_player_status(identity, view, fallback_text=message)
         except Exception as exc:
             return await self._command_error(stream_id=identity.stream_id, operation="取消佩戴成就", error=exc)
 
@@ -4020,11 +4222,21 @@ class PigCatcherPlugin(MaiBotPlugin):
             ticket_id = await cast(AchievementService, self._achievement_service).activate_ticket(
                 identity, name, track_achievements=self.settings.features.achievements_enabled
             )
-            return await self._reply_text(
-                identity.stream_id,
-                f"已激活{name}（{ticket_id}），将在下一次符合条件的操作中结算。",
-                success=True,
+            ticket_label = reward_label(AchievementReward("ticket", ticket_id, 1))
+            message = f"已激活{ticket_label}，将在下一次符合条件的操作中结算。"
+            view = EconomyReceiptViewModel(
+                eyebrow="成就奖励 · 玩法券待命",
+                title="成就券已激活",
+                badge_label="当前状态",
+                badge_value="待结算",
+                summary=ticket_label,
+                rows=(
+                    EconomyReceiptRowViewModel("已激活", "1 张"),
+                    EconomyReceiptRowViewModel("生效时机", "下一次符合条件的操作"),
+                ),
+                note="同一消息重复投递不会再次扣券；使用条件与原有效果保持不变。",
             )
+            return await self._deliver_player_status(identity, view, fallback_text=message)
         except Exception as exc:
             return await self._command_error(
                 stream_id=identity.stream_id,
@@ -4083,8 +4295,23 @@ class PigCatcherPlugin(MaiBotPlugin):
             rewards = await cast(AchievementService, self._achievement_service).open_choice_chest(
                 identity, matched_group(kwargs, "arguments")
             )
-            text = "【成就自选宝箱】\n已选择奖励：" + "、".join(reward_label(item) for item in rewards)
-            return await self._reply_text(identity.stream_id, text, success=True)
+            labels = tuple(
+                f"{COSMETIC_DEFINITIONS.get(item.reward_id, {}).get('name', '外观奖励')} ×{item.quantity}"
+                if item.reward_type in {"title", "frame", "badge", "cosmetic"}
+                else reward_label(item)
+                for item in rewards
+            )
+            text = "【成就自选宝箱】\n已选择奖励：" + "、".join(labels)
+            view = EconomyReceiptViewModel(
+                eyebrow="成就奖励 · 自选宝箱",
+                title="宝箱奖励已领取",
+                badge_label="奖励种类",
+                badge_value=str(len(rewards)),
+                summary="成就自选宝箱已开启",
+                rows=tuple(EconomyReceiptRowViewModel("已获得", label) for label in labels),
+                note="奖励已进入库存，可通过 /道具背包 查看；同一消息重试不会再次开箱。",
+            )
+            return await self._deliver_player_status(identity, view, fallback_text=text)
         except Exception as exc:
             return await self._command_error(stream_id=identity.stream_id, operation="打开成就宝箱", error=exc)
 
@@ -4235,12 +4462,23 @@ class PigCatcherPlugin(MaiBotPlugin):
             )
             renderer = cast(PigCatcherRenderer, self._renderer)
             data_dir = Path(self.ctx.paths.data_dir).resolve()
+            view = ranking_view(result)
+            if self._achievement_service is not None and (
+                self.settings.features.achievements_enabled or self.settings.features.weekly_competitions_enabled
+            ):
+                equipped = await self._achievement_service.cosmetics_for_players([item.key for item in view.items])
+                view = replace(view, items=tuple(
+                    replace(
+                        item,
+                        achievement_title=equipped[item.key].title_id,
+                        achievement_frame=equipped[item.key].frame_id,
+                        achievement_badge=equipped[item.key].badge_name,
+                    ) if item.key in equipped else item
+                    for item in view.items
+                ))
             return await self._deliver_query(
                 stream_id=identity.stream_id,
-                render=lambda: renderer.render_ranking(
-                    ranking_view(result),
-                    ranking_media_paths(data_dir, result),
-                ),
+                render=lambda: renderer.render_ranking(view, ranking_media_paths(data_dir, result)),
                 fallback_text=format_ranking_summary(result),
             )
         except Exception as exc:
@@ -4341,8 +4579,11 @@ class PigCatcherPlugin(MaiBotPlugin):
             activity_identity=identity,
         )
 
-    async def _activity_view_cosmetics(self, identity: CommandIdentity, view: DispatchView) -> DispatchView:
-        if self._achievement_service is None or not self.settings.features.achievements_enabled:
+    async def _activity_view_cosmetics(self, identity: CommandIdentity, view: Any) -> Any:
+        """Decorate an already settled/query view; no reward or random operation occurs."""
+        if self._achievement_service is None or not (
+            self.settings.features.achievements_enabled or self.settings.features.weekly_competitions_enabled
+        ):
             return view
         cosmetics = await self._achievement_service.cosmetics_for_player(identity.player_id)
         return replace(

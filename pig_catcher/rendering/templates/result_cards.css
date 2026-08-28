@@ -1,0 +1,39 @@
+/* Media remains at x=38/y=164/480px for the animation compositor. */
+.pig-card.pig-card { height:auto; min-height:860px; }
+.pig-card.pig-card .pig-card__detail { position:relative; left:auto; top:auto; width:534px; min-height:480px; margin:38px 38px 28px 556px; }
+.pig-card.pig-card .pig-card__description,
+.pig-card.pig-card .pig-card__subline { position:static; left:auto; right:auto; top:auto; bottom:auto; max-height:none; min-height:0; width:auto; overflow:visible; overflow-wrap:anywhere; }
+.pig-card.pig-card .pig-card__description { font-size:18px !important; line-height:1.65 !important; }
+.pig-card.pig-card .pig-card__subline { font-size:16px; line-height:1.65; margin-top:22px; }
+.pig-card.pig-card .pig-card__receipt { position:relative; left:auto; right:auto; top:auto; bottom:auto; height:auto; margin:0 38px 24px; width:auto; }
+.food-card.pig-card.pig-card--long.pig-card--probability .pig-card__receipt { margin-top:0; }
+.game-sheet.game-sheet[data-achievement-frame] { position:relative; outline:none!important; }
+.game-sheet.game-sheet[data-achievement-frame]::after { content:none; }
+.pig-card.pig-card .game-footer { position:relative !important; }
+.pig-card.pig-card .pig-card__receipt-item { min-width:0; overflow-wrap:anywhere; }
+.pig-card.pig-card .pig-card__receipt-item > strong { white-space:normal; }
+.pig-card.pig-card .result-probability { grid-column:1/-1; display:flex; flex-direction:column; gap:8px; }
+.pig-card.pig-card .result-probability strong { font-size:22px; line-height:1.7; letter-spacing:.1px; }
+.pig-card.pig-card .result-probability small { font-size:16px; line-height:1.6; color:#806a76; }
+.result-audit { grid-column:1/-1; padding:16px 18px; border-top:1px solid #ecd5df; }
+.result-audit > span { display:block; font-size:16px; color:#a04e71; margin-bottom:6px; }
+.result-audit p { margin:0; font-size:18px; line-height:1.75; overflow-wrap:anywhere; }
+.result-audit--muted { background:#faf8fa; color:#806d78; }
+.food-card.pig-card .food-card__probability-primary,
+.food-card.pig-card .food-card__probability-source { grid-column:1/-1; }
+.food-card.pig-card .food-card__probability-primary strong { font-size:22px; line-height:1.7; }
+.food-card.pig-card .food-card__probability-source strong { font-size:16px; line-height:1.7; font-weight:500; }
+.food-card.pig-card .food-card__probability-row p { font-size:18px; line-height:1.75; }
+.result-cosmetics { display:flex; flex-direction:column; align-items:flex-start; gap:10px; margin:0 0 18px; }
+.result-cosmetics .cosmetic-plate--compact { width:470px; max-width:100%; }
+.result-cosmetics .cosmetic-badge img { width:52px; height:52px; }
+.cosmetic-gallery { display:flex; flex-wrap:wrap; align-items:center; gap:16px; margin-top:16px; }
+.cosmetic-gallery .cosmetic-plate { width:570px; max-width:100%; }
+.achievement-strip { align-items:center; flex-wrap:wrap; }
+.achievement-strip .cosmetic-plate--compact { width:410px; }
+.achievement-strip__frame { color:#947583; font-size:15px; }
+.title-inline { display:block; margin-top:7px; }
+.title-inline .cosmetic-plate--compact { width:270px; max-width:100%; }
+.title-inline .cosmetic-badge { font-size:13px; }
+.title-inline .cosmetic-badge img { width:34px; height:34px; }
+.achievement-hero { width:100%; max-height:260px; object-fit:contain; display:block; }

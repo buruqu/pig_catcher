@@ -1494,7 +1494,7 @@ async def test_armed_item_is_idempotent_and_consumed_only_by_successful_catch(
 
 
 @pytest.mark.asyncio
-async def test_coin_bounty_tag_doubles_coins_and_increases_experience_once(
+async def test_coin_bounty_tag_triples_coins_and_increases_experience_once(
     tmp_path: Path,
 ) -> None:
     database = await _database_with_catalog(
@@ -1518,7 +1518,7 @@ async def test_coin_bounty_tag_doubles_coins_and_increases_experience_once(
     )
     await service.arm_item(identity, "猪币悬赏牌")
     result = await service.catch(_identity(message_id="bounty-catch"))
-    assert (result.coin_reward, result.experience_reward) == (4, 8)
+    assert (result.coin_reward, result.experience_reward) == (6, 8)
     assert result.item_name == "猪币悬赏牌"
     row = await database.fetch_one(
         "SELECT quantity FROM item_inventory WHERE player_id = ? AND item_id = 'coin-bounty-tag'",

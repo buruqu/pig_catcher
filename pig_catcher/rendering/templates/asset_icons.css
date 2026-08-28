@@ -1,0 +1,26 @@
+/* 旧收藏页面的原生图形，保持原媒体槽尺寸和星数文字不变。 */
+.asset-icon{display:inline-block;width:22px;height:22px;flex:none;vertical-align:middle;overflow:visible}
+.asset-feature-icon{display:inline-flex;width:24px;height:24px;flex:none;vertical-align:middle}
+.asset-feature-icon>.feature-icon{width:100%;height:100%}
+.asset-state-row{display:flex;flex-wrap:wrap;align-items:center;gap:5px 8px;margin:6px 0 9px;min-width:0}
+.asset-state-chip{display:inline-flex;align-items:center;gap:4px;max-width:100%;padding:2px 5px;background:#fff8fb;border:1px solid #eedce4;border-radius:4px;color:#805a71;font-size:12px;line-height:1.55;min-width:0}
+.asset-state-chip>span{overflow-wrap:anywhere;min-width:0}.asset-state-chip>.asset-icon{width:20px;height:20px}
+.asset-media-state{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;width:100%;height:100%;min-width:0;padding:5px;box-sizing:border-box;color:#998393}
+.asset-media-state>.asset-icon{width:38px;height:38px;max-width:70%;max-height:58%;flex-shrink:1}
+.asset-media-state>span{display:block;font-size:11px;line-height:1.4;max-width:100%;overflow-wrap:anywhere}
+.asset-display-tag>.asset-icon{width:16px;height:16px;margin-right:3px}
+.asset-display-tag{display:inline-flex;align-items:center;min-width:0;gap:2px}
+.asset-display-tags--catalog .asset-display-tag>.asset-icon{width:13px;height:13px}
+.asset-caption{display:flex;align-items:center;gap:7px;min-width:0}
+.asset-caption>.asset-icon,.asset-caption>.asset-feature-icon{width:24px;height:24px}
+.profile-stat>span.asset-caption{display:flex;gap:7px;align-items:center}.profile-sheet__collections h2.asset-caption>.asset-feature-icon{width:30px;height:30px}
+.profile-stat>strong{overflow-wrap:anywhere}.profile-sheet__balance>span.asset-caption{justify-content:flex-end}
+.inventory-item__code{overflow-wrap:anywhere;line-height:1.5}.inventory-item__facts>.asset-caption{gap:4px}.inventory-item__facts>.asset-caption>.asset-icon{width:18px;height:18px}
+.record-row{padding:9px 0}.record-row__type{display:flex;align-items:center;gap:7px;min-width:0;line-height:1.5}.record-row__type>.asset-icon{width:24px;height:24px}
+.record-row__holder .cosmetic-plate--compact{width:230px;margin:5px 0 0 auto}.record-row__holder>.asset-holder-name{display:block;overflow-wrap:anywhere;line-height:1.5}
+.giant-sighting-row .asset-sighting-qualification{display:flex;align-items:center;gap:7px}.giant-sighting-row .asset-sighting-qualification>.asset-icon{width:23px;height:23px}
+.giant-sighting-row .cosmetic-plate--compact{width:290px;margin:6px 0 0}.giant-sighting-row .asset-holder-line{display:block;line-height:1.5}
+.record-feature__heading .asset-caption,.daily-giants-board__heading .asset-caption{display:flex;align-items:center;gap:7px}.daily-giants-board__heading .asset-caption>.asset-icon{width:31px;height:31px}.daily-giant-row__copy .cosmetic-plate--compact{width:310px;margin:5px 0 0}
+.daily-giant-row__copy>.asset-holder-name{display:block;line-height:1.45}.daily-giant-row__metric .asset-caption{display:flex;justify-content:flex-end;gap:5px}.daily-giant-row__metric .asset-caption>.asset-icon{width:24px;height:24px}
+.daily-giant-row__media .asset-media-state{gap:2px;padding:3px}.daily-giant-row__media .asset-media-state>.asset-icon{width:30px;height:30px}.daily-giant-row__media .asset-media-state>span{font-size:9px}
+.asset-empty-icon{margin:0 auto 10px}.asset-empty-icon>.asset-icon{width:42px;height:42px}.asset-inline-note{display:inline-flex;align-items:center;gap:5px;vertical-align:middle}.asset-inline-note>.asset-icon{width:18px;height:18px}
