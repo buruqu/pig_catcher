@@ -112,7 +112,15 @@ async def test_tour_queries_render_and_copyable_help(tmp_path):
         for handler, args in cases:
             assert (await invoke(plugin, handler, args))[0]
         assert len(ctx.send.images) == len(cases) and not ctx.send.texts
-        assert all("tour-body" in html for html, _ in ctx.render.calls)
+        assert all(
+            'class="game-sheet feature-tour"' in html
+            and 'class="feature-body"' in html
+            and 'class="game-header feature-header feature-header--stage"' in html
+            and "data-pig-catcher-root" in html
+            and 'data-render-ready="true"' in html
+            and "<strong>巡演测试员</strong>" in html
+            for html, _ in ctx.render.calls
+        )
         assert (await invoke(plugin, "handle_tour", "帮助"))[0]
         assert "/猪猪巡演 确认" in ctx.send.texts[-1][1]
         assert len(ctx.send.images) == len(cases)
@@ -145,7 +153,11 @@ async def test_mutations_render_receipt_fallback_does_not_replay_rewards(tmp_pat
         assert (await plugin.database.fetch_one("SELECT COUNT(*) FROM tour_stages"))[0] == 3
         ctx.render.error = None
         assert (await invoke(plugin, "handle_tour_journal", "收藏 1"))[0]
-        assert "tour-body" in ctx.render.calls[-1][0]
+        collection_html = ctx.render.calls[-1][0]
+        assert 'class="game-sheet feature-tour"' in collection_html
+        assert 'class="game-header feature-header feature-header--stage"' in collection_html
+        assert "data-pig-catcher-root" in collection_html and 'data-render-ready="true"' in collection_html
+        assert ">巡演收藏册</h1>" in collection_html and "<h2>只记录自己的巡演</h2>" in collection_html
         config = plugin.get_plugin_config_data()
         config["features"]["tour_enabled"] = False
         plugin.set_plugin_config(config)

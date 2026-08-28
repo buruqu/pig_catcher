@@ -1237,11 +1237,12 @@ class EconomyService:
         identity: CommandIdentity,
         rarity: int | None,
     ) -> BatchCookingResult:
-        """Cook every eligible unlocked non-collaboration pig in one transaction.
+        """Cook eligible pigs atomically, defaulting to rarities one through three.
 
-        Batch cooking consumes ordinary queued items/effects in deterministic pig
-        order and never consumes collaboration pigs. Six-star-origin cooking
-        effects still require individual cooking so their presentation is preserved.
+        Each collaboration template keeps its highest-value eligible instance;
+        remaining duplicates may be cooked. Ordinary queued items/effects apply
+        in deterministic pig order. Six-star-origin cooking effects still require
+        individual cooking so their presentation is preserved.
         """
 
         if rarity is not None and not 1 <= int(rarity) <= 5:
@@ -1313,7 +1314,11 @@ class EconomyService:
                 ),
             )
             if not rows:
-                raise NoCookablePigError("背包中没有可批量做菜的猪猪；联动猪和六星定制猪不会参与批量做菜。")
+                raise NoCookablePigError(
+                    "背包中没有符合本次条件的可批量做菜猪猪；默认处理一至三星，"
+                    "可指定一至五星。每种联动猪保留价值最高的一只，其余符合条件的重复猪可以做菜；"
+                    "六星、收藏和锁定猪不会参与。"
+                )
             source_pigs = tuple(pig_view_from_row(row) for row in rows)
             foods: list[FoodView] = []
             coin_reward = 0

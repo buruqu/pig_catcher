@@ -29,7 +29,8 @@ DISPATCH_HELP = """【猪猪远行社】
 /派遣游记 纪念品 1 — 20枚自然纪念品收藏册
 /派遣奇遇 — 待选择奇遇；/派遣奇遇 奇遇编号 1 — 选择候选1/2
 同名自动选低价值、未收藏、空闲猪；要带收藏猪，请输入完整“猪名#编号”并确认。
-材料和熟练度独立于抓猪概率、次数、道具和菜品；猪猪安全归来。"""
+材料和熟练度独立于抓猪概率、次数、道具和菜品；猪猪安全归来。
+简明流程：/抓猪帮助 派遣；其他玩法：/抓猪帮助"""
 
 
 @dataclass(frozen=True, slots=True)
@@ -115,7 +116,7 @@ def parse_dispatch_request(arguments: str, *, section: str = "dispatch") -> Disp
             if selectors == ["清空"]:
                 selectors = []
             elif not 1 <= len(selectors) <= 3 or not all(selectors):
-                raise DispatchError("请用顿号分隔1至3只猪的名称，例如：/猪猪派遣 编队 1 笨猪、草莓猪。")
+                raise DispatchError("请用顿号分隔1至3只猪的名称，例如：/猪猪派遣 编队 1 苯猪、野猪。")
             return DispatchRequest("team", {"slot": slot, "selectors": selectors})
         if len(words) == 2 and words[0] == "召回":
             return DispatchRequest("recall", {"slot": positive_number(words[1], maximum=3, label="队伍编号")})

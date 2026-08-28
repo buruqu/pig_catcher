@@ -1414,14 +1414,16 @@ def test_help_is_copyable_concise_text() -> None:
     text = format_help("做菜")
     assert "/做菜 [猪名[#短编号]]" in text
     assert "/升级 <猪饲料|厨具>" in format_help("商城")
-    assert "/批量售卖 <猪猪|美食>" in format_help("商城")
-    assert "【做菜指令】" in text
+    assert "/批量售卖 <猪猪|美食>" in format_help("批量")
+    assert "/抓猪帮助 批量" in format_help("商城")
+    assert "【抓猪帮助·做菜】" in text
     assert "当前版本：" not in text
     assert "已开放抓猪" not in text
     full = format_help()
     assert "/抓猪档案" not in full
     assert "/抓猪详情" not in full
-    assert "/猪猪详情 <猪名#短编号>" in full
+    assert len(full) <= 600
+    assert "/猪猪详情 <猪名#短编号>" in format_help("背包")
     assert "/抓猪档案" not in format_help("抓猪")
     assert "/抓猪详情" not in format_help("抓猪")
     assert "<img" not in text

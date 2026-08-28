@@ -1475,7 +1475,7 @@ class PigCatcherPlugin(MaiBotPlugin):
     @Command(
         "pig_catcher_help",
         description="查看抓猪插件纯文字指令帮助",
-        pattern=r"^/抓猪帮助(?:\s+(?P<topic>\S+))?\s*$",
+        pattern=rf"^{_COMMAND_LEADING_MENTION_PATTERN}/抓猪帮助(?:\s+(?P<topic>\S+))?\s*$",
     )
     async def handle_help(
         self,
@@ -1518,7 +1518,7 @@ class PigCatcherPlugin(MaiBotPlugin):
                     "管理面板已关闭“抓猪帮助”功能。",
                     success=False,
                 )
-            text = format_help(matched_group(kwargs, "topic"))
+            text = format_help(matched_group(kwargs, "topic"), settings=self.settings)
             return await self._reply_text(identity.stream_id, text, success=True)
         except CommandContextError as exc:
             return await self._reply_text(stream_id, str(exc), success=False)
@@ -2238,7 +2238,7 @@ class PigCatcherPlugin(MaiBotPlugin):
     @Command(
         "pig_catcher_toggle_baogian",
         description="切换保千猪的立绘与表情包显示；背包里有多只保千猪时需指定编号",
-        pattern=r"^/切换\s+猪保千(?:\s+([0-9A-Za-z]{4,16}))?\s*$",
+        pattern=r"^/切换\s+猪保千(?:\s+(?P<arguments>[0-9A-Za-z]{4,16}))?\s*$",
     )
     async def handle_toggle_baogian(
         self,

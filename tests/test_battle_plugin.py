@@ -137,7 +137,12 @@ async def test_queries_help_and_errors_are_images_except_copyable_help(tmp_path)
             assert (await invoke(plugin, handler, text))[0]
         assert len(ctx.send.images) == 5 and not ctx.send.texts
         assert all(
-            "battle-body" in html and "data-pig-catcher-root" in html and 'data-render-ready="true"' in html
+            'class="game-sheet feature-battle"' in html
+            and 'class="feature-body"' in html
+            and 'class="game-header feature-header feature-header--battle"' in html
+            and "data-pig-catcher-root" in html
+            and 'data-render-ready="true"' in html
+            and "<strong>对战测试员</strong>" in html
             for html, _ in ctx.render.calls
         )
         assert (await invoke(plugin, "handle_battle_pig", "帮助"))[0]

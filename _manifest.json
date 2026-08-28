@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "id": "local.pig-catcher",
-  "version": "2.0.0.dev10",
+  "version": "2.0.0.dev11",
   "name": "抓猪插件",
   "description": "抓猪 2.0 隔离开发版：成就、周冲榜、派遣、自由乐队巡演与双人轮盘对战；含战斗养成、可恢复交锋和专属战利品。",
   "author": {

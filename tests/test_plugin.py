@@ -448,15 +448,18 @@ async def test_help_command_sends_copyable_text_without_rendering(tmp_path: Path
     success, text, level = await invoke_help(plugin)
     assert success is True
     assert level == 2
-    assert "/抓猪帮助 [抓猪|背包|道具|做菜|商城|交易|排行|成就|派遣|巡演|对战]" in text
-    assert "/比划比划 @成员" in text and "/战利品抓猪" in text
-    assert "/使用成就券 <券名>" in text
+    assert "/抓猪帮助 功能名" in text
+    assert "/抓猪" in text and "/猪猪背包" in text and "/猪猪商城" in text
+    assert "对战" in text and "术式" in text and "批量" in text and "奖励" in text
+    assert "/比划比划" not in text and "/战利品抓猪" not in text
+    assert "/使用成就券" not in text
+    assert len(text) <= 600
     assert "当前版本：" not in text
     assert "已开放抓猪" not in text
     assert "/抓猪档案" not in text
     assert "/抓猪详情" not in text
-    assert "/猪猪详情 <猪名#短编号>" in text
-    assert "/转轮盘" in text
+    assert "/猪猪详情" not in text
+    assert "/转轮盘" not in text
     assert context.send.texts == [("stream-10001", text)]
     assert context.send.images == []
     assert context.render.calls == []
@@ -474,6 +477,29 @@ async def test_help_topic_and_unknown_topic_are_explicit(tmp_path: Path) -> None
     _, unknown, _ = await invoke_help(plugin, topic="不存在")
     assert "未知帮助主题：不存在" in unknown
     await plugin.on_unload()
+
+
+@pytest.mark.asyncio
+async def test_help_reads_the_plugins_current_settings(tmp_path: Path) -> None:
+    plugin, context = await create_test_plugin(
+        tmp_path,
+        config_updates={
+            "catching": {"daily_limit": 9, "cooldown_seconds": 17, "quota_refresh_hours": [0, 6, 18]},
+            "features": {"battle_enabled": False},
+            "economy": {"feed_upgrade_prices": [321, 654, 1987, 4321, 8765]},
+        },
+    )
+    try:
+        success, catching, _ = await invoke_help(plugin, topic="抓猪")
+        assert success and "9次" in catching and "17秒" in catching
+        assert "06:00" in catching and "18:00" in catching and "09:00" not in catching
+        success, store, _ = await invoke_help(plugin, topic="商城")
+        assert success and "321 / 654 / 1987 / 4321 / 8765" in store
+        success, battle, _ = await invoke_help(plugin, topic="对战")
+        assert success and "未启用" in battle and "/比划比划" not in battle
+        assert len(context.send.texts) == 3 and context.send.images == [] and context.render.calls == []
+    finally:
+        await plugin.on_unload()
 
 
 @pytest.mark.asyncio
