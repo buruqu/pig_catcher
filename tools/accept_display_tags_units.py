@@ -335,14 +335,16 @@ async def run_formal_round9(args) -> dict:
     definitions = json.loads(
         (PROJECT_ROOT / "catalogs/formal/pig-and-food-definitions.json").read_text(encoding="utf-8")
     )["entries"]
+    # 六星素材仍按群隔离保存；本页仅取同名的一份做像素验收，跨群边界另由集成测试覆盖。
     ids = {entry["template_id"] for entry in definitions if entry["source_path"].startswith("第九期/")}
+    ids.update({"pig-g1092931381-yilu-green-core", "food-g1092931381-yilu-green-core-pie"})
     source = PROJECT_ROOT / "asset_library/current"
     entries = [
         entry
         for entry in json.loads((source / "assets.json").read_text(encoding="utf-8"))["entries"]
         if entry["template_id"] in ids
     ]
-    assert len(entries) == len(ids) == 46, "第九期应有32猪和14菜，不应重复群作用域"
+    assert len(entries) == len(ids) == 70, "第九期两批合计47猪和23菜；六星同名仅取一份验收"
     output.mkdir(parents=True)
     outputs = []
     hashes = {}

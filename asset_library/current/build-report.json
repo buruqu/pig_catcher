@@ -1,9 +1,9 @@
 {
   "source_root": "asset_library/current/media",
   "definitions": "catalogs/formal/pig-and-food-definitions.json",
-  "entry_count": 298,
-  "unique_binary_count": 233,
-  "stored_binary_count": 302,
+  "entry_count": 328,
+  "unique_binary_count": 257,
+  "stored_binary_count": 332,
   "duplicate_aliases": [
     {
       "source_path": "猪猪素材库/紫色品质/翻滚猪.jpg",
@@ -1799,8 +1799,8 @@
     },
     {
       "template_id": "pig-r1-pig-question",
-      "source_path": "第九期/一星猪猪/猪猪？.png",
-      "media_path": "media/第九期/一星猪猪/猪猪？.png",
+      "source_path": "第九期/四星猪猪/猪猪？.png",
+      "media_path": "media/第九期/四星猪猪/猪猪？.png",
       "sha256": "ab779c6e306f2a04e71ef202cb20670934c73cbd8e4649e08a682db57df76176",
       "bytes": 191629
     },
@@ -2097,6 +2097,216 @@
       "media_path": "media/第九期/五星美食/猪草莓牛奶.png",
       "sha256": "58dea844119cc6d3318fef1296d13304c75d1ae0fcfd64476fed6939d30c4ea3",
       "bytes": 323261
+    },
+    {
+      "template_id": "pig-r1-deep-sea",
+      "source_path": "第九期/一星猪猪/深海猪.png",
+      "media_path": "media/第九期/一星猪猪/深海猪.png",
+      "sha256": "02dc0b8ee539f2b1c7554d08d2fceacb66bdf89ea4816c64840f3f036fc30d8b",
+      "bytes": 665370
+    },
+    {
+      "template_id": "pig-r1-sleeping",
+      "source_path": "第九期/一星猪猪/猪睡觉.png",
+      "media_path": "media/第九期/一星猪猪/猪睡觉.png",
+      "sha256": "cc9c69bae87bc3eb18b646aa7a7cbda1ab669168d21836a3b87eeed0a6e1e89e",
+      "bytes": 133074
+    },
+    {
+      "template_id": "pig-r1-identity-card",
+      "source_path": "第九期/一星猪猪/猪身份证.png",
+      "media_path": "media/第九期/一星猪猪/猪身份证.png",
+      "sha256": "fd050e4e8e7101e5498e7b31da2c6b08b53b2d8712ab7a60b39c969c4da79c23",
+      "bytes": 1133933
+    },
+    {
+      "template_id": "pig-r1-dice",
+      "source_path": "第九期/一星猪猪/猪骰.png",
+      "media_path": "media/第九期/一星猪猪/猪骰.png",
+      "sha256": "5a7e581bc830cdbe89a1e7d11e1913ba83929dfb5ad6152f078d9212174d1b97",
+      "bytes": 241754
+    },
+    {
+      "template_id": "food-r1-pig-egg",
+      "source_path": "第九期/一星美食/猪蛋.png",
+      "media_path": "media/第九期/一星美食/猪蛋.png",
+      "sha256": "c56ab5783c6e2e7249316ab5afcbb5e5d37c41e4e350eb9ec3d332d4694e390d",
+      "bytes": 768900
+    },
+    {
+      "template_id": "food-r1-feed-tray",
+      "source_path": "第九期/一星美食/猪饲料.png",
+      "media_path": "media/第九期/一星美食/猪饲料.png",
+      "sha256": "1043a6abc0c949dfc65414feb0839e4c3980ecd0ee4e14a2fe647986a497c426",
+      "bytes": 611857
+    },
+    {
+      "template_id": "pig-r3-trill-chart",
+      "source_path": "第九期/三星猪猪/渚交互.png",
+      "media_path": "media/第九期/三星猪猪/渚交互.png",
+      "sha256": "14f4d7b0147eade53483fa806e7ef343ffbcf55afdb20011741ebc112059262b",
+      "bytes": 566940
+    },
+    {
+      "template_id": "pig-r3-glowstick-call",
+      "source_path": "第九期/三星猪猪/猪打call.gif",
+      "media_path": "media/第九期/三星猪猪/猪打call.gif",
+      "sha256": "5b6d8b8b55096c915d3a304c257a1e837a72fe4322b19f7ec647fd9befcde68d",
+      "bytes": 598166
+    },
+    {
+      "template_id": "food-r3-open-pig-can",
+      "source_path": "第九期/三星美食/开猪罐头.png",
+      "media_path": "media/第九期/三星美食/开猪罐头.png",
+      "sha256": "48a79891d0dd621f794d5a391b57d00a64bf9e68d850225a5c4dee5d2825f35e",
+      "bytes": 694684
+    },
+    {
+      "template_id": "pig-r2-like-a-pig",
+      "source_path": "第九期/二星猪猪/你怎么跟猪一样.gif",
+      "media_path": "media/第九期/二星猪猪/你怎么跟猪一样.gif",
+      "sha256": "3abf5717027d2542b770d92b804ac9a1447248b10b31df84321278d84495e84a",
+      "bytes": 176198
+    },
+    {
+      "template_id": "pig-r2-explosive-big-head",
+      "source_path": "第九期/二星猪猪/劲爆大只猪头.png",
+      "media_path": "media/第九期/二星猪猪/劲爆大只猪头.png",
+      "sha256": "0c49d788c3d86567a24247ca315af3ae7d650b56caffa4c87d5488ec932252e3",
+      "bytes": 2023581
+    },
+    {
+      "template_id": "pig-r2-at-work",
+      "source_path": "第九期/二星猪猪/猪上班.png",
+      "media_path": "media/第九期/二星猪猪/猪上班.png",
+      "sha256": "52d44e080bc1ac6c9741403aa214da88803aa0bf6e95fd0cb258d2ba3701d4fe",
+      "bytes": 203697
+    },
+    {
+      "template_id": "food-r2-bamboo-shoot",
+      "source_path": "第九期/二星美食/猪笋.png",
+      "media_path": "media/第九期/二星美食/猪笋.png",
+      "sha256": "797089d48d3e7182dc0cb5b062797053150a2102f14fe303177cb5ef859e5749",
+      "bytes": 436560
+    },
+    {
+      "template_id": "food-r5-burger-combo",
+      "source_path": "第九期/五星美食/猪堡套餐.png",
+      "media_path": "media/第九期/五星美食/猪堡套餐.png",
+      "sha256": "c1f5065abeb35e0c3b69f73ef9cee9b397955365c83e4ce6e1b44b11fde52fac",
+      "bytes": 488623
+    },
+    {
+      "template_id": "food-r4-pig-cola",
+      "source_path": "第九期/四星美食/猪可乐.png",
+      "media_path": "media/第九期/四星美食/猪可乐.png",
+      "sha256": "8042785a36089beb28919a9dfb1d92ddca36f1f3b0023f0dbec6e204e7b720ca",
+      "bytes": 271721
+    },
+    {
+      "template_id": "food-r4-kitty-burger",
+      "source_path": "第九期/四星美食/猪咪堡.png",
+      "media_path": "media/第九期/四星美食/猪咪堡.png",
+      "sha256": "a1e496266bd05ac787b483beeb541e39e6ad5494ae6446b1e94aa571621d6d99",
+      "bytes": 553168
+    },
+    {
+      "template_id": "food-r4-pig-fries",
+      "source_path": "第九期/四星美食/猪条.png",
+      "media_path": "media/第九期/四星美食/猪条.png",
+      "sha256": "0e2a816e42ee8c43eecb09fb45f329bce1385922ba4127c59bad9d20fd97fa7f",
+      "bytes": 399440
+    },
+    {
+      "template_id": "pig-bandori-yumemita-arale",
+      "source_path": "第九期/五星猪猪/阿拉蕾猪.png",
+      "media_path": "media/第九期/五星猪猪/阿拉蕾猪.png",
+      "sha256": "9dbb362bab1e4c08f253e79000d65faf8ee69586b8de507bb3a796822cec7fa9",
+      "bytes": 1552505
+    },
+    {
+      "template_id": "pig-bandori-yumemita-nonoka",
+      "source_path": "第九期/四星猪猪/nnk猪.png",
+      "media_path": "media/第九期/四星猪猪/nnk猪.png",
+      "sha256": "4df40077024060345bbc64092b50ee35b06169d3caabafecb231dc83d55499fc",
+      "bytes": 2044957
+    },
+    {
+      "template_id": "pig-bandori-yumemita-ritsu",
+      "source_path": "第九期/四星猪猪/律猪.png",
+      "media_path": "media/第九期/四星猪猪/律猪.png",
+      "sha256": "0164a0efc7ad65c071b84fa029aef2faddcc55df6e305a22eb05a7a03a40dba4",
+      "bytes": 1651832
+    },
+    {
+      "template_id": "pig-bandori-yumemita-miyako",
+      "source_path": "第九期/五星猪猪/都子猪.png",
+      "media_path": "media/第九期/五星猪猪/都子猪.png",
+      "sha256": "03c3f07d2e450cf73d17228cb6548d4ca2481701df2ac0361cb2bd5ccae65ebe",
+      "bytes": 2086057
+    },
+    {
+      "template_id": "pig-bandori-yumemita-yuno",
+      "source_path": "第九期/五星猪猪/由乃猪.png",
+      "media_path": "media/第九期/五星猪猪/由乃猪.png",
+      "sha256": "e210ef492278349f3290a12507cf7598e409f93cbb049b8908b19a7faf233502",
+      "bytes": 1698962
+    },
+    {
+      "template_id": "pig-g1092931381-yilu-green-core",
+      "source_path": "定制猪群友库/1092931381/熠～噜猪.png",
+      "media_path": "media/定制猪群友库/1092931381/熠～噜猪.png",
+      "sha256": "94e3cde855846439796ea189ce500ef1162a0c24372f3c602ec183b566f9ff5a",
+      "bytes": 1881504
+    },
+    {
+      "template_id": "food-g1092931381-yilu-green-core-pie",
+      "source_path": "定制美食库/1092931381/熠～噜猪绿芯小猪派.png",
+      "media_path": "media/定制美食库/1092931381/熠～噜猪绿芯小猪派.png",
+      "sha256": "76ce0235d4c48e5f35015052ad1e619ed7a82e7fe99291530865223fd0539b01",
+      "bytes": 2645037
+    },
+    {
+      "template_id": "pig-g237716658-yilu-green-core",
+      "source_path": "定制猪群友库/237716658/熠～噜猪.png",
+      "media_path": "media/定制猪群友库/237716658/熠～噜猪.png",
+      "sha256": "94e3cde855846439796ea189ce500ef1162a0c24372f3c602ec183b566f9ff5a",
+      "bytes": 1881504
+    },
+    {
+      "template_id": "food-g237716658-yilu-green-core-pie",
+      "source_path": "定制美食库/237716658/熠～噜猪绿芯小猪派.png",
+      "media_path": "media/定制美食库/237716658/熠～噜猪绿芯小猪派.png",
+      "sha256": "76ce0235d4c48e5f35015052ad1e619ed7a82e7fe99291530865223fd0539b01",
+      "bytes": 2645037
+    },
+    {
+      "template_id": "pig-qo5e5854406d0297d6feae696a13e3a339-yilu-green-core",
+      "source_path": "定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/熠～噜猪.png",
+      "media_path": "media/定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/熠～噜猪.png",
+      "sha256": "94e3cde855846439796ea189ce500ef1162a0c24372f3c602ec183b566f9ff5a",
+      "bytes": 1881504
+    },
+    {
+      "template_id": "food-qo5e5854406d0297d6feae696a13e3a339-yilu-green-core-pie",
+      "source_path": "定制美食库/5E5854406D0297D6FEAE696A13E3A339/熠～噜猪绿芯小猪派.png",
+      "media_path": "media/定制美食库/5E5854406D0297D6FEAE696A13E3A339/熠～噜猪绿芯小猪派.png",
+      "sha256": "76ce0235d4c48e5f35015052ad1e619ed7a82e7fe99291530865223fd0539b01",
+      "bytes": 2645037
+    },
+    {
+      "template_id": "pig-qo9ea2810f378fbd7dc3219c56ceab3520-yilu-green-core",
+      "source_path": "定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/熠～噜猪.png",
+      "media_path": "media/定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/熠～噜猪.png",
+      "sha256": "94e3cde855846439796ea189ce500ef1162a0c24372f3c602ec183b566f9ff5a",
+      "bytes": 1881504
+    },
+    {
+      "template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-yilu-green-core-pie",
+      "source_path": "定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/熠～噜猪绿芯小猪派.png",
+      "media_path": "media/定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/熠～噜猪绿芯小猪派.png",
+      "sha256": "76ce0235d4c48e5f35015052ad1e619ed7a82e7fe99291530865223fd0539b01",
+      "bytes": 2645037
     }
   ]
 }

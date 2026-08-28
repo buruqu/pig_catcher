@@ -383,11 +383,11 @@ class AssetsSection(PluginConfigBase):
         json_schema_extra=_ui("素材清单文件", "第二轮 2B 导入素材时读取，必须是 JSON 文件"),
     )
     min_image_side: int = Field(
-        default=256,
+        default=180,
         ge=32,
         le=4096,
         description="允许导入图片的最短边像素下限",
-        json_schema_extra=_ui("图片最短边", "正式素材建议不低于 1024；测试素材可在配置验证中降低"),
+        json_schema_extra=_ui("图片最短边", "正式素材建议不低于 1024；默认兼容已审阅的 180px 横幅动画"),
     )
     max_image_bytes: int = Field(
         default=12582912,

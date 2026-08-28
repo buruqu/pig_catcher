@@ -182,8 +182,8 @@ class SocialRepository:
                 record.record_type,
                 record.record_value,
                 record.achieved_at,
-                template.display_name,
-                template.rarity,
+                instance.display_name_snapshot AS display_name,
+                instance.rarity,
                 instance.short_code,
                 player.display_name AS holder_display_name
             FROM group_global_records AS record
@@ -217,8 +217,8 @@ class SocialRepository:
                 sighting.size_qualified,
                 sighting.weight_qualified,
                 sighting.achieved_at,
-                template.display_name,
-                template.rarity,
+                instance.display_name_snapshot AS display_name,
+                instance.rarity,
                 instance.short_code,
                 player.display_name AS holder_display_name
             FROM giant_sightings AS sighting

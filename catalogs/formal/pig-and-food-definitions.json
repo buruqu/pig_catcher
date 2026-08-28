@@ -6287,10 +6287,10 @@
     },
     {
       "template_id": "pig-r1-pig-question",
-      "source_path": "第九期/一星猪猪/猪猪？.png",
+      "source_path": "第九期/四星猪猪/猪猪？.png",
       "kind": "pig",
       "display_name": "猪猪？",
-      "rarity": 1,
+      "rarity": 4,
       "description": "淡绿头发的小观众盯着气泡里的猪猪，脑海里只剩一个非常认真的疑问：这是猪猪，还是想到猪猪时又想到的猪猪？",
       "recipe_tags": [
         "清淡",
@@ -7153,6 +7153,671 @@
       ],
       "effect_id": "",
       "effect_params": {}
+    },
+    {
+      "template_id": "pig-r1-deep-sea",
+      "source_path": "第九期/一星猪猪/深海猪.png",
+      "kind": "pig",
+      "rarity": 1,
+      "description": "橙红色条纹沿着圆圆的猪身一圈圈绕开，连猪鼻都认真参加了深海伪装；看上去很懂海底，开口却还是熟悉的哼哼。",
+      "recipe_tags": [
+        "清淡",
+        "家常"
+      ],
+      "display_tags": [
+        "海洋",
+        "橙红条纹",
+        "深海伪装"
+      ],
+      "fat_profile": "balanced",
+      "stature_profile": "standard",
+      "length_min_cm": 35,
+      "length_max_cm": 120,
+      "weight_min_kg": 20,
+      "weight_max_kg": 260,
+      "display_name": "深海猪"
+    },
+    {
+      "template_id": "pig-r1-sleeping",
+      "source_path": "第九期/一星猪猪/猪睡觉.png",
+      "kind": "pig",
+      "rarity": 1,
+      "description": "粉色小枕头刚垫好，眼皮就抢先下班了；嘴边留着一点睡得很香的证据，卷尾巴还在替主人认真值夜。",
+      "recipe_tags": [
+        "丰腴",
+        "家常"
+      ],
+      "display_tags": [
+        "酣睡",
+        "粉色枕头",
+        "软乎乎"
+      ],
+      "fat_profile": "fatty",
+      "stature_profile": "standard",
+      "length_min_cm": 35,
+      "length_max_cm": 105,
+      "weight_min_kg": 30,
+      "weight_max_kg": 250,
+      "display_name": "猪睡觉"
+    },
+    {
+      "template_id": "pig-r1-identity-card",
+      "source_path": "第九期/一星猪猪/猪身份证.png",
+      "kind": "pig",
+      "rarity": 1,
+      "description": "姓名认真写了三遍猪，出生日期却先把日历难住了；证件照里的小猪一脸正经，仿佛正在证明自己确实很有猪的身份。",
+      "recipe_tags": [
+        "清淡",
+        "家常"
+      ],
+      "display_tags": [
+        "证件梗",
+        "卡片",
+        "一本正经"
+      ],
+      "fat_profile": "lean",
+      "stature_profile": "mini",
+      "length_min_cm": 8,
+      "length_max_cm": 18,
+      "weight_min_kg": 0.01,
+      "weight_max_kg": 0.08,
+      "display_name": "猪身份证"
+    },
+    {
+      "template_id": "pig-r1-dice",
+      "source_path": "第九期/一星猪猪/猪骰.png",
+      "kind": "pig",
+      "rarity": 1,
+      "description": "木色方块把黑色点数排得整整齐齐，顶面却被一只探头的小猪占了座；翻来覆去数了半天，最后总会多看见一个猪鼻。",
+      "recipe_tags": [
+        "结实",
+        "家常"
+      ],
+      "display_tags": [
+        "骰子",
+        "方块",
+        "袖珍"
+      ],
+      "fat_profile": "balanced",
+      "stature_profile": "mini",
+      "length_min_cm": 3,
+      "length_max_cm": 20,
+      "weight_min_kg": 0.08,
+      "weight_max_kg": 6,
+      "display_name": "猪骰"
+    },
+    {
+      "template_id": "food-r1-pig-egg",
+      "source_path": "第九期/一星美食/猪蛋.png",
+      "kind": "food",
+      "rarity": 1,
+      "description": "圆圆猪鼻贴在浅金色蛋壳上，头顶还顶着一圈小光环；整颗蛋安静得很有仪式感，只把一点点委屈藏在眉毛里。",
+      "recipe_tags": [
+        "家常",
+        "清淡"
+      ],
+      "effect_id": "",
+      "effect_params": {},
+      "display_name": "猪蛋"
+    },
+    {
+      "template_id": "food-r1-feed-tray",
+      "source_path": "第九期/一星美食/猪饲料.png",
+      "kind": "food",
+      "rarity": 1,
+      "description": "木槽里盛满金褐色的小颗粒，边角还贴着一只认真监餐的猪猪；没有华丽摆盘，只有把普通一餐装得满满当当的踏实。",
+      "recipe_tags": [
+        "家常",
+        "谷物"
+      ],
+      "effect_id": "",
+      "effect_params": {},
+      "display_name": "猪饲料"
+    },
+    {
+      "template_id": "pig-r3-trill-chart",
+      "source_path": "第九期/三星猪猪/渚交互.png",
+      "kind": "pig",
+      "rarity": 3,
+      "description": "小猪左右错开排成一串，像把交互连打从谱面上搬了下来；左一下、右一下，节奏还没停，手指已经开始和猪鼻互相认亲。",
+      "recipe_tags": [
+        "清淡",
+        "家常"
+      ],
+      "display_tags": [
+        "邦邦谱面",
+        "交互",
+        "左右连打"
+      ],
+      "fat_profile": "lean",
+      "stature_profile": "standard",
+      "length_min_cm": 60,
+      "length_max_cm": 240,
+      "weight_min_kg": 30,
+      "weight_max_kg": 360,
+      "display_name": "渚交互"
+    },
+    {
+      "template_id": "pig-r3-glowstick-call",
+      "source_path": "第九期/三星猪猪/猪打call.gif",
+      "kind": "pig",
+      "rarity": 3,
+      "description": "两根荧光棒在小蹄子里黄绿交替，笑弯的眼睛比舞台灯还投入；别问下一句应援喊什么，先跟着这只猪把气氛接起来。",
+      "recipe_tags": [
+        "清淡",
+        "家常"
+      ],
+      "display_tags": [
+        "应援",
+        "荧光棒",
+        "动态"
+      ],
+      "fat_profile": "balanced",
+      "stature_profile": "standard",
+      "length_min_cm": 40,
+      "length_max_cm": 110,
+      "weight_min_kg": 22,
+      "weight_max_kg": 230,
+      "display_name": "猪打call"
+    },
+    {
+      "template_id": "food-r3-open-pig-can",
+      "source_path": "第九期/三星美食/开猪罐头.png",
+      "kind": "food",
+      "rarity": 3,
+      "description": "拉环一掀，圆圆猪鼻先从罐口探了出来；外壳还印着同款表情，像是给这份罐头又套上一层不愿离场的猪猪。",
+      "recipe_tags": [
+        "醇香",
+        "家常"
+      ],
+      "effect_id": "",
+      "effect_params": {},
+      "display_name": "开猪罐头"
+    },
+    {
+      "template_id": "pig-r2-like-a-pig",
+      "source_path": "第九期/二星猪猪/你怎么跟猪一样.gif",
+      "kind": "pig",
+      "rarity": 2,
+      "description": "话说到一半，中间的小猪就开始慢悠悠地翻身；转正像猪，倒过来也像猪，这句认真比较到最后，反而显得很难反驳。",
+      "recipe_tags": [
+        "家常",
+        "清淡"
+      ],
+      "display_tags": [
+        "文字梗",
+        "翻转",
+        "动态"
+      ],
+      "fat_profile": "balanced",
+      "stature_profile": "standard",
+      "length_min_cm": 40,
+      "length_max_cm": 105,
+      "weight_min_kg": 22,
+      "weight_max_kg": 210,
+      "display_name": "你怎么跟猪一样"
+    },
+    {
+      "template_id": "pig-r2-explosive-big-head",
+      "source_path": "第九期/二星猪猪/劲爆大只猪头.png",
+      "kind": "pig",
+      "rarity": 2,
+      "description": "还没看见身子，一颗带着蓝光的大猪头就先冲进了画面；速度线挤得到处都是，闭着眼也能把登场动静拉得满满当当。",
+      "recipe_tags": [
+        "结实",
+        "家常"
+      ],
+      "display_tags": [
+        "巨大猪头",
+        "冲刺",
+        "漫画速度线"
+      ],
+      "fat_profile": "balanced",
+      "stature_profile": "giant",
+      "length_min_cm": 140,
+      "length_max_cm": 420,
+      "weight_min_kg": 400,
+      "weight_max_kg": 8000,
+      "display_name": "劲爆大只猪头"
+    },
+    {
+      "template_id": "pig-r2-at-work",
+      "source_path": "第九期/二星猪猪/猪上班.png",
+      "kind": "pig",
+      "rarity": 2,
+      "description": "电脑已经打开，粉色工位也布置得很认真，只有脑袋上的瞌睡符号还没打卡；它坚称自己并没摸鱼，只是在后台运行午睡。",
+      "recipe_tags": [
+        "家常",
+        "清淡"
+      ],
+      "display_tags": [
+        "上班",
+        "笔记本",
+        "摸鱼"
+      ],
+      "fat_profile": "balanced",
+      "stature_profile": "standard",
+      "length_min_cm": 40,
+      "length_max_cm": 110,
+      "weight_min_kg": 22,
+      "weight_max_kg": 230,
+      "display_name": "猪上班"
+    },
+    {
+      "template_id": "food-r2-bamboo-shoot",
+      "source_path": "第九期/二星美食/猪笋.png",
+      "kind": "food",
+      "rarity": 2,
+      "description": "层层笋衣把圆猪鼻包得只露一点，顶端还倔强地冒出几撮嫩绿；光环飘在上头，像给这份脆生生的春味盖了一个可爱章。",
+      "recipe_tags": [
+        "清淡",
+        "鲜甜"
+      ],
+      "effect_id": "",
+      "effect_params": {},
+      "display_name": "猪笋"
+    },
+    {
+      "template_id": "food-r5-burger-combo",
+      "source_path": "第九期/五星美食/猪堡套餐.png",
+      "kind": "food",
+      "rarity": 5,
+      "description": "猫耳猪堡站中间，红杯饮料和金黄薯条一左一右排好队；每份都长着自己的猪鼻，连点一份套餐也像凑齐了一桌小伙伴。",
+      "recipe_tags": [
+        "丰腴",
+        "家常"
+      ],
+      "effect_id": "",
+      "effect_params": {},
+      "display_name": "猪堡套餐"
+    },
+    {
+      "template_id": "food-r4-pig-cola",
+      "source_path": "第九期/四星美食/猪可乐.png",
+      "kind": "food",
+      "rarity": 4,
+      "description": "红色纸杯长着猪耳和猪鼻，弯弯吸管像在认真招手；杯盖把气泡声藏得很好，看见这张脸，又总觉得里面正轻轻哼哼。",
+      "recipe_tags": [
+        "清甜",
+        "冷饮"
+      ],
+      "effect_id": "",
+      "effect_params": {},
+      "display_name": "猪可乐"
+    },
+    {
+      "template_id": "food-r4-kitty-burger",
+      "source_path": "第九期/四星美食/猪咪堡.png",
+      "kind": "food",
+      "rarity": 4,
+      "description": "猫耳面包顶着一颗小猪鼻，生菜、芝士和肉饼在下面叠得整整齐齐；还没决定先咬哪边，就已经被小胡须盯得有点心软。",
+      "recipe_tags": [
+        "丰腴",
+        "炙烤"
+      ],
+      "effect_id": "",
+      "effect_params": {},
+      "display_name": "猪咪堡"
+    },
+    {
+      "template_id": "food-r4-pig-fries",
+      "source_path": "第九期/四星美食/猪条.png",
+      "kind": "food",
+      "rarity": 4,
+      "description": "金黄长条挤在红色猪鼻小纸盒里，高高低低像排队探头；酥脆都藏在尖尖的边角上，盒子却还在一本正经地装可爱。",
+      "recipe_tags": [
+        "酥香",
+        "炙烤"
+      ],
+      "effect_id": "",
+      "effect_params": {},
+      "display_name": "猪条"
+    },
+    {
+      "template_id": "pig-bandori-yumemita-arale",
+      "source_path": "第九期/五星猪猪/阿拉蕾猪.png",
+      "kind": "pig",
+      "rarity": 5,
+      "description": "金色双马尾晃着彩色发梢，猫耳跟着节拍一抖一抖。借仲町阿拉蕾的大嗓门把猪圈当舞台，扩音器还没打开，它已经把大家喊来安可了。",
+      "recipe_tags": [
+        "BanG Dream!",
+        "梦限大みゅーたいぷ",
+        "主唱",
+        "活力舞台"
+      ],
+      "display_tags": [
+        "乐队联动",
+        "主唱",
+        "猫耳",
+        "彩色双马尾"
+      ],
+      "fat_profile": "balanced",
+      "stature_profile": "standard",
+      "length_min_cm": 34.0,
+      "length_max_cm": 118.0,
+      "weight_min_kg": 28.0,
+      "weight_max_kg": 330.0,
+      "collection": {
+        "collaboration_name": "BanG Dream!",
+        "collection_id": "bandori-yumemita",
+        "collection_name": "梦限大みゅーたいぷ",
+        "slot": 1,
+        "total": 5,
+        "character_id": "arale",
+        "character_name": "仲町阿拉蕾",
+        "official_profile_url": "https://bang-dream.com/artist/yumemita/nakamachi-arale/"
+      },
+      "display_name": "阿拉蕾猪"
+    },
+    {
+      "template_id": "pig-bandori-yumemita-nonoka",
+      "source_path": "第九期/四星猪猪/nnk猪.png",
+      "kind": "pig",
+      "rarity": 4,
+      "description": "银白长发、兔耳格纹帽和粉色吉他一齐登场，把宫永野乃花的软绵元气带进猪圈。自己先弹得摇头晃脑，路过的猪也不知不觉跟着蹦起来。",
+      "recipe_tags": [
+        "BanG Dream!",
+        "梦限大みゅーたいぷ",
+        "吉他",
+        "自由演奏"
+      ],
+      "display_tags": [
+        "乐队联动",
+        "吉他",
+        "兔耳格纹",
+        "银白长发"
+      ],
+      "fat_profile": "balanced",
+      "stature_profile": "standard",
+      "length_min_cm": 32.0,
+      "length_max_cm": 112.0,
+      "weight_min_kg": 24.0,
+      "weight_max_kg": 300.0,
+      "collection": {
+        "collaboration_name": "BanG Dream!",
+        "collection_id": "bandori-yumemita",
+        "collection_name": "梦限大みゅーたいぷ",
+        "slot": 2,
+        "total": 5,
+        "character_id": "nonoka",
+        "character_name": "宫永野乃花",
+        "official_profile_url": "https://bang-dream.com/artist/yumemita/miyanaga-nonoka/"
+      },
+      "display_name": "nnk猪"
+    },
+    {
+      "template_id": "pig-bandori-yumemita-ritsu",
+      "source_path": "第九期/四星猪猪/律猪.png",
+      "kind": "pig",
+      "rarity": 4,
+      "description": "蓝色短发和机械小伙伴整整齐齐，吉他节拍也像峰月律一样稳。排练时认真托住全队，开饭后胃口就切成梦限大——本轮安可是再来一碗。",
+      "recipe_tags": [
+        "BanG Dream!",
+        "梦限大みゅーたいぷ",
+        "节奏吉他",
+        "稳拍"
+      ],
+      "display_tags": [
+        "乐队联动",
+        "节奏吉他",
+        "蓝色短发",
+        "机械伙伴"
+      ],
+      "fat_profile": "balanced",
+      "stature_profile": "standard",
+      "length_min_cm": 34.0,
+      "length_max_cm": 120.0,
+      "weight_min_kg": 28.0,
+      "weight_max_kg": 340.0,
+      "collection": {
+        "collaboration_name": "BanG Dream!",
+        "collection_id": "bandori-yumemita",
+        "collection_name": "梦限大みゅーたいぷ",
+        "slot": 3,
+        "total": 5,
+        "character_id": "ritsu",
+        "character_name": "峰月律",
+        "official_profile_url": "https://bang-dream.com/artist/yumemita/minetsuki-ritsu/"
+      },
+      "display_name": "律猪"
+    },
+    {
+      "template_id": "pig-bandori-yumemita-miyako",
+      "source_path": "第九期/五星猪猪/都子猪.png",
+      "kind": "pig",
+      "rarity": 5,
+      "description": "紫发、星星和小翅膀围着毛绒伙伴，借藤都子的键盘与画笔把日常编成舞台。看着文静，排练和截稿却一件不落；猪蹄下的草稿纸堆得比食盆还高。",
+      "recipe_tags": [
+        "BanG Dream!",
+        "梦限大みゅーたいぷ",
+        "键盘",
+        "创作"
+      ],
+      "display_tags": [
+        "乐队联动",
+        "键盘",
+        "漫画创作",
+        "天使翅膀",
+        "毛绒伙伴"
+      ],
+      "fat_profile": "balanced",
+      "stature_profile": "standard",
+      "length_min_cm": 32.0,
+      "length_max_cm": 112.0,
+      "weight_min_kg": 24.0,
+      "weight_max_kg": 300.0,
+      "collection": {
+        "collaboration_name": "BanG Dream!",
+        "collection_id": "bandori-yumemita",
+        "collection_name": "梦限大みゅーたいぷ",
+        "slot": 4,
+        "total": 5,
+        "character_id": "miyako",
+        "character_name": "藤都子",
+        "official_profile_url": "https://bang-dream.com/artist/yumemita/fuji-miyako/"
+      },
+      "display_name": "都子猪"
+    },
+    {
+      "template_id": "pig-bandori-yumemita-yuno",
+      "source_path": "第九期/五星猪猪/由乃猪.png",
+      "kind": "pig",
+      "rarity": 5,
+      "description": "黑粉挑染配猫耳耳机，转盘旁常备一罐能量饮料。借千石由乃的冷静把全队声音稳稳接起来：出门可以省电，节拍绝不能掉线。",
+      "recipe_tags": [
+        "BanG Dream!",
+        "梦限大みゅーたいぷ",
+        "DJ",
+        "电子"
+      ],
+      "display_tags": [
+        "乐队联动",
+        "DJ",
+        "黑粉挑染",
+        "猫耳耳机",
+        "省电模式"
+      ],
+      "fat_profile": "balanced",
+      "stature_profile": "standard",
+      "length_min_cm": 34.0,
+      "length_max_cm": 118.0,
+      "weight_min_kg": 28.0,
+      "weight_max_kg": 330.0,
+      "collection": {
+        "collaboration_name": "BanG Dream!",
+        "collection_id": "bandori-yumemita",
+        "collection_name": "梦限大みゅーたいぷ",
+        "slot": 5,
+        "total": 5,
+        "character_id": "yuno",
+        "character_name": "千石由乃",
+        "official_profile_url": "https://bang-dream.com/artist/yumemita/sengoku-yuno/"
+      },
+      "display_name": "由乃猪"
+    },
+    {
+      "source_path": "定制猪群友库/1092931381/熠～噜猪.png",
+      "kind": "pig",
+      "rarity": 6,
+      "description": "黑色长发间跳着荧绿亮色，棱形小晶体在身旁像说悄悄话；项圈坠子摇了两下，旁边的创可贴又把这点威风衬得软乎乎。",
+      "recipe_tags": [
+        "群友定制",
+        "清淡"
+      ],
+      "display_tags": [
+        "群友定制",
+        "黑绿长发",
+        "悬浮晶体",
+        "创可贴"
+      ],
+      "fat_profile": "balanced",
+      "stature_profile": "standard",
+      "length_min_cm": 34,
+      "length_max_cm": 118,
+      "weight_min_kg": 28,
+      "weight_max_kg": 330,
+      "display_name": "熠～噜猪",
+      "template_id": "pig-g1092931381-yilu-green-core",
+      "group_scope_id": "qq:1092931381",
+      "paired_food_template_id": "food-g1092931381-yilu-green-core-pie"
+    },
+    {
+      "source_path": "定制美食库/1092931381/熠～噜猪绿芯小猪派.png",
+      "kind": "food",
+      "rarity": 6,
+      "description": "金黄酥皮烤成圆圆小猪，黑色薄片梳出长发，亮绿夹心和晶石装饰一起亮相；盘边还摆着创可贴造型点心，连酥脆都显得有点乖。",
+      "recipe_tags": [
+        "群友定制",
+        "酥香"
+      ],
+      "effect_id": "",
+      "effect_params": {},
+      "display_name": "熠～噜猪绿芯小猪派",
+      "template_id": "food-g1092931381-yilu-green-core-pie",
+      "group_scope_id": "qq:1092931381"
+    },
+    {
+      "source_path": "定制猪群友库/237716658/熠～噜猪.png",
+      "kind": "pig",
+      "rarity": 6,
+      "description": "黑色长发间跳着荧绿亮色，棱形小晶体在身旁像说悄悄话；项圈坠子摇了两下，旁边的创可贴又把这点威风衬得软乎乎。",
+      "recipe_tags": [
+        "群友定制",
+        "清淡"
+      ],
+      "display_tags": [
+        "群友定制",
+        "黑绿长发",
+        "悬浮晶体",
+        "创可贴"
+      ],
+      "fat_profile": "balanced",
+      "stature_profile": "standard",
+      "length_min_cm": 34,
+      "length_max_cm": 118,
+      "weight_min_kg": 28,
+      "weight_max_kg": 330,
+      "display_name": "熠～噜猪",
+      "template_id": "pig-g237716658-yilu-green-core",
+      "group_scope_id": "qq:237716658",
+      "paired_food_template_id": "food-g237716658-yilu-green-core-pie"
+    },
+    {
+      "source_path": "定制美食库/237716658/熠～噜猪绿芯小猪派.png",
+      "kind": "food",
+      "rarity": 6,
+      "description": "金黄酥皮烤成圆圆小猪，黑色薄片梳出长发，亮绿夹心和晶石装饰一起亮相；盘边还摆着创可贴造型点心，连酥脆都显得有点乖。",
+      "recipe_tags": [
+        "群友定制",
+        "酥香"
+      ],
+      "effect_id": "",
+      "effect_params": {},
+      "display_name": "熠～噜猪绿芯小猪派",
+      "template_id": "food-g237716658-yilu-green-core-pie",
+      "group_scope_id": "qq:237716658"
+    },
+    {
+      "source_path": "定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/熠～噜猪.png",
+      "kind": "pig",
+      "rarity": 6,
+      "description": "黑色长发间跳着荧绿亮色，棱形小晶体在身旁像说悄悄话；项圈坠子摇了两下，旁边的创可贴又把这点威风衬得软乎乎。",
+      "recipe_tags": [
+        "群友定制",
+        "清淡"
+      ],
+      "display_tags": [
+        "群友定制",
+        "黑绿长发",
+        "悬浮晶体",
+        "创可贴"
+      ],
+      "fat_profile": "balanced",
+      "stature_profile": "standard",
+      "length_min_cm": 34,
+      "length_max_cm": 118,
+      "weight_min_kg": 28,
+      "weight_max_kg": 330,
+      "display_name": "熠～噜猪",
+      "template_id": "pig-qo5e5854406d0297d6feae696a13e3a339-yilu-green-core",
+      "group_scope_id": "qq-official:5E5854406D0297D6FEAE696A13E3A339",
+      "paired_food_template_id": "food-qo5e5854406d0297d6feae696a13e3a339-yilu-green-core-pie"
+    },
+    {
+      "source_path": "定制美食库/5E5854406D0297D6FEAE696A13E3A339/熠～噜猪绿芯小猪派.png",
+      "kind": "food",
+      "rarity": 6,
+      "description": "金黄酥皮烤成圆圆小猪，黑色薄片梳出长发，亮绿夹心和晶石装饰一起亮相；盘边还摆着创可贴造型点心，连酥脆都显得有点乖。",
+      "recipe_tags": [
+        "群友定制",
+        "酥香"
+      ],
+      "effect_id": "",
+      "effect_params": {},
+      "display_name": "熠～噜猪绿芯小猪派",
+      "template_id": "food-qo5e5854406d0297d6feae696a13e3a339-yilu-green-core-pie",
+      "group_scope_id": "qq-official:5E5854406D0297D6FEAE696A13E3A339"
+    },
+    {
+      "source_path": "定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/熠～噜猪.png",
+      "kind": "pig",
+      "rarity": 6,
+      "description": "黑色长发间跳着荧绿亮色，棱形小晶体在身旁像说悄悄话；项圈坠子摇了两下，旁边的创可贴又把这点威风衬得软乎乎。",
+      "recipe_tags": [
+        "群友定制",
+        "清淡"
+      ],
+      "display_tags": [
+        "群友定制",
+        "黑绿长发",
+        "悬浮晶体",
+        "创可贴"
+      ],
+      "fat_profile": "balanced",
+      "stature_profile": "standard",
+      "length_min_cm": 34,
+      "length_max_cm": 118,
+      "weight_min_kg": 28,
+      "weight_max_kg": 330,
+      "display_name": "熠～噜猪",
+      "template_id": "pig-qo9ea2810f378fbd7dc3219c56ceab3520-yilu-green-core",
+      "group_scope_id": "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
+      "paired_food_template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-yilu-green-core-pie"
+    },
+    {
+      "source_path": "定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/熠～噜猪绿芯小猪派.png",
+      "kind": "food",
+      "rarity": 6,
+      "description": "金黄酥皮烤成圆圆小猪，黑色薄片梳出长发，亮绿夹心和晶石装饰一起亮相；盘边还摆着创可贴造型点心，连酥脆都显得有点乖。",
+      "recipe_tags": [
+        "群友定制",
+        "酥香"
+      ],
+      "effect_id": "",
+      "effect_params": {},
+      "display_name": "熠～噜猪绿芯小猪派",
+      "template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-yilu-green-core-pie",
+      "group_scope_id": "qq-official:9EA2810F378FBD7DC3219C56CEAB3520"
     }
   ]
 }

@@ -133,6 +133,21 @@ class PlaywrightRenderCapability:
               const brokenImages = [...root.querySelectorAll("img")]
                 .filter(image => !image.complete || image.naturalWidth <= 0 || image.naturalHeight <= 0)
                 .map(image => image.alt);
+              // overflow:hidden可能裁掉图片却没有文字/根边界错误，单独核验图鉴媒体槽。
+              const clippedMedia = [...root.querySelectorAll(".catalog-item__media img")]
+                .filter(image => {
+                  const box = image.parentElement.getBoundingClientRect();
+                  const rect = image.getBoundingClientRect();
+                  return box.width > 0 && box.height > 0 && (
+                    rect.left < box.left - 1 || rect.right > box.right + 1 ||
+                    rect.top < box.top - 1 || rect.bottom > box.bottom + 1
+                  );
+                })
+                .map(image => ({
+                  tag: "IMG", className: "catalog-item__media",
+                  text: image.alt, reason: "catalog-media-overflow",
+                }));
+              outside.push(...clippedMedia);
               return {
                 root: [Math.round(rootRect.width), Math.round(rootRect.height)],
                 rootClient: [root.clientWidth, root.clientHeight],
@@ -140,6 +155,7 @@ class PlaywrightRenderCapability:
                 clippedText,
                 outside,
                 brokenImages,
+                clippedMedia,
               };
             }
             """

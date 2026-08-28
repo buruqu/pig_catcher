@@ -1,6 +1,6 @@
 [plugin]
 enabled = true
-config_version = "2.0.0.dev7"
+config_version = "2.0.0.dev8"
 framework_phase = "6"
 
 [features]
@@ -47,7 +47,7 @@ catalog_cleanup_grace_hours = 24
 
 [assets]
 manifest_filename = "assets.json"
-min_image_side = 200
+min_image_side = 180
 max_image_bytes = 12582912
 max_animation_frames = 300
 max_animation_duration_ms = 30000

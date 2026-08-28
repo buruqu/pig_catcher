@@ -107,7 +107,11 @@ def test_runtime_pack_matches_reviewed_design_and_freezes_old_denominators():
     for fighter in FIGHTERS_BY_ID.values():
         assert set(MOVE_ALIASES[fighter.fighter_id]) == {m.move_id for m in fighter.moves}
         assert set(MOVE_ALIASES[fighter.fighter_id].values()) == FIXED_SETS[f"battle-{fighter.fighter_id}-moves-v1"]
-    assert {THEME_ALIASES.get(t.theme_id, t.theme_id) for t in THEMES} == FIXED_SETS["tour-band-themes-v1"]
+    # 后续主题不能追溯扩大旧版成就的固定九主题条件。
+    fixed_themes = FIXED_SETS["tour-band-themes-v1"]
+    assert len(fixed_themes) == 9
+    assert fixed_themes < {THEME_ALIASES.get(t.theme_id, t.theme_id) for t in THEMES}
+    assert "yumemita" not in fixed_themes
     assert {VENUE_ALIASES.get(v.venue_id, v.venue_id) for v in VENUES} == FIXED_SETS["tour-venues-v1"]
 
 

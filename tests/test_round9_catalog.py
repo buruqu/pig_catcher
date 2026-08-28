@@ -38,7 +38,7 @@ EXPECTED_ASSETS: dict[str, tuple[str, str]] = {
         "c669f3b26190277070ae7360ae37d416ae716bf1751a742cae6e48124d23b739",
     ),
     "pig-r1-pig-question": (
-        "一星猪猪/猪猪？.png",
+        "四星猪猪/猪猪？.png",
         "ab779c6e306f2a04e71ef202cb20670934c73cbd8e4649e08a682db57df76176",
     ),
     "pig-r1-halo-descent": (
@@ -232,16 +232,17 @@ def inventory_by_id() -> dict[str, dict[str, Any]]:
 
 
 def test_round9_names_rarities_and_paths_match_the_reviewed_drop(definitions: list[dict[str, Any]]) -> None:
+    # 后续补充仍保留首轮46份原图的独立SHA基线；猪猪？只迁目录和品质，不换身份。
     new_entries = {
-        entry["template_id"]: entry for entry in definitions if str(entry["source_path"]).startswith("第九期/")
+        entry["template_id"]: entry for entry in definitions if entry["template_id"] in EXPECTED_ASSETS
     }
     assert set(new_entries) == set(EXPECTED_ASSETS)
     assert Counter(entry["kind"] for entry in new_entries.values()) == {"pig": 32, "food": 14}
     assert Counter((entry["kind"], entry["rarity"]) for entry in new_entries.values()) == {
-        ("pig", 1): 7,
+        ("pig", 1): 6,
         ("pig", 2): 7,
         ("pig", 3): 8,
-        ("pig", 4): 4,
+        ("pig", 4): 5,
         ("pig", 5): 6,
         ("food", 1): 2,
         ("food", 2): 2,
@@ -263,14 +264,15 @@ def test_round9_names_rarities_and_paths_match_the_reviewed_drop(definitions: li
 
 def test_new_high_star_foods_do_not_inherit_unreviewed_effects(definitions: list[dict[str, Any]]) -> None:
     high_star_foods = [entry for entry in definitions if entry["kind"] == "food" and entry["rarity"] in (4, 5)]
-    new_foods = [entry for entry in high_star_foods if entry["template_id"] in EXPECTED_ASSETS]
-    assert len(new_foods) == 8
+    new_foods = [entry for entry in high_star_foods if str(entry["source_path"]).startswith("第九期/")]
+    assert len(new_foods) == 12
+    assert Counter(entry["rarity"] for entry in new_foods) == {4: 7, 5: 5}
     for entry in new_foods:
         assert not entry.get("effect_id"), entry["display_name"]
         assert not entry.get("effect_params"), entry["display_name"]
     # This exception is only for the newly supplied art, not a reset of old recipes.
     for entry in high_star_foods:
-        if entry["template_id"] not in EXPECTED_ASSETS:
+        if not str(entry["source_path"]).startswith("第九期/"):
             assert str(entry.get("effect_id") or "").strip(), entry["display_name"]
 
 
@@ -279,7 +281,7 @@ def test_every_old_and_new_pig_has_reviewed_tags_and_explicit_physical_ranges(
     manifest_by_id: dict[str, dict[str, Any]],
 ) -> None:
     pigs = [entry for entry in definitions if entry["kind"] == "pig"]
-    assert len(pigs) == 205
+    assert len(pigs) == 223
     for entry in pigs:
         name = entry["display_name"]
         tags = entry["display_tags"]
@@ -310,14 +312,14 @@ def test_every_old_and_new_pig_has_reviewed_tags_and_explicit_physical_ranges(
 
 
 def test_four_scopes_share_content_without_merging_six_star_ownership(definitions: list[dict[str, Any]]) -> None:
-    assert Counter(entry["kind"] for entry in definitions) == {"pig": 205, "food": 93}
+    assert Counter(entry["kind"] for entry in definitions) == {"pig": 223, "food": 105}
     scoped = [entry for entry in definitions if entry.get("group_scope_id")]
-    assert len(scoped) == 88
+    assert len(scoped) == 96
     assert {entry["group_scope_id"] for entry in scoped} == set(SCOPES)
     assert all(entry["rarity"] == 6 for entry in scoped)
     assert all(entry.get("group_scope_id") in SCOPES for entry in definitions if entry["rarity"] == 6)
-    assert len({entry["template_id"] for entry in scoped}) == 88
-    assert len({entry["source_path"] for entry in scoped}) == 88
+    assert len({entry["template_id"] for entry in scoped}) == 96
+    assert len({entry["source_path"] for entry in scoped}) == 96
     by_id = {entry["template_id"]: entry for entry in definitions}
     semantic_fields = (
         "kind",
@@ -338,9 +340,9 @@ def test_four_scopes_share_content_without_merging_six_star_ownership(definition
     signatures = []
     for scope in SCOPES:
         visible = [entry for entry in definitions if entry.get("group_scope_id") in (None, "", scope)]
-        assert Counter(entry["kind"] for entry in visible) == {"pig": 172, "food": 60}
+        assert Counter(entry["kind"] for entry in visible) == {"pig": 187, "food": 69}
         private = [entry for entry in scoped if entry["group_scope_id"] == scope]
-        assert Counter(entry["kind"] for entry in private) == {"pig": 11, "food": 11}
+        assert Counter(entry["kind"] for entry in private) == {"pig": 12, "food": 12}
         for entry in private:
             assert f"/{scope.split(':', 1)[1]}/" in f"/{entry['source_path']}"
         for pig in (entry for entry in private if entry["kind"] == "pig"):

@@ -125,13 +125,13 @@ async def world(tmp_path):
 
 
 def test_catalog_identities_and_non_probability_rules():
-    assert len(MAIN_FORMS) == 47
-    assert len({CHARACTERS[key].identity for key in MAIN_FORMS}) == 45
+    assert len(MAIN_FORMS) == 52
+    assert len({CHARACTERS[key].identity for key in MAIN_FORMS}) == 50
     assert sum(SCORE_CAPS.values()) == 100
-    assert len(THEMES) == 9 and len(TOOLS) == 4
+    assert len(THEMES) == 10 and len(TOOLS) == 4
     assert training_level(0) == 0 and training_level(39) == 0 and training_level(40) == 1
     assert training_level(2199) == 9 and training_level(2200) == training_level(100000) == 10
-    assert len({CHARACTERS[key].signature.name for key in MAIN_FORMS}) == 47
+    assert len({CHARACTERS[key].signature.name for key in MAIN_FORMS}) == 52
 
 
 @pytest.mark.parametrize(
@@ -899,12 +899,19 @@ async def test_backup_restores_partial_tour_with_same_seed_and_settlement(world,
         await restored.close()
 
 
+async def test_theme_catalog_heading_tracks_registered_themes(world):
+    view = (await world.send("主题")).view
+    assert f"{len(THEMES)}种巡演主题" in view.text()
+    assert len(view.panels) == len(THEMES)
+    assert {panel.title for panel in view.panels} == {theme.name for theme in THEMES}
+
+
 async def test_theme_cosmetics_require_actual_qualified_three_stage_completion(world):
     templates_before = [
         tuple(row) for row in await world.db.fetch_all("SELECT * FROM pig_templates ORDER BY template_id")
     ]
     assert set(THEME_EMBLEMS) == {theme.theme_id for theme in THEMES}
-    assert len(set(THEME_EMBLEMS.values())) == 9
+    assert len(set(THEME_EMBLEMS.values())) == 10
     with pytest.raises(TourError, match="尚未解锁"):
         await world.send("队徽 星星落进练习室", "band")
     async with world.db.transaction() as session:
@@ -929,7 +936,7 @@ async def test_theme_cosmetics_require_actual_qualified_three_stage_completion(w
 
 
 @pytest.mark.parametrize("theme", [t.theme_id for t in THEMES])
-def test_all_nine_themes_have_natural_ss_path_and_fixed_caps(theme):
+def test_all_themes_have_natural_ss_path_and_fixed_caps(theme):
     members = pure_members(full=True)
     plan = default_plan(theme)
     plan["venue"] = "dome"

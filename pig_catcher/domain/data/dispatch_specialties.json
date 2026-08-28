@@ -821,6 +821,78 @@
     "pig-r5-magic-kitty": [
       "灵巧",
       "搜寻"
+    ],
+    "pig-r1-deep-sea": [
+      "探路",
+      "搜寻"
+    ],
+    "pig-r1-sleeping": [
+      "后勤",
+      "搬运"
+    ],
+    "pig-r1-identity-card": [
+      "交涉",
+      "研究"
+    ],
+    "pig-r1-dice": [
+      "研究",
+      "灵巧"
+    ],
+    "pig-r3-trill-chart": [
+      "音乐器材",
+      "灵巧"
+    ],
+    "pig-r3-glowstick-call": [
+      "音乐器材",
+      "交涉"
+    ],
+    "pig-r2-like-a-pig": [
+      "交涉",
+      "灵巧"
+    ],
+    "pig-r2-explosive-big-head": [
+      "搬运",
+      "采掘"
+    ],
+    "pig-r2-at-work": [
+      "机械",
+      "后勤"
+    ],
+    "pig-bandori-yumemita-arale": [
+      "交涉",
+      "音乐器材"
+    ],
+    "pig-bandori-yumemita-nonoka": [
+      "交涉",
+      "音乐器材"
+    ],
+    "pig-bandori-yumemita-ritsu": [
+      "后勤",
+      "音乐器材"
+    ],
+    "pig-bandori-yumemita-miyako": [
+      "灵巧",
+      "音乐器材"
+    ],
+    "pig-bandori-yumemita-yuno": [
+      "机械",
+      "音乐器材"
+    ],
+    "pig-g1092931381-yilu-green-core": [
+      "研究",
+      "后勤"
+    ],
+    "pig-g237716658-yilu-green-core": [
+      "研究",
+      "后勤"
+    ],
+    "pig-qo5e5854406d0297d6feae696a13e3a339-yilu-green-core": [
+      "研究",
+      "后勤"
+    ],
+    "pig-qo9ea2810f378fbd7dc3219c56ceab3520-yilu-green-core": [
+      "研究",
+      "后勤"
     ]
   }
 }

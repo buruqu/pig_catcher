@@ -67,6 +67,15 @@ from pig_catcher.version import (
 from .helpers import FakeRender, FakeSend, png_base64
 
 
+def test_catalog_media_tracks_do_not_expand_to_intrinsic_image_size():
+    css = (Path(__file__).parents[1] / "pig_catcher/rendering/templates/theme.css").read_text(encoding="utf-8")
+    media = css.split(".catalog-item__media {", 1)[1].split("}", 1)[0]
+    image = css.split(".catalog-item__media img {", 1)[1].split("}", 1)[0]
+    assert "grid-template-columns: minmax(0, 1fr)" in media
+    assert "grid-template-rows: minmax(0, 1fr)" in media
+    assert "min-width: 0" in image and "min-height: 0" in image
+
+
 def _options(**updates: object) -> RenderOptions:
     values = {
         "card_width": 1200,

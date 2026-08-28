@@ -48,6 +48,11 @@
     {"template":"pig-bandori-avemujica-umiri","identity":"umiri","name":"贝斯佣兵猪","character":"八幡海铃","band":"mujica","instruments":["bass"],"signature":["本场支援由我负责","boost","synergy","new_mixed","混团且有磨合不足的成员时，默契与熟练+2"]},
     {"template":"pig-bandori-avemujica-mutsumi","identity":"mutsumi","name":"黄瓜猪","character":"若叶睦","band":"mujica","instruments":["guitar"],"signature":["无言的默契","boost","synergy","duet","选择关系或职能合奏时，默契与熟练+2"]},
     {"template":"pig-bandori-avemujica-mortis","identity":"mutsumi","name":"墨提斯猪","character":"Mortis·舞台形态","band":"mujica","instruments":["guitar"],"signature":["假面翻幕","boost","stage","narrative","戏剧化分支中舞台+2，与黄瓜猪共享巡演身份"]},
-    {"template":"pig-bandori-avemujica-nyamu","identity":"nyamu","name":"喵梦猪","character":"祐天寺若麦","band":"mujica","instruments":["drums"],"signature":["聚光镜头","photo","stage","burst","高能量段落额外保存一位未在高光位成员的照片"]}
+    {"template":"pig-bandori-avemujica-nyamu","identity":"nyamu","name":"喵梦猪","character":"祐天寺若麦","band":"mujica","instruments":["drums"],"signature":["聚光镜头","photo","stage","burst","高能量段落额外保存一位未在高光位成员的照片"]},
+    {"template":"pig-bandori-yumemita-arale","identity":"arale","name":"阿拉蕾猪","character":"仲町阿拉蕾","band":"yumemita","instruments":["voice"],"signature":["扩音器先别开","boost","ability","interactive","有互动曲目时，以响亮的呼应带动全场，演出+2"]},
+    {"template":"pig-bandori-yumemita-nonoka","identity":"nonoka","name":"nnk猪","character":"宫永野乃花","band":"yumemita","instruments":["guitar"],"signature":["兔耳即兴摇摆","boost","stage","new_song","有尚未练熟的曲目时，用自在的表演带入舞台，舞台+2"]},
+    {"template":"pig-bandori-yumemita-ritsu","identity":"ritsu","name":"律猪","character":"峰月律","band":"yumemita","instruments":["guitar"],"signature":["稳拍再添一碗","stabilize","synergy","technical","技术曲目中稳住节奏，抵消最多2分负面现场波动"]},
+    {"template":"pig-bandori-yumemita-miyako","identity":"miyako","name":"都子猪","character":"藤都子","band":"yumemita","instruments":["keyboard"],"signature":["截稿前的分镜","carry","setlist","theme_next","主题呼应且还有下一站时，把分镜式编排带到下一站，下一站编排+2"]},
+    {"template":"pig-bandori-yumemita-yuno","identity":"yuno","name":"由乃猪","character":"千石由乃","band":"yumemita","instruments":["dj"],"signature":["省电混音台","boost","equipment","contrast","三首歌的风格组合不同时进行声音重整，设备+2，仍不超过5"]}
   ]
 }

@@ -25,11 +25,11 @@ def _entries() -> list[dict[str, object]]:
     return list(payload["entries"])
 
 
-def test_formal_catalog_has_all_298_named_assets_and_stable_ids() -> None:
+def test_formal_catalog_has_all_328_named_assets_and_stable_ids() -> None:
     entries = _entries()
-    assert len(entries) == 298
-    assert len({entry["template_id"] for entry in entries}) == 298
-    assert len({entry["source_path"] for entry in entries}) == 298
+    assert len(entries) == 328
+    assert len({entry["template_id"] for entry in entries}) == 328
+    assert len({entry["source_path"] for entry in entries}) == 328
     assert all(str(entry["description"]).strip() for entry in entries)
     pig_counts = Counter(
         int(entry["rarity"])
@@ -41,8 +41,8 @@ def test_formal_catalog_has_all_298_named_assets_and_stable_ids() -> None:
         for entry in entries
         if entry["kind"] == "food"
     )
-    assert pig_counts == {1: 27, 2: 27, 3: 29, 4: 33, 5: 45, 6: 44}
-    assert food_counts == {1: 5, 2: 8, 3: 9, 4: 12, 5: 15, 6: 44}
+    assert pig_counts == {1: 30, 2: 30, 3: 31, 4: 36, 5: 48, 6: 48}
+    assert food_counts == {1: 7, 2: 9, 3: 10, 4: 15, 5: 16, 6: 48}
 
 
 def test_high_rarity_food_effects_cover_new_gameplay_families() -> None:
@@ -282,7 +282,7 @@ def test_group_custom_assets_are_confined_and_keep_user_text() -> None:
         for entry in entries
         if entry.get("group_scope_id")
     ]
-    assert len(group_entries) == 88
+    assert len(group_entries) == 96
     assert {entry["group_scope_id"] for entry in group_entries} == {
         "qq:1092931381",
         "qq:237716658",
@@ -310,6 +310,8 @@ def test_group_custom_assets_are_confined_and_keep_user_text() -> None:
         "糖醋排骨",
         "神龙化猪",
         "神龙化猪七星云海锅",
+        "熠～噜猪",
+        "熠～噜猪绿芯小猪派",
     } <= set(descriptions)
     assert "社区" in descriptions["彩彩修车猪"]
     assert "不是官方职业设定" in descriptions["彩彩修车猪"]
@@ -341,7 +343,7 @@ def test_group_custom_assets_are_confined_and_keep_user_text() -> None:
         for scope in {str(entry["group_scope_id"]) for entry in group_entries}
     }
     baseline = by_scope[PAIRED_GROUP_SCOPES[0][0]]
-    assert len(baseline) == 22
+    assert len(baseline) == 24
     assert all(scope_catalog == baseline for scope_catalog in by_scope.values())
     for qq_scope, official_scope in PAIRED_GROUP_SCOPES:
         assert by_scope[qq_scope] == by_scope[official_scope]
@@ -360,6 +362,7 @@ def test_every_custom_six_star_pig_has_one_same_group_food_pair() -> None:
         for entry in entries
         if entry["kind"] == "food" and entry["rarity"] == 6
     }
+    assert len(pigs) == len(foods) == 48
     paired = []
     for pig in pigs:
         paired_id = pig["paired_food_template_id"]
@@ -431,6 +434,11 @@ def test_bandori_collaboration_mappings_use_official_profiles_and_five_slots() -
         "黄瓜猪": ("若叶睦", "Ave Mujica"),
         "墨提斯猪": ("墨提斯／Mortis", "Ave Mujica"),
         "喵梦猪": ("祐天寺若麦／Amoris", "Ave Mujica"),
+        "阿拉蕾猪": ("仲町阿拉蕾", "梦限大みゅーたいぷ"),
+        "nnk猪": ("宫永野乃花", "梦限大みゅーたいぷ"),
+        "律猪": ("峰月律", "梦限大みゅーたいぷ"),
+        "都子猪": ("藤都子", "梦限大みゅーたいぷ"),
+        "由乃猪": ("千石由乃", "梦限大みゅーたいぷ"),
     }
     assert all(
         value["total"] == (
@@ -482,6 +490,19 @@ def test_bandori_collaboration_mappings_use_official_profiles_and_five_slots() -
     assert pastel_palettes_slots == {1, 2, 3, 4, 5}
     assert collabs["绿茶猪"]["collection_id"] == "bandori-yumemita-viola"
     assert collabs["绿茶猪"]["slot"] == 1
+    # 五人梦限大集合独立于绿茶猪的动画单槽，不占用或合并旧角色身份。
+    yumemita_members = {
+        name: (value["slot"], value["character_id"])
+        for name, value in collabs.items()
+        if value["collection_id"] == "bandori-yumemita"
+    }
+    assert yumemita_members == {
+        "阿拉蕾猪": (1, "arale"),
+        "nnk猪": (2, "nonoka"),
+        "律猪": (3, "ritsu"),
+        "都子猪": (4, "miyako"),
+        "由乃猪": (5, "yuno"),
+    }
     hhw_slots = {
         int(value["slot"])
         for value in collabs.values()

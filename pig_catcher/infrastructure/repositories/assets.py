@@ -11,6 +11,10 @@ from ...domain.models import ScopeKey
 from ..database import DatabaseSession
 from .framework import FrameworkRepository
 
+# 仅允许维护者已确认的单向目录纠错；普通导入仍不能任意改变品质或群归属。
+# 第九期补充把同一张“猪猪？”原图从一星移入四星目录。只改模板，不回算旧实例。
+_APPROVED_PIG_RARITY_RECLASSIFICATIONS = frozenset({("pig-r1-pig-question", 1, 4)})
+
 
 class AssetRepository:
     """把已验证目录映射到模板和群授权，不拥有事务。"""
@@ -103,8 +107,16 @@ class AssetRepository:
         if entry.kind is AssetKind.FOOD and pig_row is not None:
             raise AssetImportError(f"模板 ID 已被猪占用，不能改成美食：{entry.template_id}")
         existing = pig_row if pig_row is not None else food_row
+        approved_reclassification = (
+            existing is not None
+            and entry.kind is AssetKind.PIG
+            and entry.scope is TemplateScope.COMMON
+            and (entry.template_id, int(existing["rarity"]), int(entry.rarity))
+            in _APPROVED_PIG_RARITY_RECLASSIFICATIONS
+        )
         if existing is not None and (
-            int(existing["rarity"]) != int(entry.rarity) or str(existing["scope_type"]) != entry.scope.value
+            (int(existing["rarity"]) != int(entry.rarity) and not approved_reclassification)
+            or str(existing["scope_type"]) != entry.scope.value
         ):
             raise AssetImportError(f"模板品质或作用域发布后不能改变：{entry.template_id}")
         if existing is not None and entry.scope is TemplateScope.GROUP:
@@ -186,6 +198,7 @@ class AssetRepository:
                     ELSE pig_templates.template_version + 1
                 END,
                 display_name = excluded.display_name,
+                rarity = excluded.rarity,
                 description = excluded.description,
                 image_relpath = excluded.image_relpath,
                 image_sha256 = excluded.image_sha256,

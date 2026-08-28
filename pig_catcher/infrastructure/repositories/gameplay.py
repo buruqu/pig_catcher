@@ -942,8 +942,8 @@ class GameplayRepository:
                 record.record_type,
                 record.record_value,
                 record.achieved_at,
-                template.display_name,
-                template.rarity,
+                instance.display_name_snapshot AS display_name,
+                instance.rarity,
                 instance.short_code,
                 player.display_name AS holder_display_name
             FROM group_records AS record
@@ -954,7 +954,7 @@ class GameplayRepository:
             JOIN players AS player
               ON player.player_id = record.player_id
             WHERE record.scope_id = ?
-            ORDER BY record.achieved_at DESC, template.display_name, record.record_type
+            ORDER BY record.achieved_at DESC, instance.display_name_snapshot, record.record_type
             LIMIT ? OFFSET ?
             """,
             (scope_id, limit, offset),

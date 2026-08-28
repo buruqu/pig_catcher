@@ -21,7 +21,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--data-dir", type=Path, required=True)
     parser.add_argument("--database-filename", default="pig_catcher.sqlite3")
-    parser.add_argument("--min-image-side", type=int, default=200)
+    parser.add_argument("--min-image-side", type=int, default=180)
     parser.add_argument("--max-image-bytes", type=int, default=12 * 1024 * 1024)
     parser.add_argument("--max-animation-frames", type=int, default=300)
     parser.add_argument("--max-animation-duration-ms", type=int, default=30000)

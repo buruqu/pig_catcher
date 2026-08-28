@@ -397,7 +397,7 @@ class TourQueries:
         if action == "themes":
             return self.view(
                 identity,
-                "九种巡演主题",
+                f"{len(THEMES)}种巡演主题",
                 profile,
                 panels=tuple(Panel(t.name, (Line(t.band_name, " / ".join(t.tags), t.story),)) for t in THEMES),
                 hints=(
