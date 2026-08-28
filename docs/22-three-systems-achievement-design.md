@@ -3,7 +3,8 @@
 > 设计版本：three-systems-achievements-r1；记录日期：2026-08-27。
 >
 > 状态：48 项新成就、奖励消费与原创外观已在第四轮实现并通过离线验收。
-> 当前隔离开发版为 2.0.0.dev6 / Schema 40 / Ruleset 35（2026-08-28），生产运行目录不变。
+> 第四轮交付基线为 2.0.0.dev6 / Schema 40 / Ruleset 35（2026-08-28），生产运行目录不变。
+> 后续当前开发版为 2.0.0.dev7 / Schema 41 / Ruleset 36，见 [第九期素材交付](27-round9-content-and-physical-profiles.md)；成就规则保持不变。
 > 实际消费时机、命令、图片、数据迁移和验收报告见 [第四轮交付](26-activity-achievements-and-v2-acceptance.md)。
 > 巡演逐站、本人养成、自然材料与联演事实契约见 [第二轮交付](24-tour-implementation-and-acceptance.md)。
 > 对战逐招/核心/伤势、本人升级与双向交付事实见 [第三轮交付第 7 节](25-battle-implementation-and-acceptance.md#7-第四轮成就事实接线契约)。

@@ -305,8 +305,13 @@ async def test_schema38_migration_preserves_every_old_table(world, tmp_path):
         )
     ]
     original = {}
+    original_columns = {}
     for table in tables:
-        rows = [tuple(r) for r in await world.db.fetch_all(f'SELECT * FROM "{table}" ORDER BY rowid')]
+        original_columns[table] = ",".join(f'"{r[1]}"' for r in conn.execute(f'PRAGMA table_info("{table}")'))
+        rows = [
+            tuple(r)
+            for r in await world.db.fetch_all(f'SELECT {original_columns[table]} FROM "{table}" ORDER BY rowid')
+        ]
         original[table] = rows
         if rows:
             conn.executemany(f'INSERT INTO "{table}" VALUES(' + ",".join("?" for _ in rows[0]) + ")", rows)
@@ -316,9 +321,14 @@ async def test_schema38_migration_preserves_every_old_table(world, tmp_path):
     db = PigCatcherDatabase(path)
     await db.open()
     try:
-        assert await db.schema_version() == 40
+        from pig_catcher.version import SCHEMA_VERSION
+
+        assert await db.schema_version() == SCHEMA_VERSION
         for table, rows in original.items():
-            assert [tuple(r) for r in await db.fetch_all(f'SELECT * FROM "{table}" ORDER BY rowid')] == rows
+            assert [
+                tuple(r)
+                for r in await db.fetch_all(f'SELECT {original_columns[table]} FROM "{table}" ORDER BY rowid')
+            ] == rows
         assert set(TABLES) <= {r[0] for r in await db.fetch_all("SELECT name FROM sqlite_master WHERE type='table'")}
         assert await db.fetch_all("PRAGMA foreign_key_check") == []
     finally:

@@ -5,7 +5,8 @@
 > 以 [巡演定稿](20-pig-tour-system-design.md) 为边界；新增 48 项成就和成就外观留到第四轮。
 >
 > 以上版本、数量与后续安排是第二轮交付时的历史记录；第四轮现已接通成就与奖励，
-> 当前 `2.0.0.dev6` 交付情况见 [新增成就与总验收](26-activity-achievements-and-v2-acceptance.md)。
+> `2.0.0.dev6` 交付情况见 [新增成就与总验收](26-activity-achievements-and-v2-acceptance.md)。
+> 当前 `2.0.0.dev7` 的素材、展示标签和体型调整见 [第九期交付](27-round9-content-and-physical-profiles.md)；既有乐队身份、角色能力不变。
 
 ## 1. 已实现范围与快速上手
 

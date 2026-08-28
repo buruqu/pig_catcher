@@ -719,6 +719,7 @@ async def test_schema_37_migration_preserves_existing_assets_materials_and_econo
         connection.execute("INSERT INTO schema_migrations VALUES(?,?,?)", (migration.version, migration.name, "test"))
     connection.execute("PRAGMA user_version=37")
     original = {}
+    original_columns = {}
     for table in (
         "scopes",
         "players",
@@ -730,7 +731,8 @@ async def test_schema_37_migration_preserves_existing_assets_materials_and_econo
         "material_balances",
         "material_ledger",
     ):
-        rows = await world.db.fetch_all(f"SELECT * FROM {table} ORDER BY rowid")
+        original_columns[table] = ",".join(f'"{r[1]}"' for r in connection.execute(f'PRAGMA table_info("{table}")'))
+        rows = await world.db.fetch_all(f"SELECT {original_columns[table]} FROM {table} ORDER BY rowid")
         original[table] = [tuple(row) for row in rows]
         if rows:
             connection.executemany(
@@ -742,14 +744,22 @@ async def test_schema_37_migration_preserves_existing_assets_materials_and_econo
     migrated = PigCatcherDatabase(path)
     await migrated.open()
     try:
-        assert await migrated.schema_version() == 40
+        from pig_catcher.version import SCHEMA_VERSION
+
+        assert await migrated.schema_version() == SCHEMA_VERSION
         schema = {
             r["name"]: r["sql"]
             for r in await migrated.fetch_all("SELECT name,sql FROM sqlite_master WHERE type='table'")
         }
-        assert all(schema[name] == sql for name, sql in original_schema.items())
+        assert all(
+            schema[name].replace(", display_tags_json TEXT NOT NULL DEFAULT '[]'", "") == sql
+            for name, sql in original_schema.items()
+        )
         for table, rows in original.items():
-            assert [tuple(row) for row in await migrated.fetch_all(f"SELECT * FROM {table} ORDER BY rowid")] == rows
+            assert [
+                tuple(row)
+                for row in await migrated.fetch_all(f"SELECT {original_columns[table]} FROM {table} ORDER BY rowid")
+            ] == rows
         assert (await migrated.fetch_one("SELECT COUNT(*) FROM tour_profiles"))[0] == 0
         assert await migrated.integrity_check() == ("ok",)
         assert await migrated.fetch_all("PRAGMA foreign_key_check") == []

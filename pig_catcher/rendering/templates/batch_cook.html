@@ -64,7 +64,7 @@
         <h2 style="font-size: {% if item.display_name|length > 45 %}12{% elif item.display_name|length > 28 %}15{% elif item.display_name|length > 18 %}18{% else %}21{% endif %}px">{{ item.display_name }}</h2>
         <div class="inventory-item__code">{{ "★" * item.rarity }} · #{{ item.short_code }}</div>
         <div class="inventory-item__facts">
-          <span>{{ "%.2f"|format(item.portion_weight) }} kg</span>
+          <span>{{ item.portion_weight|physical_weight }}</span>
           <span>{{ item.fat_label }}</span>
           <span class="inventory-item__value">{{ item.official_value }} 猪币</span>
         </div>

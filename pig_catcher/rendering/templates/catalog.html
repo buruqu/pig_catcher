@@ -71,13 +71,19 @@
             <div class="catalog-item__facts">
               {% if item.discovered %}
               已抓 {{ item.acquired_count }} 次<br>
-              最佳 {{ "%.1f"|format(item.best_size or 0) }} cm / {{ "%.2f"|format(item.best_weight or 0) }} kg
+              最佳 {{ (item.best_size or 0)|physical_length }} / {{ (item.best_weight or 0)|physical_weight }}
               {% else %}
               尚未发现
               {% endif %}
             </div>
             {% if item.discovered and item.collection_name %}
             <div class="catalog-item__collection">{{ item.collection_name }}{% if item.character_name %} · {{ item.character_name }}{% endif %}</div>
+            {% endif %}
+            {% if item.discovered and item.media_visible and item.display_tags %}
+            <div class="asset-display-tags asset-display-tags--catalog">
+              {% for tag in item.display_tags[:2] %}<span class="asset-display-tag">{{ tag }}</span>{% endfor %}
+              {% if item.display_tags|length > 2 %}<span class="asset-display-tag asset-display-tag--more">+{{ item.display_tags|length - 2 }}</span>{% endif %}
+            </div>
             {% endif %}
           </article>
           {% endfor %}

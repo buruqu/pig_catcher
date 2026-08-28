@@ -60,7 +60,7 @@ def tour_pig(member: dict, *, position: int | None = None) -> DispatchPigCard:
         rarity=member["rarity"],
         image_relpath=member["image_relpath"],
         template_id=member["template_id"],
-        tags=tags,
+        tags=tuple(dict.fromkeys((*tags, *member.get("display_tags", ())[:2]))),
         summary=(
             f"{char.character if char else '薇欧拉'} · 巡演 Lv.{level} · "
             f"默契 {min(30, member.get('rapport', 0))}/30{status}"

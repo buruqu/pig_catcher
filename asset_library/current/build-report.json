@@ -1,9 +1,9 @@
 {
   "source_root": "asset_library/current/media",
   "definitions": "catalogs/formal/pig-and-food-definitions.json",
-  "entry_count": 252,
-  "unique_binary_count": 187,
-  "stored_binary_count": 256,
+  "entry_count": 298,
+  "unique_binary_count": 233,
+  "stored_binary_count": 302,
   "duplicate_aliases": [
     {
       "source_path": "猪猪素材库/紫色品质/翻滚猪.jpg",
@@ -1775,6 +1775,328 @@
       "media_path": "media/美食素材库/五条猪无量赫焰雪山.png",
       "sha256": "9cf1e0cee9718f50cabd1b2f8c9e5063d692e046b9ddcd6ed11debb15e300e5b",
       "bytes": 2884148
+    },
+    {
+      "template_id": "pig-r1-spring-grove",
+      "source_path": "第九期/一星猪猪/春猪.png",
+      "media_path": "media/第九期/一星猪猪/春猪.png",
+      "sha256": "353e9e0bc01e9fb3d85a09f9113856c342ec4c71d6df25811c9729e25025c354",
+      "bytes": 417717
+    },
+    {
+      "template_id": "pig-r1-kitty",
+      "source_path": "第九期/一星猪猪/猪咪.png",
+      "media_path": "media/第九期/一星猪猪/猪咪.png",
+      "sha256": "f59e64aadcaf2f7f7fa5613f1bea347e62579cb738a14268787a498d390be834",
+      "bytes": 89153
+    },
+    {
+      "template_id": "pig-r1-coffee-break",
+      "source_path": "第九期/一星猪猪/猪喝咖啡.png",
+      "media_path": "media/第九期/一星猪猪/猪喝咖啡.png",
+      "sha256": "c669f3b26190277070ae7360ae37d416ae716bf1751a742cae6e48124d23b739",
+      "bytes": 432505
+    },
+    {
+      "template_id": "pig-r1-pig-question",
+      "source_path": "第九期/一星猪猪/猪猪？.png",
+      "media_path": "media/第九期/一星猪猪/猪猪？.png",
+      "sha256": "ab779c6e306f2a04e71ef202cb20670934c73cbd8e4649e08a682db57df76176",
+      "bytes": 191629
+    },
+    {
+      "template_id": "pig-r1-halo-descent",
+      "source_path": "第九期/一星猪猪/猪降临.gif",
+      "media_path": "media/第九期/一星猪猪/猪降临.gif",
+      "sha256": "9db44e8c9195a79970dc69f24f04d336c0da7c66ab2ba4dba36dc87eb8ae03ba",
+      "bytes": 371648
+    },
+    {
+      "template_id": "pig-r1-reindeer-cap",
+      "source_path": "第九期/一星猪猪/猪麋鹿.png",
+      "media_path": "media/第九期/一星猪猪/猪麋鹿.png",
+      "sha256": "e87aed5f1013ac6fea0225f759a331f1a65d6e30f6a2ff0c84b0649ddfd20eb4",
+      "bytes": 730462
+    },
+    {
+      "template_id": "pig-r1-line-sketch",
+      "source_path": "第九期/一星猪猪/简笔猪.png",
+      "media_path": "media/第九期/一星猪猪/简笔猪.png",
+      "sha256": "4ec964abd9b0a44252c5cb9b8a6d86b569fe887e91e4358ba2dadfc8705d6e31",
+      "bytes": 117367
+    },
+    {
+      "template_id": "pig-r2-parking-nap",
+      "source_path": "第九期/二星猪猪/停🐷位.png",
+      "media_path": "media/第九期/二星猪猪/停🐷位.png",
+      "sha256": "8bbb8029c9a0a23c4ec80b2f93fcb829962a413961ef4139185254ef00e8d9d1",
+      "bytes": 683445
+    },
+    {
+      "template_id": "pig-r2-red-note",
+      "source_path": "第九期/二星猪猪/小红猪.png",
+      "media_path": "media/第九期/二星猪猪/小红猪.png",
+      "sha256": "b64dc310e42a41451e8860ee27102f682e40f86a0c3c647e8514821a428f3c33",
+      "bytes": 171856
+    },
+    {
+      "template_id": "pig-r2-bonk",
+      "source_path": "第九期/二星猪猪/敲猪.png",
+      "media_path": "media/第九期/二星猪猪/敲猪.png",
+      "sha256": "df21da3cbd578b41274513a9b7db81a4d4211e323a76e3935a54f5e611e05dd1",
+      "bytes": 39284
+    },
+    {
+      "template_id": "pig-r2-swinging-harness",
+      "source_path": "第九期/二星猪猪/猪上吊.gif",
+      "media_path": "media/第九期/二星猪猪/猪上吊.gif",
+      "sha256": "c8ef64d0b51042eb5c4f7383bcb3940e8135b776e2058916297a8380d0f27f8e",
+      "bytes": 2813101
+    },
+    {
+      "template_id": "pig-r2-flying-wand",
+      "source_path": "第九期/二星猪猪/猪会飞.png",
+      "media_path": "media/第九期/二星猪猪/猪会飞.png",
+      "sha256": "638b608bb9d9eb7945b190a9881473cf648b76ec4b77684845ca1832b0fb315c",
+      "bytes": 654623
+    },
+    {
+      "template_id": "pig-r2-halo-boss",
+      "source_path": "第九期/二星猪猪/猪大哥.png",
+      "media_path": "media/第九期/二星猪猪/猪大哥.png",
+      "sha256": "d0acf9115e409c211d3427f5b2c3d446707f14b3b6daca15afae2c655bc8c310",
+      "bytes": 452805
+    },
+    {
+      "template_id": "pig-r2-courier",
+      "source_path": "第九期/二星猪猪/猪递员.png",
+      "media_path": "media/第九期/二星猪猪/猪递员.png",
+      "sha256": "28d201c8ed13e990fb3f40d86fd6cde9bbdcd8869a25779a33a07dbabbe546be",
+      "bytes": 508987
+    },
+    {
+      "template_id": "pig-r3-color-spectrum",
+      "source_path": "第九期/三星猪猪/大色猪.png",
+      "media_path": "media/第九期/三星猪猪/大色猪.png",
+      "sha256": "00f664dba175dcdce615748481d3989b8593cf63246140336914c2820afbb28c",
+      "bytes": 1847978
+    },
+    {
+      "template_id": "pig-r3-exist-chart",
+      "source_path": "第九期/三星猪猪/渚打E.png",
+      "media_path": "media/第九期/三星猪猪/渚打E.png",
+      "sha256": "7f1950bec45aad1d20a5448e137a6d38b39c40af67c66ce51c4bd748538bcd7d",
+      "bytes": 261253
+    },
+    {
+      "template_id": "pig-r3-savior-song-chart",
+      "source_path": "第九期/三星猪猪/渚打S.png",
+      "media_path": "media/第九期/三星猪猪/渚打S.png",
+      "sha256": "7c3f1e231b09d2bd31d8b41f50d9e7be80b075bc0cebb49dde54c8e835621da0",
+      "bytes": 297020
+    },
+    {
+      "template_id": "pig-r3-python-eater",
+      "source_path": "第九期/三星猪猪/猪吃蛇.png",
+      "media_path": "media/第九期/三星猪猪/猪吃蛇.png",
+      "sha256": "93d1d2e332a02c1add8295e82967c39c92c9e543f03890b168ad2b9e11c02a12",
+      "bytes": 416349
+    },
+    {
+      "template_id": "pig-r3-inky-halo",
+      "source_path": "第九期/三星猪猪/猪黑黑.png",
+      "media_path": "media/第九期/三星猪猪/猪黑黑.png",
+      "sha256": "f855dc6c628ed0d52a2dfa7ef1d9994df9424d138e3ed5af6a84bf190139042e",
+      "bytes": 1246111
+    },
+    {
+      "template_id": "pig-r3-wise-glasses",
+      "source_path": "第九期/三星猪猪/睿智猪.png",
+      "media_path": "media/第九期/三星猪猪/睿智猪.png",
+      "sha256": "d6d6e0f483c4e37614f7aaca59517c835bfba705afe1078d24c04ac6dd7f8f9e",
+      "bytes": 874022
+    },
+    {
+      "template_id": "pig-r3-rhythm-rookie",
+      "source_path": "第九期/三星猪猪/菜渚.png",
+      "media_path": "media/第九期/三星猪猪/菜渚.png",
+      "sha256": "45c91a990dbf42535658692f406c09d736658340baa7fe6a0ef12cac6ae04d8c",
+      "bytes": 322953
+    },
+    {
+      "template_id": "pig-r3-python-bitten",
+      "source_path": "第九期/三星猪猪/蛇咬猪.png",
+      "media_path": "media/第九期/三星猪猪/蛇咬猪.png",
+      "sha256": "277d6922c047b5dee1053687d58000aa8d559fc4dd49c45a1ab2571d8875521b",
+      "bytes": 424016
+    },
+    {
+      "template_id": "pig-r4-anan-sketchbook",
+      "source_path": "第九期/四星猪猪/安安的猪猪.png",
+      "media_path": "media/第九期/四星猪猪/安安的猪猪.png",
+      "sha256": "1b3a35864bbe7910859eb3cc0f34002e791cdc98ef211215d01fa66a3400bc7f",
+      "bytes": 1063307
+    },
+    {
+      "template_id": "pig-r4-cheshire-maid",
+      "source_path": "第九期/四星猪猪/柴郡猪.png",
+      "media_path": "media/第九期/四星猪猪/柴郡猪.png",
+      "sha256": "4996b402f684ce965774359f0350aee400a72acd1173c1b50d17564dd677e412",
+      "bytes": 748462
+    },
+    {
+      "template_id": "pig-r4-extra-large",
+      "source_path": "第九期/四星猪猪/特大渚.png",
+      "media_path": "media/第九期/四星猪猪/特大渚.png",
+      "sha256": "43b9b2a6439895af4bf5f826ba1df176581157dd31ef4afd7fd166863afec72b",
+      "bytes": 455571
+    },
+    {
+      "template_id": "pig-r4-bandori-player",
+      "source_path": "第九期/四星猪猪/猪玩邦邦.png",
+      "media_path": "media/第九期/四星猪猪/猪玩邦邦.png",
+      "sha256": "03b21baae420821bea9f1f84234cbb977881486b3c6427589a0a5fc7d4fbeae4",
+      "bytes": 303575
+    },
+    {
+      "template_id": "pig-r5-galaxy-colossus",
+      "source_path": "第九期/五星猪猪/你是那么大的猪.png",
+      "media_path": "media/第九期/五星猪猪/你是那么大的猪.png",
+      "sha256": "572b888b6514264e9e242350f9d6442a9942884d8268e4533e8fe921f7df4244",
+      "bytes": 420119
+    },
+    {
+      "template_id": "pig-r5-king-crab",
+      "source_path": "第九期/五星猪猪/帝王猪.png",
+      "media_path": "media/第九期/五星猪猪/帝王猪.png",
+      "sha256": "da5e77557f1cfd3acb3d8bbd0b1c57ffaf283c5a42e1085bb5c1fbbff4f38d59",
+      "bytes": 923875
+    },
+    {
+      "template_id": "pig-r5-rainbow-cloud",
+      "source_path": "第九期/五星猪猪/彩虹云猪.png",
+      "media_path": "media/第九期/五星猪猪/彩虹云猪.png",
+      "sha256": "988e5104c81592f1520a8ae30e0a29d5ead5d16cd2b52a0373fdfbcf0668c572",
+      "bytes": 665362
+    },
+    {
+      "template_id": "pig-r5-dark-side-prism",
+      "source_path": "第九期/五星猪猪/猪之暗面.png",
+      "media_path": "media/第九期/五星猪猪/猪之暗面.png",
+      "sha256": "4682c797b31632cfd80f6e03fef549db96e2f6c5125937571fb372bea89795f2",
+      "bytes": 102502
+    },
+    {
+      "template_id": "pig-r5-royal-cape",
+      "source_path": "第九期/五星猪猪/猪猪王.png",
+      "media_path": "media/第九期/五星猪猪/猪猪王.png",
+      "sha256": "a467adecbf808b07ce5df585573f9a78ffa440e30073cdcb6a9d3fc62489f452",
+      "bytes": 572584
+    },
+    {
+      "template_id": "pig-r5-magic-kitty",
+      "source_path": "第九期/五星猪猪/魔法猪咪.png",
+      "media_path": "media/第九期/五星猪猪/魔法猪咪.png",
+      "sha256": "463c86756d88a6f3336db28895b9f15ecb5b4d0cce2dd5446a0474fe88c32a7e",
+      "bytes": 1333663
+    },
+    {
+      "template_id": "food-r1-starch-sausage",
+      "source_path": "第九期/一星美食/淀粉肠.png",
+      "media_path": "media/第九期/一星美食/淀粉肠.png",
+      "sha256": "f63c0065fb86ee311725b4fa9513302a094b3090c7e6ebe922a106c5a825573d",
+      "bytes": 290472
+    },
+    {
+      "template_id": "food-r1-bone-broth",
+      "source_path": "第九期/一星美食/猪骨汤.png",
+      "media_path": "media/第九期/一星美食/猪骨汤.png",
+      "sha256": "60fd5c2ae9a7e39dbc727377cb0f8f2b37e7e9b1f0dbec9719ca4e024f459dc2",
+      "bytes": 269075
+    },
+    {
+      "template_id": "food-r2-mushroom-bun",
+      "source_path": "第九期/二星美食/咕咕猪包.png",
+      "media_path": "media/第九期/二星美食/咕咕猪包.png",
+      "sha256": "1efcf98163775104b915abd15a4ee091dd8b22e081ccaad439ded92c86538840",
+      "bytes": 205569
+    },
+    {
+      "template_id": "food-r2-pig-belly-chicken",
+      "source_path": "第九期/二星美食/渚肚鸡.png",
+      "media_path": "media/第九期/二星美食/渚肚鸡.png",
+      "sha256": "0c88233399c80489befbe8fc277dc8be68972f2634e49961b83bea073198de34",
+      "bytes": 506048
+    },
+    {
+      "template_id": "food-r3-heart-bun",
+      "source_path": "第九期/三星美食/爱心馅猪包.png",
+      "media_path": "media/第九期/三星美食/爱心馅猪包.png",
+      "sha256": "83dadcbc8ebc4cb83b14986e1ab6605f5d064f6d066099c25a852b9d8f0e5596",
+      "bytes": 87036
+    },
+    {
+      "template_id": "food-r3-grape-milk",
+      "source_path": "第九期/三星美食/猪葡萄牛奶.png",
+      "media_path": "media/第九期/三星美食/猪葡萄牛奶.png",
+      "sha256": "bcbe8579e2240137621c3249616c2ebde762c36ea2260c04147898cd64f2457f",
+      "bytes": 314179
+    },
+    {
+      "template_id": "food-r4-hot-pig",
+      "source_path": "第九期/四星美食/热猪.png",
+      "media_path": "media/第九期/四星美食/热猪.png",
+      "sha256": "d0db1a17ebcfb3ed0d1335b308d3909d526e66dbb580bd3ac17c0ea6a8c276a8",
+      "bytes": 1337504
+    },
+    {
+      "template_id": "food-r4-orange-milk",
+      "source_path": "第九期/四星美食/猪橘子牛奶.png",
+      "media_path": "media/第九期/四星美食/猪橘子牛奶.png",
+      "sha256": "3c7097244fc9d661974a17a756aebdf6e2d9919e989402ea3cfe8a16d5cd766c",
+      "bytes": 315242
+    },
+    {
+      "template_id": "food-r4-souffle",
+      "source_path": "第九期/四星美食/猪芙蕾.png",
+      "media_path": "media/第九期/四星美食/猪芙蕾.png",
+      "sha256": "e5e2896edfb491b2638ba54c6f5310763b7779f281ff51d1c7da949ed52417f0",
+      "bytes": 304302
+    },
+    {
+      "template_id": "food-r4-sausage-pig",
+      "source_path": "第九期/四星美食/香肠猪.png",
+      "media_path": "media/第九期/四星美食/香肠猪.png",
+      "sha256": "e3e665829e88aa2e1ede194d37d840485006b17dae9c85dbf62da1effd4e2f2d",
+      "bytes": 366863
+    },
+    {
+      "template_id": "food-r5-tiramisu",
+      "source_path": "第九期/五星美食/提拉米猪.png",
+      "media_path": "media/第九期/五星美食/提拉米猪.png",
+      "sha256": "fb3a8235dd94132b335b370deee67a3071e49c7d2af0be567f89ad721a567191",
+      "bytes": 463017
+    },
+    {
+      "template_id": "food-r5-chocolate-pig",
+      "source_path": "第九期/五星美食/猪克力.png",
+      "media_path": "media/第九期/五星美食/猪克力.png",
+      "sha256": "db2e286092ab1832af7cf1aeb3e3e0f2da9e02dd11a6a8c709d0ff6968531b5c",
+      "bytes": 455750
+    },
+    {
+      "template_id": "food-r5-yolk-pig",
+      "source_path": "第九期/五星美食/猪包蛋.png",
+      "media_path": "media/第九期/五星美食/猪包蛋.png",
+      "sha256": "7a1a543946372582a53894d087323d00fd11e2b2543cd1e2ce33203f5a0ed8b7",
+      "bytes": 124875
+    },
+    {
+      "template_id": "food-r5-strawberry-milk",
+      "source_path": "第九期/五星美食/猪草莓牛奶.png",
+      "media_path": "media/第九期/五星美食/猪草莓牛奶.png",
+      "sha256": "58dea844119cc6d3318fef1296d13304c75d1ae0fcfd64476fed6939d30c4ea3",
+      "bytes": 323261
     }
   ]
 }

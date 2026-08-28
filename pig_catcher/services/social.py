@@ -10,6 +10,7 @@ from typing import Any
 from uuid import uuid4
 
 from ..config.model import RankingSection, TradingSection
+from ..domain.display import format_length, format_weight
 from ..domain.enums import AssetKind, ReceiptSendStatus, TradeStatus
 from ..domain.errors import (
     AssetStateConflictError,
@@ -241,7 +242,7 @@ def _social_asset_from_pig(pig: PigView) -> SocialAsset:
         short_code=pig.short_code,
         rarity=pig.rarity,
         official_value=pig.official_value,
-        detail_text=f"{pig.size_value:.1f} cm · {pig.weight_value:.2f} kg",
+        detail_text=f"{format_length(pig.size_value)} · {format_weight(pig.weight_value)}",
     )
 
 
@@ -253,7 +254,7 @@ def _social_asset_from_food(food: FoodView) -> SocialAsset:
         short_code=food.short_code,
         rarity=food.rarity,
         official_value=food.official_value,
-        detail_text=f"{food.portion_weight:.2f} kg · {food.fat_label}",
+        detail_text=f"{format_weight(food.portion_weight)} · {food.fat_label}",
     )
 
 
@@ -265,7 +266,7 @@ def _showcase_pig(pig: PigView) -> ShowcaseAsset:
         short_code=pig.short_code,
         rarity=pig.rarity,
         official_value=pig.official_value,
-        detail_text=f"{pig.size_value:.1f} cm · {pig.weight_value:.2f} kg",
+        detail_text=f"{format_length(pig.size_value)} · {format_weight(pig.weight_value)}",
         image_relpath=pig.image_relpath,
         image_fit=pig.image_fit,
         media_visible=pig.media_visible,
@@ -281,7 +282,7 @@ def _showcase_food(food: FoodView) -> ShowcaseAsset:
         short_code=food.short_code,
         rarity=food.rarity,
         official_value=food.official_value,
-        detail_text=f"{food.portion_weight:.2f} kg · {food.fat_label}",
+        detail_text=f"{format_weight(food.portion_weight)} · {food.fat_label}",
         image_relpath=food.image_relpath,
         image_fit=food.image_fit,
         media_visible=food.media_visible,

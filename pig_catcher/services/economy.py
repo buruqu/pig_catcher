@@ -10,6 +10,7 @@ from typing import Any
 from uuid import uuid4
 
 from ..config.model import CookingSection, EconomySection
+from ..domain.display import format_weight
 from ..domain.economy import (
     COOK_COIN_REWARDS,
     COOK_EXPERIENCE_REWARDS,
@@ -625,7 +626,7 @@ def format_cooking_summary(result: CookingResult) -> str:
         "【做菜成功】\n"
         f"原料：{result.source_pig.selector}（{result.source_pig.stars}）\n"
         f"出餐：{main.stars} {main.selector}（{main.rarity_name}）\n"
-        f"份量：{main.portion_weight:.2f} kg；肥瘦：{main.fat_label}\n"
+        f"份量：{format_weight(main.portion_weight)}；肥瘦：{main.fat_label}\n"
         f"官方价值：{main.official_value} 猪币{bonus}\n"
         f"奖励：+{result.coin_reward} 猪币 / +{result.experience_reward} 经验\n"
         f"等级：Lv.{progress.level} · {progress.title}；"
@@ -664,7 +665,7 @@ def format_food_detail_summary(food: FoodView) -> str:
         "【美食详情】\n"
         f"{food.stars} {food.display_name}（{food.rarity_name}）\n"
         f"编号：{food.selector}{'（已收藏保护）' if food.is_favorite else ''}\n"
-        f"份量：{food.portion_weight:.2f} kg\n"
+        f"份量：{format_weight(food.portion_weight, include_base=True)}\n"
         f"肥瘦：{food.fat_label}\n"
         f"官方价值：{food.official_value} 猪币\n"
         f"原料：{food.source_selector}\n"
@@ -688,7 +689,8 @@ def format_food_inventory_summary(result: FoodInventoryPage) -> str:
         lines.append("当前没有符合条件的美食。")
     for food in result.foods:
         lines.append(
-            f"{food.stars} {food.selector}｜{food.portion_weight:.2f}kg｜{food.fat_label}｜{food.official_value}猪币"
+            f"{food.stars} {food.selector}｜{format_weight(food.portion_weight)}｜"
+            f"{food.fat_label}｜{food.official_value}猪币"
         )
     return "\n".join(lines)
 
@@ -717,7 +719,7 @@ def format_food_catalog_summary(result: FoodCatalogPage) -> str:
         animation = "｜动态" if entry.is_animated else ""
         lines.append(
             f"{'★' * entry.rarity} {entry.display_name}｜已获得 {entry.acquired_count} 次"
-            f"｜最大份量 {entry.best_portion_weight or 0:.2f}kg{animation}"
+            f"｜最大份量 {format_weight(entry.best_portion_weight or 0)}{animation}"
         )
     return "\n".join(lines)
 

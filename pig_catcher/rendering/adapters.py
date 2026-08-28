@@ -214,6 +214,7 @@ def pig_card_view(
         mode_label=mode_label,
         display_name=pig.display_name,
         activity_label=pig.activity_label,
+        display_tags=pig.display_tags if pig.media_visible else (),
         owner_display_name=pig.owner_display_name,
         rarity=pig.rarity,
         rarity_name=pig.rarity_name,
@@ -355,6 +356,7 @@ def inventory_view(page: InventoryPage) -> InventoryViewModel:
                 body_label=pig.body_label,
                 is_favorite=pig.is_favorite,
                 activity_label=pig.activity_label,
+                display_tags=pig.display_tags if pig.media_visible else (),
             )
             for pig in page.pigs
         ),
@@ -382,6 +384,7 @@ def catalog_view(page: CatalogPage) -> CatalogViewModel:
                 best_weight=entry.best_weight,
                 collection_name=entry.collection_name,
                 character_name=entry.character_name,
+                display_tags=entry.display_tags if entry.discovered else (),
                 media_visible=entry.discovered,
                 is_animated=entry.is_animated,
                 image_fit=entry.image_fit,

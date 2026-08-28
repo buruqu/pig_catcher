@@ -25,11 +25,11 @@ def _entries() -> list[dict[str, object]]:
     return list(payload["entries"])
 
 
-def test_formal_catalog_has_all_252_named_assets_and_stable_ids() -> None:
+def test_formal_catalog_has_all_298_named_assets_and_stable_ids() -> None:
     entries = _entries()
-    assert len(entries) == 252
-    assert len({entry["template_id"] for entry in entries}) == 252
-    assert len({entry["source_path"] for entry in entries}) == 252
+    assert len(entries) == 298
+    assert len({entry["template_id"] for entry in entries}) == 298
+    assert len({entry["source_path"] for entry in entries}) == 298
     assert all(str(entry["description"]).strip() for entry in entries)
     pig_counts = Counter(
         int(entry["rarity"])
@@ -41,8 +41,8 @@ def test_formal_catalog_has_all_252_named_assets_and_stable_ids() -> None:
         for entry in entries
         if entry["kind"] == "food"
     )
-    assert pig_counts == {1: 20, 2: 20, 3: 21, 4: 29, 5: 39, 6: 44}
-    assert food_counts == {1: 3, 2: 6, 3: 7, 4: 8, 5: 11, 6: 44}
+    assert pig_counts == {1: 27, 2: 27, 3: 29, 4: 33, 5: 45, 6: 44}
+    assert food_counts == {1: 5, 2: 8, 3: 9, 4: 12, 5: 15, 6: 44}
 
 
 def test_high_rarity_food_effects_cover_new_gameplay_families() -> None:
@@ -254,7 +254,7 @@ def test_phase8_collaboration_limited_pigs_and_exclusive_foods_are_complete() ->
     )
 
 
-def test_semantic_body_ranges_match_visual_scale_without_changing_normal_pigs() -> None:
+def test_semantic_body_ranges_match_visual_scale_and_keep_regular_pigs_regular() -> None:
     pigs = {
         entry["display_name"]: entry
         for entry in _entries()
@@ -268,7 +268,11 @@ def test_semantic_body_ranges_match_visual_scale_without_changing_normal_pigs() 
     assert pigs["猪鼻"]["weight_max_kg"] == 2
     assert pigs["二维猪"]["weight_max_kg"] == 2
     assert pigs["扁猪"]["weight_max_kg"] == 5
-    assert "length_min_cm" not in pigs["普通猪"]
+    assert pigs["普通猪"]["stature_profile"] == "standard"
+    assert pigs["普通猪"]["length_min_cm"] == 34
+    assert pigs["普通猪"]["length_max_cm"] == 118
+    assert pigs["普通猪"]["weight_min_kg"] == 28
+    assert pigs["普通猪"]["weight_max_kg"] == 330
 
 
 def test_group_custom_assets_are_confined_and_keep_user_text() -> None:
@@ -326,6 +330,7 @@ def test_group_custom_assets_are_confined_and_keep_user_text() -> None:
                     "weight_min_kg",
                     "weight_max_kg",
                     "recipe_tags",
+                    "display_tags",
                     "effect_id",
                     "effect_params",
                 )

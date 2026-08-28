@@ -20,6 +20,7 @@ from PIL import Image, UnidentifiedImageError
 
 from ..domain.battle_views import BattleView
 from ..domain.dispatch_views import DispatchView
+from ..domain.display import format_length, format_measurement, format_weight
 from ..domain.errors import RenderError
 from ..domain.tour_views import TourView
 from .models import (
@@ -97,6 +98,11 @@ class PigCatcherRenderer:
         from .cosmetics import cosmetic_detail
 
         self._environment.globals["cosmetic_detail"] = cosmetic_detail
+        self._environment.filters.update(
+            physical_weight=format_weight,
+            physical_length=format_length,
+            physical_measurement=format_measurement,
+        )
         self.preview_cache_root = Path(preview_cache_root).resolve() if preview_cache_root is not None else None
         self._preview_cache: OrderedDict[tuple[object, ...], str] = OrderedDict()
         self._preview_cache_size = 0

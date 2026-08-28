@@ -21,6 +21,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from pig_catcher.domain import PIG_RARITY_NAMES, Rarity  # noqa: E402
+from pig_catcher.domain.display import display_tags_from_json  # noqa: E402
 from pig_catcher.rendering import (  # noqa: E402
     AnimatedCardComposer,
     CatalogItemViewModel,
@@ -171,7 +172,7 @@ def load_rows(database_path: Path) -> list[dict[str, object]]:
                 template_id, display_name, rarity, description, image_relpath,
                 image_fit, media_format, is_animated, frame_count,
                 length_min, length_max, weight_min, weight_max,
-                collection_name, collection_total, character_name
+                collection_name, collection_total, character_name, display_tags_json
             FROM pig_templates
             WHERE enabled = 1 AND scope_type = 'common'
             ORDER BY rarity, template_id
@@ -236,6 +237,7 @@ def pig_card(
         media_visible=media_visible,
         is_animated=bool(row["is_animated"]),
         media_format=str(row["media_format"]),
+        display_tags=display_tags_from_json(row.get("display_tags_json")) if media_visible else (),
         collection_name=str(row["collection_name"] or ""),
         character_name=str(row["character_name"] or ""),
         coin_reward=30 if mode_label == "抓猪成功" else None,
@@ -287,6 +289,7 @@ def inventory_model(rows: Sequence[Mapping[str, object]]) -> InventoryViewModel:
                 media_visible=True,
                 is_animated=bool(row["is_animated"]),
                 image_fit=str(row["image_fit"]),
+                display_tags=display_tags_from_json(row.get("display_tags_json")),
             )
             for index, row in enumerate(rows)
         ),
@@ -316,6 +319,7 @@ def catalog_model(
                 collection_name=str(row["collection_name"] or ""),
                 character_name=str(row["character_name"] or ""),
                 media_visible=index < 8,
+                display_tags=display_tags_from_json(row.get("display_tags_json")) if index < 8 else (),
                 is_animated=bool(row["is_animated"]),
                 image_fit=str(row["image_fit"]),
             )

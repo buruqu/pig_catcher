@@ -10,7 +10,7 @@
   </style>
 </head>
 <body>
-  <main class="game-sheet pig-card rarity-{{ view.rarity }}{% if view.description|length > 160 %} pig-card--long{% endif %}{% if view.probability_line %} pig-card--probability{% endif %}"{% if view.achievement_frame %} style="outline:6px solid {% if 'purple' in view.achievement_frame %}#76539c{% elif 'gold' in view.achievement_frame %}#d3a52c{% else %}#dc8aaa{% endif %};outline-offset:-6px"{% endif %} data-achievement-frame="{{ view.achievement_frame }}" data-pig-catcher-root data-render-ready="true">
+  <main class="game-sheet pig-card rarity-{{ view.rarity }}{% if view.description|length > 160 %} pig-card--long{% endif %}{% if view.probability_line %} pig-card--probability{% endif %}{% if view.display_tags and view.media_visible %} pig-card--tagged{% endif %}"{% if view.achievement_frame %} style="outline:6px solid {% if 'purple' in view.achievement_frame %}#76539c{% elif 'gold' in view.achievement_frame %}#d3a52c{% else %}#dc8aaa{% endif %};outline-offset:-6px"{% endif %} data-achievement-frame="{{ view.achievement_frame }}" data-pig-catcher-root data-render-ready="true">
     {% if view.achievement_firework %}<div class="achievement-firework"><span>✦ ✧ ✦</span><span>PiG Dream!</span><span>✦ ✧ ✦</span></div>{% endif %}
     <header class="game-header pig-card__header">
       <div class="game-header__copy">
@@ -48,14 +48,21 @@
         {% if view.achievement_badge|default('') %}{% set badge = cosmetic_detail(view.achievement_badge) %}<span class="achievement-token"><b>{{ badge.glyph }}</b>{{ badge.name }}</span>{% endif %}
         {% if view.achievement_title %}<span class="pill pill--gold">成就称号 · {{ view.achievement_title }}</span>{% endif %}
       </div>
+      {% if view.display_tags and view.media_visible %}
+      <div class="asset-display-tags" aria-label="猪猪主题标签">
+        {% for tag in view.display_tags %}<span class="asset-display-tag">{{ tag }}</span>{% endfor %}
+      </div>
+      {% endif %}
       <div class="pig-card__facts">
         <div class="pig-card__fact">
           <span>体长{% if view.size_label %} · {{ view.size_label }}{% endif %}</span>
-          <strong>{{ "%.1f"|format(view.size_value) }} cm</strong>
+          <strong>{{ view.size_value|physical_length }}</strong>
+          {% if view.size_value >= 1000 and view.coin_reward is none %}<small class="physical-base-unit">{{ "%.1f"|format(view.size_value) }} cm</small>{% endif %}
         </div>
         <div class="pig-card__fact">
           <span>体重{% if view.weight_label %} · {{ view.weight_label }}{% endif %}</span>
-          <strong>{{ "%.2f"|format(view.weight_value) }} kg</strong>
+          <strong>{{ view.weight_value|physical_weight }}</strong>
+          {% if view.weight_value >= 1000 and view.coin_reward is none %}<small class="physical-base-unit">{{ "%.2f"|format(view.weight_value) }} kg</small>{% endif %}
         </div>
         <div class="pig-card__fact">
           <span>体态</span>

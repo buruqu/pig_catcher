@@ -46,7 +46,7 @@
       <div class="pig-card__facts">
         <div class="pig-card__fact">
           <span>出餐份量</span>
-          <strong>{{ "%.2f"|format(view.portion_weight) }} kg</strong>
+          <strong>{{ view.portion_weight|physical_weight }}</strong>
         </div>
         <div class="pig-card__fact">
           <span>原料肥瘦</span>

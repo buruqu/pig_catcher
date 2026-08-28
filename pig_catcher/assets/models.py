@@ -8,6 +8,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from ..domain.display import normalize_display_tags
 from ..domain.enums import (
     AssetKind,
     ConsentStatus,
@@ -68,6 +69,7 @@ class AssetManifestEntry(BaseModel):
     fat_profile: FatProfile | None = None
     stature_profile: StatureProfile | None = None
     recipe_tags: list[str] = Field(default_factory=list, max_length=20)
+    display_tags: list[str] = Field(default_factory=list, max_length=5)
     effect_id: str = Field(default="", max_length=80)
     effect_params: dict[str, str | int | float | bool | list[object]] = Field(
         default_factory=dict,
@@ -106,6 +108,11 @@ class AssetManifestEntry(BaseModel):
         if path.suffix.lower() not in {".png", ".webp", ".jpg", ".jpeg", ".gif"}:
             raise ValueError("备用图片路径仅支持 PNG、JPEG、WebP 或 GIF 扩展名")
         return path.as_posix()
+
+    @field_validator("display_tags")
+    @classmethod
+    def validate_display_tags(cls, value: list[str]) -> list[str]:
+        return list(normalize_display_tags(value))
 
     @field_validator("recipe_tags")
     @classmethod
@@ -175,6 +182,8 @@ class AssetManifestEntry(BaseModel):
         if self.kind is AssetKind.FOOD and self.collection is not None:
             raise ValueError("美食素材不能加入猪猪联动收藏系列")
         if self.kind is AssetKind.FOOD:
+            if self.display_tags:
+                raise ValueError("当前展示标签只用于猪猪素材")
             if self.paired_food_template_id:
                 raise ValueError("美食素材不能声明对应菜模板")
             if self.effect_params and not self.effect_id:

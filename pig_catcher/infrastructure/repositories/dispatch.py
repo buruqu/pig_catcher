@@ -20,11 +20,11 @@ from ...domain.dispatch import (
     block_yield,
     encounter_options,
     exploration_step,
-    normalized_attribute,
     proficiency,
     random_at,
     specialties,
 )
+from ...domain.display import display_tags_from_json
 from ..database import DatabaseSession
 from .materials import MaterialRepository
 
@@ -80,7 +80,7 @@ class DispatchRepository:
     async def member(self, session: DatabaseSession, player_id: str, pig_id: str) -> dict[str, Any]:
         row = await session.fetch_one(
             """SELECT p.*,t.length_min,t.length_max,t.weight_min,t.weight_max,t.image_relpath,
-            t.alternate_image_relpath,t.scope_type,
+            t.alternate_image_relpath,t.scope_type,t.display_tags_json,
             COALESCE(d.hours,0) AS dispatch_hours,o.purpose AS busy_purpose,o.activity_id,
             CASE WHEN t.scope_type='common' THEN 1 ELSE EXISTS(
               SELECT 1 FROM scope_pig_templates s WHERE s.scope_id=p.scope_id AND s.template_id=p.template_id
@@ -107,9 +107,12 @@ class DispatchRepository:
             "weight_value": row["weight_value"],
             "size_percentile": row["size_percentile"],
             "weight_percentile": row["weight_percentile"],
-            "size_q": normalized_attribute(row["size_value"], row["length_min"], row["length_max"]),
-            "weight_q": normalized_attribute(row["weight_value"], row["weight_min"], row["weight_max"]),
+            # 捕获时的百分位属于实例：素材改版不能重新归一化并改变旧猪的派遣/战斗能力。
+            "size_q": float(row["size_percentile"]),
+            "weight_q": float(row["weight_percentile"]),
             "tags": list(specialties(row["template_id"])),
+            "display_tags": list(display_tags_from_json(row["display_tags_json"]))
+            if row["media_visible"] else [],
             "proficiency": proficiency(row["dispatch_hours"]),
             "hours": row["dispatch_hours"],
             "favorite": bool(row["is_favorite"]),

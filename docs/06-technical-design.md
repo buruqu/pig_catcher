@@ -601,3 +601,18 @@ SHAKE256 分域及拒绝抽样确保双方操作先后、重试与分片不改�
 
 新命令仍走 SDK 公开能力、结构化视图及现有渲染/发送队列，无逐玩家计时器、LLM 或普通聊天监听。
 状态和恢复/容量边界见 [第四轮交付](26-activity-achievements-and-v2-acceptance.md)。
+
+### Schema 41 / Ruleset 36：第九期物理档案与独立展示标签
+
+`assets/models.py`校验可选`display_tags`（最多5个、每个20字符、去重、拒绝控制符）；
+`AssetRepository`在既有目录原子导入中保存`pig_templates.display_tags_json`。
+它与食谱标签、旅行特长、collection身份彼此独立。正式205猪全部显式配置上下限，旧清单仍可缺省标签。
+
+`domain/display.py`集中处理t/m展示、原单位明细及标签解码；渲染和文字降级使用同一函数，
+不以字符串单位参与值比较。`DispatchRepository.member`直接读取实例百分位，BattleRepository复用该成员，
+阻止模板重标定影响旧培养。运行中的行程和场次继续使用已冻结快照。
+
+抓猪新回执保存标签快照，重放仍走当前权限；派遣/巡演/对战历史卡的媒体重授权同时清除不可见标签。
+大范围变化不改旧实例、旧账本或货币计算；新产出仍由现有星级/百分位公式估价。
+`test_physical_profile_stability.py`验证重导入、重启、派遣/对战能力和巨物候选范围；
+`test_round9_catalog.py`验证完整覆盖、四scope一致、原图SHA及动画帧序。

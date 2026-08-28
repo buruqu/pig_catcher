@@ -54,11 +54,11 @@
           </div>
           <div class="daily-giant-row__metric">
             {% if metric == "size" %}
-            <strong>{{ "%.1f"|format(item.size_value) }} cm</strong>
-            <span>{{ "%.2f"|format(item.weight_value) }} kg</span>
+            <strong>{{ item.size_value|physical_length }}</strong>
+            <span>{{ item.weight_value|physical_weight }}</span>
             {% else %}
-            <strong>{{ "%.2f"|format(item.weight_value) }} kg</strong>
-            <span>{{ "%.1f"|format(item.size_value) }} cm</span>
+            <strong>{{ item.weight_value|physical_weight }}</strong>
+            <span>{{ item.size_value|physical_length }}</span>
             {% endif %}
           </div>
         </article>

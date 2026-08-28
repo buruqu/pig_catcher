@@ -41,6 +41,7 @@ from .v0037_dispatch import MIGRATION_0037
 from .v0038_tours import MIGRATION_0038
 from .v0039_battles import MIGRATION_0039
 from .v0040_activity_achievements import MIGRATION_0040
+from .v0041_pig_display_tags import MIGRATION_0041
 
 MIGRATIONS: tuple[Migration, ...] = (
     MIGRATION_0001,
@@ -83,6 +84,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     MIGRATION_0038,
     MIGRATION_0039,
     MIGRATION_0040,
+    MIGRATION_0041,
 )
 
 __all__ = ["MIGRATIONS", "Migration"]

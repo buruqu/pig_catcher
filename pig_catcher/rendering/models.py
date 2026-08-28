@@ -147,6 +147,7 @@ class PigCardViewModel:
     achievement_frame: str = ""
     achievement_badge: str = ""
     activity_label: str = ""
+    display_tags: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -225,6 +226,7 @@ class InventoryItemViewModel:
     body_label: str = ""
     is_favorite: bool = False
     activity_label: str = ""
+    display_tags: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -256,6 +258,7 @@ class CatalogItemViewModel:
     media_visible: bool
     is_animated: bool
     image_fit: str
+    display_tags: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

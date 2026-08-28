@@ -11,6 +11,7 @@ from typing import Any
 from uuid import uuid4
 
 from ..config.model import CatchingSection, RankingSection
+from ..domain.display import display_tags_from_json, format_length, format_measurement, format_weight
 from ..domain.economy import (
     generate_food_attributes,
     level_cooking_higher_rarity_multiplier,
@@ -171,6 +172,7 @@ class PigView:
     alternate_image_relpath: str = ""
     is_favorite: bool = False
     activity_label: str = ""
+    display_tags: tuple[str, ...] = ()
 
     @property
     def stars(self) -> str:
@@ -348,6 +350,7 @@ class CatalogEntry:
     best_weight: float | None
     first_acquired_at: str
     last_acquired_at: str
+    display_tags: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -563,6 +566,11 @@ def pig_view_from_row(
         paired_food_template_id=str(row.get("paired_food_template_id") or ""),
         display_variant=display_variant,
         alternate_image_relpath=alternate_image_relpath,
+        display_tags=(
+            display_tags_from_json(row.get("display_tags_json"))
+            if bool(row.get("media_visible", True))
+            else ()
+        ),
         is_favorite=bool(row.get("is_favorite") or False),
         activity_label={"dispatch": "派遣中", "tour": "巡演中", "battle": "对战中"}.get(
             str(row.get("busy_purpose") or ""),
@@ -598,6 +606,7 @@ def _catalog_from_row(row: Mapping[str, object]) -> CatalogEntry:
         best_weight=_optional_float(row["best_weight"]),
         first_acquired_at=str(row["first_acquired_at"] or ""),
         last_acquired_at=str(row["last_acquired_at"] or ""),
+        display_tags=(display_tags_from_json(row.get("display_tags_json")) if discovered else ()),
     )
 
 
@@ -646,6 +655,7 @@ def format_catch_summary(result: CatchResult) -> str:
         item_text += f"（连续使用队列剩余 {result.item_remaining_uses} 次）"
     new_text = "NEW｜首次收入图鉴\n" if result.catalog_new else ""
     body_text = f"体格：{result.pig.body_label}｜{result.pig.body_description}\n" if result.pig.body_label else ""
+    tags_text = f"标签：{' · '.join(result.pig.display_tags)}\n" if result.pig.display_tags else ""
     effect_text = f"\n美食加成：{'；'.join(result.effect_summaries)}" if result.effect_summaries else ""
     excluded_text = f"\n互斥未叠加：{'；'.join(result.excluded_summaries)}" if result.excluded_summaries else ""
     quota_text = "\n专属次数：本次未消耗正常抓猪额度" if result.quota_exempt_catch else ""
@@ -678,10 +688,11 @@ def format_catch_summary(result: CatchResult) -> str:
         f"{new_text}"
         f"编号：{result.pig.selector}\n"
         f"品质：{result.pig.rarity_name}\n"
-        f"体型：{result.pig.size_value:.1f} cm\n"
-        f"重量：{result.pig.weight_value:.2f} kg\n"
+        f"体型：{format_length(result.pig.size_value)}\n"
+        f"重量：{format_weight(result.pig.weight_value)}\n"
         f"体态：{result.pig.fat_label}\n"
         f"{body_text}"
+        f"{tags_text}"
         f"官方价值：{result.pig.official_value} 猪币\n"
         f"奖励：+{result.coin_reward} 猪币 / +{result.experience_reward} 经验\n"
         f"等级：Lv.{progress.level} · {progress.title}；"
@@ -779,14 +790,15 @@ def format_pig_detail_summary(pig: PigView) -> str:
         f"编号：{pig.selector}{'（已收藏保护）' if pig.is_favorite else ''}\n"
         f"状态：{pig.activity_label or '空闲'}\n"
         f"{collection}"
-        f"体型：{pig.size_value:.1f} cm（{size_label(pig.size_percentile)}）\n"
-        f"重量：{pig.weight_value:.2f} kg（{weight_label(pig.weight_percentile)}）\n"
+        f"体型：{format_length(pig.size_value, include_base=True)}（{size_label(pig.size_percentile)}）\n"
+        f"重量：{format_weight(pig.weight_value, include_base=True)}（{weight_label(pig.weight_percentile)}）\n"
         f"体态：{pig.fat_label}\n"
         f"{body}"
         f"官方价值：{pig.official_value} 猪币\n"
         f"群纪录：{'、'.join(records) if records else '无'}\n"
         f"获得时间：{pig.acquired_at}\n"
         f"描述：{pig.description}"
+        + (f"\n标签：{' · '.join(pig.display_tags)}" if pig.display_tags else "")
     )
 
 
@@ -804,7 +816,9 @@ def format_inventory_summary(result: InventoryPage) -> str:
         lines.append("当前没有符合条件的猪猪。")
     for pig in result.pigs:
         lines.append(
-            f"{pig.stars} {pig.selector}｜{pig.size_value:.1f}cm｜{pig.weight_value:.2f}kg｜{pig.official_value}猪币"
+            f"{pig.stars} {pig.selector}｜{format_length(pig.size_value)}｜"
+            f"{format_weight(pig.weight_value)}｜{pig.official_value}猪币"
+            + (f"｜{' · '.join(pig.display_tags[:2])}" if pig.display_tags else "")
         )
     return "\n".join(lines)
 
@@ -833,7 +847,8 @@ def format_catalog_summary(result: CatalogPage) -> str:
         animation = "｜动态" if entry.is_animated else ""
         lines.append(
             f"{'★' * entry.rarity} {entry.display_name}｜已抓 {entry.acquired_count} 次"
-            f"｜最佳 {entry.best_size or 0:.1f}cm / {entry.best_weight or 0:.2f}kg{animation}"
+            f"｜最佳 {format_length(entry.best_size or 0)} / {format_weight(entry.best_weight or 0)}{animation}"
+            + (f"｜{' · '.join(entry.display_tags[:2])}" if entry.display_tags else "")
         )
     return "\n".join(lines)
 
@@ -851,7 +866,7 @@ def format_records_summary(result: RecordsPage) -> str:
     for entry in result.entries:
         lines.append(
             f"{'★' * entry.rarity} {entry.display_name}#{entry.short_code}｜"
-            f"{entry.record_label} {entry.record_value:.2f}{entry.unit}｜"
+            f"{entry.record_label} {format_measurement(entry.record_value, entry.unit)}｜"
             f"{entry.holder_display_name}"
         )
     if result.global_entries:
@@ -860,7 +875,7 @@ def format_records_summary(result: RecordsPage) -> str:
             lines.append(
                 f"{entry.record_label}最高｜{'★' * entry.rarity} "
                 f"{entry.display_name}#{entry.short_code}｜"
-                f"{entry.record_value:.2f}{entry.unit}｜"
+                f"{format_measurement(entry.record_value, entry.unit)}｜"
                 f"{entry.holder_display_name}"
             )
     if result.giant_sightings:
@@ -869,7 +884,7 @@ def format_records_summary(result: RecordsPage) -> str:
             lines.append(
                 f"{'★' * sighting.rarity} "
                 f"{sighting.display_name}#{sighting.short_code}｜"
-                f"{sighting.size_value:.1f}cm / {sighting.weight_value:.2f}kg｜"
+                f"{format_length(sighting.size_value)} / {format_weight(sighting.weight_value)}｜"
                 f"{sighting.giant_score:.1f}分｜{sighting.holder_display_name}"
             )
     return "\n".join(lines)
@@ -890,15 +905,15 @@ def format_daily_giants_summary(result: DailyGiants) -> str:
     for entry in result.size_entries:
         lines.append(
             f"{entry.rank}. {entry.holder_display_name}｜{'★' * entry.rarity} "
-            f"{entry.display_name}#{entry.short_code}｜{entry.size_value:.1f} cm｜"
-            f"{entry.weight_value:.2f} kg"
+            f"{entry.display_name}#{entry.short_code}｜{format_length(entry.size_value)}｜"
+            f"{format_weight(entry.weight_value)}"
         )
     lines.append("—— 最重体重榜 ——")
     for entry in result.weight_entries:
         lines.append(
             f"{entry.rank}. {entry.holder_display_name}｜{'★' * entry.rarity} "
-            f"{entry.display_name}#{entry.short_code}｜{entry.weight_value:.2f} kg｜"
-            f"{entry.size_value:.1f} cm"
+            f"{entry.display_name}#{entry.short_code}｜{format_weight(entry.weight_value)}｜"
+            f"{format_length(entry.size_value)}"
         )
     return "\n".join(lines)
 
@@ -1773,6 +1788,7 @@ class GameplayService:
                 "item_name": armed_item.display_name if armed_item is not None else "",
                 "item_remaining_uses": (max(0, armed_uses - 1) if armed_item is not None else 0),
                 "weights": [round(value, 8) for value in weights],
+                "display_tags": list(pig.display_tags),
                 "effect_summaries": list(effect_summaries),
                 "excluded_summaries": list(excluded_summaries),
                 "exclusive_effect_active": exclusive_effect_active,
@@ -3268,6 +3284,9 @@ class GameplayService:
         weights_raw = payload.get("weights", ())
         if not isinstance(weights_raw, list) or len(weights_raw) != 6:
             raise ReceiptConflictError("抓猪回执中的概率快照无效。")
+        if "display_tags" in payload:
+            # 新回执重放保持当时标签；旧回执没有此字段时使用兼容的当前模板。
+            row["display_tags_json"] = json.dumps(payload["display_tags"], ensure_ascii=False)
         return CatchResult(
             pig=self._pig_view(row),
             receipt=receipt,

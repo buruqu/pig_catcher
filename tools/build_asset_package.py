@@ -122,6 +122,7 @@ def manifest_entry(
                 "weight_max_kg": definition.get("weight_max_kg", weight_max),
                 "fat_profile": definition.get("fat_profile", "balanced"),
                 "stature_profile": definition.get("stature_profile", "standard"),
+                "display_tags": definition.get("display_tags", []),
             }
         )
     return result

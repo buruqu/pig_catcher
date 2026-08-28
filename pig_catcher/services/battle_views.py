@@ -17,6 +17,7 @@ from ..domain.dispatch import MATERIALS, safe_display_name
 from ..domain.dispatch_views import DispatchLine as Line
 from ..domain.dispatch_views import DispatchPanel as Panel
 from ..domain.dispatch_views import DispatchPigCard
+from ..domain.display import format_length, format_weight
 from ..domain.models import CommandIdentity
 
 STATUS_NAMES = {
@@ -43,8 +44,8 @@ def pig_card(member: dict, note: str = "") -> DispatchPigCard:
         member["short_code"],
         member["rarity"],
         member.get("image_relpath", ""),
-        (f"战斗强化 +{member.get('level', 0)}",),
-        note or f"{member['size_value']:g}cm · {member['weight_value']:g}kg",
+        (f"战斗强化 +{member.get('level', 0)}", *member.get("display_tags", ())[:2]),
+        note or f"{format_length(member['size_value'])} · {format_weight(member['weight_value'])}",
         bool(member.get("favorite")),
         member["template_id"],
     )

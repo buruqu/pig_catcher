@@ -275,6 +275,10 @@ class PigCatcherDatabase:
         if missing_tables:
             raise MigrationError("数据库版本已是当前版，但缺少关键表：" + "、".join(sorted(missing_tables)))
 
+        pig_columns = await (await connection.execute("PRAGMA table_info(pig_templates)")).fetchall()
+        if not any(str(row[1]) == "display_tags_json" and bool(row[3]) for row in pig_columns):
+            raise MigrationError("数据库缺少猪猪展示标签字段，请先完成 Schema 41 迁移。")
+
         required_guards = {
             "material_ledger_no_update",
             "material_ledger_no_delete",

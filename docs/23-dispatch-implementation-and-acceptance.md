@@ -2,7 +2,8 @@
 
 > 2026-08-27；开发版本 `2.0.0.dev3`，Schema `37`，Ruleset `32`，Asset Manifest `4`。
 
-> 后续进展：四轮均已完成，当前为 `2.0.0.dev6`，见 [第四轮交付](26-activity-achievements-and-v2-acceptance.md)。
+> 后续进展：四轮已在 `2.0.0.dev6` 完成，见 [第四轮交付](26-activity-achievements-and-v2-acceptance.md)。
+> 当前 `2.0.0.dev7` 已补全第九期32只新猪特长，旧猪使用实例百分位保持能力稳定，见 [第九期交付](27-round9-content-and-physical-profiles.md)。
 > 本文版本、数量与“下一轮”均为第一轮交付时的历史记录，不覆盖当前开发状态。
 >
 > 状态：完整派遣功能已在 `develop/2.0` 隔离工作树实现并通过离线验收，**没有上线**。

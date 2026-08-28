@@ -25,6 +25,7 @@ from pig_catcher.infrastructure.repositories.framework import FrameworkRepositor
 from pig_catcher.infrastructure.repositories.materials import MaterialRepository
 from pig_catcher.services.achievements import AchievementService
 from pig_catcher.services.activity_achievements import ActivityAchievements
+from pig_catcher.version import SCHEMA_VERSION
 
 from .helpers import build_message, create_test_plugin
 from .test_activity_achievements import _RUNTIME, complete_state, trip
@@ -88,15 +89,22 @@ async def test_all_legacy_baselines_migrate_without_rewriting_any_existing_row(t
     before = path.read_bytes()
     backup = tmp_path / f"rollback{version}.sqlite3"
     with sqlite3.connect(path) as source, sqlite3.connect(backup) as target:
+        original_columns = {
+            table: ",".join(f'"{r[1]}"' for r in source.execute(f'PRAGMA table_info("{table}")'))
+            for table in original
+        }
         source.backup(target)
     migrated = PigCatcherDatabase(path)
     await migrated.open()
     try:
-        assert await migrated.schema_version() == 40
+        assert await migrated.schema_version() == SCHEMA_VERSION
         assert await migrated.integrity_check() == ("ok",)
         assert await migrated.fetch_all("PRAGMA foreign_key_check") == []
         for table, rows in original.items():
-            assert [tuple(r) for r in await migrated.fetch_all(f'SELECT * FROM "{table}" ORDER BY rowid')] == rows
+            assert [
+                tuple(r)
+                for r in await migrated.fetch_all(f'SELECT {original_columns[table]} FROM "{table}" ORDER BY rowid')
+            ] == rows
         queue = await migrated.fetch_all("SELECT * FROM achievement_activity_queue")
         assert all(row["historical"] == 1 and row["processed_at"] is None for row in queue)
         if version >= 38:

@@ -6,7 +6,8 @@
 > 三个新玩法的基本功能、图片和测试分别在各自轮次交付；48 项新成就留到第四轮。
 >
 > 以上为第三轮交付历史基线；第四轮现已接入 48 项成就、奖券和外观，
-> 当前 `2.0.0.dev6` 状态见 [新增成就与总验收](26-activity-achievements-and-v2-acceptance.md)。
+> `2.0.0.dev6` 状态见 [新增成就与总验收](26-activity-achievements-and-v2-acceptance.md)。
+> 当前 `2.0.0.dev7` 的素材与体型调整见 [第九期交付](27-round9-content-and-physical-profiles.md)；战斗微调改用实例已存百分位，避免旧猪随模板范围更新漂移。
 
 ## 1. 已实现范围与快速上手
 

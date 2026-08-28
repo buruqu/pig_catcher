@@ -17,6 +17,7 @@ from playwright.async_api import async_playwright
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from pig_catcher.domain.display import display_tags_from_json  # noqa: E402
 from pig_catcher.domain.food_effects import effect_summary  # noqa: E402
 from pig_catcher.rendering import (  # noqa: E402
     CatalogItemViewModel,
@@ -56,7 +57,7 @@ def _load_rows(
             template.template_id, template.display_name, template.rarity,
             template.image_relpath, template.image_fit, template.is_animated,
             template.scope_type, template.collection_name,
-            template.collection_total, template.character_name
+            template.collection_total, template.character_name, template.display_tags_json
         """
     elif kind == "food":
         table = "food_templates"
@@ -134,6 +135,9 @@ def _pig_view(rows: Sequence[Mapping[str, object]]) -> CatalogViewModel:
             media_visible=str(row["scope_type"]) == "common",
             is_animated=bool(row["is_animated"]),
             image_fit=str(row["image_fit"]),
+            display_tags=(
+                display_tags_from_json(row.get("display_tags_json")) if str(row["scope_type"]) == "common" else ()
+            ),
         )
         for index, row in enumerate(rows)
     )
@@ -191,7 +195,7 @@ def _media_paths(
     return {
         str(row["template_id"]): data_dir / str(row["image_relpath"])
         for row in rows
-        if str(row["scope_type"]) == "common" and not bool(row["is_animated"])
+        if str(row["scope_type"]) == "common"
     }
 
 

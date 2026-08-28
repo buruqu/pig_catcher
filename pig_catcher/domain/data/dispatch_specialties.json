@@ -693,6 +693,134 @@
     "pig-jjk-sukuna": [
       "搬运",
       "研究"
+    ],
+    "pig-r1-spring-grove": [
+      "搜寻",
+      "探路"
+    ],
+    "pig-r1-kitty": [
+      "灵巧",
+      "搜寻"
+    ],
+    "pig-r1-coffee-break": [
+      "后勤",
+      "研究"
+    ],
+    "pig-r1-pig-question": [
+      "研究",
+      "后勤"
+    ],
+    "pig-r1-halo-descent": [
+      "探路",
+      "搜寻"
+    ],
+    "pig-r1-reindeer-cap": [
+      "探路",
+      "搬运"
+    ],
+    "pig-r1-line-sketch": [
+      "灵巧",
+      "研究"
+    ],
+    "pig-r2-parking-nap": [
+      "后勤",
+      "搬运"
+    ],
+    "pig-r2-red-note": [
+      "交涉",
+      "搜寻"
+    ],
+    "pig-r2-bonk": [
+      "采掘",
+      "机械"
+    ],
+    "pig-r2-swinging-harness": [
+      "灵巧",
+      "探路"
+    ],
+    "pig-r2-flying-wand": [
+      "探路",
+      "搜寻"
+    ],
+    "pig-r2-halo-boss": [
+      "交涉",
+      "后勤"
+    ],
+    "pig-r2-courier": [
+      "搬运",
+      "探路"
+    ],
+    "pig-r3-color-spectrum": [
+      "灵巧",
+      "交涉"
+    ],
+    "pig-r3-exist-chart": [
+      "音乐器材",
+      "灵巧"
+    ],
+    "pig-r3-savior-song-chart": [
+      "音乐器材",
+      "灵巧"
+    ],
+    "pig-r3-python-eater": [
+      "研究",
+      "机械"
+    ],
+    "pig-r3-inky-halo": [
+      "搜寻",
+      "探路"
+    ],
+    "pig-r3-wise-glasses": [
+      "研究",
+      "交涉"
+    ],
+    "pig-r3-rhythm-rookie": [
+      "音乐器材",
+      "后勤"
+    ],
+    "pig-r3-python-bitten": [
+      "机械",
+      "研究"
+    ],
+    "pig-r4-anan-sketchbook": [
+      "灵巧",
+      "研究"
+    ],
+    "pig-r4-cheshire-maid": [
+      "后勤",
+      "交涉"
+    ],
+    "pig-r4-extra-large": [
+      "搬运",
+      "采掘"
+    ],
+    "pig-r4-bandori-player": [
+      "音乐器材",
+      "灵巧"
+    ],
+    "pig-r5-galaxy-colossus": [
+      "搬运",
+      "研究"
+    ],
+    "pig-r5-king-crab": [
+      "采掘",
+      "搬运"
+    ],
+    "pig-r5-rainbow-cloud": [
+      "探路",
+      "搜寻"
+    ],
+    "pig-r5-dark-side-prism": [
+      "音乐器材",
+      "研究"
+    ],
+    "pig-r5-royal-cape": [
+      "交涉",
+      "后勤"
+    ],
+    "pig-r5-magic-kitty": [
+      "灵巧",
+      "搜寻"
     ]
   }
 }

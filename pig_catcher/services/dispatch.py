@@ -115,7 +115,10 @@ class DispatchService:
         permitted = {row["template_id"] for row in rows}
         return replace(
             view,
-            pigs=tuple(pig if pig.template_id in permitted else replace(pig, image_relpath="") for pig in view.pigs),
+            pigs=tuple(
+                pig if pig.template_id in permitted else replace(pig, image_relpath="", tags=())
+                for pig in view.pigs
+            ),
         )
 
     async def _perform(

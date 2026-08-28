@@ -1169,6 +1169,8 @@ async def test_released_v33_source_unique_constraint_is_repaired(tmp_path: Path)
                 CREATE TABLE pig_instances(
                     pig_instance_id TEXT PRIMARY KEY,owner_player_id TEXT,scope_id TEXT,state TEXT,locked_trade_id TEXT
                 );
+        -- A released v33 database already has its template table; Schema 41 adds its display-only column.
+        CREATE TABLE pig_templates(template_id TEXT PRIMARY KEY);
         INSERT INTO players(player_id) VALUES ('qq:100:200');
         INSERT INTO food_instances(food_instance_id) VALUES ('roulette-source');
         CREATE TABLE player_roulette_state(

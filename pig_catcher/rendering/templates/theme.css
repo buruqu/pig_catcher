@@ -583,6 +583,8 @@ footer strong {
   width: 480px;
   height: 480px;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   place-items: center;
   overflow: hidden;
   background: #fff9fb;
@@ -592,6 +594,8 @@ footer strong {
 
 .pig-card__media img {
   display: block;
+  min-width: 0;
+  min-height: 0;
   width: 100%;
   height: 100%;
 }
@@ -621,6 +625,62 @@ footer strong {
   border-top: 1px solid #eadfe3;
   border-left: 1px solid #eadfe3;
 }
+
+/* 主题标签属于静态说明；不占用纪录、效果或最终概率的固定空间。 */
+.asset-display-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 14px;
+  min-width: 0;
+}
+
+.asset-display-tag {
+  max-width: 100%;
+  padding: 4px 8px;
+  overflow-wrap: anywhere;
+  color: #98546f;
+  background: #fff5f9;
+  border: 1px solid #efd7e2;
+  border-radius: 5px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.asset-display-tags--compact { margin: 0 0 9px; gap: 4px; }
+.asset-display-tags--compact .asset-display-tag { padding: 2px 6px; font-size: 12px; }
+.asset-display-tags--catalog { margin: 7px 0 0; gap: 3px; }
+.asset-display-tags--catalog .asset-display-tag { padding: 2px 5px; font-size: 10px; }
+.asset-display-tag--more { color: #806c75; background: #f8f5f6; }
+.physical-base-unit { display: block; margin-top: 4px; color: #806c75; font-size: 12px; }
+
+/* 标签和长说明使结果卡自然增高；媒体槽仍固定在 x38/y164，不影响逐帧动画。 */
+.pig-card.pig-card--tagged { height: auto; min-height: 860px; }
+.pig-card.pig-card--tagged .pig-card__detail {
+  position: relative;
+  left: auto;
+  top: auto;
+  min-height: 480px;
+  margin: 38px 38px 28px 556px;
+}
+.pig-card.pig-card--tagged .pig-card__description,
+.pig-card.pig-card--tagged .pig-card__subline {
+  position: static;
+  width: auto;
+  min-height: 0;
+  max-height: none;
+  overflow: visible;
+  overflow-wrap: anywhere;
+}
+.pig-card.pig-card--tagged .pig-card__description { margin: 22px 0 18px; }
+.pig-card.pig-card--tagged .pig-card__receipt {
+  position: relative;
+  left: auto;
+  right: auto;
+  top: auto;
+  margin: 0 38px 24px;
+}
+.pig-card.pig-card--tagged .game-footer { position: relative !important; }
 
 .pig-card__fact {
   min-height: 92px;

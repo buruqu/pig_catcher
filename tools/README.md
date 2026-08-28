@@ -16,6 +16,13 @@
 | `accept_catching_and_collection_views.py` | 抓猪、详情、背包、图鉴和纪录 |
 | `accept_cooking_and_economy_views.py` | 做菜、美食、商城、升级、售卖和账本 |
 | `accept_social_and_ranking_views.py` | 赠送、交易、展示位和排行榜 |
+| `accept_display_tags_units.py` | 全猪标签、吨/米、长说明、隐私占位与固定动画槽 |
+
+第九期仅在隔离2.0中验收。`accept_display_tags_units.py`使用已发布目录与合成视图，
+生成13个场景、DOM裁切/越界/坏图诊断、联系表和动画哈希检查；不连接生产库或QQ。
+`accept_complete_catalogs.py`支持真实展示标签与动画中帧缩略图，四个scope均应各有172猪/60菜。
+本机可显式传入`--browser-executable 'C:\Program Files\Google\Chrome\Application\chrome.exe'`；
+仅启动独立无头绘图进程，不接管用户已有浏览器。已有输出目录不可覆盖。
 
 ## 命令级 UAT
 

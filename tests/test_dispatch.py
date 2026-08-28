@@ -172,11 +172,11 @@ async def world(tmp_path: Path):
     await db.close()
 
 
-def test_formal_specialties_cover_all_173_pigs_and_61_low_star_templates():
+def test_formal_specialties_cover_all_205_pigs_and_83_low_star_templates():
     path = Path(__file__).resolve().parents[1] / "catalogs/formal/pig-and-food-definitions.json"
     pigs = [entry for entry in json.loads(path.read_text(encoding="utf-8"))["entries"] if entry["kind"] == "pig"]
     assert set(SPECIALTIES) == {entry["template_id"] for entry in pigs}
-    assert len(pigs) == 173 and sum(entry["rarity"] <= 3 for entry in pigs) == 61
+    assert len(pigs) == 205 and sum(entry["rarity"] <= 3 for entry in pigs) == 83
     assert specialties("future-unknown-template") == ("后勤",)
 
 
@@ -605,6 +605,7 @@ async def test_schema_36_migrates_to_dispatch_without_changing_existing_tables(t
         connection.execute("INSERT INTO schema_migrations VALUES(?,?,?)", (migration.version, migration.name, "test"))
     connection.execute("PRAGMA user_version=36")
     original_rows = {}
+    original_columns = {}
     for table in (
         "scopes",
         "players",
@@ -614,7 +615,8 @@ async def test_schema_36_migrates_to_dispatch_without_changing_existing_tables(t
         "pig_instances",
         "currency_ledger",
     ):
-        rows = await world.db.fetch_all(f"SELECT * FROM {table} ORDER BY rowid")
+        original_columns[table] = ",".join(f'"{r[1]}"' for r in connection.execute(f'PRAGMA table_info("{table}")'))
+        rows = await world.db.fetch_all(f"SELECT {original_columns[table]} FROM {table} ORDER BY rowid")
         original_rows[table] = [tuple(row) for row in rows]
         if rows:
             placeholders = ",".join("?" for _ in rows[0])
@@ -626,13 +628,20 @@ async def test_schema_36_migrates_to_dispatch_without_changing_existing_tables(t
     connection.close()
     db = PigCatcherDatabase(path)
     await db.open()
-    assert await db.schema_version() == 40
+    from pig_catcher.version import SCHEMA_VERSION
+
+    assert await db.schema_version() == SCHEMA_VERSION
     current = {
         row["name"]: row["sql"] for row in await db.fetch_all("SELECT name,sql FROM sqlite_master WHERE type='table'")
     }
-    assert all(current[name] == value for name, value in old_schema.items())
+    assert all(
+        current[name].replace(", display_tags_json TEXT NOT NULL DEFAULT '[]'", "") == value
+        for name, value in old_schema.items()
+    )
     for table, rows in original_rows.items():
-        assert [tuple(row) for row in await db.fetch_all(f"SELECT * FROM {table} ORDER BY rowid")] == rows
+        assert [
+            tuple(row) for row in await db.fetch_all(f"SELECT {original_columns[table]} FROM {table} ORDER BY rowid")
+        ] == rows
     assert await db.fetch_all("PRAGMA foreign_key_check") == []
     assert await db.integrity_check() == ("ok",)
     await db.close()

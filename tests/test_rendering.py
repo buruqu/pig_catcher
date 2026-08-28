@@ -1107,7 +1107,7 @@ async def test_third_round_templates_render_all_business_views(
     assert "最大体型榜" in daily_html
     assert "最重体重榜" in daily_html
     assert "爱丽丝" in daily_html and "鲍勃" in daily_html
-    assert "2694.7 cm" in daily_html and "88888.88 kg" in daily_html
+    assert "26.947 m" in daily_html and "88.88888 t" in daily_html
     assert daily_html.count("data:image/webp;base64,") == 2
     assert daily_options["allow_network"] is False
 

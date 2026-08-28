@@ -443,6 +443,7 @@ class GameplayRepository:
                 template.frame_count,
                 template.scope_type,
                 template.stature_profile,
+                template.display_tags_json,
                 template.collection_name,
                 template.collection_total,
                 template.character_name,
@@ -804,6 +805,7 @@ class GameplayRepository:
                 template.frame_count,
                 template.stature_profile,
                 template.alternate_image_relpath,
+                template.display_tags_json,
                 EXISTS(
                     SELECT 1
                     FROM group_global_records AS record
@@ -904,6 +906,7 @@ class GameplayRepository:
                 template.frame_count,
                 template.collection_id,
                 template.collection_name,
+                template.display_tags_json,
                 template.collection_slot,
                 template.collection_total,
                 template.character_name,

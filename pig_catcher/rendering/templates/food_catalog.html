@@ -55,7 +55,7 @@
             </div>
             <h2 style="font-size: {% if item.display_name|length > 50 %}9{% elif item.display_name|length > 32 %}11{% elif item.display_name|length > 20 %}13{% else %}16{% endif %}px">{{ item.display_name if item.discovered else "???" }}</h2>
             {% if item.discovered %}
-            <div class="catalog-item__facts">获得 {{ item.acquired_count }} 次<br>最大 {{ "%.2f"|format(item.best_portion_weight or 0) }} kg</div>
+            <div class="catalog-item__facts">获得 {{ item.acquired_count }} 次<br>最大 {{ (item.best_portion_weight or 0)|physical_weight }}</div>
             {% if item.effect_summary %}
             <div class="catalog-item__effect">{{ item.effect_summary }}</div>
             {% endif %}

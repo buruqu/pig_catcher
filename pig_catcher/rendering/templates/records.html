@@ -24,8 +24,8 @@
     <section class="list-summary">
       <p>第 {{ view.page }}/{{ view.page_count }} 页</p>
       <div class="pill-row">
-        <span class="pill pill--blue">体型 cm</span>
-        <span class="pill pill--gold">重量 kg</span>
+        <span class="pill pill--blue">体型 cm / m</span>
+        <span class="pill pill--gold">重量 kg / t</span>
       </div>
     </section>
 
@@ -43,7 +43,7 @@
             <strong>{{ "★" * item.rarity }} {{ item.display_name }}</strong>
             <span>#{{ item.short_code }} · {{ item.achieved_at }}</span>
           </div>
-          <div class="record-row__value">{{ "%.2f"|format(item.record_value) }} {{ item.unit }}</div>
+          <div class="record-row__value">{{ item.record_value|physical_measurement(item.unit) }}</div>
           <div class="record-row__holder">{{ item.holder_display_name }}</div>
         </div>
         {% endfor %}
@@ -65,7 +65,7 @@
             <strong>{{ item.qualification_label }} · {{ "★" * item.rarity }} {{ item.display_name }}</strong>
             <span>#{{ item.short_code }} · {{ item.holder_display_name }} · {{ item.achieved_at }}</span>
           </div>
-          <b>{{ "%.1f"|format(item.size_value) }} cm<br>{{ "%.2f"|format(item.weight_value) }} kg</b>
+          <b>{{ item.size_value|physical_length }}<br>{{ item.weight_value|physical_weight }}</b>
         </div>
         {% endfor %}
       </div>
@@ -81,7 +81,7 @@
           <strong style="font-size: {% if item.display_name|length > 48 %}12{% elif item.display_name|length > 28 %}15{% else %}19{% endif %}px">{{ "★" * item.rarity }} {{ item.display_name }}</strong>
           <span>#{{ item.short_code }} · {{ item.achieved_at }}</span>
         </div>
-        <div class="record-row__value">{{ "%.2f"|format(item.record_value) }} {{ item.unit }}</div>
+        <div class="record-row__value">{{ item.record_value|physical_measurement(item.unit) }}</div>
         <div class="record-row__holder">{{ item.holder_display_name }}</div>
       </div>
       {% endfor %}

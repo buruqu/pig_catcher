@@ -9,6 +9,7 @@ from ..domain.dispatch import safe_display_name
 from ..domain.dispatch_views import DispatchLine as Line
 from ..domain.dispatch_views import DispatchPanel as Panel
 from ..domain.dispatch_views import DispatchPigCard
+from ..domain.display import display_tags_from_json, format_length, format_weight
 from ..domain.errors import CatchCooldownError, DailyCatchLimitError, NoDrawableTemplateError
 from ..domain.gameplay import generate_pig_attributes, level_progress
 from ..domain.quota import catch_quota_window
@@ -181,8 +182,9 @@ async def claim_loot(service, session, identity, now_ms: int, key: str):
                 code,
                 int(rarity),
                 str(template["image_relpath"]),
-                ("战利品", "已交付"),
-                f"{attributes.size_value:g}cm · {attributes.weight_value:g}kg · 价值{attributes.official_value}猪币",
+                ("战利品", "已交付", *display_tags_from_json(template.get("display_tags_json"))[:2]),
+                f"{format_length(attributes.size_value)} · {format_weight(attributes.weight_value)}"
+                f" · 价值{attributes.official_value}猪币",
                 False,
                 template["template_id"],
             ),

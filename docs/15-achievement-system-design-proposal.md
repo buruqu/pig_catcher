@@ -8,6 +8,7 @@
 > 本文初始交付标识：`2.0.0.dev1` / Schema `35` / Ruleset `30`；以下为首期历史记录。
 > 2026-08-28 当前开发版已完成周榜和三系统，新增 48 项后共 130 项；
 > `2.0.0.dev6` 的实际状态与未上线边界见 [第四轮交付](26-activity-achievements-and-v2-acceptance.md)。
+> 后续第九期素材、标签和体型审阅已进入 `2.0.0.dev7`，见 [第九期交付](27-round9-content-and-physical-profiles.md)；成就规则未改动。
 
 ## 0. 第一轮实现记录
 
