@@ -99,9 +99,26 @@ async def test_empty_database_migrates_and_passes_integrity_check(tmp_path: Path
     assert len(instance_tables) == 2
     for row in instance_tables:
         table_sql = str(row["sql"])
-        assert "short_code TEXT NOT NULL COLLATE NOCASE UNIQUE" in table_sql
+        assert "short_code TEXT NOT NULL COLLATE NOCASE CHECK" in table_sql
+        assert "short_code TEXT NOT NULL COLLATE NOCASE UNIQUE" not in table_sql
         assert "length(short_code) BETWEEN 4 AND 16" in table_sql
         assert "short_code NOT GLOB '*[^0-9A-Za-z]*'" in table_sql
+    active_code_guards = await database.fetch_all(
+        """
+        SELECT name, type, sql FROM sqlite_master
+        WHERE name IN (
+            'idx_pig_active_short_code', 'idx_food_active_short_code',
+            'pig_active_short_code_insert', 'pig_active_short_code_update',
+            'food_active_short_code_insert', 'food_active_short_code_update'
+        )
+        """
+    )
+    assert len(active_code_guards) == 6
+    for row in active_code_guards:
+        assert "state IN ('active', 'locked-for-trade')" in str(row["sql"])
+        if row["type"] == "index":
+            assert "CREATE UNIQUE INDEX" in str(row["sql"])
+            assert "short_code COLLATE NOCASE" in str(row["sql"])
     receipt_columns = await database.fetch_all("PRAGMA table_info(command_receipts)")
     receipt_column_map = {str(row["name"]): row for row in receipt_columns}
     assert int(receipt_column_map["catch_quota_cost"]["notnull"]) == 1
@@ -1147,58 +1164,42 @@ async def test_released_v33_source_unique_constraint_is_repaired(tmp_path: Path)
 
     path = tmp_path / "released-v33.sqlite3"
     connection = sqlite3.connect(path)
+    connection.execute("PRAGMA foreign_keys=OFF")
+    connection.execute(
+        "CREATE TABLE schema_migrations(version INTEGER PRIMARY KEY,name TEXT NOT NULL UNIQUE,applied_at TEXT NOT NULL)"
+    )
+    # 使用实际的旧版完整结构。后续实例表迁移必须验证真实列、索引和 UUID
+    # 外键，而不是把只含主键的伪表错误当成曾发布过的 Schema33 数据库。
+    for migration in MIGRATIONS:
+        if migration.version > 32:
+            break
+        for statement in migration.statements:
+            connection.execute(statement)
+        connection.execute(
+            "INSERT INTO schema_migrations VALUES(?,?,?)",
+            (migration.version, migration.name, "2026-08-24T17:46:47.946Z"),
+        )
     connection.executescript(
         """
-        CREATE TABLE schema_migrations(
-            version INTEGER PRIMARY KEY,
-            name TEXT NOT NULL UNIQUE,
-            applied_at TEXT NOT NULL
-            );
-            INSERT INTO schema_migrations(version, name, applied_at)
-            VALUES (33, 'food-roulette-rebalance', '2026-08-24T17:46:47.946Z');
-            CREATE TABLE players(player_id TEXT PRIMARY KEY);
-            CREATE TABLE currency_ledger(
-                ledger_entry_id TEXT PRIMARY KEY,
-                player_id TEXT NOT NULL,
-                amount INTEGER NOT NULL,
-                reason_code TEXT NOT NULL,
-                created_at TEXT NOT NULL
-            );
-                CREATE TABLE food_instances(food_instance_id TEXT PRIMARY KEY);
-                CREATE TABLE scopes(scope_id TEXT PRIMARY KEY);
-                CREATE TABLE pig_instances(
-                    pig_instance_id TEXT PRIMARY KEY,owner_player_id TEXT,scope_id TEXT,state TEXT,locked_trade_id TEXT
-                );
-        -- A released v33 database already has its template table; Schema 41 adds its display-only column.
-        CREATE TABLE pig_templates(template_id TEXT PRIMARY KEY);
-        INSERT INTO players(player_id) VALUES ('qq:100:200');
-        INSERT INTO food_instances(food_instance_id) VALUES ('roulette-source');
-        CREATE TABLE player_roulette_state(
-            player_id TEXT PRIMARY KEY REFERENCES players(player_id),
-            available_spins INTEGER NOT NULL DEFAULT 0 CHECK (available_spins >= 0),
-            source_food_instance_id TEXT NOT NULL REFERENCES food_instances(food_instance_id),
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
-        );
-        CREATE TABLE player_food_effects (
-            effect_entry_id TEXT PRIMARY KEY,
-            player_id TEXT NOT NULL REFERENCES players(player_id) ON DELETE CASCADE,
-            source_food_instance_id TEXT NOT NULL UNIQUE
-                REFERENCES food_instances(food_instance_id),
-            effect_id TEXT NOT NULL,
-            params_json TEXT NOT NULL DEFAULT '{}',
-            granted_uses INTEGER NOT NULL CHECK (granted_uses >= 1),
-            consumed_uses INTEGER NOT NULL DEFAULT 0 CHECK (
-                consumed_uses >= 0 AND consumed_uses <= granted_uses
-            ),
-            expires_at TEXT,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
-        );
-        CREATE INDEX idx_player_food_effects_active
-        ON player_food_effects(
-            player_id, effect_id, consumed_uses, expires_at, created_at
-        );
+        INSERT INTO scopes(scope_id, platform, group_id, group_name, stream_id, created_at, updated_at)
+        VALUES ('qq:100', 'qq', '100', '旧版群', 'stream-100', 'now', 'now');
+        INSERT INTO players(player_id, scope_id, platform_user_id, display_name, created_at, updated_at)
+        VALUES ('qq:100:200', 'qq:100', '200', '旧版玩家', 'now', 'now');
+        INSERT INTO asset_manifest_imports(
+            catalog_hash, catalog_id, manifest_version, source_label, storage_relpath,
+            entry_count, status, created_at
+        ) VALUES ('legacy-catalog', 'legacy-catalog', 4, 'pytest', 'legacy-catalog', 1, 'active', 'now');
+        INSERT INTO food_templates(
+            template_id, catalog_hash, display_name, rarity, scope_type, description,
+            image_relpath, image_sha256, image_fit, source_label, license, consent_status, created_at, updated_at
+        ) VALUES ('legacy-food', 'legacy-catalog', '旧回执来源菜', 1, 'common', '旧数据',
+                  'food.png', 'test-sha256', 'contain', 'pytest', 'test', 'not-required', 'now', 'now');
+        INSERT INTO food_instances(
+            food_instance_id, short_code, scope_id, owner_player_id, template_id, template_version,
+            rarity, display_name_snapshot, portion_weight, fat_category, official_value,
+            ruleset_version, random_snapshot_json, state, acquired_at, disposed_at, updated_at
+        ) VALUES ('roulette-source', 'Roul9471', 'qq:100', 'qq:100:200', 'legacy-food', 1,
+                  1, '旧回执来源菜', 10, 'balanced', 100, 28, '{}', 'consumed', 'now', 'now', 'now');
         INSERT INTO player_food_effects(
             effect_entry_id, player_id, source_food_instance_id,
             effect_id, granted_uses, created_at, updated_at
@@ -1206,9 +1207,20 @@ async def test_released_v33_source_unique_constraint_is_repaired(tmp_path: Path)
             'existing-effect', 'qq:100:200', 'roulette-source',
             'next-six-star-cook-bonus', 1, 'now', 'now'
         );
-        PRAGMA user_version = 33;
         """
     )
+    released_v33 = next(migration for migration in MIGRATIONS if migration.version == 33)
+    for statement in released_v33.statements:
+        if statement.lstrip().startswith("DROP INDEX"):
+            break  # 模拟已添加轮盘并写入33版本号，但尚未发布效果表重建的旧库。
+        connection.execute(statement)
+    connection.execute(
+        "INSERT INTO schema_migrations VALUES(33,?,?)",
+        (released_v33.name, "2026-08-24T17:46:47.946Z"),
+    )
+    connection.execute("PRAGMA user_version=33")
+    old_food = connection.execute("SELECT * FROM food_instances WHERE food_instance_id='roulette-source'").fetchone()
+    assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
     connection.commit()
     connection.close()
 
@@ -1235,6 +1247,8 @@ async def test_released_v33_source_unique_constraint_is_repaired(tmp_path: Path)
         "next-six-star-cook-bonus",
         "next-guaranteed-six-star-catch",
     ]
+    migrated_food = await database.fetch_one("SELECT * FROM food_instances WHERE food_instance_id='roulette-source'")
+    assert tuple(migrated_food) == old_food
     assert await database.integrity_check() == ("ok",)
     assert await database.fetch_all("PRAGMA foreign_key_check") == []
     await database.close()

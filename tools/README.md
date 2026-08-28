@@ -92,6 +92,10 @@ uv run python .\tools\reset_catch_quota.py --group-id <群号>
 
 ## 全量离线审计
 
+2.0.0.dev9新增 `sync_round9_food_effects.py`（默认校验，`--write`同步仓库两份食品规则JSON）、
+`accept_item_bag_views.py`、`accept_food_reward_views.py`。本轮按用户要求只做必要检查，完整图片和回归留到最终统一验收；
+各脚本使用 `--help` 查看隔离输出参数，不要对生产数据目录运行验收。
+
 ```powershell
 uv run pytest -q
 uv run ruff check .

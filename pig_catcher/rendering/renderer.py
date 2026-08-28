@@ -489,6 +489,36 @@ class PigCatcherRenderer:
         )
         return await self._render_template("dispatch.html", view=view, previews=previews)
 
+    async def render_food_rewards(self, view: Any, media_paths: Mapping[str, Path]) -> RenderedImage:
+        """Receipt-backed rewards, with a bounded single-render 947 reveal."""
+        from .food_rewards import reveal_receipt
+
+        previews = await self._list_media_data_urls(
+            ((item.key, bool(item.image_relpath) and item.media_visible, False) for item in view.items), media_paths,
+        )
+        artwork = ""
+        if view.animation in {"pure-947", "original-947"}:
+            art_path = Path(__file__).with_name("assets") / "947" / f"{view.animation}.png"
+            if art_path.is_file():
+                try:
+                    artwork = await self._cached_preview_data_url(
+                        art_path, is_animated=False, max_side=960, quality=90,
+                    )
+                except (RenderError, OSError, ValueError):
+                    # Optional reveal art must never prevent delivery of the settled receipt.
+                    artwork = ""
+        result = await self._render_template("food_rewards.html", view=view, previews=previews, artwork=artwork)
+        if artwork:
+            async with self._preprocess_semaphore:
+                try:
+                    return await asyncio.to_thread(
+                        reveal_receipt, result, max_bytes=self.options.max_animation_bytes, theme=view.animation,
+                    )
+                except (OSError, ValueError):
+                    # A static receipt is preferable to losing the image over an optional flourish.
+                    return result
+        return result
+
     async def render_tour(self, view: TourView, media_paths: Mapping[str, Path]) -> RenderedImage:
         previews = await self._list_media_data_urls(
             ((pig.short_code, bool(pig.image_relpath), False) for pig in view.pigs),

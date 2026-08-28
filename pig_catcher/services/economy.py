@@ -51,6 +51,7 @@ from ..domain.food_effects import (
     CURRENT_WINDOW_CATCHES,
     EVEN_CATCH_DISTRIBUTION,
     EXTRA_CATCHES,
+    FOOD_SUPPLY_PACK,
     GROUP_COIN_TRIBUTE,
     GROUP_EFFECT_IDS,
     GROUP_NEXT_EXCLUSIVE_HIGH_STAR_CATCH,
@@ -68,8 +69,8 @@ from ..domain.food_effects import (
     SIX_STAR_COOK_FAILURE_RETURN,
     TECHNIQUE_PERMIT,
     TODAY_WINDOW_CATCHES,
+    WEEK_END_WINDOW_CATCHES,
     WEEKLY_WINDOW_CATCHES,
-    CookingEffectApplication,
     active_effect_from_row,
     apply_cooking_effects,
     apply_six_star_progress,
@@ -77,6 +78,7 @@ from ..domain.food_effects import (
     has_compatible_exclusive_cook_effect,
     resolve_food_effect,
 )
+from ..domain.food_lottery import YILU_LOTTERY
 from ..domain.gameplay import (
     ItemDefinition,
     item_by_id,
@@ -123,7 +125,9 @@ from .command_state import (
     valid_page_count,
     validate_existing_receipt,
 )
+from .food_supplies import grant_food_supply_pack
 from .gameplay import PigView, _cooldown_remaining, _safe_datetime, pig_view_from_row
+from .item_bag import ItemBagService
 from .receipts import request_fingerprint
 from .veteran_rewards import settle_veteran_rewards
 
@@ -325,6 +329,7 @@ class EatResult:
     available_effect_uses: int = 0
     veteran_coin_reward: int = 0
     veteran_reward_levels: tuple[int, ...] = ()
+    reward_payload: Mapping[str, object] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
@@ -740,12 +745,20 @@ def format_eat_summary(result: EatResult) -> str:
         if result.veteran_coin_reward
         else ""
     )
+    reward_lines = []
+    for item in result.reward_payload.get("items", []):
+        if isinstance(item, Mapping):
+            name = str(item.get("name") or "奖励")
+            code = str(item.get("short_code") or "")
+            quantity = int(item.get("quantity") or 1)
+            reward_lines.append(f"{name}#{code}" if code else f"{name} ×{quantity}")
+    rewards = "\n已到账：\n" + "\n".join(reward_lines) if reward_lines else ""
     return (
         "【美食品鉴】\n"
         f"已吃掉 {result.food.stars} {result.food.selector}\n"
         f"获得经验：+{experience}{coin}\n"
         f"当前累计经验：{result.total_experience}；猪币：{result.coin_balance}\n"
-        f"效果：{result.effect.summary}{uses}{veteran}"
+        f"效果：{result.effect.summary}{uses}{veteran}{rewards}"
     )
 
 
@@ -1550,9 +1563,9 @@ class EconomyService:
             )
             if progressed_weights != weights:
                 weights = progressed_weights
-                effect_application = CookingEffectApplication(
+                effect_application = replace(
+                    effect_application,
                     weights=weights,
-                    consumed_entry_ids=effect_application.consumed_entry_ids,
                     summaries=effect_application.summaries
                     + (
                         f"达妮娅泡泡云冻永久加成：6 星菜概率 "
@@ -1718,6 +1731,7 @@ class EconomyService:
             "slow-cook-seasoning": 1.18,
             "harvest-apron": 1.25,
         }.get(applied_item.item_id if applied_item is not None else "", 1.0)
+        output_multiplier = min(2.0, output_multiplier * effect_application.serving_multiplier)
         if output_multiplier > 1.0:
             main_attributes = scale_food_attributes(
                 main_attributes,
@@ -1798,6 +1812,8 @@ class EconomyService:
             "domain_gojo_bypass": domain_gojo_bypass,
             "bonus_roll": bonus_roll,
             "bonus_serving": bonus_serving,
+            "food_serving_multiplier": effect_application.serving_multiplier,
+            "output_multiplier": output_multiplier,
             "food_effect_entry_ids": consumed_effect_entry_ids,
             "food_effect_summaries": cook_effect_summaries,
             "exclusive_effect_active": exclusive_effect_active,
@@ -2151,6 +2167,8 @@ class EconomyService:
                 normalized_selector,
             )
             effect = self._food_effect(food)
+            overflow_active = False
+            reward_payload: dict[str, object] = {}
             effect_expires_at = effect.expires_at
             if effect.queued_effect_id in GROUP_EFFECT_IDS:
                 effect_expires_at = self._next_same_window_effect_expiry(now_datetime)
@@ -2206,7 +2224,25 @@ class EconomyService:
                     now=now,
                 )
                 if permanent_total is None:
-                    raise FoodEffectError("永久抓猪时段额度已经达到 +5 上限；美食未消耗。")
+                    if not effect.queued_effect_params.get("overflow_coupon"):
+                        raise FoodEffectError("永久抓猪时段额度已经达到 +5 上限；美食未消耗。")
+                    overflow_active = True
+                    effect = replace(
+                        effect,
+                        coin_bonus=int(effect.queued_effect_params["overflow_coin"]),
+                        summary=(
+                            "永久额度已满层：本周各时段基础抓猪额度 +1，获得 12222 猪币及编号修改券 ×1；"
+                            "周一 00:00 清除本次周加成。"
+                        ),
+                    )
+                else:
+                    effect = replace(
+                        effect,
+                        summary=(
+                            f"所有时段永久抓猪额度增加 1 次，目前为 +{permanent_total}/5；"
+                            "满层后再次食用可获得周加成、猪币及编号修改券。"
+                        ),
+                    )
             elif effect.queued_effect_id == PERMANENT_SIX_STAR_PROGRESS:
                 progress_total = await self.repository.increment_six_star_progress(
                     session,
@@ -2216,7 +2252,22 @@ class EconomyService:
                     now=now,
                 )
                 if progress_total is None:
-                    raise FoodEffectError("六星概率永久加成已经达到累计上限；美食未消耗。")
+                    if not effect.queued_effect_params.get("overflow_coupon"):
+                        raise FoodEffectError("六星概率永久加成已经达到累计上限；美食未消耗。")
+                    overflow_active = True
+                    effect = replace(
+                        effect,
+                        coin_bonus=int(effect.queued_effect_params["overflow_coin"]),
+                        summary="六星永久加成已满层：获得 22222 猪币及猪猪自选券 ×1。",
+                    )
+                else:
+                    effect = replace(
+                        effect,
+                        summary=(
+                            f"达妮娅永久加成增加 1 层，目前为 {progress_total}/5 层；"
+                            "原有永久概率效果保持，满层后再次食用可获得猪币及猪猪自选券。"
+                        ),
+                    )
             elif effect.queued_effect_id == NEXT_STACKABLE_SIX_STAR_COOK_BONUS:
                 active_rows = await self.repository.list_active_food_effects(
                     session,
@@ -2258,6 +2309,8 @@ class EconomyService:
                 PERMANENT_WINDOW_CATCH,
                 PERMANENT_SIX_STAR_PROGRESS,
                 GROUP_COIN_TRIBUTE,
+                FOOD_SUPPLY_PACK,
+                YILU_LOTTERY,
                 ROULETTE_CHANCES,
                 TECHNIQUE_PERMIT,
                 *GROUP_EFFECT_IDS,
@@ -2360,6 +2413,65 @@ class EconomyService:
                     effect,
                     summary=(f"{effect.summary} 当前未发动资格共 {available} 次。"),
                 )
+            elif effect.queued_effect_id == FOOD_SUPPLY_PACK:
+                supply = await grant_food_supply_pack(
+                    session,
+                    identity=identity,
+                    food_instance_id=food.food_instance_id,
+                    source_key=idempotency_key,
+                    pack_id=str(effect.queued_effect_params["pack_id"]),
+                    now=now,
+                )
+                reward_payload = supply.payload()
+                effect = replace(effect, summary=supply.summary)
+            elif effect.queued_effect_id == YILU_LOTTERY:
+                from .food_lottery import grant_food_lottery
+
+                lottery = await grant_food_lottery(
+                    session,
+                    identity=identity,
+                    food_instance_id=food.food_instance_id,
+                    source_key=idempotency_key,
+                    now=now,
+                    random_source=self.random_source,
+                )
+                reward_payload = lottery.payload()
+                effect = replace(effect, summary=lottery.summary)
+            if overflow_active:
+                coupon_id = str(effect.queued_effect_params["overflow_coupon"])
+                coupon = await ItemBagService(self.database, clock=self.clock).grant_coupon(
+                    session,
+                    player_id=identity.player_id,
+                    scope_id=identity.scope.value,
+                    coupon_id=coupon_id,
+                    source_id=food.food_instance_id,
+                    now=now,
+                )
+                coupon_name = "编号修改券" if coupon_id == "asset-code-change" else "猪猪自选券"
+                reward_payload = {
+                    "kind": "permanent-overflow",
+                    "items": [
+                        {"kind": "coupon", "reward_id": coupon_id, "name": coupon_name, "quantity": 1},
+                    ],
+                    "coupon_grant": coupon,
+                }
+                if effect.queued_effect_id == PERMANENT_WINDOW_CATCH:
+                    effect_expires_at = self._natural_week_effect_expiry(now_datetime)
+                    effect_entry_id = self._new_identifier()
+                    weekly_count = int(effect.queued_effect_params["overflow_weekly_bonus"])
+                    await self.repository.insert_food_effect(
+                        session,
+                        effect_entry_id=effect_entry_id,
+                        player_id=identity.player_id,
+                        source_food_instance_id=food.food_instance_id,
+                        effect_id=WEEK_END_WINDOW_CATCHES,
+                        params_json=json.dumps({"count": weekly_count}),
+                        granted_uses=1,
+                        expires_at=effect_expires_at,
+                        now=now,
+                    )
+                    reward_payload["weekly_quota_bonus"] = weekly_count
+                    reward_payload["expires_at"] = effect_expires_at
             base_experience = EAT_EXPERIENCE_REWARDS[Rarity(food.rarity)]
             total_experience = await self.repository.add_experience(
                 session,
@@ -2442,6 +2554,7 @@ class EconomyService:
                 "available_effect_uses": available_effect_uses,
                 "group_rewarded_players": group_rewarded_players,
                 "group_coin_total": group_coin_total,
+                "reward_payload": reward_payload,
                 "total_experience": total_experience,
                 "coin_balance": coin_balance,
                 "veteran_coin_reward": veteran_reward.coin_reward,
@@ -2467,6 +2580,7 @@ class EconomyService:
                 group_rewarded_players=group_rewarded_players,
                 group_coin_total=group_coin_total,
                 available_effect_uses=available_effect_uses,
+                reward_payload=reward_payload,
                 veteran_coin_reward=veteran_reward.coin_reward,
                 veteran_reward_levels=veteran_reward.rewarded_levels,
             )
@@ -2497,9 +2611,48 @@ class EconomyService:
                 group_rewarded_players=group_rewarded_players,
                 group_coin_total=group_coin_total,
                 available_effect_uses=available_effect_uses,
+                reward_payload=reward_payload,
                 veteran_coin_reward=veteran_reward.coin_reward,
                 veteran_reward_levels=veteran_reward.rewarded_levels,
             )
+
+    async def visible_eat_result(self, identity: CommandIdentity, result: EatResult) -> EatResult:
+        """Recheck reward artwork permissions at delivery, including receipt replays."""
+        if not result.reward_payload:
+            return result
+        if result.receipt.scope_id != identity.scope.value or result.receipt.player_id != identity.player_id:
+            raise ReceiptConflictError("不能读取其他群或玩家的美食奖励。")
+        payload = dict(result.reward_payload)
+        items = [dict(item) for item in payload.get("items", []) if isinstance(item, Mapping)]
+        async with self.database.transaction(immediate=False) as session:
+            source = await self._food_by_id(session, result.food.food_instance_id)
+            for kind, table, authorization in (
+                ("pig", "pig_templates", "scope_pig_templates"),
+                ("food", "food_templates", "scope_food_templates"),
+            ):
+                ids = tuple({str(item.get("template_id")) for item in items if item.get("kind") == kind})
+                if not ids:
+                    continue
+                rows = await session.fetch_all(
+                    f"""SELECT t.template_id,t.image_relpath FROM {table} AS t
+                    LEFT JOIN {authorization} AS a ON a.template_id=t.template_id AND a.scope_id=?
+                    WHERE t.template_id IN ({",".join("?" for _ in ids)}) AND t.enabled=1 AND (
+                        (t.scope_type='common' AND t.consent_status='not-required') OR
+                        (t.scope_type='group' AND t.consent_status='granted' AND a.authorized=1
+                            AND a.consent_status='granted'))""",
+                    (identity.scope.value, *ids),
+                )
+                visible = {str(row["template_id"]): str(row["image_relpath"]) for row in rows}
+                for item in items:
+                    if item.get("kind") != kind:
+                        continue
+                    template_id = str(item.get("template_id"))
+                    if template_id in visible:
+                        item["asset_path"] = visible[template_id]
+                    else:
+                        item.update(name="已隐藏的专属奖励", asset_path="", value=0, media_visible=False)
+        payload["items"] = items
+        return replace(result, food=source, reward_payload=payload)
 
     async def spin_roulette(self, identity: CommandIdentity) -> RouletteResult:
         """Consume one durable roulette chance and settle one uniform outcome."""
@@ -3805,6 +3958,7 @@ class EconomyService:
             available_effect_uses=int(
                 payload.get("available_effect_uses") or payload.get("roulette_available_spins") or 0
             ),
+            reward_payload=(dict(payload["reward_payload"]) if isinstance(payload.get("reward_payload"), dict) else {}),
             veteran_coin_reward=int(payload.get("veteran_coin_reward") or 0),
             veteran_reward_levels=tuple(int(value) for value in payload.get("veteran_reward_levels", [])),
         )
@@ -4170,6 +4324,14 @@ class EconomyService:
                 raise RuntimeError("炸猪全家桶猪币归集失败。")
             eater_balance = credited
         return eater_balance, payer_count, transferred_total
+
+    @staticmethod
+    def _natural_week_effect_expiry(now: datetime) -> str:
+        """The over-cap pie reward ends at the next Monday in Shanghai."""
+        beijing_timezone = timezone(timedelta(hours=8), "Asia/Shanghai")
+        local = now.astimezone(beijing_timezone)
+        monday = (local + timedelta(days=7 - local.weekday())).date()
+        return iso_timestamp(datetime.combine(monday, datetime.min.time(), tzinfo=beijing_timezone))
 
     @staticmethod
     def _daily_effect_expiry(now: datetime) -> str:

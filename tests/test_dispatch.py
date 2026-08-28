@@ -634,10 +634,23 @@ async def test_schema_36_migrates_to_dispatch_without_changing_existing_tables(t
     current = {
         row["name"]: row["sql"] for row in await db.fetch_all("SELECT name,sql FROM sqlite_master WHERE type='table'")
     }
-    assert all(
-        current[name].replace(", display_tags_json TEXT NOT NULL DEFAULT '[]'", "") == value
-        for name, value in old_schema.items()
-    )
+    for name, value in old_schema.items():
+        actual = current[name].replace(", display_tags_json TEXT NOT NULL DEFAULT '[]'", "")
+        if name in {"pig_instances", "food_instances"}:
+            # Schema42 only replaces historical code uniqueness with live-code
+            # uniqueness; every column, CHECK and foreign key must still match.
+            expected = value.replace(
+                "short_code TEXT NOT NULL COLLATE NOCASE UNIQUE", "short_code TEXT NOT NULL COLLATE NOCASE"
+            )
+            assert "".join(actual.split()) == "".join(expected.split()), name
+            index_name = f"idx_{name.split('_')[0]}_active_short_code"
+            index = await db.fetch_one("SELECT sql FROM sqlite_master WHERE type='index' AND name=?", (index_name,))
+            assert index is not None
+            assert "CREATE UNIQUE INDEX" in index[0]
+            assert "short_code COLLATE NOCASE" in index[0]
+            assert "state IN ('active', 'locked-for-trade')" in index[0]
+        else:
+            assert actual == value, name
     for table, rows in original_rows.items():
         assert [
             tuple(row) for row in await db.fetch_all(f"SELECT {original_columns[table]} FROM {table} ORDER BY rowid")

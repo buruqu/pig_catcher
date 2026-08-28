@@ -184,7 +184,7 @@ async def test_schema40_to41_adds_only_empty_display_metadata_and_keeps_rows(tmp
         migrated = PigCatcherDatabase(path)
         await migrated.open()
         try:
-            assert await migrated.schema_version() == SCHEMA_VERSION == 41
+            assert await migrated.schema_version() == SCHEMA_VERSION == 44
             for table, rows in original.items():
                 assert [
                     tuple(r) for r in await migrated.fetch_all(f'SELECT {columns[table]} FROM "{table}" ORDER BY rowid')

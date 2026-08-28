@@ -25,17 +25,18 @@
   </style>
 </head>
 <body>
+{% set is_item_bag = view.subtitle == '道具与奖励' %}
 <main class="game-sheet" data-achievement-frame="{{ view.achievement_frame }}" data-pig-catcher-root data-render-ready="true">
   <header class="game-header">
     <div class="game-header__copy"><p class="game-header__eyebrow">PiG Dream! · {{ view.subtitle }}</p><h1>{{ view.title }}</h1></div>
-    <div class="game-header__meta"><span>远行社成员</span><strong class="dispatch-header__player">{{ view.player_name }}</strong></div>
+    <div class="game-header__meta"><span>{{ '道具持有人' if is_item_bag else '远行社成员' }}</span><strong class="dispatch-header__player">{{ view.player_name }}</strong></div>
   </header>
   {% include 'achievement_strip.html' %}
   <div class="dispatch-body">
     {% if view.banner %}<div class="dispatch-banner">{{ view.banner }}</div>{% endif %}
     {% if view.stats %}<section class="dispatch-stats" style="--stat-columns:{{ [view.stats|length,3]|min }}">{% for stat in view.stats %}<div class="dispatch-stat"><span>{{ stat.label }}</span><strong>{{ stat.value }}</strong>{% if stat.note %}<small>{{ stat.note }}</small>{% endif %}</div>{% endfor %}</section>{% endif %}
     {% if view.pigs %}<section class="dispatch-pigs">{% for pig in view.pigs %}<article class="dispatch-pig">
-      <div class="dispatch-pig__media">{% if previews.get(pig.short_code) %}<img src="{{ previews[pig.short_code] }}" alt="{{ pig.name }}">{% else %}<span>同行伙伴</span>{% endif %}</div>
+      <div class="dispatch-pig__media">{% if previews.get(pig.short_code) %}<img src="{{ previews[pig.short_code] }}" alt="{{ pig.name }}">{% else %}<span>{{ '猪猪图片' if is_item_bag else '同行伙伴' }}</span>{% endif %}</div>
       <div class="dispatch-stars">{{ '★' * pig.rarity }}</div><h2>{{ pig.name }}</h2><div class="dispatch-code">#{{ pig.short_code }}{% if pig.favorite %} · 已收藏保护{% endif %}</div>
       <div class="dispatch-tags">{% for tag in pig.tags %}<span>{{ tag }}</span>{% endfor %}</div><p>{{ pig.summary }}</p>
     </article>{% endfor %}</section>{% endif %}
@@ -45,7 +46,7 @@
     </section>{% endfor %}
     {% if view.hints %}<aside class="dispatch-hints">{% for hint in view.hints %}<p>{{ hint }}</p>{% endfor %}</aside>{% endif %}
   </div>
-  <footer class="game-footer"><span>轻装出发 · 满载而归 · 猪猪不会被消耗</span><strong>{% if view.page_count > 1 %}{{ view.page }}/{{ view.page_count }}{% else %}猪猪远行社{% endif %}</strong></footer>
+  <footer class="game-footer"><span>{{ '按群独立 · 先确认后结算 · 不重复扣券' if is_item_bag else '轻装出发 · 满载而归 · 猪猪不会被消耗' }}</span><strong>{% if view.page_count > 1 %}{{ view.page }}/{{ view.page_count }}{% else %}{{ '道具与奖励' if is_item_bag else '猪猪远行社' }}{% endif %}</strong></footer>
 </main>
 </body>
 </html>

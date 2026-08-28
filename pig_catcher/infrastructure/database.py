@@ -210,6 +210,9 @@ class PigCatcherDatabase:
         from .migrations.v0039_battles import TABLES as BATTLE_TABLES
         from .migrations.v0040_activity_achievements import GUARDS as ACTIVITY_GUARDS
         from .migrations.v0040_activity_achievements import TABLES as ACTIVITY_TABLES
+        from .migrations.v0042_asset_code_lifecycle import GUARDS as ASSET_CODE_GUARDS
+        from .migrations.v0043_reward_coupon_bag import GUARDS as COUPON_GUARDS
+        from .migrations.v0043_reward_coupon_bag import TABLES as COUPON_TABLES
 
         required_tables = {
             "player_food_effects",
@@ -262,6 +265,7 @@ class PigCatcherDatabase:
         }
         required_tables.update(BATTLE_TABLES)
         required_tables.update(ACTIVITY_TABLES)
+        required_tables.update(COUPON_TABLES)
         table_rows = await (
             await connection.execute(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name IN ("
@@ -323,12 +327,34 @@ class PigCatcherDatabase:
         }
         required_guards.update(BATTLE_GUARDS)
         required_guards.update(ACTIVITY_GUARDS)
+        required_guards.update(ASSET_CODE_GUARDS)
+        required_guards.update(COUPON_GUARDS)
         guard_rows = await (
             await connection.execute("SELECT name FROM sqlite_master WHERE type IN ('trigger','index')")
         ).fetchall()
         missing_guards = required_guards - {str(row[0]) for row in guard_rows}
         if missing_guards:
             raise MigrationError("数据库缺少活动占用、保护或账本约束：" + "、".join(sorted(missing_guards)))
+
+        for table in ("pig_instances", "food_instances"):
+            indexes = await (await connection.execute(f"PRAGMA index_list({table})")).fetchall()
+            active_code_index = False
+            for index in indexes:
+                escaped = str(index[1]).replace('"', '""')
+                columns = await (await connection.execute(f'PRAGMA index_info("{escaped}")')).fetchall()
+                if tuple(str(column[2]) for column in columns) != ("short_code",) or not index[2]:
+                    continue
+                if not index[4]:
+                    raise MigrationError(f"{table}.short_code 仍是永久唯一，消耗后不能释放编号。")
+                definition = await (await connection.execute(
+                    "SELECT sql FROM sqlite_master WHERE type='index' AND name=?", (str(index[1]),)
+                )).fetchone()
+                normalized = "".join(str(definition[0]).lower().split()) if definition else ""
+                if "wherestatein('active','locked-for-trade')" not in normalized or "collatenocase" not in normalized:
+                    raise MigrationError(f"{table} 的活跃编号大小写或状态约束不正确。")
+                active_code_index = True
+            if not active_code_index:
+                raise MigrationError(f"{table} 缺少活跃编号唯一索引。")
 
         index_rows = await (await connection.execute("PRAGMA index_list(player_food_effects)")).fetchall()
         source_index_found = False

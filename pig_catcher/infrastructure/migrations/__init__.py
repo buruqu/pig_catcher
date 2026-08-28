@@ -42,6 +42,9 @@ from .v0038_tours import MIGRATION_0038
 from .v0039_battles import MIGRATION_0039
 from .v0040_activity_achievements import MIGRATION_0040
 from .v0041_pig_display_tags import MIGRATION_0041
+from .v0042_asset_code_lifecycle import MIGRATION_0042
+from .v0043_reward_coupon_bag import MIGRATION_0043
+from .v0044_round9_food_effects import MIGRATION_0044
 
 MIGRATIONS: tuple[Migration, ...] = (
     MIGRATION_0001,
@@ -85,6 +88,9 @@ MIGRATIONS: tuple[Migration, ...] = (
     MIGRATION_0039,
     MIGRATION_0040,
     MIGRATION_0041,
+    MIGRATION_0042,
+    MIGRATION_0043,
+    MIGRATION_0044,
 )
 
 __all__ = ["MIGRATIONS", "Migration"]

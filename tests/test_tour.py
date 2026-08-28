@@ -751,10 +751,25 @@ async def test_schema_37_migration_preserves_existing_assets_materials_and_econo
             r["name"]: r["sql"]
             for r in await migrated.fetch_all("SELECT name,sql FROM sqlite_master WHERE type='table'")
         }
-        assert all(
-            schema[name].replace(", display_tags_json TEXT NOT NULL DEFAULT '[]'", "") == sql
-            for name, sql in original_schema.items()
-        )
+        for name, sql in original_schema.items():
+            actual = schema[name].replace(", display_tags_json TEXT NOT NULL DEFAULT '[]'", "")
+            if name in {"pig_instances", "food_instances"}:
+                # Do not skip asset schema verification: only the reviewed
+                # Schema42 short-code UNIQUE change is allowed.
+                expected = sql.replace(
+                    "short_code TEXT NOT NULL COLLATE NOCASE UNIQUE", "short_code TEXT NOT NULL COLLATE NOCASE"
+                )
+                assert "".join(actual.split()) == "".join(expected.split()), name
+                index_name = f"idx_{name.split('_')[0]}_active_short_code"
+                index = await migrated.fetch_one(
+                    "SELECT sql FROM sqlite_master WHERE type='index' AND name=?", (index_name,)
+                )
+                assert index is not None
+                assert "CREATE UNIQUE INDEX" in index[0]
+                assert "short_code COLLATE NOCASE" in index[0]
+                assert "state IN ('active', 'locked-for-trade')" in index[0]
+            else:
+                assert actual == sql, name
         for table, rows in original.items():
             assert [
                 tuple(row)

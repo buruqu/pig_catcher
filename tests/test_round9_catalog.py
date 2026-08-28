@@ -262,14 +262,15 @@ def test_round9_names_rarities_and_paths_match_the_reviewed_drop(definitions: li
         assert str(entry["description"]).strip()
 
 
-def test_new_high_star_foods_do_not_inherit_unreviewed_effects(definitions: list[dict[str, Any]]) -> None:
+def test_new_high_star_foods_have_explicit_reviewed_effects(definitions: list[dict[str, Any]]) -> None:
+    from pig_catcher.domain.round9_food_rules import ROUND9_FOOD_EFFECTS
+
     high_star_foods = [entry for entry in definitions if entry["kind"] == "food" and entry["rarity"] in (4, 5)]
     new_foods = [entry for entry in high_star_foods if str(entry["source_path"]).startswith("第九期/")]
     assert len(new_foods) == 12
     assert Counter(entry["rarity"] for entry in new_foods) == {4: 7, 5: 5}
     for entry in new_foods:
-        assert not entry.get("effect_id"), entry["display_name"]
-        assert not entry.get("effect_params"), entry["display_name"]
+        assert (entry["effect_id"], entry["effect_params"]) == ROUND9_FOOD_EFFECTS[entry["template_id"]]
     # This exception is only for the newly supplied art, not a reset of old recipes.
     for entry in high_star_foods:
         if not str(entry["source_path"]).startswith("第九期/"):

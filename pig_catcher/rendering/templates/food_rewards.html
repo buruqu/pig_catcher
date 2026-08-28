@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><style>
+:root { --font-family: {{ font_family }}; } {{ theme_css | safe }}
+.rewards-body { padding: 26px 38px 32px; }
+.game-header__eyebrow { line-height: 1.5; overflow-wrap: anywhere; }
+.reward-banner { padding: 20px 24px; border: 1px solid #bce1d2; border-radius: 8px; background: #f4fff9; color: #286d5a; }
+.reward-banner p { margin: 0; font-size: 17px; line-height: 1.65; overflow-wrap: anywhere; }
+.reward-banner strong { display: block; font-size: 25px; margin-bottom: 8px; overflow-wrap: anywhere; }
+.reward-art { width: 100%; max-height: 360px; object-fit: contain; background: #f6fff9; border-radius: 8px; margin-bottom: 18px; }
+.reward-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 22px; }
+.reward-item { min-width: 0; min-height: 102px; border: 1px solid #ecd5e1; border-radius: 8px; display: flex; align-items: center; gap: 16px; padding: 14px; background: white; }
+.reward-item img,.reward-token { width: 76px; height: 76px; object-fit: contain; border-radius: 8px; flex-shrink: 0; }
+.reward-token { display: grid; place-items: center; background: #fff0f7; color: #d74d87; font-size: 24px; font-weight: 800; border: 1px solid #f1cade; }
+.reward-token--material { color: #3d7567; background: #eef9f4; border-color: #c3e4d6; }
+.reward-token--chest { color: #996f26; background: #fff9e9; border-color: #ecdcac; }
+.reward-token--ticket { color: #78558f; background: #f7f1fb; border-color: #dfd0e9; }
+.reward-copy { min-width: 0; }.reward-copy h3 { font-size: 19px; margin: 0 0 6px; line-height: 1.35; overflow-wrap: anywhere; }
+.reward-copy p { margin: 3px 0; color: #846474; font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; }
+.reward-copy .reward-code { color: #d64986; font-size: 14px; font-weight: 700; }
+.reward-copy .reward-kind { color: var(--rarity-color); font-size: 12px; font-weight: 700; letter-spacing: 0.5px; }
+.reward-copy .reward-balance { color: #3a7a68; }
+.reward-stats { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 22px; color: #755468; font-size: 15px; }
+.reward-stats span { background: #fff1f7; padding: 10px 16px; border-radius: 8px; }
+.reward-hint { margin: 22px 0 0; line-height: 1.6; font-size: 14px; color: #967887; }
+</style></head><body>
+<main class="game-sheet" data-pig-catcher-root data-render-ready="true">
+<header class="game-header"><div class="game-header__copy"><p class="game-header__eyebrow">{{ view.player_name }} · {{ view.food_name }}</p><h1>{{ view.title }}</h1></div><div class="game-header__meta"><span>奖励归属</span><strong style="font-size: 24px">本人领取</strong></div></header>
+<section class="rewards-body">
+{% if artwork %}<img class="reward-art" src="{{ artwork }}" alt="947奖励揭晓插画">{% endif %}
+<div class="reward-banner">{% if view.prize_label %}<strong>{{ view.prize_label }}</strong>{% endif %}<p>{{ view.summary }}</p></div>
+<div class="reward-grid">{% for item in view.items %}<article class="reward-item rarity-{{ item.rarity }}">
+{% if previews.get(item.key) and item.media_visible %}<img src="{{ previews[item.key] }}" alt="{{ item.name }}">{% else %}<div class="reward-token reward-token--{{ item.tone }}">{{ item.token_label }}</div>{% endif %}
+<div class="reward-copy"><p class="reward-kind">{% if item.rarity %}{{ '★' * item.rarity }} · {% endif %}{{ item.kind_label }}</p><h3>{{ item.name }}{% if item.quantity > 1 %} ×{{ item.quantity }}{% endif %}</h3>{% if item.short_code %}<p class="reward-code">#{{ item.short_code }}</p>{% endif %}<p>{{ item.detail }}</p>{% if item.balance_after is not none %}<p class="reward-balance">到账后库存 {{ '{:,}'.format(item.balance_after) }}</p>{% endif %}</div>
+</article>{% endfor %}</div>
+<div class="reward-stats"><span>当前猪币 {{ '{:,}'.format(view.coin_balance) }}</span><span>品鉴经验 +{{ view.experience }}</span>{% if view.coin_bonus %}<span>本次额外猪币 +{{ '{:,}'.format(view.coin_bonus) }}</span>{% endif %}</div>
+<p class="reward-hint">{{ view.hint }}</p>
+</section><footer class="game-footer"><span>奖励已结算 · 图片异常不会重复发放</span><strong>好胃口，好运气</strong></footer>
+</main></body></html>

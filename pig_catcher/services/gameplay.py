@@ -567,18 +567,19 @@ def pig_view_from_row(
         display_variant=display_variant,
         alternate_image_relpath=alternate_image_relpath,
         display_tags=(
-            display_tags_from_json(row.get("display_tags_json"))
-            if bool(row.get("media_visible", True))
-            else ()
+            display_tags_from_json(row.get("display_tags_json")) if bool(row.get("media_visible", True)) else ()
         ),
         is_favorite=bool(row.get("is_favorite") or False),
         activity_label={"dispatch": "派遣中", "tour": "巡演中", "battle": "对战中"}.get(
             str(row.get("busy_purpose") or ""),
             " / ".join(
-                label for label, active in (
-                    ("乐队保护", row.get("tour_protected")), ("战斗保护", row.get("battle_protected"))
-                ) if active
-            )
+                label
+                for label, active in (
+                    ("乐队保护", row.get("tour_protected")),
+                    ("战斗保护", row.get("battle_protected")),
+                )
+                if active
+            ),
         ),
     )
 
@@ -797,8 +798,7 @@ def format_pig_detail_summary(pig: PigView) -> str:
         f"官方价值：{pig.official_value} 猪币\n"
         f"群纪录：{'、'.join(records) if records else '无'}\n"
         f"获得时间：{pig.acquired_at}\n"
-        f"描述：{pig.description}"
-        + (f"\n标签：{' · '.join(pig.display_tags)}" if pig.display_tags else "")
+        f"描述：{pig.description}" + (f"\n标签：{' · '.join(pig.display_tags)}" if pig.display_tags else "")
     )
 
 
@@ -1138,8 +1138,13 @@ class GameplayService:
             )
             # 六星菜独占效果：回到未受等级、饲料、道具和普通菜影响的基础层。
             exclusive_effect_active = group_exclusive_effect_active or personal_exclusive_effect_active
+            deferred_achievement_tickets = bool(
+                exclusive_effect_active and (achievement_catch_tickets or achievement_visual_tickets)
+            )
             if exclusive_effect_active:
                 armed_item = None
+                achievement_catch_tickets = frozenset()
+                achievement_visual_tickets = frozenset()
             weights = self._available_weights(
                 buckets=buckets,
                 feed_level=0 if exclusive_effect_active else feed_level,
@@ -1169,8 +1174,22 @@ class GameplayService:
                 effect_application = apply_catch_effects(
                     weights,
                     applicable_active_effects,
+                    random_value=self.random_source.random,
+                    shuffle_base_weights=self.catching.weights(),
                 )
                 weights = effect_application.weights
+                if effect_application.shuffle_permutation:
+                    # 纯概率换位，不叠加任何成长；无六星授权时才转入五星。
+                    if not buckets[Rarity.SIX]:
+                        available_weights = list(weights)
+                        available_weights[4] += available_weights[5]
+                        available_weights[5] = 0.0
+                        weights = tuple(available_weights)
+                    weights = normalize_weights(
+                        tuple(
+                            weight if buckets[rarity] else 0.0 for rarity, weight in zip(Rarity, weights, strict=True)
+                        )
+                    )
                 effect_summaries = effect_application.summaries
                 excluded_summaries = effect_application.skipped_summaries
                 if personal_exclusive_effect_active:
@@ -1189,6 +1208,8 @@ class GameplayService:
                     weights = group_effect_application.weights
                     effect_summaries += group_effect_application.summaries
                     excluded_summaries += group_effect_application.skipped_summaries
+            if deferred_achievement_tickets:
+                excluded_summaries += ("已装备的临时成就券本次受六星独占规则影响，保留且不消耗。",)
             if deferred_duplication_effects and not exclusive_effect_active:
                 excluded_summaries += tuple(
                     resolve_food_effect(effect.effect_id, effect.params).summary
@@ -1395,17 +1416,19 @@ class GameplayService:
                         reserved=(short_code,),
                     )
                     effect_summaries += (
-                        "珍猪奶茶复制成功：额外获得一只完全相同的 "
+                        "美食复制成功：额外获得一只完全相同的 "
                         f"{template['display_name']}#{duplicated_short_code}；"
                         "复制品不重复发放抓猪奖励。",
                     )
                 else:
-                    effect_summaries += ("珍猪奶茶本次未触发复制。",)
+                    effect_summaries += ("美食加成本次未触发复制。",)
             auto_gift_target_player_id = ""
             random_snapshot = {
                 "ruleset_version": RULESET_VERSION,
                 "base_weights": list(self.catching.weights()),
                 "normalized_weights": [round(value, 8) for value in weights],
+                "shuffle_permutation": list(effect_application.shuffle_permutation),
+                "shuffle_rolls": list(effect_application.shuffle_rolls),
                 "feed_level": feed_level,
                 "player_level": probability_level,
                 "item_id": armed_item.item_id if armed_item is not None else "",
@@ -1609,6 +1632,8 @@ class GameplayService:
             if armed_item is not None and armed_item.item_id == "coin-bounty-tag":
                 coin_reward *= 2
                 experience_reward = (experience_reward * 3 + 1) // 2
+            coin_reward += effect_application.coin_bonus
+            experience_reward = math.ceil(experience_reward * effect_application.experience_multiplier)
             coin_balance, total_experience = await self.repository.apply_catch_rewards(
                 session,
                 player_id=identity.player_id,

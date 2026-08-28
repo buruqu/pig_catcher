@@ -92,14 +92,8 @@ def test_high_rarity_food_effects_cover_new_gameplay_families() -> None:
         "six_star_percent": 60,
         "uses": 5,
     }
-    assert foods["雾蓝键盘大福"]["effect_params"] == {
-        "uses": 5,
-        "four_star_percent": 61.5385,
-        "five_star_percent": 30.7692,
-        "six_star_percent": 7.6923,
-        "current_window_only": True,
-    }
-    assert foods["雾蓝键盘大福"]["effect_id"] == "next-high-star-catch"
+    assert foods["雾蓝键盘大福"]["effect_params"] == {"uses": 10}
+    assert foods["雾蓝键盘大福"]["effect_id"] == "shuffled-catch-distribution"
     assert foods["彩彩修车猪慕斯"]["effect_id"] == (
         "six-star-cook-failure-return"
     )
@@ -142,7 +136,10 @@ def test_high_rarity_food_effects_cover_new_gameplay_families() -> None:
         "source_label": "神龙化猪七星云海锅",
         "uses_per_player": 1,
     }
-    assert foods["撅撅猪派"]["effect_params"] == {"count": 1, "max_bonus": 5}
+    assert foods["撅撅猪派"]["effect_params"] == {
+        "count": 1, "max_bonus": 5, "overflow_weekly_bonus": 1,
+        "overflow_coin": 12222, "overflow_coupon": "asset-code-change",
+    }
     assert foods["向你道早猪猪巧克力螺"]["effect_params"] == {"count": 5}
     # 每道不同名菜的效果签名必须唯一（群专属双群复制品除外）
     signatures: dict[tuple[str, str], list[str]] = {}

@@ -48,6 +48,7 @@ from .pig_catcher.commands import (
 )
 from .pig_catcher.commands.battle import BATTLE_HELP, parse_battle_request
 from .pig_catcher.commands.dispatch import DISPATCH_HELP, parse_dispatch_request
+from .pig_catcher.commands.item_bag import ITEM_BAG_PATTERN, REWARD_COUPON_PATTERN, parse_item_bag_request
 from .pig_catcher.commands.tour import TOUR_HELP, parse_tour_request
 from .pig_catcher.config import AccessPolicy, PigCatcherConfig
 from .pig_catcher.domain.battle_views import BattleView
@@ -177,7 +178,8 @@ from .pig_catcher.services import (
     reward_label,
 )
 from .pig_catcher.services.battle import BattleService
-from .pig_catcher.services.dispatch import DispatchService
+from .pig_catcher.services.dispatch import DispatchResult, DispatchService
+from .pig_catcher.services.item_bag import ItemBagService
 from .pig_catcher.services.tour import TourService
 from .pig_catcher.version import PLUGIN_VERSION
 
@@ -217,6 +219,7 @@ class PigCatcherPlugin(MaiBotPlugin):
         self._achievement_service: AchievementService | None = None
         self._weekly_competition_service: WeeklyCompetitionService | None = None
         self._dispatch_service: DispatchService | None = None
+        self._item_bag_service: ItemBagService | None = None
         self._tour_service: TourService | None = None
         self._battle_service: BattleService | None = None
         self._renderer: PigCatcherRenderer | None = None
@@ -394,6 +397,7 @@ class PigCatcherPlugin(MaiBotPlugin):
             self._asset_service = asset_service
             self._framework_service = FrameworkService(database)
             self._dispatch_service = DispatchService(database)
+            self._item_bag_service = ItemBagService(database)
             self._tour_service = TourService(database)
             self._gameplay_service = GameplayService(
                 database,
@@ -491,6 +495,7 @@ class PigCatcherPlugin(MaiBotPlugin):
         self._achievement_service = None
         self._weekly_competition_service = None
         self._dispatch_service = None
+        self._item_bag_service = None
         self._tour_service = None
         self._battle_service = None
         self._receipt_service = None
@@ -3178,6 +3183,19 @@ class PigCatcherPlugin(MaiBotPlugin):
         result: EatResult,
     ) -> tuple[bool, str, int]:
         renderer = cast(PigCatcherRenderer, self._renderer)
+        if result.reward_payload:
+            from .pig_catcher.rendering.food_rewards import food_reward_view
+
+            result = await cast(EconomyService, self._economy_service).visible_eat_result(identity, result)
+            view = food_reward_view(result)
+            data_dir = Path(self.ctx.paths.data_dir).resolve()
+            paths = {item.key: media_path(data_dir, item.image_relpath) for item in view.items if item.image_relpath}
+            return await self._deliver_receipt(
+                stream_id=identity.stream_id,
+                receipt=result.receipt,
+                render=lambda: renderer.render_food_rewards(view, paths),
+                fallback_text=format_eat_summary(result),
+            )
         if is_group_event_food(result):
             event_view = group_event_eat_view(
                 result,
@@ -3988,7 +4006,7 @@ class PigCatcherPlugin(MaiBotPlugin):
         identity, rejected = await self._prepare_command(
             stream_id,
             kwargs,
-            feature_enabled=self.settings.features.achievements_enabled,
+            feature_enabled=True,
             feature_label="使用成就券",
         )
         if rejected is not None or identity is None:
@@ -3999,7 +4017,9 @@ class PigCatcherPlugin(MaiBotPlugin):
 
             if any(item["kind"] == "ticket" and name in {key, item["name"]} for key, item in ACTIVITY_REWARDS.items()):
                 return await self._activity_reward_command(identity, "使用 " + name)
-            ticket_id = await cast(AchievementService, self._achievement_service).activate_ticket(identity, name)
+            ticket_id = await cast(AchievementService, self._achievement_service).activate_ticket(
+                identity, name, track_achievements=self.settings.features.achievements_enabled
+            )
             return await self._reply_text(
                 identity.stream_id,
                 f"已激活{name}（{ticket_id}），将在下一次符合条件的操作中结算。",
@@ -4014,9 +4034,9 @@ class PigCatcherPlugin(MaiBotPlugin):
 
     @Command(
         "pig_catcher_achievement_reforge",
-        description="使用编号重铸券修改一件资产的短编号",
+        description="使用编号修改券或旧编号重铸券修改一件资产的短编号",
         pattern=(
-            r"^/重铸编号\s+(?P<kind>猪猪|猪|美食|菜)\s+"
+            rf"^{_COMMAND_LEADING_MENTION_PATTERN}/重铸编号\s+(?P<kind>猪猪|猪|美食|菜)\s+"
             r"(?P<old_code>[A-Za-z0-9]{4,16})\s+"
             r"(?P<new_code>[A-Za-z0-9]{4,16})\s*$"
         ),
@@ -4025,23 +4045,22 @@ class PigCatcherPlugin(MaiBotPlugin):
         identity, rejected = await self._prepare_command(
             stream_id,
             kwargs,
-            feature_enabled=self.settings.features.achievements_enabled,
+            feature_enabled=True,
             feature_label="重铸编号",
         )
         if rejected is not None or identity is None:
             return rejected or (False, "", 0)
         try:
-            new_code = await cast(AchievementService, self._achievement_service).reforge_identifier(
+            service = self._item_bag_service
+            if service is None:
+                raise RuntimeError("道具与奖励服务尚未就绪。")
+            result = await service.reforge_identifier(
                 identity,
                 asset_kind=matched_group(kwargs, "kind"),
                 old_code=matched_group(kwargs, "old_code"),
                 new_code=matched_group(kwargs, "new_code"),
             )
-            return await self._reply_text(
-                identity.stream_id,
-                f"编号重铸完成，新编号为 #{new_code}。",
-                success=True,
-            )
+            return await self._deliver_item_bag_result(identity, result)
         except Exception as exc:
             return await self._command_error(
                 stream_id=identity.stream_id,
@@ -4238,7 +4257,7 @@ class PigCatcherPlugin(MaiBotPlugin):
     )
     async def handle_activity_rewards(self, stream_id: str = "", **kwargs: Any) -> tuple[bool, str, int]:
         identity, rejected = await self._prepare_command(
-            stream_id, kwargs, feature_enabled=self.settings.features.achievements_enabled, feature_label="成就奖励"
+            stream_id, kwargs, feature_enabled=True, feature_label="成就奖励"
         )
         if rejected is not None or identity is None:
             return rejected or (False, "", 0)
@@ -4246,6 +4265,60 @@ class PigCatcherPlugin(MaiBotPlugin):
             return await self._activity_reward_command(identity, matched_group(kwargs, "arguments"))
         except Exception as exc:
             return await self._command_error(stream_id=identity.stream_id, operation="成就奖励", error=exc)
+
+    @Command(
+        "pig_catcher_item_bag",
+        description="分页查看商城道具、已装备和排队份数以及奖励券库存",
+        pattern="^" + _COMMAND_LEADING_MENTION_PATTERN + ITEM_BAG_PATTERN[1:],
+    )
+    async def handle_item_bag(self, stream_id: str = "", **kwargs: Any) -> tuple[bool, str, int]:
+        return await self._item_bag_command(stream_id, kwargs, "bag")
+
+    @Command(
+        "pig_catcher_reward_coupon",
+        description="使用编号修改券、选择猪猪自选券并确认兑换",
+        pattern="^" + _COMMAND_LEADING_MENTION_PATTERN + REWARD_COUPON_PATTERN[1:],
+    )
+    async def handle_reward_coupon(self, stream_id: str = "", **kwargs: Any) -> tuple[bool, str, int]:
+        return await self._item_bag_command(stream_id, kwargs, "coupon")
+
+    async def _item_bag_command(self, stream_id: str, kwargs: dict[str, Any], section: str) -> tuple[bool, str, int]:
+        label = "道具背包" if section == "bag" else "使用奖励券"
+        identity, rejected = await self._prepare_command(stream_id, kwargs, feature_enabled=True, feature_label=label)
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            service = self._item_bag_service
+            if service is None:
+                raise RuntimeError("道具与奖励服务尚未就绪。")
+            request = parse_item_bag_request(matched_group(kwargs, "arguments"), section=section)
+            result = await service.execute(identity, request)
+            return await self._deliver_item_bag_result(identity, result)
+        except Exception as exc:
+            return await self._command_error(stream_id=identity.stream_id, operation=label, error=exc)
+
+    async def _deliver_item_bag_result(
+        self, identity: CommandIdentity, result: DispatchResult
+    ) -> tuple[bool, str, int]:
+        renderer = self._renderer
+        if renderer is None:
+            raise RuntimeError("道具与奖励图片服务尚未就绪。")
+        data_dir = Path(self.ctx.paths.data_dir).resolve()
+        paths = {
+            pig.short_code: media_path(data_dir, pig.image_relpath) for pig in result.view.pigs if pig.image_relpath
+        }
+
+        async def render() -> RenderedImage:
+            return await renderer.render_dispatch(await self._activity_view_cosmetics(identity, result.view), paths)
+
+        if result.receipt is not None:
+            return await self._deliver_receipt(
+                stream_id=identity.stream_id,
+                receipt=result.receipt,
+                render=render,
+                fallback_text=result.receipt.text_summary,
+            )
+        return await self._deliver_query(stream_id=identity.stream_id, render=render, fallback_text=result.view.text())
 
     async def _activity_reward_command(self, identity: CommandIdentity, text: str) -> tuple[bool, str, int]:
         from pig_catcher.services.achievement_rewards import AchievementRewardService

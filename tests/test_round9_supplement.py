@@ -134,7 +134,10 @@ def _entry(entries, name, scope=None):
     return candidates[0]
 
 
-def test_supplement_counts_and_all_pending_food_effects(definitions):
+def test_supplement_counts_and_reviewed_high_star_food_effects(definitions):
+    from pig_catcher.domain.round9_food_rules import reviewed_food_revisions
+
+    revisions = reviewed_food_revisions()
     assert len(definitions) == 328
     assert Counter(row["kind"] for row in definitions) == {"pig": 223, "food": 105}
     new_names = {PurePosixPath(path).stem for path in EXPECTED_SOURCES}
@@ -145,8 +148,7 @@ def test_supplement_counts_and_all_pending_food_effects(definitions):
         assert len(matching) == (4 if rarity == 6 else len(names))
         for row in matching:
             assert row["rarity"] == rarity
-            assert row.get("effect_id", "") == ""
-            assert row.get("effect_params", {}) == {}
+            assert (row["effect_id"], row["effect_params"]) == revisions[row["template_id"]]
 
 
 def test_new_private_pair_keeps_synchronized_content_but_four_isolated_paths(definitions, manifest):
@@ -210,7 +212,12 @@ def test_every_added_source_matches_reviewed_bytes_and_kind(source_path, definit
                 assert 0 < row[low] < row[high] <= cap
                 assert (released[low], released[high]) == (row[low], row[high])
         else:
-            assert not row.get("effect_id") and not row.get("effect_params")
+            if row["rarity"] < 4:
+                assert not row.get("effect_id") and not row.get("effect_params")
+            else:
+                from pig_catcher.domain.round9_food_rules import reviewed_food_revisions
+
+                assert (row["effect_id"], row["effect_params"]) == reviewed_food_revisions()[row["template_id"]]
     assert len(media_paths) == len(reviewed)
 
 
@@ -408,20 +415,20 @@ async def test_new_six_star_pair_cooks_only_same_scope_food_and_remains_safe_to_
             db,
             CookingSection(cook_cooldown_seconds=0),
             EconomySection(),
-            random_source=SequenceRandom(0.999, 0.999, 0.5),
+            random_source=SequenceRandom(0.999, 0.999, 0.5, 0.5, 0.0, 0.5),
             clock=clock,
         )
         cooked = await service.cook(identity, SIX_PIG)
         assert len(cooked.foods) == 1 and cooked.foods[0].template_id == food["template_id"]
-        assert cooked.foods[0].rarity == 6 and cooked.foods[0].effect_id == ""
+        assert cooked.foods[0].rarity == 6 and cooked.foods[0].effect_id == "yilu-food-lottery"
         assert (await db.fetch_one("SELECT state FROM pig_instances WHERE pig_instance_id=?", (pig_id,)))[
             0
         ] == "consumed-for-cooking"
         eaten = await service.eat(replace(identity, message_id="eat-pair"), cooked.foods[0].selector)
         assert eaten.base_experience == EAT_EXPERIENCE_REWARDS[Rarity.SIX]
-        assert eaten.effect.queued_effect_id == ""
+        assert eaten.effect.queued_effect_id == "yilu-food-lottery"
         assert (await db.fetch_one("SELECT COUNT(*) FROM player_food_effects"))[0] == 0
-        assert (await db.fetch_one("SELECT COUNT(*) FROM food_instances WHERE state='active'"))[0] == 0
+        assert (await db.fetch_one("SELECT COUNT(*) FROM food_instances WHERE state='active'"))[0] == 1
         replay = await service.cook(identity, SIX_PIG)
         assert not replay.receipt_created and replay.foods[0].food_instance_id == cooked.foods[0].food_instance_id
     finally:
@@ -472,7 +479,7 @@ def test_asset_validation_rejects_new_six_star_cross_scope_pair(scope, manifest)
 
 
 @pytest.mark.parametrize("rarity,name", [(rarity, name) for rarity, names in HIGH_STAR_FOODS.items() for name in names])
-async def test_each_round9_high_star_food_has_only_basic_tasting_until_effect_review(tmp_path, rarity, name, manifest):
+async def test_explicit_empty_food_snapshot_does_not_inherit_live_template_rule(tmp_path, rarity, name, manifest):
     entry = _entry(manifest, name, SCOPES[0] if rarity == 6 else None)
     entries = [entry]
     if rarity == 6:

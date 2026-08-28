@@ -3904,7 +3904,10 @@
       "effect_id": "permanent-window-catch",
       "effect_params": {
         "count": 1,
-        "max_bonus": 5
+        "max_bonus": 5,
+        "overflow_weekly_bonus": 1,
+        "overflow_coin": 12222,
+        "overflow_coupon": "asset-code-change"
       },
       "paired_food_template_id": "",
       "collection": null
@@ -3991,7 +3994,10 @@
       "effect_id": "permanent-window-catch",
       "effect_params": {
         "count": 1,
-        "max_bonus": 5
+        "max_bonus": 5,
+        "overflow_weekly_bonus": 1,
+        "overflow_coin": 12222,
+        "overflow_coupon": "asset-code-change"
       },
       "paired_food_template_id": "",
       "collection": null
@@ -4861,13 +4867,9 @@
         "键盘",
         "大福"
       ],
-      "effect_id": "next-high-star-catch",
+      "effect_id": "shuffled-catch-distribution",
       "effect_params": {
-        "uses": 5,
-        "four_star_percent": 61.5385,
-        "five_star_percent": 30.7692,
-        "six_star_percent": 7.6923,
-        "current_window_only": true
+        "uses": 10
       },
       "paired_food_template_id": "",
       "collection": null
@@ -4987,13 +4989,9 @@
         "键盘",
         "大福"
       ],
-      "effect_id": "next-high-star-catch",
+      "effect_id": "shuffled-catch-distribution",
       "effect_params": {
-        "uses": 5,
-        "four_star_percent": 61.5385,
-        "five_star_percent": 30.7692,
-        "six_star_percent": 7.6923,
-        "current_window_only": true
+        "uses": 10
       },
       "paired_food_template_id": "",
       "collection": null
@@ -6508,7 +6506,10 @@
       "effect_id": "permanent-window-catch",
       "effect_params": {
         "count": 1,
-        "max_bonus": 5
+        "max_bonus": 5,
+        "overflow_weekly_bonus": 1,
+        "overflow_coin": 12222,
+        "overflow_coupon": "asset-code-change"
       },
       "paired_food_template_id": "",
       "collection": null
@@ -6593,13 +6594,9 @@
         "键盘",
         "大福"
       ],
-      "effect_id": "next-high-star-catch",
+      "effect_id": "shuffled-catch-distribution",
       "effect_params": {
-        "uses": 5,
-        "four_star_percent": 61.5385,
-        "five_star_percent": 30.7692,
-        "six_star_percent": 7.6923,
-        "current_window_only": true
+        "uses": 10
       },
       "paired_food_template_id": "",
       "collection": null
@@ -6951,7 +6948,10 @@
       "effect_id": "permanent-window-catch",
       "effect_params": {
         "count": 1,
-        "max_bonus": 5
+        "max_bonus": 5,
+        "overflow_weekly_bonus": 1,
+        "overflow_coin": 12222,
+        "overflow_coupon": "asset-code-change"
       },
       "paired_food_template_id": "",
       "collection": null
@@ -7036,13 +7036,9 @@
         "键盘",
         "大福"
       ],
-      "effect_id": "next-high-star-catch",
+      "effect_id": "shuffled-catch-distribution",
       "effect_params": {
-        "uses": 5,
-        "four_star_percent": 61.5385,
-        "five_star_percent": 30.7692,
-        "six_star_percent": 7.6923,
-        "current_window_only": true
+        "uses": 10
       },
       "paired_food_template_id": "",
       "collection": null
@@ -7672,8 +7668,10 @@
       "effect_id": "permanent-six-star-progress",
       "effect_params": {
         "catch_bonus_per_stack": 0.2,
-        "cook_bonus_per_stack": 2.0,
-        "max_stacks": 5
+        "cook_bonus_per_stack": 2,
+        "max_stacks": 5,
+        "overflow_coin": 22222,
+        "overflow_coupon": "pig-choice"
       },
       "paired_food_template_id": "",
       "collection": null
@@ -7809,8 +7807,10 @@
       "effect_id": "permanent-six-star-progress",
       "effect_params": {
         "catch_bonus_per_stack": 0.2,
-        "cook_bonus_per_stack": 2.0,
-        "max_stacks": 5
+        "cook_bonus_per_stack": 2,
+        "max_stacks": 5,
+        "overflow_coin": 22222,
+        "overflow_coupon": "pig-choice"
       },
       "paired_food_template_id": "",
       "collection": null
@@ -7946,8 +7946,10 @@
       "effect_id": "permanent-six-star-progress",
       "effect_params": {
         "catch_bonus_per_stack": 0.2,
-        "cook_bonus_per_stack": 2.0,
-        "max_stacks": 5
+        "cook_bonus_per_stack": 2,
+        "max_stacks": 5,
+        "overflow_coin": 22222,
+        "overflow_coupon": "pig-choice"
       },
       "paired_food_template_id": "",
       "collection": null
@@ -8083,8 +8085,10 @@
       "effect_id": "permanent-six-star-progress",
       "effect_params": {
         "catch_bonus_per_stack": 0.2,
-        "cook_bonus_per_stack": 2.0,
-        "max_stacks": 5
+        "cook_bonus_per_stack": 2,
+        "max_stacks": 5,
+        "overflow_coin": 22222,
+        "overflow_coupon": "pig-choice"
       },
       "paired_food_template_id": "",
       "collection": null
@@ -9924,8 +9928,12 @@
         "丰腴",
         "炙烤"
       ],
-      "effect_id": "",
-      "effect_params": {},
+      "effect_id": "catch-reward-bonus",
+      "effect_params": {
+        "uses": 3,
+        "coin_bonus": 20,
+        "experience_multiplier": 1.5
+      },
       "paired_food_template_id": "",
       "collection": null
     },
@@ -9947,8 +9955,11 @@
         "香甜",
         "奶香"
       ],
-      "effect_id": "",
-      "effect_params": {},
+      "effect_id": "next-cook-quality",
+      "effect_params": {
+        "shift_percent": 10,
+        "uses": 2
+      },
       "paired_food_template_id": "",
       "collection": null
     },
@@ -9970,8 +9981,12 @@
         "香甜",
         "奶香"
       ],
-      "effect_id": "",
-      "effect_params": {},
+      "effect_id": "next-pig-stature",
+      "effect_params": {
+        "mode": "mini",
+        "strength": 0.35,
+        "uses": 2
+      },
       "paired_food_template_id": "",
       "collection": null
     },
@@ -9993,8 +10008,10 @@
         "丰腴",
         "醇香"
       ],
-      "effect_id": "",
-      "effect_params": {},
+      "effect_id": "food-supply-pack",
+      "effect_params": {
+        "pack_id": "sausage-pig"
+      },
       "paired_food_template_id": "",
       "collection": null
     },
@@ -10016,8 +10033,11 @@
         "香甜",
         "醇香"
       ],
-      "effect_id": "",
-      "effect_params": {},
+      "effect_id": "next-cook-quality",
+      "effect_params": {
+        "shift_percent": 25,
+        "uses": 3
+      },
       "paired_food_template_id": "",
       "collection": null
     },
@@ -10039,8 +10059,10 @@
         "香甜",
         "醇香"
       ],
-      "effect_id": "",
-      "effect_params": {},
+      "effect_id": "food-supply-pack",
+      "effect_params": {
+        "pack_id": "pig-chocolate"
+      },
       "paired_food_template_id": "",
       "collection": null
     },
@@ -10062,8 +10084,11 @@
         "鲜香",
         "家常"
       ],
-      "effect_id": "",
-      "effect_params": {},
+      "effect_id": "cook-serving-bonus",
+      "effect_params": {
+        "uses": 3,
+        "multiplier": 1.6
+      },
       "paired_food_template_id": "",
       "collection": null
     },
@@ -10085,8 +10110,11 @@
         "香甜",
         "奶香"
       ],
-      "effect_id": "",
-      "effect_params": {},
+      "effect_id": "catch-duplication-chance",
+      "effect_params": {
+        "chance_percent": 90,
+        "uses": 3
+      },
       "paired_food_template_id": "",
       "collection": null
     },
@@ -10506,8 +10534,10 @@
         "丰腴",
         "家常"
       ],
-      "effect_id": "",
-      "effect_params": {},
+      "effect_id": "food-supply-pack",
+      "effect_params": {
+        "pack_id": "pig-burger-meal"
+      },
       "paired_food_template_id": "",
       "collection": null
     },
@@ -10529,8 +10559,10 @@
         "清甜",
         "冷饮"
       ],
-      "effect_id": "",
-      "effect_params": {},
+      "effect_id": "food-supply-pack",
+      "effect_params": {
+        "pack_id": "pig-cola"
+      },
       "paired_food_template_id": "",
       "collection": null
     },
@@ -10552,8 +10584,12 @@
         "丰腴",
         "炙烤"
       ],
-      "effect_id": "",
-      "effect_params": {},
+      "effect_id": "next-pig-stature",
+      "effect_params": {
+        "mode": "giant",
+        "strength": 0.28,
+        "uses": 3
+      },
       "paired_food_template_id": "",
       "collection": null
     },
@@ -10575,8 +10611,10 @@
         "酥香",
         "炙烤"
       ],
-      "effect_id": "",
-      "effect_params": {},
+      "effect_id": "food-supply-pack",
+      "effect_params": {
+        "pack_id": "pig-fries"
+      },
       "paired_food_template_id": "",
       "collection": null
     },
@@ -10865,7 +10903,7 @@
         "群友定制",
         "酥香"
       ],
-      "effect_id": "",
+      "effect_id": "yilu-food-lottery",
       "effect_params": {},
       "paired_food_template_id": "",
       "collection": null
@@ -10923,7 +10961,7 @@
         "群友定制",
         "酥香"
       ],
-      "effect_id": "",
+      "effect_id": "yilu-food-lottery",
       "effect_params": {},
       "paired_food_template_id": "",
       "collection": null
@@ -10981,7 +11019,7 @@
         "群友定制",
         "酥香"
       ],
-      "effect_id": "",
+      "effect_id": "yilu-food-lottery",
       "effect_params": {},
       "paired_food_template_id": "",
       "collection": null
@@ -11039,7 +11077,7 @@
         "群友定制",
         "酥香"
       ],
-      "effect_id": "",
+      "effect_id": "yilu-food-lottery",
       "effect_params": {},
       "paired_food_template_id": "",
       "collection": null

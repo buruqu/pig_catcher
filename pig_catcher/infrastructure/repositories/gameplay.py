@@ -8,6 +8,7 @@ from collections.abc import Mapping, Sequence
 from ...domain.enums import RecordType
 from ...domain.models import AssetSelector
 from ..database import DatabaseSession
+from .asset_codes import AssetCodeRepository
 from .batch_safety import (
     highest_collaboration_pig_ids_per_template,
     highest_instance_ids_per_template,
@@ -177,20 +178,9 @@ class GameplayRepository:
         return dict(row) if row is not None else None
 
     async def short_code_exists(self, session: DatabaseSession, short_code: str) -> bool:
-        row = await session.fetch_one(
-            """
-            SELECT 1
-            FROM pig_instances
-            WHERE short_code COLLATE NOCASE = ?
-            UNION ALL
-            SELECT 1
-            FROM food_instances
-            WHERE short_code COLLATE NOCASE = ?
-            LIMIT 1
-            """,
-            (short_code, short_code),
-        )
-        return row is not None
+        """只检查仍持有的猪猪/美食；处置后的 UUID 历史不继续占用短编号。"""
+
+        return await AssetCodeRepository.code_is_occupied(session, short_code)
 
     async def insert_pig_instance(
         self,

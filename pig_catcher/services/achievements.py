@@ -100,6 +100,8 @@ _REWARD_NAMES: Mapping[str, str] = {
     "mini-rescale": "迷你复秤券",
     "recook": "回锅重做券",
     "identifier-reforge": "编号重铸券",
+    "asset-code-change": "编号修改券",
+    "pig-choice": "猪猪自选券",
     "achievement-firework": "成就礼花券",
     "achievement-choice": "成就自选宝箱",
     "regular-five-star-memorial": "常规成就毕业纪念猪礼盒",
@@ -1308,16 +1310,21 @@ class AchievementService:
             )
         return rewards
 
-    async def activate_ticket(self, identity: CommandIdentity, ticket_name: str) -> str:
+    async def activate_ticket(
+        self, identity: CommandIdentity, ticket_name: str, *, track_achievements: bool = True
+    ) -> str:
         normalized = str(ticket_name or "").strip()
         ticket = _TICKET_NAMES.get(normalized)
         if ticket is None:
             raise DomainValidationError("可使用的成就券：" + "、".join(_TICKET_NAMES))
         ticket_id, action_type = ticket
-        await self._ensure_identity_profile(identity)
+        if track_achievements:
+            await self._ensure_identity_profile(identity)
         now = _now_text(self.clock)
         operation_key = f"achievement-ticket:{identity.player_id}:{identity.message_id or 'no-message'}"
         async with self.database.transaction() as session:
+            if not track_achievements:
+                await self.framework_repository.touch_identity(session, identity=identity, now=now)
             existing = await self.repository.operation_result(session, operation_key=operation_key)
             if existing is not None:
                 return str(json.loads(existing).get("ticket_id") or ticket_id)

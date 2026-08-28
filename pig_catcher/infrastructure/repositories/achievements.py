@@ -10,7 +10,10 @@ from __future__ import annotations
 import json
 from collections.abc import Sequence
 
+from ...domain.enums import AssetKind
+from ...domain.errors import AssetStateConflictError, DomainValidationError
 from ..database import DatabaseSession
+from .asset_codes import AssetCodeRepository
 
 
 class AchievementRepository:
@@ -989,35 +992,38 @@ class AchievementRepository:
         new_code: str,
         now: str,
     ) -> str | None:
-        conflict = await session.fetch_one(
-            """
-            SELECT 1 FROM pig_instances WHERE short_code COLLATE NOCASE=?
-            UNION ALL
-            SELECT 1 FROM food_instances WHERE short_code COLLATE NOCASE=?
-            LIMIT 1
-            """,
-            (new_code, new_code),
-        )
-        if conflict is not None:
+        """旧成就券和新编号券共享活跃占用、活动保护及 UUID 选择规则。"""
+
+        if asset_kind not in {"pig", "food"}:
             return None
         table = "pig_instances" if asset_kind == "pig" else "food_instances"
         id_column = "pig_instance_id" if asset_kind == "pig" else "food_instance_id"
-        cursor = await session.execute(
-            f"""
-            UPDATE {table}
-            SET short_code=?, updated_at=?
-            WHERE owner_player_id=? AND short_code COLLATE NOCASE=?
-              AND state='active' AND locked_trade_id IS NULL
-            """,
-            (new_code, now, player_id, old_code),
-        )
-        if cursor.rowcount != 1:
-            return None
         row = await session.fetch_one(
-            f"SELECT {id_column} AS instance_id FROM {table} WHERE owner_player_id=? AND short_code=?",
-            (player_id, new_code),
+            f"""
+            SELECT instance.{id_column} AS instance_id, instance.scope_id
+            FROM {table} AS instance
+            JOIN players AS player ON player.player_id = instance.owner_player_id
+                                   AND player.scope_id = instance.scope_id
+            WHERE instance.owner_player_id = ? AND instance.short_code COLLATE NOCASE = ?
+              AND instance.state = 'active' AND instance.locked_trade_id IS NULL
+            """,
+            (player_id, old_code),
         )
-        return str(row["instance_id"]) if row is not None else None
+        if row is None:
+            return None
+        try:
+            result = await AssetCodeRepository().rename_owned_asset(
+                session,
+                asset_kind=AssetKind(asset_kind),
+                asset_instance_id=str(row["instance_id"]),
+                owner_player_id=player_id,
+                scope_id=str(row["scope_id"]),
+                new_short_code=new_code,
+                now=now,
+            )
+        except (AssetStateConflictError, DomainValidationError):
+            return None
+        return result["asset_instance_id"]
 
 
 def _json_array(values: Sequence[str]) -> str:
