@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PiG Dream! 2.0 · 美术确认样张</title>
+  <style>
+    :root{--rose:#bf5279;--ink:#342c39;--muted:#766d7b;--line:#ebdce4;--paper:#fff;--pink:#fff3f8;--gold:#987126;--mint:#408575;--violet:#7650a3;--blue:#437fa1}
+    *{box-sizing:border-box}body{margin:0;background:#eee8ed;color:var(--ink);font-family:"Microsoft YaHei","Noto Sans CJK SC",sans-serif;letter-spacing:0}button,a{font:inherit}a{color:var(--rose)}
+    .review-nav{max-width:1128px;margin:36px auto;padding:30px;background:#fff;border-top:5px solid var(--rose)}.review-nav h1{margin:0 0 14px;font-size:32px}.review-nav p{line-height:1.8}.nav-links{display:flex;gap:22px;flex-wrap:wrap}
+    .sheet{width:1128px;margin:42px auto;background:var(--paper);position:relative;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+    .sheet:before{content:"";display:block;height:7px;background:linear-gradient(90deg,#e9a9bc 0 36%,#b4bfdd 36% 62%,#d4bb80 62% 76%,#d1e4d8 76%)}
+    .head{padding:30px 42px 26px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:24px;background:#fff8fb}
+    .eyebrow{font-size:18px;color:var(--rose);font-weight:700;margin:0 0 10px}.head h2{font-size:48px;line-height:1.25;margin:0}.head-meta{text-align:right;flex-shrink:0}.head-meta strong{display:block;font-size:33px;color:var(--gold)}.head-meta span{display:block;margin-bottom:7px;color:var(--muted);font-size:18px}
+    .identity{padding:16px 42px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line)}.identity b{font-size:24px}.identity small{font-size:17px;color:var(--muted);display:block;margin-top:6px}
+    .wear{width:312px;height:94px;overflow:hidden;flex-shrink:0}.wear svg{width:312px;height:94px;display:block}.wear-note{font-size:13px;color:var(--muted);text-align:right}
+    .hero{display:grid;grid-template-columns:470px 1fr;gap:32px;padding:30px 42px 24px}.asset{height:450px;display:flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:6px;background:#fff}.asset img{width:100%;height:100%;object-fit:contain}.facts{display:grid;grid-template-columns:1fr 1fr;border-left:1px solid var(--line);border-top:1px solid var(--line);margin-top:20px}.fact{padding:20px 17px;min-height:122px;border-right:1px solid var(--line);border-bottom:1px solid var(--line)}.fact span{font-size:17px;color:var(--muted);display:block}.fact strong{display:block;margin-top:8px;font-size:32px;font-variant-numeric:tabular-nums}.fact .small-value{font-size:25px}
+    .tagline{display:flex;gap:8px;flex-wrap:wrap}.tag{padding:6px 10px;font-size:16px;color:var(--rose);background:var(--pink);border:1px solid #eed2de;border-radius:4px}.tag.blue{color:var(--blue);background:#f0f8fc;border-color:#d2e5ee}.tag.mint{color:var(--mint);background:#f1faf6;border-color:#d4e9dd}.tag.gold{color:var(--gold);background:#fffaf0;border-color:#efdfbc}.desc{margin:22px 0 12px;font-size:22px;line-height:1.65}.subtle{font-size:17px;color:var(--muted);line-height:1.6}
+    .section{margin:0 42px 26px;padding-top:22px;border-top:1px solid var(--line)}.section h3{margin:0;font-size:24px}.section-head{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:18px}.section-head small{font-size:17px;color:var(--rose)}
+    .probabilities{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}.prob{padding:12px 12px 14px;background:#fbf9fc;border-bottom:4px solid var(--tier);border-radius:4px;min-width:0}.prob span{display:block;color:var(--tier);font-size:18px;font-weight:700}.prob b{display:block;font-size:30px;margin-top:7px;font-variant-numeric:tabular-nums}.probability-note{margin:13px 0 0;color:var(--muted);font-size:18px;line-height:1.6}
+    .effects{display:grid;gap:10px}.effect{display:flex;justify-content:space-between;gap:16px;padding:15px 18px;background:#fff9fc;border-left:4px solid #c67ca0;font-size:20px;line-height:1.55}.effect strong{font-size:21px;white-space:nowrap;color:var(--rose)}.effect p{margin:0}.effect small{font-size:17px;color:var(--muted)}
+    .summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));background:#fcf4f8;border:1px solid var(--line);margin:0 42px 26px}.summary div{padding:17px 20px;border-right:1px solid var(--line)}.summary div:last-child{border:0}.summary span{display:block;font-size:17px;color:var(--muted)}.summary b{display:block;margin-top:6px;font-size:27px}.summary small{display:block;color:var(--muted);font-size:16px;margin-top:6px}
+    .footer{padding:20px 42px;display:flex;justify-content:space-between;gap:24px;color:var(--muted);font-size:16px;border-top:1px solid var(--line);background:#fffafe}.footer b{color:var(--rose)}
+    .concept{width:100%;display:block;background:white}.concept-note{padding:22px 42px;font-size:20px;line-height:1.7}.concept-note b{color:var(--rose)}
+    .route{padding:28px 42px;background:#f5faf7;border-bottom:1px solid #dcebe0;display:flex;justify-content:space-between;align-items:center}.route h3{font-size:36px;margin:0 0 8px}.route p{font-size:19px;margin:0;color:var(--muted)}.stamp{width:125px;height:125px;border:3px double #589d89;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-direction:column;transform:rotate(-10deg);color:#3c8a76;font-weight:700;outline:1px solid #589d89;outline-offset:-10px}.stamp strong{font-size:34px}.stamp span{font-size:17px}
+    .team{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;padding:28px 42px}.member img{display:block;width:100%;height:235px;object-fit:contain;border-bottom:1px solid var(--line)}.member h4{font-size:25px;margin:12px 0 8px}.member p{font-size:18px;color:var(--muted);margin:0;line-height:1.6}.materials{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.material{padding:18px 18px 20px;background:#f4faf6;border:1px solid #dcebe0;border-radius:6px}.material b{font-size:20px}.material strong{display:block;font-size:40px;color:var(--mint);margin-top:8px}.material span{font-size:17px;color:var(--muted)}
+    .stage-top{padding:32px 42px 24px;background:linear-gradient(130deg,#fff2f6,#f3f4ff);border-bottom:1px solid var(--line)}.stage-top h3{font-size:42px;margin:6px 0 8px}.stage-top p{margin:0;font-size:21px;color:var(--muted)}.lineup{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;padding:26px 42px}.lineup img{display:block;width:100%;height:184px;object-fit:contain}.lineup b{display:block;font-size:21px;margin:12px 0 7px}.lineup small{font-size:16px;color:var(--muted);line-height:1.5}.tour-stations{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}.station{border:1px solid var(--line);padding:20px;background:#fffbfd}.station span{font-size:18px;color:var(--muted)}.station b{display:block;font-size:26px;margin:10px 0}.station strong{font-size:38px;color:var(--rose)}.note-box{padding:18px 22px;border-left:4px solid var(--rose);background:#fff7fa;font-size:21px;line-height:1.6}
+    .versus{display:grid;grid-template-columns:1fr 80px 1fr;align-items:center;padding:26px 42px 16px;gap:22px}.fighter{border:1px solid #d4e5ef;background:#f6fbfe;padding:18px;text-align:center;border-radius:6px}.fighter.red{border-color:#eddbdc;background:#fff7f7}.fighter img{width:100%;height:325px;object-fit:contain}.fighter h3{font-size:29px;margin:12px 0}.fighter p{font-size:19px;color:var(--muted);margin:8px 0}.vs{font:italic 900 43px Georgia,serif;color:var(--rose);text-align:center}.weight-row{display:flex;justify-content:space-between;align-items:baseline}.weight-row span{font-size:22px}.weight-row b{font-size:54px;font-variant-numeric:tabular-nums}.weight-bar{display:flex;margin:12px 0;height:22px;overflow:hidden;border-radius:4px}.weight-bar .left{width:58%;background:#79b6d1}.weight-bar .right{width:42%;background:#d390a1}.weight-legend{display:flex;justify-content:space-between;font-size:22px;color:var(--muted)}.move{display:grid;grid-template-columns:1fr 1fr;gap:20px}.move div{border:1px solid var(--line);padding:19px}.move b{font-size:23px}.move p{font-size:20px;line-height:1.6;margin-bottom:0}
+    @media print{body{background:white}.review-nav{display:none}.sheet{break-after:page;margin:0}}
+  </style>
+</head>
+<body>
+<nav class="review-nav"><h1>PiG Dream! 2.0 · 美术样张确认</h1><p>这是独立设计预览，不是插件运行画面。所有昵称、编号、成绩、库存及结算均为演示数据；不代表正式数值已修改。这里只确认视觉方向、信息层级和佩戴位置。</p><div class="nav-links"><a href="#plates">称号与活动牌</a><a href="#catch">抓猪与效果余次</a><a href="#cook">做菜与长效果</a><a href="#dispatch">派遣归航</a><a href="#tour">自由混团巡演</a><a href="#battle">对战</a></div></nav>
+
+{% macro footer(label) %}<footer class="footer"><span>设计样张 · 演示数据 · 未上线 · {{ label }}</span><b>PiG Dream! 2.0</b></footer>{% endmacro %}
+{% macro heading(kicker,title,status,value) %}<header class="head"><div><p class="eyebrow">{{ kicker }}</p><h2>{{ title }}</h2></div><div class="head-meta"><span>{{ status }}</span><strong>{{ value }}</strong></div></header>{% endmacro %}
+{% macro wear(kind) %}<div><div class="wear"><svg viewBox="{{ crops[kind] }}" role="img" aria-label="{{ kind }}称号佩戴概念"><image href="{{ concept_src }}" width="1456" height="1088"/></svg></div><div class="wear-note">称号佩戴位置示意 · 正式版将单独制作</div></div>{% endmacro %}
+{% macro probability(values,note) %}<div class="probabilities">{% for value in values %}<div class="prob" style="--tier:{{ tiers[loop.index0] }}"><span>{{ loop.index }}★</span><b>{{ value }}%</b></div>{% endfor %}</div><p class="probability-note">{{ note }}</p>{% endmacro %}
+
+<section class="sheet" id="plates" data-sample="01-plates">
+{{ heading('ART DIRECTION · 第一批风格确认','把称号做成值得收藏的活动牌','只确认风格','待确认') }}
+<img class="concept" src="{{ concept_src }}" alt="四款成就称号与第一期四档周榜牌原创风格样张">
+<div class="concept-note"><b>称号有自己的主题；日常界面保持清爽。</b><br>上四张为已解锁称号方向，下四张为第1期「抓猪冲刺！！！」的1／2／3／10牌。4–10名共享10牌。后续每期单独设计主题，不只替换期数。AI生成图只作概念参考，正式中文、期数、名次与动态数据由模板绘制。</div>
+{{ footer('原画方向稿，不是最终拆分资产') }}
+</section>
+
+<section class="sheet" id="catch" data-sample="02-catch">
+{{ heading('捕获记录 · 成功结果示意','地球猪','传说珍馐猪','★★★★★') }}
+<div class="identity"><div><b>样张玩家 · Lv.31</b><small>称号、品质与主题标签各有固定位置</small></div>{{ wear('雨爱') }}</div>
+<div class="hero"><div class="asset"><img src="{{ assets['地球猪'] }}" alt="地球猪原图"></div><div><div class="tagline"><span class="tag">#DEMO947</span><span class="tag gold">巨物目击</span><span class="tag mint">NEW</span></div><div class="facts"><div class="fact"><span>体长 · 超巨物</span><strong>29.5 m</strong></div><div class="fact"><span>体重 · 吨级</span><strong>78.45 t</strong></div><div class="fact"><span>体态</span><strong>均衡</strong></div><div class="fact"><span>官方价值 · 演示</span><strong class="small-value">2,067 猪币</strong></div></div><p class="desc">小小猪鼻，装着整个世界。吨级体重用新单位展示，价值仍按同品种内的个体属性计算。</p><div class="tagline"><span class="tag blue">星体</span><span class="tag blue">行星</span><span class="tag blue">超巨物</span></div></div></div>
+<div class="section"><div class="section-head"><h3>本次最终概率</h3><small>雾蓝键盘大福 · 本次已使用</small></div>{{ probability(['1','4','8','17','30','40'],'本抽示例：基础六档概率随机换位；下一抽会重新换位。没有叠加任何其他概率加成。') }}</div>
+<div class="section"><div class="effects"><div class="effect"><div><p>雾蓝专属次数</p><small>不消耗本时段普通抓猪额度</small></div><strong>剩余 7 / 10</strong></div><div class="effect"><div><p>未参与：等级、饲料、普通道具与其他美食</p><small>未参与的临时道具、菜品和券保留，未扣次数</small></div></div></div></div>
+<div class="summary"><div><span>本次奖励 · 示意</span><b>+80 猪币</b></div><div><span>普通额度 · 未扣除</span><b>5 / 5</b></div><div><span>专属额度</span><b>7 次可用</b></div></div>
+{{ footer('概率先于长效果，余次独立展示') }}
+</section>
+
+<section class="sheet" id="cook" data-sample="03-cook">
+{{ heading('厨房出餐单 · 成功结果示意','糖醋排骨','漂亮定制菜','★★★★★★') }}
+<div class="identity"><div><b>样张主厨</b><small>称号不占概率区，也不覆盖食物插画</small></div>{{ wear('全场安可') }}</div>
+<div class="hero"><div class="asset"><img src="{{ assets['糖醋排骨'] }}" alt="当前群授权糖醋排骨原图"></div><div><div class="tagline"><span class="tag">#FOOD947</span><span class="tag gold">六星专属菜</span></div><div class="facts"><div class="fact"><span>出餐份量</span><strong>65.37 kg</strong></div><div class="fact"><span>原料肥瘦</span><strong>偏瘦</strong></div><div class="fact"><span>官方价值 · 演示</span><strong class="small-value">23,564 猪币</strong></div><div class="fact"><span>新增图鉴</span><strong>1 道</strong></div></div><p class="desc">完整原图、配对原料与成品信息留在上方；本次结算概率独立成区。</p></div></div>
+<div class="section"><div class="section-head"><h3>本次最终概率</h3><small>普通六星原料做菜 · 示例分布</small></div>{{ probability(['0','0','0','0','80','20'],'六星原料基础10%，超级主厨香料增加10个百分点；其他临时来源未参与此示例。') }}</div>
+<div class="section"><div class="section-head"><h3>本次已消耗 / 剩余次数</h3><small>以提交成功后的快照为准</small></div><div class="effect"><p>超级主厨香料 · 已使用1份</p><strong>队列余 2 份</strong></div></div>
+<div class="section"><div class="section-head"><h3>成品效果</h3><small>吃菜后生效 · 本次仅做出菜品</small></div><div class="note-box">食用后获得1次「/重置额度」机会。<br>实际执行重置后，本群已登记玩家获得1007猪币和10次专属抓猪额度，并在对应有效期内享受已确认的全群加成。<br>资格取得、技能发动、实际结算分别提示，不能把尚未领取的奖励画成已到账。</div><p class="subtle">这里只演示长效果排版，不展开隐藏彩蛋。正式结果按当前菜品完整公开文案自然增高，不裁切概率与页脚。</p></div>
+{{ footer('长效果在概率后自然延展') }}
+</section>
+
+<section class="sheet" id="dispatch" data-sample="04-dispatch">
+{{ heading('远行手账 · 归航结果示意','猪猪们把远方带回来了','五地邮戳','归航') }}
+<div class="route"><div><h3>回声矿洞 · 12小时</h3><p>一队三只 · 完成旅程 · 奖励明细为排版演示</p></div><div class="stamp"><span>PiG POST</span><strong>归航</strong><span>回声矿洞</span></div></div>
+<div class="team">{% for name,role in [('口琴猪','音乐与旅途'),('上流猪','体面归来'),('土木猪','矿洞探索')] %}<div class="member"><img src="{{ assets[name] }}" alt="{{ name }}原图"><h4>{{ name }}</h4><p>{{ role }}<br>本趟占用已解除 · 示意</p></div>{% endfor %}</div>
+<div class="section"><div class="section-head"><h3>这一趟的收获</h3><small>先看实际材料，再看故事与纪念品</small></div><div class="materials"><div class="material"><b>训练矿石</b><strong>+48</strong><span>到账后 126 份</span></div><div class="material"><b>机关零件</b><strong>+18</strong><span>到账后 55 份</span></div><div class="material"><b>旅行补给</b><strong>+8</strong><span>到账后 42 份</span></div></div><p class="subtle">此处数量仅测试信息层级，不作为派遣产量提案。材料不可直接售出换币；猪猪原图保持不变。</p></div>
+<div class="section"><div class="section-head"><h3>旅途纪念</h3><small>专属邮戳与游记插页将在全量阶段制作</small></div><div class="identity" style="padding:0;border:0"><p class="desc">归航不是一张普通“成功”票据，<br>而是一封来自小队的信。</p>{{ wear('远行家') }}</div></div>
+{{ footer('路线色、邮戳、材料三层，不堆奖励卡') }}
+</section>
+
+<section class="sheet" id="tour" data-sample="05-tour">
+{{ heading('PiG Dream! LIVE · 混团海报示意','由你定义这支乐队','三站完成','ALL S') }}
+<div class="stage-top"><p>自组乐队 · 名称为演示</p><h3>今晚，猪圈不打烊！</h3><p>跨原乐队组队也能拥有独立海报，不套用某个官方队标</p></div>
+<div class="lineup">{% for name,role in [('阿拉蕾猪','主唱'),('偶像猪','主唱 / 高光'),('器材猪','鼓手'),('巴巴猪','鼓手 / 节奏'),('saki猪','键盘')] %}<div><img src="{{ assets[name] }}" alt="{{ name }}原图"><b>{{ name }}</b><small>{{ role }}<br>既有角色猪素材</small></div>{% endfor %}</div>
+<div class="section"><div class="section-head"><h3>三站演出记录</h3><small>得分为排版示例 · 不是稀有度排名</small></div><div class="tour-stations"><div class="station"><span>第一站</span><b>开场舞台</b><strong>S · 81.2</strong></div><div class="station"><span>第二站</span><b>城市夜场</b><strong>S · 83.9</strong></div><div class="station"><span>第三站</span><b>安可终场</b><strong>S · 86.1</strong></div></div></div>
+<div class="section"><div class="section-head"><h3>这次高光</h3><small>五项评分、角色位置与训练进度各自展示</small></div><div class="note-box">舞台主题可以华丽，结算区域保持白底。<br>队员素材完整保留；原乐队身份、组队自由与巡演评分不混为一项。</div></div>
+{{ footer('暂未制作五城背景与全部角色徽记') }}
+</section>
+
+<section class="sheet" id="battle" data-sample="06-battle">
+{{ heading('比划比划 · 回合结算示意','第3回合 · 双方出招完成','战斗权重整场累积','VS') }}
+<div class="versus"><div class="fighter"><img src="{{ assets['五条猪'] }}" alt="五条猪原图"><h3>五条猪 · 强化 +3</h3><p>样张甲 · 正常 · 核心 ×1</p><span class="tag blue">下回合欠招 0</span></div><div class="vs">VS</div><div class="fighter red"><img src="{{ assets['宿傩猪'] }}" alt="宿傩猪原图"><h3>宿傩猪 · 强化 +2</h3><p>样张乙 · 重伤 · 核心 ×0</p><span class="tag">下回合欠招 2</span></div></div>
+<div class="section"><div class="section-head"><h3>累计胜利权重</h3><small>不是血量，不在回合结束时清零</small></div><div class="weight-row"><b>58</b><span>本回合抽胜者的依据</span><b>42</b></div><div class="weight-bar"><span class="left"></span><span class="right"></span></div><div class="weight-legend"><b>本回合胜率 58%</b><b>本回合胜率 42%</b></div></div>
+<div class="section"><div class="section-head"><h3>状态区独立呈现</h3><small>招式加分、抽中权重、伤势风险不能混淆</small></div><div class="move"><div><b>强化只提高数值招式加分</b><p>功能招式不会因为升级多抽几次；伤势和核心的加减单独列出。</p></div><div><b>贷款欠招保留到下回合</b><p>下一回合少2招；实际招数最低为0，不生成负数操作。</p></div></div></div>
+<div class="section"><div class="note-box">下一步：按当前累计权重抽取本回合胜者，败方进入伤势盘。<br>正式版的转盘演出只回放已结算结果，不二次抽奖。</div></div>
+{{ footer('正式转盘动画与技能特效在全量制作阶段接入') }}
+</section>
+</body></html>

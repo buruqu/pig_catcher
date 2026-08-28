@@ -1,0 +1,16 @@
+Use case: stylized-concept.
+Asset type: one preview-only game UI art-direction sheet, not a finished runtime asset.
+Create a beautiful high-resolution landscape 4:3 concept sheet for the existing Chinese pig-collection game "PiG Dream!" 2.0. The sheet contains EXACTLY eight exquisite horizontal collectible title plates, arranged as two columns by four rows, consistent width, generous clean gaps. This is one coherent sheet, not separate output files. Main board white and very pale blush; crisp dark charcoal typography; bright, premium Japanese band/rhythm-game event reward aesthetic. Original artwork and original pig / music / travel emblems; do NOT copy any official BanG Dream logo, character, screenshot or existing event plate. No unrelated human or anime portraits.
+Each plate should feel hand-designed and collectible, with layered enamel / foil edging, restrained tiny decorative highlights, fine illustrated ornaments, clearly readable central title, and a thematic left emblem; NOT just a rectangle with text, NOT a generic medal. Keep ornaments away from center title. White/ivory negative space, navy or deep rose readable titles, detailed borders with strong silhouettes. Avoid excessive gold/baroque fantasy, full-page gradients, neon, clutter.
+Top board title exactly: "PiG Dream!"; subtitle exactly: "2.0 美术样张". Footer exactly: "设计稿 · 待确认".
+Eight plates:
+Row1 left: exact large title "雨爱". Poetic pearl-white, rain-blue and restrained violet; illustrated small umbrella, luminous raindrops and intersecting fine ribbons; elegant secret-achievement title. Tiny label "成就称号".
+Row1 right: exact large title "远行家". Mint, cream and brass; small paper map, compass, folded ticket and pawprint stamp; warm expedition memories. Tiny label "成就称号".
+Row2 left: exact large title "全场安可". Rose, lilac and champagne; small stage microphone, flowing musical staff, five tiny stage-light points; exciting concert souvenir. Tiny label "成就称号".
+Row2 right: exact large title "我还能再领悟". Ice blue and amethyst; delicate concentric rings and a small pig-nose sigil, refined battle notebook accent, legible long title. Tiny label "成就称号".
+Rows3 and4 are four distinct tiers of the SAME first weekly event. Exact event title on ALL FOUR plates: "抓猪冲刺！！！" (three fullwidth exclamation marks). Exact small season line: "第1期". Same pig-sprint track and finish-line theme, visible small pig emblem, fine motion ribbon. Each tier has distinct silhouette and crest, not color-only changes:
+Row3 left: label "1位", championship layered crystal-gold crown, full double laurel, pink speed ribbon.
+Row3 right: label "2位", silver-cyan winged star with fine ivory laurel.
+Row4 left: label "3位", rose-copper faceted shield and one elegant laurel.
+Row4 right: label "TOP10", pearl-pink sprint ticket with modest star corners.
+No probability numbers, no coins, no unlock requirements, no dummy user names, no blank placeholder boxes. Render Chinese names exactly as given with beautiful large readable typography. This is a visual approval board only.
