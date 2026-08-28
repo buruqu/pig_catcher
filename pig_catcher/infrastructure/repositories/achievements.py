@@ -15,6 +15,18 @@ from ...domain.errors import AssetStateConflictError, DomainValidationError
 from ..database import DatabaseSession
 from .asset_codes import AssetCodeRepository
 
+_BADGE_PROJECTION = """
+    (SELECT json_group_object(b.slot, b.badge_id)
+     FROM achievement_badge_slots b JOIN achievement_reward_inventory r
+       ON r.player_id=b.player_id AND r.reward_type='badge'
+      AND r.reward_id=b.badge_id AND r.quantity>0
+     WHERE b.player_id=ap.player_id) AS badge_slots_json,
+    CASE WHEN EXISTS(
+        SELECT 1 FROM achievement_reward_inventory r WHERE r.player_id=ap.player_id
+        AND r.reward_type='cosmetic' AND r.reward_id='badge-showcase-3' AND r.quantity>0
+    ) THEN 3 ELSE 1 END AS badge_capacity
+"""
+
 
 class AchievementRepository:
     async def sync_definition(
@@ -543,27 +555,26 @@ class AchievementRepository:
     async def sushi_instance_ids(self, session: DatabaseSession, *, player_id: str) -> set[str]:
         rows = await session.fetch_all(
             """
-            SELECT DISTINCT food.food_instance_id
-            FROM food_instances food
+            WITH acquired_food_ids AS (
+                SELECT food_instance_id
+                FROM food_instances
+                WHERE owner_player_id=?
+                UNION
+                SELECT generated.value AS food_instance_id
+                FROM command_receipts receipt,
+                     json_each(receipt.result_json, '$.food_instance_ids') generated
+                WHERE receipt.player_id=?
+                  AND receipt.result_type IN ('cooking', 'batch-cooking')
+                UNION
+                SELECT asset_instance_id AS food_instance_id
+                FROM asset_transfer_events
+                WHERE asset_kind='food' AND to_player_id=?
+            )
+            SELECT food.food_instance_id
+            FROM acquired_food_ids acquired
+            JOIN food_instances food ON food.food_instance_id=acquired.food_instance_id
             WHERE food.display_name_snapshot='猪寿司拼盘'
               AND COALESCE(json_extract(food.random_snapshot_json, '$.source'), '') <> 'admin-grant'
-              AND (
-                  food.owner_player_id=?
-                  OR EXISTS(
-                      SELECT 1
-                      FROM command_receipts receipt,
-                           json_each(receipt.result_json, '$.food_instance_ids') generated
-                      WHERE receipt.player_id=?
-                        AND receipt.result_type IN ('cooking', 'batch-cooking')
-                        AND generated.value=food.food_instance_id
-                  )
-                  OR EXISTS(
-                      SELECT 1 FROM asset_transfer_events transfer
-                      WHERE transfer.asset_kind='food'
-                        AND transfer.asset_instance_id=food.food_instance_id
-                        AND transfer.to_player_id=?
-                  )
-              )
             """,
             (player_id, player_id, player_id),
         )
@@ -639,10 +650,11 @@ class AchievementRepository:
 
     async def profile_row(self, session: DatabaseSession, *, player_id: str) -> dict[str, object] | None:
         row = await session.fetch_one(
-            """
+            f"""
             SELECT p.display_name, ap.achievement_points, ap.equipped_title_id,
                    ap.equipped_frame_id, ap.showcase_achievement_id,
-                   (SELECT COUNT(*) FROM achievement_unlocks u WHERE u.player_id=p.player_id) AS unlocked_count
+                   (SELECT COUNT(*) FROM achievement_unlocks u WHERE u.player_id=p.player_id) AS unlocked_count,
+                   {_BADGE_PROJECTION}
             FROM players p
             JOIN achievement_profiles ap ON ap.player_id=p.player_id
             WHERE p.player_id=?
@@ -659,8 +671,8 @@ class AchievementRepository:
             raise ValueError("外观批量查询最多50名玩家")
         placeholders = ",".join("?" for _ in player_ids)
         rows = await session.fetch_all(
-            f"SELECT player_id,equipped_title_id,equipped_frame_id,showcase_achievement_id "
-            f"FROM achievement_profiles WHERE player_id IN ({placeholders})",
+            f"SELECT ap.player_id,ap.equipped_title_id,ap.equipped_frame_id,ap.showcase_achievement_id, "
+            f"{_BADGE_PROJECTION} FROM achievement_profiles ap WHERE ap.player_id IN ({placeholders})",
             player_ids,
         )
         return {str(row["player_id"]): dict(row) for row in rows}
@@ -764,6 +776,15 @@ class AchievementRepository:
             )
             if owned is None:
                 return False
+        if showcase_achievement_id is not None:
+            badge_id = await self.resolve_owned_badge(
+                session, player_id=player_id, selector=showcase_achievement_id
+            ) if showcase_achievement_id else ""
+            if showcase_achievement_id and not badge_id:
+                return False
+            await self.update_badge_slot(
+                session, player_id=player_id, slot=1, badge_id=badge_id, now=now
+            )
         await session.execute(
             """
             UPDATE achievement_profiles
@@ -778,6 +799,7 @@ class AchievementRepository:
         return True
 
     async def clear_equipped_cosmetics(self, session: DatabaseSession, *, player_id: str, now: str) -> None:
+        await session.execute("DELETE FROM achievement_badge_slots WHERE player_id=?", (player_id,))
         await session.execute(
             """
             UPDATE achievement_profiles
@@ -787,6 +809,61 @@ class AchievementRepository:
             """,
             (now, player_id),
         )
+
+    async def resolve_owned_badge(self, session: DatabaseSession, *, player_id: str, selector: str) -> str:
+        """兼容早期成就ID和直接徽章ID；库存授权始终按当前玩家检查。"""
+        row = await session.fetch_one(
+            """
+            SELECT r.reward_id FROM achievement_reward_inventory r
+            WHERE r.player_id=? AND r.reward_type='badge' AND r.quantity>0
+              AND (r.reward_id=? OR r.reward_id IN (
+                  SELECT json_extract(reward.value, '$.id')
+                  FROM achievement_definition_snapshots d, json_each(d.rewards_json) reward
+                  WHERE d.achievement_id=? AND json_extract(reward.value, '$.type')='badge'
+              ))
+            ORDER BY CASE WHEN r.reward_id=? THEN 0 ELSE 1 END, r.reward_id LIMIT 1
+            """,
+            (player_id, selector, selector, selector),
+        )
+        return str(row[0]) if row is not None else ""
+
+    async def update_badge_slot(
+        self, session: DatabaseSession, *, player_id: str, slot: int, badge_id: str, now: str
+    ) -> None:
+        """原子更换一个展示位，不消耗徽章、不改其他槽或称号边框。"""
+        if slot not in (1, 2, 3):
+            raise DomainValidationError("徽章位置只能填写1、2或3。")
+        if slot > 1:
+            entitlement = await session.fetch_one(
+                "SELECT 1 FROM achievement_reward_inventory WHERE player_id=? AND reward_type='cosmetic' "
+                "AND reward_id='badge-showcase-3' AND quantity>0", (player_id,),
+            )
+            if entitlement is None:
+                raise DomainValidationError("当前只有1个徽章位；获得500成就点里程碑的三格徽章展示架后开放第2、3位。")
+        if badge_id:
+            owned = await self.resolve_owned_badge(session, player_id=player_id, selector=badge_id)
+            if owned != badge_id:
+                raise DomainValidationError("你在本群尚未获得这个徽章，请 /成就徽章 查看已拥有的徽章。")
+            existing = await session.fetch_one(
+                "SELECT slot FROM achievement_badge_slots WHERE player_id=? AND badge_id=? AND slot<>?",
+                (player_id, badge_id, slot),
+            )
+            if existing is not None:
+                raise DomainValidationError(f"这个徽章已在第{existing[0]}位，请先卸下再移动，不能重复佩戴。")
+            await session.execute(
+                "INSERT INTO achievement_badge_slots(player_id,slot,badge_id,updated_at) VALUES(?,?,?,?) "
+                "ON CONFLICT(player_id,slot) DO UPDATE SET badge_id=excluded.badge_id,updated_at=excluded.updated_at",
+                (player_id, slot, badge_id, now),
+            )
+        else:
+            await session.execute("DELETE FROM achievement_badge_slots WHERE player_id=? AND slot=?", (player_id, slot))
+        if slot == 1:
+            await session.execute(
+                "UPDATE achievement_profiles SET showcase_achievement_id=?,updated_at=? WHERE player_id=?",
+                (badge_id, now, player_id),
+            )
+        else:
+            await session.execute("UPDATE achievement_profiles SET updated_at=? WHERE player_id=?", (now, player_id))
 
     async def reward_rows(self, session: DatabaseSession, *, player_id: str) -> list[dict[str, object]]:
         rows = await session.fetch_all(

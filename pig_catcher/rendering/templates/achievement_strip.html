@@ -1,9 +1,9 @@
-{% from 'cosmetic_components.html' import cosmetic_plate, cosmetic_badge, cosmetic_frame %}
-{% if view.achievement_title|default('') or view.achievement_badge|default('') or view.achievement_frame|default('') %}
+{% from 'cosmetic_components.html' import cosmetic_plate, cosmetic_badges, cosmetic_frame %}
+{% if view.achievement_title|default('') or view.achievement_badge|default('') or view.achievement_badges|default(())|reject('equalto', '')|list or view.achievement_badge_capacity|default(1) == 3 or view.achievement_frame|default('') %}
 {{ cosmetic_frame(view.achievement_frame|default('')) }}
 <aside class="achievement-strip" aria-label="已佩戴外观">
   {{ cosmetic_plate(view.achievement_title|default('')) }}
-  {{ cosmetic_badge(view.achievement_badge|default('')) }}
+  {{ cosmetic_badges(view.achievement_badges|default(()), view.achievement_badge|default(''), view.achievement_badge_capacity|default(1)) }}
   {% if view.achievement_frame|default('') %}{% set frame = cosmetic_detail(view.achievement_frame, kind='frame') %}{% if frame.name %}<span class="achievement-strip__frame">{{ frame.name }}</span>{% endif %}{% endif %}
 </aside>
 {% endif %}

@@ -10,7 +10,7 @@
   </style>
 </head>
 <body>
-  {% from 'cosmetic_components.html' import cosmetic_plate, cosmetic_badge, cosmetic_frame %}
+  {% from 'cosmetic_components.html' import cosmetic_plate, cosmetic_badges, cosmetic_frame %}
   <main class="game-sheet pig-card rarity-{{ view.rarity }}{% if view.description|length > 160 %} pig-card--long{% endif %}{% if view.probability_line %} pig-card--probability{% endif %}{% if view.display_tags and view.media_visible %} pig-card--tagged{% endif %}" data-achievement-frame="{{ view.achievement_frame }}" data-pig-catcher-root data-render-ready="true">
     {{ cosmetic_frame(view.achievement_frame) }}
     {% if view.achievement_firework %}<div class="achievement-firework"><span>✦ ✧ ✦</span><span>PiG Dream!</span><span>✦ ✧ ✦</span></div>{% endif %}
@@ -48,7 +48,7 @@
         {% if view.global_weight_record %}<span class="pill pill--gold">全群重量最高</span>{% endif %}
         {% if view.giant_sighting %}<span class="pill pill--pink">巨物目击留档</span>{% endif %}
       </div>
-      {% if view.achievement_title or view.achievement_badge %}<div class="result-cosmetics">{{ cosmetic_plate(view.achievement_title) }}{{ cosmetic_badge(view.achievement_badge) }}</div>{% endif %}
+      {% if view.achievement_title or view.achievement_badge or view.achievement_badges|reject('equalto', '')|list or view.achievement_badge_capacity == 3 %}<div class="result-cosmetics">{{ cosmetic_plate(view.achievement_title) }}{{ cosmetic_badges(view.achievement_badges, view.achievement_badge, view.achievement_badge_capacity) }}</div>{% endif %}
       {% if view.display_tags and view.media_visible %}
       <div class="asset-display-tags" aria-label="猪猪主题标签">
         {% for tag in view.display_tags %}<span class="asset-display-tag">{{ tag }}</span>{% endfor %}

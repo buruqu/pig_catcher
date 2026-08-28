@@ -19,7 +19,7 @@
   <div class="ach-stat"><span>完成数量</span><strong>{{ view.unlocked_count }}/{{ view.total_count }}</strong></div>
   <div class="ach-stat"><span>完成率</span><strong>{{ '%.1f'|format(view.completion_percent) }}%</strong></div>
   <div class="ach-stat"><span>下一里程碑</span><strong>{{ view.next_milestone_text }}</strong></div>
-  <div class="ach-stat"><span>展示成就</span><strong style="font-size:18px">{{ view.showcase_text }}</strong></div>
+  <div class="ach-stat"><span>徽章展示架</span><strong style="font-size:18px">{{ view.showcase_text }}</strong></div>
 </div>
 <div class="ach-progress"><i style="width:{{ view.completion_percent }}%"></i></div>
 <div class="ach-section"><h2>最近解锁</h2><div class="ach-list">
@@ -28,7 +28,7 @@
   {% if item.cosmetics %}{% from 'cosmetic_components.html' import cosmetic_preview %}<div class="cosmetic-gallery">{% for art in item.cosmetics %}{{ cosmetic_preview(art) }}{% endfor %}</div>{% endif %}
 {% else %}<div class="empty-state">尚未解锁成就，完成一次抓猪就会开始记录。</div>{% endfor %}
 </div></div>
-<div class="ach-section"><h2>奖励库存</h2><p class="ach-prose">{{ view.reward_inventory_text }}</p><p class="ach-prose">/成就奖励 查看三系统材料与专用券，预览、确认后使用。</p></div>
+<div class="ach-section"><h2>奖励库存</h2><p class="ach-prose">{{ view.reward_inventory_text }}</p><p class="ach-prose">/成就奖励 查看三系统材料与专用券，预览、确认后使用。<br>/成就徽章 查看已拥有的徽章并管理展示位。</p></div>
 </section>
 <footer class="game-footer"><span>/猪猪成就 分类 页码 · /成就详情 名称</span><strong>三章同行 · 原创纪念</strong></footer>
 </main></body></html>

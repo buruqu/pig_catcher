@@ -8,6 +8,7 @@ import base64
 import importlib.util
 import json
 import logging
+import re
 import shutil
 import sqlite3
 import sys
@@ -55,18 +56,57 @@ def clone_formal_data(
 ) -> None:
     """Create a transactionally consistent DB clone plus an asset tree copy."""
 
-    target_data_dir.mkdir(parents=True, exist_ok=False)
-    source_database = source_data_dir / database_filename
-    target_database = target_data_dir / database_filename
-    with (
-        sqlite3.connect(source_database) as source,
-        sqlite3.connect(target_database) as target,
-    ):
-        source.backup(target)
+    source_data_dir = source_data_dir.resolve(strict=True)
+    target_data_dir = target_data_dir.resolve()
+    if Path(database_filename).name != database_filename or not database_filename:
+        raise ValueError("The database filename must be a single filename.")
+    if target_data_dir.is_relative_to(source_data_dir) or source_data_dir.is_relative_to(target_data_dir):
+        raise ValueError("A UAT clone must not overlap its source directory.")
+    source_database = (source_data_dir / database_filename).resolve(strict=True)
+    if source_database.parent != source_data_dir:
+        raise ValueError("The source database must remain within its data directory.")
     source_assets = source_data_dir / "assets"
     if not source_assets.is_dir():
         raise RuntimeError(f"Formal asset directory is missing: {source_assets}")
+    target_data_dir.mkdir(parents=True, exist_ok=False)
+    target_database = target_data_dir / database_filename
+    with (
+        sqlite3.connect(source_database.as_uri() + "?mode=ro", uri=True) as source,
+        sqlite3.connect(target_database) as target,
+    ):
+        source.execute("PRAGMA query_only = ON")
+        source.backup(target)
     shutil.copytree(source_assets, target_data_dir / "assets")
+
+
+def validate_components(plugin: Any) -> dict[str, int]:
+    """Check the current exported command contract, not a historical command count."""
+
+    components = plugin.get_components()
+    names = [item["name"] for item in components]
+    if len(names) != len(set(names)):
+        raise AssertionError("Exported component names must be unique.")
+    commands = [item for item in components if item["type"] == "COMMAND"]
+    handlers = set()
+    for item in commands:
+        metadata = item["metadata"]
+        handler = metadata["handler_name"]
+        if not callable(getattr(plugin, handler, None)):
+            raise AssertionError(f"Missing command handler: {handler}")
+        re.compile(metadata["command_pattern"])
+        handlers.add(handler)
+    required = {
+        "handle_catch", "handle_cook", "handle_inventory", "handle_food_inventory",
+        "handle_purchase", "handle_gift", "handle_trade_offer", "handle_ranking",
+        "handle_achievements", "handle_weekly_competition", "handle_dispatch",
+        "handle_tour", "handle_battle_challenge", "handle_item_bag", "handle_help",
+    }
+    if not required.issubset(handlers):
+        raise AssertionError(f"Missing feature routes: {sorted(required - handlers)}")
+    home_cards = sum(item["type"] == "HOME_CARD" for item in components)
+    if home_cards != 1 or len(components) != len(commands) + home_cards:
+        raise AssertionError("Expected explicit commands and exactly one operations home card.")
+    return {"commands": len(commands), "home_cards": home_cards, "total": len(components)}
 
 
 class FixedRandom:
@@ -275,19 +315,7 @@ async def load_plugin(
     )
     configure_plugin(plugin)
     await plugin.on_load()
-    components = plugin.get_components()
-    command_count = sum(
-        component["type"] == "COMMAND"
-        for component in components
-    )
-    home_card_count = sum(
-        component["type"] == "HOME_CARD"
-        for component in components
-    )
-    if len(components) != 56 or command_count != 55 or home_card_count != 1:
-        raise AssertionError(
-            "MaiBot component registration is not exactly 55 commands and 1 home card."
-        )
+    validate_components(plugin)
     return plugin
 
 

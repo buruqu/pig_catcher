@@ -10,7 +10,7 @@
   </style>
 </head>
 <body>
-  {% from 'cosmetic_components.html' import cosmetic_plate, cosmetic_badge, cosmetic_frame %}
+  {% from 'cosmetic_components.html' import cosmetic_plate, cosmetic_badges, cosmetic_frame %}
   {% set has_probability = view.coin_reward is not none and (view.probability_line or view.probability_summary) %}
   <main class="game-sheet pig-card food-card rarity-{{ view.rarity }}{% if view.description|length > 160 %} pig-card--long{% endif %}{% if has_probability %} pig-card--probability{% endif %}" data-achievement-frame="{{ view.achievement_frame }}" data-pig-catcher-root data-render-ready="true">
     {{ cosmetic_frame(view.achievement_frame) }}
@@ -43,7 +43,7 @@
         {% if view.catalog_new_count %}<span class="pill pill--mint">新图鉴 {{ view.catalog_new_count }}</span>{% endif %}
         {% if view.bonus_selector %}<span class="pill pill--gold">大份餐盒加餐</span>{% endif %}
       </div>
-      {% if view.achievement_title or view.achievement_badge %}<div class="result-cosmetics">{{ cosmetic_plate(view.achievement_title) }}{{ cosmetic_badge(view.achievement_badge) }}</div>{% endif %}
+      {% if view.achievement_title or view.achievement_badge or view.achievement_badges|reject('equalto', '')|list or view.achievement_badge_capacity == 3 %}<div class="result-cosmetics">{{ cosmetic_plate(view.achievement_title) }}{{ cosmetic_badges(view.achievement_badges, view.achievement_badge, view.achievement_badge_capacity) }}</div>{% endif %}
       <div class="pig-card__facts">
         <div class="pig-card__fact">
           <span>出餐份量</span>

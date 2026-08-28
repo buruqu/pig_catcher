@@ -46,6 +46,7 @@ from .v0042_asset_code_lifecycle import MIGRATION_0042
 from .v0043_reward_coupon_bag import MIGRATION_0043
 from .v0044_round9_food_effects import MIGRATION_0044
 from .v0045_economy_template_balance import MIGRATION_0045
+from .v0046_achievement_badge_showcase import MIGRATION_0046
 
 MIGRATIONS: tuple[Migration, ...] = (
     MIGRATION_0001,
@@ -93,6 +94,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     MIGRATION_0043,
     MIGRATION_0044,
     MIGRATION_0045,
+    MIGRATION_0046,
 )
 
 __all__ = ["MIGRATIONS", "Migration"]

@@ -168,6 +168,8 @@ class AchievementOverview:
     next_milestone: int | None
     rewards: tuple[tuple[str, str, int], ...]
     recent: tuple[AchievementEntry, ...]
+    badge_ids: tuple[str, ...] = ()
+    badge_capacity: int = 1
 
 
 @dataclass(frozen=True, slots=True)
@@ -218,6 +220,8 @@ class AchievementCosmetics:
     frame_id: str
     showcase_achievement_id: str
     badge_name: str = ""
+    badge_ids: tuple[str, ...] = ()
+    badge_capacity: int = 1
 
 
 class AchievementService:
@@ -626,6 +630,17 @@ class AchievementService:
             if row is not None:
                 pigs.append(row)
         context["pigs"] = pigs
+        if receipt.result_type == "pig" and payload.get("giant_sighting"):
+            # Use the committed per-axis qualification, not today's configurable
+            # thresholds or the receipt's OR-combined giant flag. Ownership may
+            # have changed since capture; the sighting retains its actual catcher.
+            sighting = await session.fetch_one(
+                "SELECT size_qualified, weight_qualified FROM giant_sightings "
+                "WHERE pig_instance_id = ? AND scope_id = ? AND player_id = ?",
+                (receipt.result_object_id, receipt.scope_id, receipt.player_id),
+            )
+            if sighting is not None:
+                context["giant_qualification"] = dict(sighting)
         food_ids: list[str] = []
         raw_food_ids = payload.get("food_instance_ids")
         if isinstance(raw_food_ids, list):
@@ -678,11 +693,17 @@ class AchievementService:
             flags["sugar_1004_burst"] = bool(payload.get("group_hidden_boost_triggered"))
             random_snapshot = _safe_mapping(str(pig.get("random_snapshot_json") or "{}"))
             flags["assam_auto_gift"] = bool(random_snapshot.get("auto_gift_target_player_id"))
-            if payload.get("giant_sighting"):
+            qualification = context.get("giant_qualification")
+            if isinstance(qualification, Mapping):
+                size_qualified = bool(qualification.get("size_qualified"))
+                weight_qualified = bool(qualification.get("weight_qualified"))
                 deltas["giant_sightings"] = 1
-                deltas["size_board_entries"] = 1
-                deltas["weight_board_entries"] = 1
-                deltas["dual_board_entries"] = 1
+                if size_qualified:
+                    deltas["size_board_entries"] = 1
+                if weight_qualified:
+                    deltas["weight_board_entries"] = 1
+                if size_qualified and weight_qualified:
+                    deltas["dual_board_entries"] = 1
             if payload.get("global_size_record"):
                 deltas["size_record_breaks"] = 1
             if payload.get("global_weight_record"):
@@ -1121,6 +1142,7 @@ class AchievementService:
         )
         points = int(profile["achievement_points"])
         next_milestone = next((value for value in _MILESTONE_REWARDS if value > points), None)
+        cosmetics = self._cosmetics_from_profile(profile)
         return AchievementOverview(
             str(profile["display_name"]),
             points,
@@ -1145,6 +1167,8 @@ class AchievementService:
             next_milestone,
             tuple((str(row["reward_type"]), str(row["reward_id"]), int(row["quantity"])) for row in rewards),
             recent,
+            cosmetics.badge_ids,
+            cosmetics.badge_capacity,
         )
 
     async def page(self, identity: CommandIdentity, *, category: str | None, page: int) -> AchievementPage:
@@ -1551,23 +1575,32 @@ class AchievementService:
 
     @staticmethod
     def _cosmetics_from_profile(profile: Mapping[str, object] | None) -> AchievementCosmetics:
+        legacy = str(profile["showcase_achievement_id"] if profile else "")
+        first_badge = next(
+            (
+                next((r.reward_id for r in d.rewards if r.reward_type == "badge"), "")
+                for d in ACHIEVEMENT_DEFINITIONS if d.achievement_id == legacy
+            ),
+            legacy,
+        )
+        # Stored projections include the slots and owned capacity. The fallback
+        # only keeps older in-memory fixtures/view callers compatible.
+        capacity = 3 if profile and profile.get("badge_capacity") == 3 else 1
+        slots = (
+            _safe_mapping(str(profile["badge_slots_json"]))
+            if profile and "badge_slots_json" in profile else {"1": first_badge}
+        )
+        badge_ids = tuple(str(slots.get(str(index), "")) for index in range(1, capacity + 1))
         return AchievementCosmetics(
             _REWARD_NAMES.get(
                 str(profile["equipped_title_id"] if profile else ""),
                 str(profile["equipped_title_id"] if profile else ""),
             ),
             str(profile["equipped_frame_id"] if profile else ""),
-            str(profile["showcase_achievement_id"] if profile else ""),
-            next(
-                (
-                    next(
-                        (_REWARD_NAMES.get(r.reward_id, r.reward_id) for r in d.rewards if r.reward_type == "badge"), ""
-                    )
-                    for d in ACHIEVEMENT_DEFINITIONS
-                    if profile and d.achievement_id == profile["showcase_achievement_id"]
-                ),
-                WEEKLY_REWARD_NAMES.get(str(profile["showcase_achievement_id"] if profile else ""), ""),
-            ),
+            legacy,
+            _REWARD_NAMES.get(badge_ids[0], badge_ids[0]),
+            badge_ids,
+            capacity,
         )
 
     async def ranking(self, identity: CommandIdentity, *, page: int) -> AchievementRanking:

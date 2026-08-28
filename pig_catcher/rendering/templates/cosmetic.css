@@ -15,3 +15,17 @@
 .achievement-keepsakes{display:flex;flex-wrap:wrap;align-items:center;gap:12px 22px;margin-top:10px;min-width:0}
 .achievement-strip .cosmetic-plate--compact{width:310px}
 .achievement-strip .cosmetic-badge img{width:48px;height:48px;flex-basis:48px}
+.cosmetic-badge-rack{width:100%;min-width:0;display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
+.cosmetic-badge-rack--3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.cosmetic-badge-slot{min-width:0;max-width:100%;display:flex;flex-direction:column;justify-content:center;gap:6px}
+.cosmetic-badge-rack--3 .cosmetic-badge-slot{padding:10px;background:#fff9fc;border:1px solid #eddae4;border-radius:10px}
+.cosmetic-badge-slot__label{display:block;font-size:13px;line-height:1.4;color:#927783}
+.cosmetic-badge-slot--empty{border-style:dashed!important}
+.cosmetic-badge-slot__empty{font-size:15px;line-height:1.5;color:#a88f9c;overflow-wrap:anywhere}
+.cosmetic-badge-slot .cosmetic-plate--compact{width:100%!important;margin:0!important}
+.cosmetic-badge-rack--3 .cosmetic-badge{flex-direction:column;align-items:center;text-align:center;gap:5px}
+.cosmetic-badge-rack--3 .cosmetic-badge>span{font-size:15px;line-height:1.45}
+.cosmetic-badge-rack--3 .cosmetic-badge img{width:54px;height:54px;flex-basis:54px}
+.result-cosmetics{width:100%;min-width:0}
+.achievement-strip>.cosmetic-badge-rack--3{flex-basis:100%}
+.title-inline .cosmetic-badge-rack--3{margin-top:7px}

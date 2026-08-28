@@ -266,6 +266,7 @@ class PigCatcherDatabase:
         required_tables.update(BATTLE_TABLES)
         required_tables.update(ACTIVITY_TABLES)
         required_tables.update(COUPON_TABLES)
+        required_tables.add("achievement_badge_slots")
         table_rows = await (
             await connection.execute(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name IN ("
@@ -329,6 +330,7 @@ class PigCatcherDatabase:
         required_guards.update(ACTIVITY_GUARDS)
         required_guards.update(ASSET_CODE_GUARDS)
         required_guards.update(COUPON_GUARDS)
+        required_guards.update({"achievement_badge_slot_insert_guard", "achievement_badge_slot_update_guard"})
         guard_rows = await (
             await connection.execute("SELECT name FROM sqlite_master WHERE type IN ('trigger','index')")
         ).fetchall()

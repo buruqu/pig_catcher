@@ -1,17 +1,17 @@
 <!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8"><style>:root{--font-family:{{ font_family }};}{{ theme_css|safe }}</style></head><body>
 {% from 'feature_components.html' import header, stats, panels, hints %}
-{% from 'cosmetic_components.html' import cosmetic_preview %}
+{% from 'cosmetic_components.html' import cosmetic_preview, cosmetic_badges %}
 <main class="game-sheet feature-cosmetics" data-achievement-frame="{{ view.achievement_frame }}" data-pig-catcher-root data-render-ready="true">
 {{ header('collection', 'PiG Dream! · 外观陈列室', view.title, view.player_name, '外观收藏家', 'crown') }}
 {% include 'achievement_strip.html' %}
 <div class="feature-body">
 {% if view.banner %}<div class="feature-banner">{{ view.banner }}</div>{% endif %}
 {{ stats(view.stats) }}
-{% if view.achievement_title or view.achievement_frame or view.achievement_badge %}<section class="feature-cosmetic-showcase"><h2>当前佩戴 · 实际外观</h2>
+{% if view.achievement_title or view.achievement_frame or view.achievement_badge or view.achievement_badges|reject('equalto', '')|list or view.achievement_badge_capacity == 3 %}<section class="feature-cosmetic-showcase"><h2>当前佩戴 · 实际外观</h2>
 {% if view.achievement_title %}{{ cosmetic_preview(view.achievement_title) }}{% endif %}
 {% if view.achievement_frame %}{{ cosmetic_preview(view.achievement_frame) }}{% endif %}
-{% if view.achievement_badge %}{{ cosmetic_preview(view.achievement_badge) }}{% endif %}
+{{ cosmetic_badges(view.achievement_badges, view.achievement_badge, view.achievement_badge_capacity, show_empty=True) }}
 </section>{% endif %}
 {{ panels(view.panels) }}{{ hints(view.hints) }}
 </div><footer class="game-footer"><span>外观只改变展示，不改变抓猪或做菜概率</span><strong>PiG Dream! COLLECTION</strong></footer>

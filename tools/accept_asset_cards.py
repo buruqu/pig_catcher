@@ -5,16 +5,15 @@ from __future__ import annotations
 import argparse
 import asyncio
 import base64
+import hashlib
 import json
 import math
 import sqlite3
 import sys
-from io import BytesIO
 from pathlib import Path
-from typing import Any
 
 from PIL import Image, ImageDraw, ImageFont, ImageOps
-from playwright.async_api import Browser, Page, async_playwright
+from playwright.async_api import async_playwright
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFINITIONS = PROJECT_ROOT / "catalogs" / "formal" / "pig-and-food-definitions.json"
@@ -26,6 +25,10 @@ from pig_catcher.rendering import (  # noqa: E402
     PigCatcherRenderer,
     RenderOptions,
 )
+from tools.accept_catching_and_collection_views import (  # noqa: E402
+    PlaywrightRenderCapability,
+    animation_report,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -35,54 +38,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--database-filename", default="pig_catcher.sqlite3")
     parser.add_argument("--browser-executable", type=Path)
     return parser.parse_args()
-
-
-class PlaywrightRenderCapability:
-    """Local equivalent of MaiBot's public html2png contract for UAT only."""
-
-    def __init__(self, browser: Browser) -> None:
-        self.browser = browser
-        self.page: Page | None = None
-
-    async def open(self) -> None:
-        self.page = await self.browser.new_page(viewport={"width": 1200, "height": 1600})
-
-        async def block_network(route: Any) -> None:
-            if str(route.request.url).startswith(("http://", "https://")):
-                await route.abort()
-            else:
-                await route.continue_()
-
-        await self.page.route("**/*", block_network)
-
-    async def close(self) -> None:
-        if self.page is not None:
-            await self.page.close()
-            self.page = None
-
-    async def html2png(self, html: str, **kwargs: object) -> object:
-        if self.page is None:
-            raise RuntimeError("Playwright page is not open")
-        viewport = dict(kwargs.get("viewport") or {})
-        await self.page.set_viewport_size(
-            {
-                "width": int(viewport.get("width", 1200)),
-                "height": int(viewport.get("height", 1600)),
-            }
-        )
-        await self.page.set_content(html, wait_until="load")
-        selector = str(kwargs.get("selector") or "body")
-        locator = self.page.locator(selector)
-        await locator.wait_for(state="visible")
-        payload = await locator.screenshot(type="png", animations="disabled")
-        with Image.open(BytesIO(payload)) as image:
-            width, height = image.size
-        return {
-            "image_base64": base64.b64encode(payload).decode("ascii"),
-            "mime": "image/png",
-            "width": width,
-            "height": height,
-        }
 
 
 def load_rows(database_path: Path) -> list[dict[str, object]]:
@@ -252,18 +207,14 @@ async def accept(args: argparse.Namespace) -> dict[str, object]:
     rows = load_rows(data_dir / args.database_filename)
     expected_assets = expected_asset_count()
     if len(rows) != expected_assets:
-        raise RuntimeError(
-            f"Expected {expected_assets} active assets, found {len(rows)}"
-        )
+        raise RuntimeError(f"Expected {expected_assets} active assets, found {len(rows)}")
 
     rendered_paths: dict[str, Path] = {}
     results: list[dict[str, object]] = []
     async with async_playwright() as playwright:
         launch_options: dict[str, object] = {"headless": True}
         if args.browser_executable is not None:
-            launch_options["executable_path"] = str(
-                args.browser_executable.resolve(strict=True)
-            )
+            launch_options["executable_path"] = str(args.browser_executable.resolve(strict=True))
         browser = await playwright.chromium.launch(**launch_options)
         capability = PlaywrightRenderCapability(browser)
         await capability.open()
@@ -287,6 +238,10 @@ async def accept(args: argparse.Namespace) -> dict[str, object]:
             )
             for row in rows:
                 source_path = data_dir / str(row["image_relpath"])
+                source_hash = hashlib.sha256(source_path.read_bytes()).hexdigest()
+                if source_hash != row["image_sha256"]:
+                    raise AssertionError(f"Source checksum mismatch: {row['template_id']}")
+                capability.label = str(row["template_id"])
                 view = AssetPreviewViewModel(
                     display_name=str(row["display_name"]),
                     description=str(row["description"]),
@@ -295,11 +250,7 @@ async def accept(args: argparse.Namespace) -> dict[str, object]:
                     media_format=str(row["media_format"]),
                     frame_count=int(row["frame_count"]),
                     collection_name=str(row["collection_name"]),
-                    collection_progress=(
-                        f"0/{int(row['collection_total'])}"
-                        if int(row["collection_total"])
-                        else ""
-                    ),
+                    collection_progress=(f"0/{int(row['collection_total'])}" if int(row["collection_total"]) else ""),
                     character_name=str(row["character_name"]),
                 )
                 if bool(row["is_animated"]):
@@ -317,6 +268,13 @@ async def accept(args: argparse.Namespace) -> dict[str, object]:
                     )
                     output = rendered_root / f"{row['template_id']}.png"
                 output.write_bytes(base64.b64decode(rendered.image_base64))
+                animation = None
+                if bool(row["is_animated"]):
+                    animation = animation_report(source_path, output, missing_duration_ms=100)
+                    if not animation["preserved"]:
+                        raise AssertionError(f"Animation fidelity mismatch: {row['template_id']}")
+                if hashlib.sha256(source_path.read_bytes()).hexdigest() != source_hash:
+                    raise AssertionError(f"Rendering changed source bytes: {row['template_id']}")
                 rendered_paths[str(row["template_id"])] = output
                 results.append(
                     {
@@ -329,6 +287,9 @@ async def accept(args: argparse.Namespace) -> dict[str, object]:
                         "frame_count": rendered.frame_count,
                         "duration_ms": rendered.total_duration_ms,
                         "loop_count": rendered.loop_count,
+                        "source_sha256": source_hash,
+                        "source_bytes_unchanged": True,
+                        "animation": animation,
                     }
                 )
         finally:
@@ -337,7 +298,13 @@ async def accept(args: argparse.Namespace) -> dict[str, object]:
 
     contacts = write_contact_sheets(rows, rendered_paths, output_root)
     animation_strips = write_animation_strips(rows, rendered_paths, output_root)
+    failures = [
+        row
+        for row in capability.diagnostics
+        if row["clippedText"] or row["outside"] or row["brokenImages"] or row["clippedMedia"]
+    ]
     report = {
+        "status": "failed" if failures else "passed",
         "asset_count": len(rows),
         "pig_count": sum(row["kind"] == "pig" for row in rows),
         "food_count": sum(row["kind"] == "food" for row in rows),
@@ -346,11 +313,15 @@ async def accept(args: argparse.Namespace) -> dict[str, object]:
         "results": results,
         "contact_sheets": contacts,
         "animation_strips": animation_strips,
+        "diagnostics": capability.diagnostics,
+        "failures": failures,
     }
     (output_root / "report.json").write_text(
         json.dumps(report, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
+    if failures:
+        raise AssertionError("Asset DOM diagnostics failed: " + json.dumps(failures, ensure_ascii=False))
     return report
 
 

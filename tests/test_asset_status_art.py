@@ -21,6 +21,7 @@ from pig_catcher.rendering import (
     PigCatcherRenderer,
     daily_giants_view,
     inventory_view,
+    pig_card_view,
     records_view,
 )
 from pig_catcher.rendering.asset_icons import ASSET_ICON_KEYS, asset_icon
@@ -105,6 +106,30 @@ def _pig(**updates) -> PigView:
         display_tags=("巨物",),
     )
     return replace(pig, **updates)
+
+
+@pytest.mark.parametrize(
+    "name,alternate,visible,code,expected",
+    (
+        ("保千猪", "alternate.png", True, "ART2026", "/切换 猪保千 ART2026"),
+        ("初华猪", "alternate.png", True, "ART2026", "/切换 初华猪 ART2026"),
+        ("初华猪", "alternate.png", True, "", "/切换 初华猪 可"),
+        ("初华猪", "", True, "ART2026", ""),
+        ("初华猪", "alternate.png", False, "ART2026", ""),
+        ("保千猪", "alternate.png", False, "ART2026", ""),
+        ("其他猪", "alternate.png", True, "ART2026", ""),
+    ),
+)
+def test_alternate_art_card_teaches_only_its_available_command(name, alternate, visible, code, expected):
+    pig = _pig(display_name=name, alternate_image_relpath=alternate, media_visible=visible, short_code=code)
+    view = pig_card_view(pig, mode_label="猪猪详情")
+    if expected:
+        assert expected in view.tutorial_text
+        if name == "初华猪":
+            assert "普通版与戴帽子版" in view.tutorial_text
+            assert "/切换 猪保千" not in view.tutorial_text
+    else:
+        assert not view.tutorial_text
 
 
 @pytest.mark.parametrize(

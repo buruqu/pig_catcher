@@ -1,5 +1,10 @@
 # 技术架构设计
 
+> 当前2.0隔离开发验收标识为dev12 / Schema46 / Ruleset40 / Manifest4，SDK锁定2.7.1、
+> 本地Python3.13.12。新徽章槽和安全边界见[数据模型](02-domain-and-data-model.md)，
+> 全量结果见[验收报告](34-v2-final-acceptance.md)。下文1.x兼容基线和迁移历史保留原记录，
+> 不表示本次启动、升级或修改了正式MaiBot。
+
 ## 1. 本机兼容基线
 
 - MaiBot：`1.0.12`

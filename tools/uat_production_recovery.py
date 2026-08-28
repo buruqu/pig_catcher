@@ -25,6 +25,7 @@ from tools.uat_catching_and_collection import (  # noqa: E402
     clone_formal_data,
     command_kwargs,
     create_plugin,
+    validate_components,
 )
 
 
@@ -61,6 +62,9 @@ def configure_plugin(plugin: Any) -> None:
     config["storage"]["sqlite_busy_timeout_ms"] = 100
     config["catching"]["cooldown_seconds"] = 0
     config["catching"]["daily_limit"] = 100
+    # This recovery scenario has exact delivery counts. Achievement backfill
+    # notifications have their own full-clone acceptance, not a hidden extra send.
+    config["features"]["achievements_enabled"] = False
     plugin.set_plugin_config(config)
 
 
@@ -106,11 +110,7 @@ async def load_plugin(
         LocalContext(data_dir=data_dir, browser=browser, collector=collector)
     )
     await plugin.on_load()
-    components = plugin.get_components()
-    command_count = sum(item["type"] == "COMMAND" for item in components)
-    home_card_count = sum(item["type"] == "HOME_CARD" for item in components)
-    if len(components) != 56 or command_count != 55 or home_card_count != 1:
-        raise AssertionError("正式版必须注册 49 个显式命令和 1 个运营首页卡片。")
+    validate_components(plugin)
     if plugin.gameplay_service is None:
         raise AssertionError("正式版抓猪服务未加载。")
     plugin.gameplay_service.random_source = FixedRandom(
@@ -663,15 +663,13 @@ async def run(args: argparse.Namespace) -> dict[str, object]:
         "plugin_version": PLUGIN_VERSION,
         "framework_phase": FRAMEWORK_PHASE,
         "schema_version": SCHEMA_VERSION,
-        "component_count": 55,
-        "production_defaults": {
-            "daily_limit": 22,
-            "cooldown_seconds": 20,
-        },
+        "components": validate_components(create_plugin()),
+        "production_defaults": create_plugin().get_default_config()["catching"],
         "uat_overrides": {
             "daily_limit": 100,
             "cooldown_seconds": 0,
             "sqlite_busy_timeout_ms": 100,
+            "achievements_enabled": False,
         },
         "steps": records,
         "step_count": len(records),

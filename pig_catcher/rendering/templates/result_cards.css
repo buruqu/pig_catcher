@@ -1,6 +1,6 @@
 /* Media remains at x=38/y=164/480px for the animation compositor. */
 .pig-card.pig-card { height:auto; min-height:860px; }
-.pig-card.pig-card .pig-card__detail { position:relative; left:auto; top:auto; width:534px; min-height:480px; margin:38px 38px 28px 556px; }
+.pig-card.pig-card .pig-card__detail { position:relative; left:auto; top:auto; width:534px; max-width:calc(100% - 594px); min-height:480px; margin:38px 38px 28px 556px; }
 .pig-card.pig-card .pig-card__description,
 .pig-card.pig-card .pig-card__subline { position:static; left:auto; right:auto; top:auto; bottom:auto; max-height:none; min-height:0; width:auto; overflow:visible; overflow-wrap:anywhere; }
 .pig-card.pig-card .pig-card__description { font-size:18px !important; line-height:1.65 !important; }

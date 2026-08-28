@@ -212,6 +212,16 @@ def pig_card_view(
     """Build one catch or detail card view."""
 
     progress = level_progress(catch.total_experience) if catch is not None else None
+    tutorial_text = ""
+    if pig.media_visible and pig.alternate_image_relpath:
+        variants = {
+            "保千猪": ("猪保千", "猪猪立绘与表情包"),
+            "初华猪": ("初华猪", "普通版与戴帽子版"),
+        }
+        if pig.display_name in variants:
+            command_name, variant_names = variants[pig.display_name]
+            selector = f" {pig.short_code}" if pig.short_code else ""
+            tutorial_text = f"输入 /切换 {command_name}{selector} 可在{variant_names}之间切换"
     return PigCardViewModel(
         mode_label=mode_label,
         display_name=pig.display_name,
@@ -264,7 +274,7 @@ def pig_card_view(
         weight_label=weight_label(pig.weight_percentile),
         effect_summaries=(catch.effect_summaries if catch is not None else ()),
         excluded_summaries=(catch.excluded_summaries if catch is not None else ()),
-        tutorial_text=("输入 /切换 猪保千 可在猪猪立绘与表情包之间切换" if pig.alternate_image_relpath else ""),
+        tutorial_text=tutorial_text,
         probability_line=(_probability_line(catch.weights) if catch is not None else ""),
         probability_sources=(
             _probability_sources(
@@ -1840,12 +1850,14 @@ def achievement_overview_view(result: object) -> AchievementOverviewViewModel:
         completion_percent=(result.unlocked_count * 100 / result.total_count if result.total_count else 0),
         title_text=cosmetic_detail(result.equipped_title_id, kind="title")["name"] or "未佩戴",
         frame_text=cosmetic_detail(result.equipped_frame_id, kind="frame")["name"] or "默认淡粉",
-        showcase_text=result.showcase_achievement_name or "未展示",
+        showcase_text=f"{sum(bool(badge) for badge in result.badge_ids)} / {result.badge_capacity} 格已佩戴",
         next_milestone_text=(f"{result.next_milestone} 点" if result.next_milestone else "已完成全部里程碑"),
         reward_inventory_text=reward_text,
         recent=tuple(achievement_row_view(entry) for entry in result.recent),
         achievement_title=result.equipped_title_id,
         achievement_frame=result.equipped_frame_id,
+        achievement_badges=result.badge_ids,
+        achievement_badge_capacity=result.badge_capacity,
     )
 
 

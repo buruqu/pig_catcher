@@ -47,6 +47,8 @@ class DispatchView:
     achievement_title: str = ""
     achievement_frame: str = ""
     achievement_badge: str = ""
+    achievement_badges: tuple[str, ...] = ()
+    achievement_badge_capacity: int = 1
     # 仅影响模板路由和插画；不参与旅行、库存或经济结算。旧回执无字段仍可读。
     presentation: str = "dispatch"
     scene_key: str = ""
@@ -77,6 +79,8 @@ class DispatchView:
             achievement_title=data.get("achievement_title", ""),
             achievement_frame=data.get("achievement_frame", ""),
             achievement_badge=data.get("achievement_badge", ""),
+            achievement_badges=tuple(data.get("achievement_badges", ())),
+            achievement_badge_capacity=data.get("achievement_badge_capacity", 1),
             presentation=data.get("presentation", "dispatch"),
             scene_key=data.get("scene_key", ""),
         )

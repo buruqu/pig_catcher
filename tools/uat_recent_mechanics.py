@@ -45,6 +45,9 @@ def configure_plugin(plugin: Any) -> None:
     config["catching"]["cooldown_seconds"] = 0
     config["catching"]["daily_limit"] = 100
     config["cooking"]["cook_cooldown_seconds"] = 0
+    # Assert one core result image per action. Achievement notifications have a
+    # separate enabled end-to-end suite and must not be mistaken for duplicates.
+    config["features"]["achievements_enabled"] = False
     plugin.set_plugin_config(config)
 
 

@@ -146,6 +146,8 @@ class PigCardViewModel:
     achievement_title: str = ""
     achievement_frame: str = ""
     achievement_badge: str = ""
+    achievement_badges: tuple[str, ...] = ()
+    achievement_badge_capacity: int = 1
     activity_label: str = ""
     display_tags: tuple[str, ...] = ()
 
@@ -168,6 +170,8 @@ class CosmeticViewModel:
     achievement_title: str = ""
     achievement_frame: str = ""
     achievement_badge: str = ""
+    achievement_badges: tuple[str, ...] = ()
+    achievement_badge_capacity: int = 1
 
 
 @dataclass(frozen=True, slots=True)
@@ -470,6 +474,8 @@ class FoodCardViewModel:
     achievement_title: str = ""
     achievement_frame: str = ""
     achievement_badge: str = ""
+    achievement_badges: tuple[str, ...] = ()
+    achievement_badge_capacity: int = 1
     excluded_summaries: tuple[str, ...] = ()
     probability_line: str = ""
     probability_sources: str = ""

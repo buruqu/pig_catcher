@@ -13,6 +13,21 @@
   {% elif art.name and not art.masked %}<span class="cosmetic-missing">{{ art.name }} · 外观图暂缺</span>{% endif %}
 {%- endmacro %}
 
+{% macro cosmetic_badges(values=(), fallback='', capacity=1, show_empty=False) -%}
+  {% set slots = values if values else (fallback,) %}
+  {% if capacity == 3 or show_empty or slots|reject('equalto', '')|list %}
+  <div class="cosmetic-badge-rack cosmetic-badge-rack--{{ capacity }}" aria-label="{{ capacity }}格徽章展示架">
+    {% for index in range(capacity) %}
+    {% set value = slots[index] if index < slots|length else '' %}
+    <div class="cosmetic-badge-slot{% if not value %} cosmetic-badge-slot--empty{% endif %}" data-badge-slot="{{ index + 1 }}">
+      {% if capacity == 3 or show_empty %}<span class="cosmetic-badge-slot__label">第{{ index + 1 }}位</span>{% endif %}
+      {% if value %}{{ cosmetic_badge(value) }}{% else %}<span class="cosmetic-badge-slot__empty">空位 · 待佩戴</span>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+{%- endmacro %}
+
 {% macro cosmetic_preview(value) -%}
   {% set art = value if value is mapping else cosmetic_detail(value) %}
   {% if art.is_plate %}{{ cosmetic_plate(art, compact=False) }}

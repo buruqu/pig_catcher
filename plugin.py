@@ -1041,25 +1041,28 @@ class PigCatcherPlugin(MaiBotPlugin):
         receipt: CommandReceipt,
         render: Callable[[], Awaitable[RenderedImage]],
         fallback_text: str,
+        track_progress: bool = True,
     ) -> tuple[bool, str, int]:
         receipts = self._receipt_service
         if receipts is None:
             return False, "抓猪回执服务尚未就绪。", 1
-        await self._process_achievement_receipt(receipt)
-        await self._process_weekly_competition_receipt(receipt)
+        if track_progress:
+            await self._process_achievement_receipt(receipt)
+            await self._process_weekly_competition_receipt(receipt)
         if not await receipts.claim_send(receipt.receipt_id):
-            await self._deliver_achievement_notifications(
-                stream_id=stream_id,
-                receipt=receipt,
-            )
-            await self._deliver_achievement_backfill_summary(
-                stream_id=stream_id,
-                player_id=receipt.player_id,
-            )
-            await self._deliver_weekly_competition_award(
-                stream_id=stream_id,
-                player_id=receipt.player_id,
-            )
+            if track_progress:
+                await self._deliver_achievement_notifications(
+                    stream_id=stream_id,
+                    receipt=receipt,
+                )
+                await self._deliver_achievement_backfill_summary(
+                    stream_id=stream_id,
+                    player_id=receipt.player_id,
+                )
+                await self._deliver_weekly_competition_award(
+                    stream_id=stream_id,
+                    player_id=receipt.player_id,
+                )
             return True, "该消息已处理，不重复公示。", 0
         if self._delivery is None:
             try:
@@ -1081,18 +1084,19 @@ class PigCatcherPlugin(MaiBotPlugin):
                     "抓猪回执已发送但无法标记完成，receipt_id=%s",
                     receipt.receipt_id,
                 )
-            await self._deliver_achievement_notifications(
-                stream_id=stream_id,
-                receipt=receipt,
-            )
-            await self._deliver_achievement_backfill_summary(
-                stream_id=stream_id,
-                player_id=receipt.player_id,
-            )
-            await self._deliver_weekly_competition_award(
-                stream_id=stream_id,
-                player_id=receipt.player_id,
-            )
+            if track_progress:
+                await self._deliver_achievement_notifications(
+                    stream_id=stream_id,
+                    receipt=receipt,
+                )
+                await self._deliver_achievement_backfill_summary(
+                    stream_id=stream_id,
+                    player_id=receipt.player_id,
+                )
+                await self._deliver_weekly_competition_award(
+                    stream_id=stream_id,
+                    player_id=receipt.player_id,
+                )
             return True, fallback_text, 2
         await receipts.mark_failed(
             receipt.receipt_id,
@@ -1371,6 +1375,8 @@ class PigCatcherPlugin(MaiBotPlugin):
                 achievement_title=cosmetics.title_id,
                 achievement_frame=cosmetics.frame_id,
                 achievement_badge=cosmetics.badge_name,
+                achievement_badges=cosmetics.badge_ids,
+                achievement_badge_capacity=cosmetics.badge_capacity,
             )
         data_dir = Path(self.ctx.paths.data_dir).resolve()
         source_path = pig_media_path(data_dir, pig)
@@ -1441,6 +1447,8 @@ class PigCatcherPlugin(MaiBotPlugin):
                 achievement_title=cosmetics.title_id,
                 achievement_frame=cosmetics.frame_id,
                 achievement_badge=cosmetics.badge_name,
+                achievement_badges=cosmetics.badge_ids,
+                achievement_badge_capacity=cosmetics.badge_capacity,
             )
         data_dir = Path(self.ctx.paths.data_dir).resolve()
         source_path = food_media_path(data_dir, food)
@@ -4168,6 +4176,44 @@ class PigCatcherPlugin(MaiBotPlugin):
             return await self._command_error(stream_id=identity.stream_id, operation="佩戴成就", error=exc)
 
     @Command(
+        "pig_catcher_achievement_badges",
+        description="查看或按位置佩戴、卸下已拥有的成就徽章与周榜牌",
+        pattern=rf"^{_COMMAND_LEADING_MENTION_PATTERN}/成就徽章(?:\s+(?P<arguments>.*?))?\s*$",
+    )
+    async def handle_achievement_badges(self, stream_id: str = "", **kwargs: Any) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_command(
+            stream_id, kwargs,
+            feature_enabled=(
+                self.settings.features.achievements_enabled or self.settings.features.weekly_competitions_enabled
+            ),
+            feature_label="成就徽章",
+        )
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            from .pig_catcher.services.achievement_badges import AchievementBadgeService
+
+            result = await AchievementBadgeService(
+                cast(AchievementService, self._achievement_service),
+                labels={
+                    key: str(value["name"]) for key, value in COSMETIC_DEFINITIONS.items() if value["kind"] == "badge"
+                },
+            ).execute(identity, matched_group(kwargs, "arguments"))
+            renderer = cast(PigCatcherRenderer, self._renderer)
+            if result.receipt:
+                return await self._deliver_receipt(
+                    stream_id=identity.stream_id, receipt=result.receipt,
+                    render=lambda: renderer.render_dispatch(result.view, {}), fallback_text=result.view.text(),
+                    track_progress=False,
+                )
+            return await self._deliver_query(
+                stream_id=identity.stream_id, render=lambda: renderer.render_dispatch(result.view, {}),
+                fallback_text=result.view.text(),
+            )
+        except Exception as exc:
+            return await self._command_error(stream_id=identity.stream_id, operation="成就徽章", error=exc)
+
+    @Command(
         "pig_catcher_achievement_unequip",
         description="取消当前佩戴的成就称号、边框和徽章",
         pattern=r"^/取消佩戴成就\s*$",
@@ -4473,6 +4519,8 @@ class PigCatcherPlugin(MaiBotPlugin):
                         achievement_title=equipped[item.key].title_id,
                         achievement_frame=equipped[item.key].frame_id,
                         achievement_badge=equipped[item.key].badge_name,
+                        achievement_badges=equipped[item.key].badge_ids,
+                        achievement_badge_capacity=equipped[item.key].badge_capacity,
                     ) if item.key in equipped else item
                     for item in view.items
                 ))
@@ -4591,6 +4639,8 @@ class PigCatcherPlugin(MaiBotPlugin):
             achievement_title=cosmetics.title_id,
             achievement_frame=cosmetics.frame_id,
             achievement_badge=cosmetics.badge_name,
+            achievement_badges=cosmetics.badge_ids,
+            achievement_badge_capacity=cosmetics.badge_capacity,
         )
 
     async def _dispatch_command(self, stream_id: str, kwargs: Mapping[str, Any], section: str) -> tuple[bool, str, int]:

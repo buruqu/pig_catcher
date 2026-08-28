@@ -97,6 +97,11 @@ async def test_art_toggle_renders_changed_pig_but_never_toggles_again_for_previe
         else:
             assert len(context.send.images) == 1 and not context.send.texts
             assert "立绘已切换" in context.render.calls[-1][0]
+            command_name = "猪保千" if display_name == "保千猪" else "初华猪"
+            assert f"/切换 {command_name} ART2026" in context.render.calls[-1][0]
+            if display_name == "初华猪":
+                assert "普通版与戴帽子版" in context.render.calls[-1][0]
+                assert "/切换 猪保千" not in context.render.calls[-1][0]
     finally:
         await plugin.on_unload()
 

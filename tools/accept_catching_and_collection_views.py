@@ -466,10 +466,11 @@ def animation_report(
 ) -> dict[str, object]:
     def inspect(path: Path) -> dict[str, object]:
         with Image.open(path) as image:
-            durations = [
-                int(frame.info.get("duration", image.info.get("duration", 0)) or 0)
-                for frame in ImageSequence.Iterator(image)
-            ]
+            durations = []
+            for frame in ImageSequence.Iterator(image):
+                # WebP时长在解码帧后才进入info；只seek会把正常动画误判为全部缺时长。
+                frame.load()
+                durations.append(int(frame.info.get("duration", image.info.get("duration", 0)) or 0))
             return {
                 "frames": int(getattr(image, "n_frames", 1)),
                 "durations": durations,

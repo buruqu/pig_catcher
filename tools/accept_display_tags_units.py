@@ -16,6 +16,7 @@ from playwright.async_api import async_playwright
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from pig_catcher.domain.food_effects import effect_summary  # noqa: E402
 from pig_catcher.rendering import (  # noqa: E402
     AnimatedCardComposer,
     CatalogItemViewModel,
@@ -388,7 +389,9 @@ async def run_formal_round9(args) -> dict:
                         official_value=588,
                         acquired_at="2026-08-28 12:00",
                         source_selector="离线验收原料",
-                        effect_summary="效果与价值留待后续数值方案；此图仅验收素材和排版。",
+                        effect_summary=effect_summary(
+                            str(entry.get("effect_id") or ""), entry.get("effect_params") or {}
+                        ),
                         image_fit=entry.get("fit", "contain"),
                         media_visible=True,
                         media_format=media_format,
