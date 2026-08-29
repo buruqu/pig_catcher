@@ -15,7 +15,8 @@ from .rules import (
     shift_original_probability_up_one_tier,
 )
 
-COOKWARE_HIGHER_RARITY_STEP = 0.04
+COOKWARE_HIGHER_RARITY_STEP = 0.02
+MAX_COOKWARE_LEVEL = 10
 LEVEL_COOKING_HIGHER_RARITY_STEP = 0.02
 
 FOOD_RARITY_NAMES: dict[Rarity, str] = {
@@ -134,8 +135,8 @@ def cookware_higher_rarity_multiplier(cookware_level: int) -> float:
     """返回厨具对高于原料品质结果的相对权重乘数。"""
 
     normalized_level = int(cookware_level)
-    if not 0 <= normalized_level <= 5:
-        raise DomainValidationError("厨具等级必须位于 0 至 5。")
+    if not 0 <= normalized_level <= MAX_COOKWARE_LEVEL:
+        raise DomainValidationError(f"厨具等级必须位于 0 至 {MAX_COOKWARE_LEVEL}。")
     return 1.0 + COOKWARE_HIGHER_RARITY_STEP * normalized_level
 
 
@@ -300,15 +301,16 @@ def build_store_products(
         (UpgradeType.FEED, feed_level, feed_prices),
         (UpgradeType.COOKWARE, cookware_level, cookware_prices),
     ):
-        target = min(level + 1, 5)
+        max_level = len(prices)
+        target = min(level + 1, max_level)
         products.append(
             StoreProduct(
                 product_id=f"upgrade-{upgrade_type.value}",
                 display_name=UPGRADE_DISPLAY_NAMES[upgrade_type],
                 category="永久升级",
                 product_type="upgrade",
-                unit_price=prices[level] if level < 5 else 0,
-                effect_summary="已满级" if level >= 5 else f"购买后提升至 Lv.{target}",
+                unit_price=prices[level] if level < max_level else 0,
+                effect_summary="已满级" if level >= max_level else f"购买后提升至 Lv.{target}",
                 current_level=level,
                 target_level=target,
             )

@@ -180,16 +180,16 @@ def test_catch_weights_are_normalized_and_transfer_missing_six_star() -> None:
 def test_feed_and_lucky_item_improve_high_rarity_share() -> None:
     baseline = catch_weights(feed_level=0, lucky_whistle=False)
     lucky_only = catch_weights(feed_level=0, lucky_whistle=True)
-    boosted = catch_weights(feed_level=5, lucky_whistle=True)
-    assert lucky_only == pytest.approx((34.0, 27.0, 16.0, 12.0, 7.0, 4.0))
+    boosted = catch_weights(feed_level=10, lucky_whistle=True)
+    assert lucky_only == pytest.approx((35.0, 27.0, 16.0, 12.0, 7.0, 3.0))
     assert sum(boosted[2:]) > sum(baseline[2:])
 
     super_lucky = catch_weights(super_lucky_whistle=True)
-    assert super_lucky == pytest.approx((27.0, 23.0, 15.0, 15.0, 12.0, 8.0))
+    assert super_lucky == pytest.approx((29.0, 23.0, 15.0, 15.0, 12.0, 6.0))
     assert sum(super_lucky) == pytest.approx(100.0)
     assert sum(super_lucky[4:]) > sum(lucky_only[4:])
     radar = catch_weights(item_id="star-pig-radar")
-    assert radar == pytest.approx((0.0, 0.0, 45.0, 30.0, 18.0, 7.0))
+    assert radar == pytest.approx((0.0, 0.0, 47.0, 30.0, 18.0, 5.0))
     with pytest.raises(DomainValidationError, match="一个"):
         catch_weights(lucky_whistle=True, super_lucky_whistle=True)
 
@@ -212,7 +212,7 @@ def test_monotonic_high_rarity_layer_holds_a_squeezed_tier_at_baseline() -> None
 )
 def test_feed_and_level_never_reduce_any_high_rarity_tier(item_id: str) -> None:
     item_baseline = catch_weights(item_id=item_id)
-    for feed_level in range(6):
+    for feed_level in range(11):
         for player_level in (1, 5, 9, 13, 17, 21, 999):
             adjusted = catch_weights(
                 item_id=item_id,
@@ -228,22 +228,22 @@ def test_feed_and_level_never_reduce_any_high_rarity_tier(item_id: str) -> None:
 
 def test_rebalanced_item_catalog_is_unique_and_priced_by_strength() -> None:
     expected_prices = {
-        "幸运猪哨": 360,
-        "超级幸运猪哨": 850,
-        "星辉探猪镜": 1050,
-        "巨物玉米": 100,
-        "增膘豆饼": 70,
-        "精瘦青饲料": 70,
-        "猪币悬赏牌": 60,
-        "主厨香料": 120,
-        "超级主厨香料": 2600,
-        "精准刀工券": 150,
-        "慢炖调料包": 220,
-        "大份餐盒": 780,
-        "稳火保底锅盖": 420,
-        "升星炉芯": 220,
-        "丰收围裙": 380,
-        "天逆鉾": 1000,
+        "幸运猪哨": 840,
+        "超级幸运猪哨": 1680,
+        "星辉探猪镜": 1680,
+        "巨物玉米": 240,
+        "增膘豆饼": 200,
+        "精瘦青饲料": 200,
+        "猪币悬赏牌": 320,
+        "主厨香料": 480,
+        "超级主厨香料": 3600,
+        "精准刀工券": 260,
+        "慢炖调料包": 360,
+        "大份餐盒": 1280,
+        "稳火保底锅盖": 840,
+        "升星炉芯": 680,
+        "丰收围裙": 600,
+        "天逆鉾": 2000,
     }
     assert len(ITEM_DEFINITIONS) == 16
     assert {item.display_name: item.price for item in ITEM_DEFINITIONS} == expected_prices
@@ -251,7 +251,7 @@ def test_rebalanced_item_catalog_is_unique_and_priced_by_strength() -> None:
     assert len({item.effect_summary for item in ITEM_DEFINITIONS}) == 16
     assert all(item.action_type in {"catching", "cooking"} for item in ITEM_DEFINITIONS)
     assert expected_prices["超级幸运猪哨"] < 2000
-    assert expected_prices["超级主厨香料"] == 2600
+    assert expected_prices["超级主厨香料"] == 3600
 
 
 def test_phase8_item_food_and_calendar_rules_are_explicit() -> None:
@@ -320,7 +320,7 @@ def test_numeric_level_improves_catch_probability_with_a_hard_cap() -> None:
     assert sum(growing[3:]) > sum(baseline[3:])
     assert sum(capped[3:]) > sum(growing[3:])
     assert far_beyond_cap == pytest.approx(capped)
-    assert capped == pytest.approx(catch_weights(feed_level=5))
+    assert capped == pytest.approx(catch_weights(feed_level=10))
     with pytest.raises(DomainValidationError, match="玩家等级"):
         catch_weights(player_level=0)
 
@@ -1331,8 +1331,11 @@ def test_default_config_exposes_fixed_rules_and_chinese_schema() -> None:
     assert config.catching.cooldown_seconds == 20
     assert config.catching.quota_refresh_hours == [0, 9, 12, 19]
     assert config.catching.weights() == BASE_CATCH_WEIGHTS
+    assert config.catching.max_feed_level == 10
     assert config.cooking.six_star_to_five_percent == 90
     assert config.cooking.six_star_to_six_percent == 10
+    assert config.cooking.max_cookware_level == 10
+    assert config.economy.max_upgrade_level == 10
     assert config.features.cooking_enabled is True
     assert config.features.ledger_enabled is True
     assert config.trading.gift_enabled is True

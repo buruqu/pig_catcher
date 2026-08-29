@@ -136,11 +136,15 @@ def test_chef_spice_runs_after_attributes_but_does_not_change_same_family_food()
 def test_packaged_upgrade_defaults_match_model_and_do_not_override_custom_prices():
     config = tomllib.loads((ROOT / "config.toml").read_text(encoding="utf-8"))
     model = EconomySection()
-    assert model.feed_upgrade_prices == config["economy"]["feed_upgrade_prices"] == [300, 800, 1800, 4000, 8000]
-    assert model.cookware_upgrade_prices == config["economy"]["cookware_upgrade_prices"] == [300, 700, 1600, 3500, 7000]
-    assert sum(model.feed_upgrade_prices) + sum(model.cookware_upgrade_prices) == 28000
-    custom = EconomySection(feed_upgrade_prices=[100, 200, 300, 400, 500])
-    assert custom.feed_upgrade_prices == [100, 200, 300, 400, 500]
+    assert model.feed_upgrade_prices == config["economy"]["feed_upgrade_prices"] == [
+        300, 600, 1000, 1600, 2600, 4200, 6800, 10500, 16000, 25000
+    ]
+    assert model.cookware_upgrade_prices == config["economy"]["cookware_upgrade_prices"] == [
+        300, 550, 900, 1450, 2400, 3800, 6200, 9800, 15000, 24000
+    ]
+    assert sum(model.feed_upgrade_prices) + sum(model.cookware_upgrade_prices) == 133000
+    custom = EconomySection(feed_upgrade_prices=[100 * level for level in range(1, 11)])
+    assert custom.feed_upgrade_prices == [100 * level for level in range(1, 11)]
 
 
 def test_new_food_base_values_preserve_pig_prices_and_absolute_weight_independence():
@@ -259,7 +263,12 @@ async def test_schema45_changes_only_new_lemon_template_and_preserves_all_other_
         for name, rows in before.items():
             if name == "food_templates":
                 continue
-            assert [tuple(row) for row in await database.fetch_all(f'SELECT * FROM "{name}" ORDER BY rowid')] == rows
+            actual_rows = [
+                tuple(row) for row in await database.fetch_all(f'SELECT * FROM "{name}" ORDER BY rowid')
+            ]
+            if name == "upgrades":
+                rows = [(row[0], row[1], int(row[2]) * 2, row[3]) for row in rows]
+            assert actual_rows == rows
         assert await database.integrity_check() == ("ok",)
         assert await database.fetch_all("PRAGMA foreign_key_check") == []
         async with database.transaction() as session:

@@ -649,6 +649,8 @@ async def test_schema_36_migrates_to_dispatch_without_changing_existing_tables(t
             assert "CREATE UNIQUE INDEX" in index[0]
             assert "short_code COLLATE NOCASE" in index[0]
             assert "state IN ('active', 'locked-for-trade')" in index[0]
+        elif name == "upgrades":
+            assert "level BETWEEN 0 AND 10" in actual
         else:
             assert actual == value, name
     for table, rows in original_rows.items():

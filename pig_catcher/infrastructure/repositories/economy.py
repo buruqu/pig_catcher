@@ -4,6 +4,12 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
+from ...domain.feature_shop import (
+    FEATURE_SHOP_PRODUCTS_BY_ID,
+    FEATURE_SHOP_TARGET_INVENTORIES,
+    FeatureShopProduct,
+    FeatureShopSystem,
+)
 from ...domain.models import AssetSelector
 from ..database import DatabaseSession
 from .activity_locks import unoccupied_clause
@@ -18,6 +24,30 @@ _FOOD_INVENTORY_ORDER_SQL = {
     "价值": "instance.official_value DESC, instance.acquired_at DESC",
     "份量": "instance.portion_weight DESC, instance.acquired_at DESC",
     "名称": "instance.display_name_snapshot, instance.acquired_at DESC",
+}
+
+_FEATURE_TOOL_INVENTORY_SELECT_SQL: Mapping[FeatureShopSystem, str] = {
+    FeatureShopSystem.DISPATCH: ("SELECT quantity FROM dispatch_tools WHERE player_id = ? AND tool_id = ?"),
+    FeatureShopSystem.TOUR: "SELECT quantity FROM tour_tools WHERE player_id = ? AND tool_id = ?",
+    FeatureShopSystem.BATTLE: ("SELECT quantity FROM battle_tools WHERE player_id = ? AND tool_id = ?"),
+}
+
+_FEATURE_TOOL_INVENTORY_UPSERT_SQL: Mapping[FeatureShopSystem, str] = {
+    FeatureShopSystem.DISPATCH: """
+        INSERT INTO dispatch_tools(player_id, tool_id, quantity)
+        VALUES (?, ?, ?)
+        ON CONFLICT(player_id, tool_id) DO UPDATE SET quantity = excluded.quantity
+    """,
+    FeatureShopSystem.TOUR: """
+        INSERT INTO tour_tools(player_id, tool_id, quantity)
+        VALUES (?, ?, ?)
+        ON CONFLICT(player_id, tool_id) DO UPDATE SET quantity = excluded.quantity
+    """,
+    FeatureShopSystem.BATTLE: """
+        INSERT INTO battle_tools(player_id, tool_id, quantity)
+        VALUES (?, ?, ?)
+        ON CONFLICT(player_id, tool_id) DO UPDATE SET quantity = excluded.quantity
+    """,
 }
 
 
@@ -1423,6 +1453,120 @@ class EconomyRepository:
         if row is None:
             raise RuntimeError("道具购买后无法读取库存。")
         return int(row["quantity"])
+
+    async def add_feature_tool_inventory(
+        self,
+        session: DatabaseSession,
+        *,
+        product: FeatureShopProduct,
+        player_id: str,
+        scope_id: str,
+        quantity: int,
+        unit_price: int,
+        total_price: int,
+        ledger_entry_key: str,
+        source_kind: str,
+        now: str,
+    ) -> int:
+        """Grant one catalogued feature tool and append its immutable purchase fact.
+
+        The caller owns the surrounding transaction.  SQL identifiers never come
+        from ``product``: the product must equal its immutable domain-catalog entry,
+        then its enum selects one of the three literal statements above.
+        """
+
+        if not isinstance(product, FeatureShopProduct):
+            raise TypeError("功能商城库存只能接收 FeatureShopProduct。")
+        canonical = FEATURE_SHOP_PRODUCTS_BY_ID.get(product.product_id)
+        if canonical is None or canonical != product:
+            raise ValueError("功能商城商品未登记，不能写入器具库存。")
+        expected_inventory = FEATURE_SHOP_TARGET_INVENTORIES.get(canonical.system)
+        if expected_inventory != canonical.target_inventory:
+            raise ValueError("功能商城商品的目标库存不在领域白名单中。")
+        if canonical.system not in _FEATURE_TOOL_INVENTORY_SELECT_SQL:
+            raise ValueError("功能商城商品系统不在仓储白名单中。")
+        if isinstance(quantity, bool) or not isinstance(quantity, int) or quantity <= 0:
+            raise ValueError("功能商城购买数量必须为正整数。")
+        if unit_price != canonical.unit_price or unit_price <= 0:
+            raise ValueError("功能商城购买单价与商品目录不一致。")
+        if total_price != unit_price * quantity:
+            raise ValueError("功能商城购买总价与单价、数量不一致。")
+        if not str(player_id).strip() or not str(scope_id).strip():
+            raise ValueError("功能商城购买必须指定玩家和群范围。")
+        if not str(ledger_entry_key).strip() or not str(source_kind).strip() or not str(now).strip():
+            raise ValueError("功能商城购买账本字段不能为空。")
+
+        previous = await session.fetch_one(
+            """
+            SELECT player_id, scope_id, system, product_id, tool_id,
+                   delta, balance_after, unit_price, quantity, total_price,
+                   source_kind
+            FROM feature_tool_store_ledger
+            WHERE entry_key = ?
+            """,
+            (ledger_entry_key,),
+        )
+        if previous is not None:
+            replay_fields = (
+                str(previous["player_id"]),
+                str(previous["scope_id"]),
+                str(previous["system"]),
+                str(previous["product_id"]),
+                str(previous["tool_id"]),
+                int(previous["delta"]),
+                int(previous["unit_price"]),
+                int(previous["quantity"]),
+                int(previous["total_price"]),
+                str(previous["source_kind"]),
+            )
+            requested_fields = (
+                player_id,
+                scope_id,
+                canonical.system.value,
+                canonical.product_id,
+                canonical.tool_id,
+                quantity,
+                unit_price,
+                quantity,
+                total_price,
+                source_kind,
+            )
+            if replay_fields != requested_fields:
+                raise ValueError("功能商城购买账本重放参数冲突。")
+            return int(previous["balance_after"])
+
+        select_sql = _FEATURE_TOOL_INVENTORY_SELECT_SQL[canonical.system]
+        existing = await session.fetch_one(select_sql, (player_id, canonical.tool_id))
+        balance_after = (int(existing["quantity"]) if existing is not None else 0) + quantity
+
+        upsert_sql = _FEATURE_TOOL_INVENTORY_UPSERT_SQL[canonical.system]
+        await session.execute(upsert_sql, (player_id, canonical.tool_id, balance_after))
+        await session.execute(
+            """
+            INSERT INTO feature_tool_store_ledger(
+                entry_key, player_id, scope_id, system, product_id, tool_id,
+                delta, balance_after, unit_price, quantity, total_price,
+                source_kind, occurred_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                ledger_entry_key,
+                player_id,
+                scope_id,
+                canonical.system.value,
+                canonical.product_id,
+                canonical.tool_id,
+                quantity,
+                balance_after,
+                unit_price,
+                quantity,
+                total_price,
+                source_kind,
+                now,
+            ),
+        )
+        return balance_after
 
     async def set_upgrade_level(
         self,

@@ -620,6 +620,7 @@ class StoreViewModel:
     feed_level: int
     cookware_level: int
     products: tuple[StoreProductViewModel, ...]
+    shop_section: str = "主商城"
     feed_probability_rows: tuple[StoreProbabilityRowViewModel, ...] = ()
     cookware_probability_rows: tuple[StoreProbabilityRowViewModel, ...] = ()
     lucky_whistle_rows: tuple[StoreConsumableProbabilityRowViewModel, ...] = ()

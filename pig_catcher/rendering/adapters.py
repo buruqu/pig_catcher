@@ -648,6 +648,7 @@ def food_catalog_view(page: FoodCatalogPage) -> FoodCatalogViewModel:
 def store_view(page: StorePage) -> StoreViewModel:
     """Build one store rendering view."""
 
+    show_main_probabilities = page.shop_section == "主商城"
     feed_probability_rows = tuple(
         StoreProbabilityRowViewModel(
             level=level,
@@ -655,10 +656,10 @@ def store_view(page: StorePage) -> StoreViewModel:
             delta=" · ".join(f"{rarity}★{weights[rarity - 1]:.2f}" for rarity in range(4, 7)),
             current=level == page.feed_level,
         )
-        for level in range(6)
+        for level in range(11)
         for weights in (catch_weights(page.catch_base_weights, feed_level=level),)
         for high_probability in (sum(weights[3:]),)
-    )
+    ) if show_main_probabilities else ()
     cookware_probability_rows = tuple(
         StoreProbabilityRowViewModel(
             level=level,
@@ -666,8 +667,8 @@ def store_view(page: StorePage) -> StoreViewModel:
             delta="相对权重",
             current=level == page.cookware_level,
         )
-        for level in range(6)
-    )
+        for level in range(11)
+    ) if show_main_probabilities else ()
     lucky_before = catch_weights(page.catch_base_weights)
     lucky_after = catch_weights(page.catch_base_weights, lucky_whistle=True)
     lucky_whistle_rows = tuple(
@@ -760,6 +761,7 @@ def store_view(page: StorePage) -> StoreViewModel:
         category=page.category,
         feed_level=page.feed_level,
         cookware_level=page.cookware_level,
+        shop_section=page.shop_section,
         feed_probability_rows=feed_probability_rows,
         cookware_probability_rows=cookware_probability_rows,
         lucky_whistle_rows=lucky_whistle_rows,

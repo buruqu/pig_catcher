@@ -208,8 +208,8 @@ def test_spear_public_effect_stays_the_approved_non_spoiler_summary() -> None:
 
 
 def test_help_uses_runtime_upgrade_prices_instead_of_a_hardcoded_table() -> None:
-    feed = [311, 733, 1777, 3889, 8111]
-    cookware = [299, 611, 1559, 3449, 6997]
+    feed = [311, 733, 1777, 3889, 8111, 12001, 15001, 18001, 21001, 26001]
+    cookware = [299, 611, 1559, 3449, 6997, 11003, 14009, 17011, 20011, 23003]
     settings = PigCatcherConfig.model_validate(
         {"economy": {"feed_upgrade_prices": feed, "cookware_upgrade_prices": cookware}}
     )
@@ -217,12 +217,12 @@ def test_help_uses_runtime_upgrade_prices_instead_of_a_hardcoded_table() -> None
     for price in (*feed, *cookware):
         assert _contains_integer(text, price), price
     assert "猪饲料" in text and "厨具" in text
-    assert not _contains_integer(text, 8000)
-    assert not _contains_integer(text, 7000)
+    assert not _contains_integer(text, 25000)
+    assert not _contains_integer(text, 24000)
     # 另一份配置不能错误复用上一个群或旧配置的帮助缓存。
     fresh = format_help("商城", settings=PigCatcherConfig())
-    assert _contains_integer(fresh, 8000)
-    assert not _contains_integer(fresh, 8111)
+    assert _contains_integer(fresh, 25000)
+    assert not _contains_integer(fresh, 26001)
 
 
 def test_help_uses_runtime_catch_quota_refresh_hours_and_cooldown() -> None:
@@ -288,6 +288,17 @@ def test_disabled_feature_topics_show_status_not_an_executable_menu(
     for command in hidden_commands:
         assert command not in text
     assert "/抓猪帮助" in text
+
+
+def test_store_help_hides_feature_store_notes_when_all_three_systems_are_disabled() -> None:
+    text = format_help(
+        "商城",
+        settings=_settings(dispatch_enabled=False, tour_enabled=False, battle_enabled=False),
+    )
+    for command in ("/猪猪商城 派遣", "/猪猪商城 巡演", "/猪猪商城 对战"):
+        assert command not in text
+    assert "独立分商城" not in text
+    assert "对应玩法库存" not in text
 
 
 def test_coupon_and_bag_help_remain_available_with_achievements_and_items_disabled() -> None:
@@ -387,15 +398,16 @@ def test_boundary_runtime_values_still_produce_bounded_help() -> None:
         {
             "catching": {"daily_limit": 1000, "cooldown_seconds": 86400, "quota_refresh_hours": list(range(24))},
             "economy": {
-                "feed_upgrade_prices": [2147483647] * 5,
-                "cookware_upgrade_prices": [2147483647] * 5,
+                "feed_upgrade_prices": [2147483647] * 10,
+                "cookware_upgrade_prices": [2147483647] * 10,
             },
             "trading": {"offer_expiry_minutes": 1440, "max_trade_price": 2147483647},
         }
     )
     assert len(format_help(settings=settings)) <= 600
     for topic in PUBLIC_TOPICS:
-        assert len(format_help(topic, settings=settings)) <= 2000
+        limit = 6000 if topic == "商城" else 2000
+        assert len(format_help(topic, settings=settings)) <= limit
     catching = format_help("抓猪", settings=settings)
     for hour in range(24):
         assert f"{hour:02d}:00" in catching
@@ -443,6 +455,7 @@ def test_unknown_topic_is_bounded_and_cannot_echo_notification_markup() -> None:
         ),
         ("背包", "/猪猪图鉴", parse_catalog_query, "品质=未收集", {"undiscovered_only": True}),
         ("商城", "/猪猪商城", parse_store_query, "分类=做菜", {"category": "做菜"}),
+        ("商城", "/猪猪商城", parse_store_query, "派遣", {"category": "派遣"}),
         ("商城", "/购买", parse_purchase_query, "超级幸运猪哨 2", {"product_name": "超级幸运猪哨", "quantity": 2}),
         ("道具", "/使用道具", parse_item_use_query, "幸运猪哨 3", {"item_name": "幸运猪哨", "quantity": 3}),
         ("批量", "/批量做菜", parse_batch_cook_query, "五星", {"rarity": 5}),

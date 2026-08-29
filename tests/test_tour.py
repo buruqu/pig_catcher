@@ -768,6 +768,8 @@ async def test_schema_37_migration_preserves_existing_assets_materials_and_econo
                 assert "CREATE UNIQUE INDEX" in index[0]
                 assert "short_code COLLATE NOCASE" in index[0]
                 assert "state IN ('active', 'locked-for-trade')" in index[0]
+            elif name == "upgrades":
+                assert "level BETWEEN 0 AND 10" in actual
             else:
                 assert actual == sql, name
         for table, rows in original.items():

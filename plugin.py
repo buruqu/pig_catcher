@@ -57,8 +57,14 @@ from .pig_catcher.domain.dispatch_views import DispatchLine, DispatchView
 from .pig_catcher.domain.enums import AssetKind
 from .pig_catcher.domain.errors import (
     CommandContextError,
+    DomainValidationError,
     MentionTargetError,
     PigCatcherError,
+)
+from .pig_catcher.domain.feature_shop import (
+    FEATURE_SHOP_PRODUCTS,
+    FEATURE_SHOP_PRODUCTS_BY_NAME,
+    FeatureShopSystem,
 )
 from .pig_catcher.domain.gameplay import ITEM_DEFINITIONS
 from .pig_catcher.domain.models import (
@@ -187,7 +193,10 @@ from .pig_catcher.services.item_bag import ItemBagService
 from .pig_catcher.services.tour import TourService
 from .pig_catcher.version import PLUGIN_VERSION
 
-_PURCHASE_PRODUCT_PATTERN = "(?:" + "|".join(escape(item.display_name) for item in ITEM_DEFINITIONS) + ")"
+_PURCHASE_PRODUCT_NAMES = tuple(item.display_name for item in ITEM_DEFINITIONS) + tuple(
+    product.display_name for product in FEATURE_SHOP_PRODUCTS
+)
+_PURCHASE_PRODUCT_PATTERN = "(?:" + "|".join(escape(name) for name in _PURCHASE_PRODUCT_NAMES) + ")"
 _COMMAND_LEADING_MENTION_PATTERN = r"(?:\[CQ:at,qq=[^\],]+\]\s*|<@!?[^>\s]+>\s*|@\S+\s*)?"
 _PURCHASE_COMMAND_PATTERN = (
     rf"^{_COMMAND_LEADING_MENTION_PATTERN}/购买"
@@ -3415,6 +3424,12 @@ class PigCatcherPlugin(MaiBotPlugin):
             return rejected or (False, "", 0)
         try:
             query = parse_store_query(matched_group(kwargs, "arguments"))
+            if query.category == "派遣" and not self.settings.features.dispatch_enabled:
+                raise DomainValidationError("管理面板已关闭“猪猪派遣”功能，派遣商城暂不可用。")
+            if query.category == "巡演" and not self.settings.features.tour_enabled:
+                raise DomainValidationError("管理面板已关闭“猪猪巡演”功能，巡演商城暂不可用。")
+            if query.category == "对战" and not self.settings.features.battle_enabled:
+                raise DomainValidationError("管理面板已关闭“猪猪对战”功能，对战商城暂不可用。")
             result = await cast(EconomyService, self._economy_service).store(
                 identity,
                 page=query.page,
@@ -3454,6 +3469,23 @@ class PigCatcherPlugin(MaiBotPlugin):
             return rejected or (False, "", 0)
         try:
             query = parse_purchase_query(matched_group(kwargs, "arguments"))
+            feature_product = FEATURE_SHOP_PRODUCTS_BY_NAME.get(query.product_name)
+            if feature_product is not None:
+                if (
+                    feature_product.system is FeatureShopSystem.DISPATCH
+                    and not self.settings.features.dispatch_enabled
+                ):
+                    raise DomainValidationError("管理面板已关闭“猪猪派遣”功能，无法购买派遣器具。")
+                if (
+                    feature_product.system is FeatureShopSystem.TOUR
+                    and not self.settings.features.tour_enabled
+                ):
+                    raise DomainValidationError("管理面板已关闭“猪猪巡演”功能，无法购买巡演器具。")
+                if (
+                    feature_product.system is FeatureShopSystem.BATTLE
+                    and not self.settings.features.battle_enabled
+                ):
+                    raise DomainValidationError("管理面板已关闭“猪猪对战”功能，无法购买对战器具。")
             result = await cast(EconomyService, self._economy_service).purchase(
                 identity,
                 query.product_name,

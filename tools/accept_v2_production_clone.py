@@ -104,7 +104,7 @@ def database_facts(path: Path) -> dict:
 
 
 def expected_legacy_row(table, old, new, *, mist_food_ids, migration_started):
-    """Allow only the reviewed v44/v45 changes, keeping every other old field."""
+    """Allow only the reviewed v44/v45/v47 changes, keeping every other old field."""
     expected = dict(old)
     updated = False
     if table in {"food_templates", "food_instances"}:
@@ -140,7 +140,10 @@ def expected_legacy_row(table, old, new, *, mist_food_ids, migration_started):
             expected["params_json"] = json.dumps({"uses": old["granted_uses"]}, separators=(",", ":"))
             expected["expires_at"] = None
             updated = True
-    if updated:
+    if table == "upgrades":
+        expected["level"] = int(old["level"]) * 2
+        updated = True
+    if updated and table != "upgrades":
         changed_at = datetime.fromisoformat(new["updated_at"].replace("Z", "+00:00"))
         if changed_at.timestamp() + 1 < migration_started.timestamp():
             raise AssertionError("A reviewed migration update did not receive a fresh timestamp.")

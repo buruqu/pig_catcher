@@ -46,6 +46,12 @@ from ..domain.errors import (
     StoreProductError,
     UpgradeLimitError,
 )
+from ..domain.feature_shop import (
+    FEATURE_SHOP_PRODUCTS_BY_NAME,
+    FeatureShopProduct,
+    FeatureShopSystem,
+    build_feature_shop_products,
+)
 from ..domain.food_effects import (
     COOK_EFFECT_IDS,
     CURRENT_WINDOW_CATCHES,
@@ -154,6 +160,11 @@ _STORE_CATEGORIES = {
     "抓猪": "抓猪道具",
     "做菜": "做菜道具",
     "升级": "永久升级",
+}
+_FEATURE_STORE_CATEGORIES = {
+    "派遣": FeatureShopSystem.DISPATCH,
+    "巡演": FeatureShopSystem.TOUR,
+    "对战": FeatureShopSystem.BATTLE,
 }
 
 
@@ -367,6 +378,7 @@ class StorePage:
     cookware_level: int
     products: tuple[StoreProduct, ...]
     catch_base_weights: tuple[float, ...] = BASE_CATCH_WEIGHTS
+    shop_section: str = "主商城"
 
 
 @dataclass(frozen=True, slots=True)
@@ -858,15 +870,35 @@ def format_group_event_eat_summary(result: EatResult) -> str:
 def format_store_summary(result: StorePage) -> str:
     """Return a complete store fallback."""
 
+    if result.shop_section != "主商城":
+        lines = [
+            f"【猪猪商城 · {result.shop_section}】",
+            f"玩家：{result.display_name}；余额：{result.coin_balance} 猪币",
+            f"独立分区：{result.shop_section}；共 {result.total_count} 件专属器具",
+            "购买后器具会直接进入对应玩法库存；原有材料制作入口继续保留。",
+            "器具请在对应玩法流程中选择，不使用 /使用道具。",
+        ]
+        if not result.products:
+            lines.append("当前分区没有商品。")
+        for product in result.products:
+            lines.append(
+                f"{product.display_name}｜{product.unit_price} 猪币｜"
+                f"{product.effect_summary}｜/购买 {product.display_name}"
+            )
+        return "\n".join(lines)
+
     feed_distributions = tuple(
         catch_weights(
             result.catch_base_weights,
             feed_level=level,
         )
-        for level in range(6)
+        for level in range(11)
     )
     feed_probabilities = tuple(sum(weights[3:]) for weights in feed_distributions)
-    cookware_bonuses = tuple((cookware_higher_rarity_multiplier(level) - 1.0) * 100.0 for level in range(6))
+    cookware_bonuses = tuple(
+        (cookware_higher_rarity_multiplier(level) - 1.0) * 100.0
+        for level in range(11)
+    )
     lucky_before = catch_weights(result.catch_base_weights)
 
     def catch_item_summary(item_id: str) -> str:
@@ -904,13 +936,15 @@ def format_store_summary(result: StorePage) -> str:
         f"玩家：{result.display_name}；余额：{result.coin_balance} 猪币",
         f"分类：{result.category}；单页展示全部 {result.total_count} 项",
         f"猪饲料 Lv.{result.feed_level}；厨具 Lv.{result.cookware_level}",
-        "猪饲料 Lv.0-5 的 4-6 星合计概率：" + " / ".join(f"{value:.2f}%" for value in feed_probabilities),
+        "猪饲料 Lv.0-10 的 4-6 星合计概率："
+        + " / ".join(f"{value:.2f}%" for value in feed_probabilities),
         "猪饲料逐档 4★/5★/6★："
         + " / ".join(
             f"Lv.{level} {weights[3]:.2f}%/{weights[4]:.2f}%/{weights[5]:.2f}%"
             for level, weights in enumerate(feed_distributions)
         ),
-        "厨具 Lv.0-5 的高档菜相对权重增幅：" + " / ".join(f"+{value:.0f}%" for value in cookware_bonuses),
+        "厨具 Lv.0-10 的高档菜相对权重增幅："
+        + " / ".join(f"+{value:.0f}%" for value in cookware_bonuses),
         "单调增益规则：等级、饲料与概率道具组合后，4/5/6 星均不会低于组合前；"
         "定向菜品只从更低星级转移概率，不压低更高星级。",
         f"幸运猪哨（基础权重，使用前→使用后）：{catch_item_summary('lucky-whistle')}",
@@ -2973,8 +3007,8 @@ class EconomyService:
     ) -> StorePage:
         """Read all current store products on one page."""
 
-        if category not in _STORE_CATEGORIES:
-            raise StoreProductError("商城分类只能是：全部、抓猪、做菜、升级。")
+        if category not in _STORE_CATEGORIES and category not in _FEATURE_STORE_CATEGORIES:
+            raise StoreProductError("商城分类只能是：全部、抓猪、做菜、升级、派遣、巡演、对战。")
         if page != 1:
             raise StoreProductError("猪猪商城已改为单页展示，不需要填写页码。")
         now = iso_timestamp(self.clock.now())
@@ -2994,14 +3028,34 @@ class EconomyService:
             )
             if profile is None:
                 raise RuntimeError("商城无法读取玩家余额。")
-        products = build_store_products(
-            feed_level=upgrades["feed"],
-            cookware_level=upgrades["cookware"],
-            feed_prices=self.economy.feed_upgrade_prices,
-            cookware_prices=self.economy.cookware_upgrade_prices,
-        )
-        resolved = _STORE_CATEGORIES[category]
-        filtered = tuple(product for product in products if resolved is None or product.category == resolved)
+        feature_system = _FEATURE_STORE_CATEGORIES.get(category)
+        if feature_system is None:
+            products = build_store_products(
+                feed_level=upgrades["feed"],
+                cookware_level=upgrades["cookware"],
+                feed_prices=self.economy.feed_upgrade_prices,
+                cookware_prices=self.economy.cookware_upgrade_prices,
+            )
+            resolved = _STORE_CATEGORIES[category]
+            filtered = tuple(
+                product
+                for product in products
+                if resolved is None or product.category == resolved
+            )
+            shop_section = "主商城"
+        else:
+            filtered = tuple(
+                StoreProduct(
+                    product_id=product.product_id,
+                    display_name=product.display_name,
+                    category=f"{category}器具",
+                    product_type="feature-tool",
+                    unit_price=product.unit_price,
+                    effect_summary=product.effect_summary,
+                )
+                for product in build_feature_shop_products(feature_system)
+            )
+            shop_section = category
         page_size = max(1, len(filtered))
         return StorePage(
             display_name=identity.display_name,
@@ -3015,6 +3069,7 @@ class EconomyService:
             cookware_level=upgrades["cookware"],
             products=filtered,
             catch_base_weights=self.catch_base_weights,
+            shop_section=shop_section,
         )
 
     async def purchase(
@@ -3069,9 +3124,15 @@ class EconomyService:
         upgrade_type = upgrade_type_by_name(normalized_name)
         if upgrade_type is not None and quantity != 1:
             raise StoreProductError("永久升级每次只能购买一级，数量必须为 1。")
+        feature_product: FeatureShopProduct | None = None
         if upgrade_type is None:
+            feature_product = FEATURE_SHOP_PRODUCTS_BY_NAME.get(normalized_name)
+        if upgrade_type is None and feature_product is None:
             item = item_product_by_name(normalized_name)
             product_id = item.item_id
+        elif feature_product is not None:
+            item = None
+            product_id = feature_product.product_id
         else:
             item = None
             product_id = f"upgrade-{upgrade_type.value}"
@@ -3101,7 +3162,13 @@ class EconomyService:
                 session,
                 player_id=identity.player_id,
             )
-            if upgrade_type is None:
+            if feature_product is not None:
+                display_name = feature_product.display_name
+                product_type = "feature-tool"
+                unit_price = feature_product.unit_price
+                upgrade_level = 0
+                upgrade_type_value = ""
+            elif upgrade_type is None:
                 assert item is not None
                 display_name = item.display_name
                 product_type = "item"
@@ -3110,8 +3177,9 @@ class EconomyService:
                 upgrade_type_value = ""
             else:
                 current_level = upgrades[upgrade_type.value]
-                if current_level >= 5:
-                    raise UpgradeLimitError(f"{'猪饲料' if upgrade_type is UpgradeType.FEED else '厨具'}已达到 Lv.5。")
+                if current_level >= self.economy.max_upgrade_level:
+                    label = "猪饲料" if upgrade_type is UpgradeType.FEED else "厨具"
+                    raise UpgradeLimitError(f"{label}已达到 Lv.{self.economy.max_upgrade_level}。")
                 prices = (
                     self.economy.feed_upgrade_prices
                     if upgrade_type is UpgradeType.FEED
@@ -3139,7 +3207,20 @@ class EconomyService:
             if balance_after is None:
                 raise InsufficientBalanceError(f"购买需要 {total_price} 猪币，当前余额不足。")
             inventory_quantity = 0
-            if upgrade_type is None:
+            if feature_product is not None:
+                inventory_quantity = await self.repository.add_feature_tool_inventory(
+                    session,
+                    player_id=identity.player_id,
+                    scope_id=identity.scope.value,
+                    product=feature_product,
+                    quantity=quantity,
+                    unit_price=unit_price,
+                    total_price=total_price,
+                    ledger_entry_key=f"{idempotency_key}:feature-tool",
+                    source_kind="store-purchase",
+                    now=now,
+                )
+            elif upgrade_type is None:
                 assert item is not None
                 inventory_quantity = await self.repository.add_item_inventory(
                     session,

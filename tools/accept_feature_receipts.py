@@ -127,6 +127,16 @@ async def scenarios(output: Path):
             return replace(who, message_id=uuid4().hex)
 
         cases.append(("01-store", "store", store_view(await economy.store(actor, page=1, category="全部")), None, {}))
+        for slug, category in (("dispatch", "派遣"), ("tour", "巡演"), ("battle", "对战")):
+            cases.append(
+                (
+                    f"01-store-{slug}",
+                    "store",
+                    store_view(await economy.store(actor, page=1, category=category)),
+                    None,
+                    {},
+                )
+            )
         purchased = await economy.purchase(fresh(), "幸运猪哨", quantity=3)
         cases.append(("02-purchase", "economy_receipt", purchase_receipt_view(purchased), None, {}))
         armed = await game.arm_item(fresh(), "幸运猪哨", quantity=3)

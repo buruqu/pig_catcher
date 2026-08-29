@@ -213,6 +213,8 @@ class PigCatcherDatabase:
         from .migrations.v0042_asset_code_lifecycle import GUARDS as ASSET_CODE_GUARDS
         from .migrations.v0043_reward_coupon_bag import GUARDS as COUPON_GUARDS
         from .migrations.v0043_reward_coupon_bag import TABLES as COUPON_TABLES
+        from .migrations.v0048_feature_tool_store_ledger import GUARDS as FEATURE_STORE_GUARDS
+        from .migrations.v0048_feature_tool_store_ledger import TABLES as FEATURE_STORE_TABLES
 
         required_tables = {
             "player_food_effects",
@@ -266,6 +268,7 @@ class PigCatcherDatabase:
         required_tables.update(BATTLE_TABLES)
         required_tables.update(ACTIVITY_TABLES)
         required_tables.update(COUPON_TABLES)
+        required_tables.update(FEATURE_STORE_TABLES)
         required_tables.add("achievement_badge_slots")
         table_rows = await (
             await connection.execute(
@@ -283,6 +286,17 @@ class PigCatcherDatabase:
         pig_columns = await (await connection.execute("PRAGMA table_info(pig_templates)")).fetchall()
         if not any(str(row[1]) == "display_tags_json" and bool(row[3]) for row in pig_columns):
             raise MigrationError("数据库缺少猪猪展示标签字段，请先完成 Schema 41 迁移。")
+
+        upgrade_definition = await (
+            await connection.execute(
+                "SELECT sql FROM sqlite_master WHERE type='table' AND name='upgrades'"
+            )
+        ).fetchone()
+        normalized_upgrade_sql = (
+            "".join(str(upgrade_definition[0]).lower().split()) if upgrade_definition else ""
+        )
+        if "check(levelbetween0and10)" not in normalized_upgrade_sql:
+            raise MigrationError("数据库永久升级等级约束不是 0 至 10，请先完成 Schema 47 迁移。")
 
         required_guards = {
             "material_ledger_no_update",
@@ -330,6 +344,7 @@ class PigCatcherDatabase:
         required_guards.update(ACTIVITY_GUARDS)
         required_guards.update(ASSET_CODE_GUARDS)
         required_guards.update(COUPON_GUARDS)
+        required_guards.update(FEATURE_STORE_GUARDS)
         required_guards.update({"achievement_badge_slot_insert_guard", "achievement_badge_slot_update_guard"})
         guard_rows = await (
             await connection.execute("SELECT name FROM sqlite_master WHERE type IN ('trigger','index')")

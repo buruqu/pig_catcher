@@ -531,11 +531,11 @@ class CatchingSection(PluginConfigBase):
         description="六星可爱猪群友的基础权重",
         json_schema_extra=_ui("六星权重", "默认 1；当前群没有授权素材时不会抽取"),
     )
-    max_feed_level: Literal[5] = Field(
-        default=5,
+    max_feed_level: Literal[10] = Field(
+        default=10,
         frozen=True,
         description="猪饲料永久升级的最高等级",
-        json_schema_extra=_ui("饲料最高等级", "产品规则固定为 5 级", disabled=True),
+        json_schema_extra=_ui("饲料最高等级", "产品规则固定为 10 级", disabled=True),
     )
     missing_six_star_strategy: Literal["transfer-to-five"] = Field(
         default="transfer-to-five",
@@ -569,11 +569,11 @@ class CookingSection(PluginConfigBase):
     __ui_icon__ = "cooking-pot"
     __ui_order__ = 60
 
-    max_cookware_level: Literal[5] = Field(
-        default=5,
+    max_cookware_level: Literal[10] = Field(
+        default=10,
         frozen=True,
         description="厨具永久升级的最高等级",
-        json_schema_extra=_ui("厨具最高等级", "产品规则固定为 5 级", disabled=True),
+        json_schema_extra=_ui("厨具最高等级", "产品规则固定为 10 级", disabled=True),
     )
     six_star_to_five_percent: Literal[90] = Field(
         default=90,
@@ -633,25 +633,47 @@ class EconomySection(PluginConfigBase):
     __ui_icon__ = "coins"
     __ui_order__ = 70
 
-    max_upgrade_level: Literal[5] = Field(
-        default=5,
+    max_upgrade_level: Literal[10] = Field(
+        default=10,
         frozen=True,
         description="永久升级统一最高等级",
-        json_schema_extra=_ui("升级最高等级", "猪饲料和厨具均固定为 5 级", disabled=True),
+        json_schema_extra=_ui("升级最高等级", "猪饲料和厨具均固定为 10 级", disabled=True),
     )
     feed_upgrade_prices: list[int] = Field(
-        default_factory=lambda: [300, 800, 1800, 4000, 8000],
-        min_length=5,
-        max_length=5,
-        description="猪饲料从一级到五级的购买价格",
-        json_schema_extra=_ui("饲料升级价格", "按一级到五级顺序填写五个正整数"),
+        default_factory=lambda: [
+            300,
+            600,
+            1000,
+            1600,
+            2600,
+            4200,
+            6800,
+            10500,
+            16000,
+            25000,
+        ],
+        min_length=10,
+        max_length=10,
+        description="猪饲料从一级到十级的购买价格",
+        json_schema_extra=_ui("饲料升级价格", "按一级到十级顺序填写十个正整数"),
     )
     cookware_upgrade_prices: list[int] = Field(
-        default_factory=lambda: [300, 700, 1600, 3500, 7000],
-        min_length=5,
-        max_length=5,
-        description="厨具从一级到五级的购买价格",
-        json_schema_extra=_ui("厨具升级价格", "按一级到五级顺序填写五个正整数"),
+        default_factory=lambda: [
+            300,
+            550,
+            900,
+            1450,
+            2400,
+            3800,
+            6200,
+            9800,
+            15000,
+            24000,
+        ],
+        min_length=10,
+        max_length=10,
+        description="厨具从一级到十级的购买价格",
+        json_schema_extra=_ui("厨具升级价格", "按一级到十级顺序填写十个正整数"),
     )
     store_page_size: int = Field(
         default=16,

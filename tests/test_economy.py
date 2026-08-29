@@ -378,14 +378,14 @@ def test_level_and_cookware_probability_bonuses_are_exact_and_bounded() -> None:
         3,
         size_percentile=0.5,
         weight_percentile=0.5,
-        cookware_level=5,
+        cookware_level=10,
         player_level=21,
         chef_spice=False,
     )
     assert tuple(
         round((cookware_higher_rarity_multiplier(level) - 1.0) * 100)
-        for level in range(6)
-    ) == (0, 4, 8, 12, 16, 20)
+        for level in range(11)
+    ) == (0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20)
     assert level_cooking_higher_rarity_multiplier(1) == 1.0
     assert level_cooking_higher_rarity_multiplier(21) == pytest.approx(1.10)
     assert level_cooking_higher_rarity_multiplier(999) == pytest.approx(1.10)
@@ -394,7 +394,7 @@ def test_level_and_cookware_probability_bonuses_are_exact_and_bounded() -> None:
         6,
         size_percentile=1.0,
         weight_percentile=1.0,
-        cookware_level=5,
+        cookware_level=10,
         player_level=999,
         chef_spice=True,
     ) == (0.0, 0.0, 0.0, 0.0, 90.0, 10.0)
@@ -1351,7 +1351,7 @@ async def test_store_purchase_upgrade_insufficient_balance_and_ledger(
     database = await _database_with_catalog(tmp_path)
     clock = FixedClock()
     seed_identity = _identity(message_id="seed")
-    await _grant_coins(database, seed_identity, 1600)
+    await _grant_coins(database, seed_identity, 3000)
     service = EconomyService(
         database,
         CookingSection(cook_cooldown_seconds=0),
@@ -1362,26 +1362,36 @@ async def test_store_purchase_upgrade_insufficient_balance_and_ledger(
         ).__next__,
     )
     store = await service.store(seed_identity, page=1, category="全部")
-    assert store.coin_balance == 1600
+    assert store.coin_balance == 3000
     assert len(store.products) == 18
     products = {product.display_name: product for product in store.products}
-    assert products["超级幸运猪哨"].unit_price == 850
-    assert products["超级主厨香料"].unit_price == 2600
+    assert products["超级幸运猪哨"].unit_price == 1680
+    assert products["超级主厨香料"].unit_price == 3600
     store_card = store_view(store)
     assert tuple(row.value for row in store_card.feed_probability_rows) == (
         "13.00%",
+        "13.16%",
         "13.33%",
+        "13.49%",
         "13.66%",
+        "13.82%",
         "13.98%",
+        "14.14%",
         "14.30%",
+        "14.46%",
         "14.62%",
     )
     assert tuple(row.value for row in store_card.cookware_probability_rows) == (
         "+0%",
+        "+2%",
         "+4%",
+        "+6%",
         "+8%",
+        "+10%",
         "+12%",
+        "+14%",
         "+16%",
+        "+18%",
         "+20%",
     )
     assert store_card.feed_probability_rows[0].current is True
@@ -1390,12 +1400,12 @@ async def test_store_purchase_upgrade_insufficient_balance_and_ledger(
         (row.before, row.after)
         for row in store_card.lucky_whistle_rows
     ) == (
-        ("40.00%", "34.00%"),
+        ("40.00%", "35.00%"),
         ("30.00%", "27.00%"),
         ("17.00%", "16.00%"),
         ("8.00%", "12.00%"),
         ("4.00%", "7.00%"),
-        ("1.00%", "4.00%"),
+        ("1.00%", "3.00%"),
     )
     assert tuple(row.after for row in store_card.chef_spice_rows) == (
         "1★ 57% · 2★ 40% · 3★ 3%",
@@ -1406,8 +1416,8 @@ async def test_store_purchase_upgrade_insufficient_balance_and_ledger(
     )
     assert store_card.super_chef_spice_rows[0].after == "5★ 80% · 6★ 20%"
     store_text = format_store_summary(store)
-    assert "猪饲料 Lv.0-5 的 4-6 星合计概率" in store_text
-    assert "厨具 Lv.0-5 的高档菜相对权重增幅" in store_text
+    assert "猪饲料 Lv.0-10 的 4-6 星合计概率" in store_text
+    assert "厨具 Lv.0-10 的高档菜相对权重增幅" in store_text
     assert "幸运猪哨（基础权重，使用前→使用后）" in store_text
     assert "超级幸运猪哨（基础权重，使用前→使用后）" in store_text
     assert "星辉探猪镜（基础权重，使用前→使用后）" in store_text
@@ -1416,7 +1426,7 @@ async def test_store_purchase_upgrade_insufficient_balance_and_ledger(
 
     item_identity = _identity(message_id="buy-item")
     item = await service.purchase(item_identity, "幸运猪哨", quantity=3)
-    assert item.balance_after == 520
+    assert item.balance_after == 480
     assert item.inventory_quantity == 3
     assert (await service.purchase(item_identity, "幸运猪哨", quantity=3)).receipt_created is False
 
@@ -1425,7 +1435,7 @@ async def test_store_purchase_upgrade_insufficient_balance_and_ledger(
         "厨具",
     )
     assert upgrade.upgrade_level == 1
-    assert upgrade.balance_after == 220
+    assert upgrade.balance_after == 180
     with pytest.raises(InsufficientBalanceError):
         await service.upgrade(
             _identity(message_id="buy-too-expensive"),
@@ -1437,8 +1447,85 @@ async def test_store_purchase_upgrade_insufficient_balance_and_ledger(
     )
     assert inventory is not None and inventory["quantity"] == 3
     ledger = await service.ledger(seed_identity, page=1)
-    assert ledger.coin_balance == ledger.ledger_total == 220
+    assert ledger.coin_balance == ledger.ledger_total == 180
     assert ledger.total_count == 3
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_feature_stores_are_separate_and_purchase_into_existing_tool_inventories(
+    tmp_path: Path,
+) -> None:
+    database = await _database_with_catalog(tmp_path)
+    clock = FixedClock()
+    identity = _identity(message_id="feature-store-seed")
+    await _grant_coins(database, identity, 2000)
+    service = EconomyService(
+        database,
+        CookingSection(cook_cooldown_seconds=0),
+        EconomySection(),
+        clock=clock,
+        id_factory=iter(("feature-coin-1", "feature-coin-2", "feature-coin-3")).__next__,
+    )
+
+    main = await service.store(identity, page=1, category="全部")
+    dispatch = await service.store(identity, page=1, category="派遣")
+    tour = await service.store(identity, page=1, category="巡演")
+    battle = await service.store(identity, page=1, category="对战")
+    assert main.shop_section == "主商城" and len(main.products) == 18
+    assert {product.display_name for product in main.products}.isdisjoint(
+        {product.display_name for product in (*dispatch.products, *tour.products, *battle.products)}
+    )
+    assert (dispatch.shop_section, len(dispatch.products)) == ("派遣", 4)
+    assert (tour.shop_section, len(tour.products)) == ("巡演", 4)
+    assert (battle.shop_section, len(battle.products)) == ("对战", 3)
+    dispatch_view = store_view(dispatch)
+    assert dispatch_view.shop_section == "派遣"
+    assert dispatch_view.feed_probability_rows == ()
+    assert "猪饲料 Lv." not in format_store_summary(dispatch)
+
+    buy_map_identity = _identity(message_id="feature-buy-map")
+    bought_map = await service.purchase(buy_map_identity, "区域地图", quantity=2)
+    duplicate = await service.purchase(buy_map_identity, "区域地图", quantity=2)
+    bought_wristband = await service.purchase(
+        _identity(message_id="feature-buy-wristband"),
+        "练习护腕",
+        quantity=1,
+    )
+    assert bought_map.product_type == "feature-tool"
+    assert bought_map.inventory_quantity == 2 and bought_map.balance_after == 960
+    assert duplicate.receipt_created is False and duplicate.balance_after == 960
+    assert bought_wristband.inventory_quantity == 1 and bought_wristband.balance_after == 80
+    with pytest.raises(InsufficientBalanceError):
+        await service.purchase(
+            _identity(message_id="feature-buy-insufficient"),
+            "奇遇罗盘",
+            quantity=1,
+        )
+
+    dispatch_row = await database.fetch_one(
+        "SELECT quantity FROM dispatch_tools WHERE player_id = ? AND tool_id = 'region-map'",
+        (identity.player_id,),
+    )
+    battle_row = await database.fetch_one(
+        "SELECT quantity FROM battle_tools WHERE player_id = ? AND tool_id = 'wristband'",
+        (identity.player_id,),
+    )
+    ledger_rows = await database.fetch_all(
+        """
+        SELECT system, product_id, tool_id, quantity, total_price, balance_after
+        FROM feature_tool_store_ledger
+        WHERE player_id = ?
+        ORDER BY occurred_at, entry_key
+        """,
+        (identity.player_id,),
+    )
+    assert dispatch_row is not None and dispatch_row["quantity"] == 2
+    assert battle_row is not None and battle_row["quantity"] == 1
+    assert [tuple(row) for row in ledger_rows] == [
+        ("dispatch", "feature-dispatch-region-map", "region-map", 2, 1040, 2),
+        ("battle", "feature-battle-wristband", "wristband", 1, 880, 1),
+    ]
     await database.close()
 
 

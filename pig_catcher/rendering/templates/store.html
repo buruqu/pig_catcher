@@ -11,22 +11,26 @@
 <body>
   {% from 'feature_components.html' import header %}
   <main class="game-sheet store-sheet" data-pig-catcher-root data-render-ready="true">
-    {{ header('collection', 'PiG Dream! · ' ~ view.display_name, '猪猪商城', view.coin_balance, '猪币余额', 'coin') }}
+    {{ header('collection', 'PiG Dream! · ' ~ view.display_name, '猪猪商城' ~ ((' · ' ~ view.shop_section) if view.shop_section != '主商城' else ''), view.coin_balance, '猪币余额', 'coin') }}
+    {% if view.shop_section == '主商城' %}
     <section class="feature-store-intro">{{ feature_icon('box') }}<div><h2>每一次准备，都有自己的用场</h2><p>消耗品与永久升级同页展示；售价和效果均来自当前规则，已购库存可在 /道具背包 查看。</p></div></section>
+    {% else %}
+    <section class="feature-store-intro">{{ feature_icon(view.shop_section) }}<div><h2>{{ view.shop_section }}专属器具</h2><p>这是独立功能商城，不混入主商城“全部”。材料制作入口继续保留；购买后请在对应玩法中选择器具，不使用 /使用道具。</p></div></section>
+    {% endif %}
 
     <section class="store-summary">
       <div>
         <span>当前分类</span>
         <strong>{{ view.category }}</strong>
       </div>
-      <div>
+      {% if view.shop_section == '主商城' %}<div>
         <span>猪饲料</span>
         <strong>Lv.{{ view.feed_level }}</strong>
       </div>
       <div>
         <span>厨具</span>
         <strong>Lv.{{ view.cookware_level }}</strong>
-      </div>
+      </div>{% else %}<div><span>商城分区</span><strong>{{ view.shop_section }}</strong></div><div><span>使用方式</span><strong>玩法内选择</strong></div>{% endif %}
       <div>
         <span>展示</span>
         <strong>全部 {{ view.total_count }} 项</strong>
@@ -60,6 +64,7 @@
     <section style="padding:32px 38px"><div class="empty-state">当前分类没有商品</div></section>
     {% endif %}
 
+    {% if view.shop_section == '主商城' %}
     <section class="feature-store-intro">{{ feature_icon('radar') }}<div><h2>概率参考 · 逐星对照</h2><p>以下是当前规则提供的基准计算，不是把已有装备重复叠加。</p></div></section>
     <section class="store-probability">
       <div class="store-probability__group">
@@ -98,7 +103,7 @@
           </div>
           {% endfor %}
         </div>
-        <p class="store-probability__note">厨具每级 +4%，Lv.5 为 +20%；玩家等级另可提供最多 +10%。六星猪做菜不受二者影响，保持 90% 五星 / 10% 六星。</p>
+        <p class="store-probability__note">厨具每级 +2%，Lv.10 为 +20%；玩家等级另可提供最多 +10%。六星猪做菜不受二者影响，保持 90% 五星 / 10% 六星。</p>
       </div>
 
       <div class="store-probability__group">
@@ -168,9 +173,10 @@
         <p class="store-probability__note">主厨香料向高一档转移最多 18 个百分点；超级主厨香料把六星菜概率从 10% 提至 20%。普通五星菜“一猪六吃”可继续叠加，六星菜独占效果触发时香料保留且不参与。</p>
       </div>
     </section>
+    {% endif %}
 
     <footer class="game-footer">
-      <span>消耗品用 /购买；永久成长用 /升级</span>
+      <span>{% if view.shop_section == '主商城' %}消耗品用 /购买；永久成长用 /升级{% else %}器具用 /购买；在对应玩法内选择使用{% endif %}</span>
       <strong>共 {{ view.total_count }} 项</strong>
     </footer>
   </main>

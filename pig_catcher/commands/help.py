@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ..config import PigCatcherConfig
+from ..domain.feature_shop import FEATURE_SHOP_PRODUCTS, FEATURE_SHOP_SYSTEM_LABELS
 from ..domain.gameplay import ITEM_DEFINITIONS
 
 
@@ -99,6 +100,9 @@ _TOPICS: dict[str, HelpTopic] = {
     "商城": HelpTopic(
         (
             HelpLine("/猪猪商城 [分类=全部|抓猪|做菜|升级]", "store"),
+            HelpLine("/猪猪商城 派遣", "dispatch_store"),
+            HelpLine("/猪猪商城 巡演", "tour_store"),
+            HelpLine("/猪猪商城 对战", "battle_store"),
             HelpLine("/购买 <商品名称> [数量]", "store"),
             HelpLine("/升级 <猪饲料|厨具>", "store"),
             HelpLine("/售卖猪猪 [猪名[#短编号]]", "sell"),
@@ -106,6 +110,8 @@ _TOPICS: dict[str, HelpTopic] = {
             HelpLine("/猪币账本 [页码]", "ledger"),
         ),
         (
+            HelpLine("派遣、巡演、对战器具各自放在独立分商城，不会混入主商城“全部”。", "feature_store"),
+            HelpLine("功能器具购买后直接进入对应玩法库存，在玩法流程中选择；原有材料制作入口保留。", "feature_store"),
             "购买数量不等于立刻使用；单件售卖按名称选最低价值的可售资产，省略名称仅选1至3星。",
             "旧猪菜保留原有价值，新获得的资产采用当前数值；已收藏或占用的资产不可售卖。",
         ),
@@ -382,6 +388,11 @@ def _gates(settings: PigCatcherConfig) -> dict[str, bool]:
         "dispatch": features.dispatch_enabled,
         "tour": features.tour_enabled,
         "battle": features.battle_enabled,
+        "dispatch_store": features.store_enabled and features.dispatch_enabled,
+        "tour_store": features.store_enabled and features.tour_enabled,
+        "battle_store": features.store_enabled and features.battle_enabled,
+        "feature_store": features.store_enabled
+        and (features.dispatch_enabled or features.tour_enabled or features.battle_enabled),
         "loot": features.battle_enabled and features.catching_enabled,
         "batch": features.selling_enabled or features.cooking_enabled,
         "gameplay": features.catching_enabled or features.cooking_enabled or features.eating_enabled,
@@ -458,6 +469,20 @@ def _configured_notes(topic: str, settings: PigCatcherConfig, gates: dict[str, b
             "【当前道具·猪币/件】",
         ]
         prices.extend(f"{item.display_name} {item.price}：{item.effect_summary}" for item in ITEM_DEFINITIONS)
+        enabled_feature_gates = {
+            "派遣": gates["dispatch_store"],
+            "巡演": gates["tour_store"],
+            "对战": gates["battle_store"],
+        }
+        for system, label in FEATURE_SHOP_SYSTEM_LABELS.items():
+            if not enabled_feature_gates[label]:
+                continue
+            prices.append(f"【{label}独立商城·猪币/件】")
+            prices.extend(
+                f"{product.display_name} {product.unit_price}：{product.effect_summary}"
+                for product in FEATURE_SHOP_PRODUCTS
+                if product.system is system
+            )
         return prices
     if topic == "交易" and gates["trade"]:
         trading = settings.trading

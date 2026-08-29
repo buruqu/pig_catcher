@@ -1,6 +1,6 @@
 [plugin]
 enabled = true
-config_version = "2.0.0.dev12"
+config_version = "2.0.0.dev13"
 framework_phase = "6"
 
 [features]
@@ -67,11 +67,11 @@ rarity_3_weight = 17.0
 rarity_4_weight = 8.0
 rarity_5_weight = 4.0
 rarity_6_weight = 1.0
-max_feed_level = 5
+max_feed_level = 10
 missing_six_star_strategy = "transfer-to-five"
 
 [cooking]
-max_cookware_level = 5
+max_cookware_level = 10
 six_star_to_five_percent = 90
 six_star_to_six_percent = 10
 inventory_page_size = 12
@@ -79,9 +79,9 @@ catalog_page_size = 12
 cook_cooldown_seconds = 10
 
 [economy]
-max_upgrade_level = 5
-feed_upgrade_prices = [300, 800, 1800, 4000, 8000]
-cookware_upgrade_prices = [300, 700, 1600, 3500, 7000]
+max_upgrade_level = 10
+feed_upgrade_prices = [300, 600, 1000, 1600, 2600, 4200, 6800, 10500, 16000, 25000]
+cookware_upgrade_prices = [300, 550, 900, 1450, 2400, 3800, 6200, 9800, 15000, 24000]
 store_page_size = 16
 ledger_page_size = 10
 max_purchase_quantity = 99

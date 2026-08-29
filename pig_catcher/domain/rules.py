@@ -8,17 +8,25 @@ from .enums import Rarity
 from .errors import DomainValidationError
 
 BASE_CATCH_WEIGHTS: tuple[float, ...] = (40.0, 30.0, 17.0, 8.0, 4.0, 1.0)
-LUCKY_WHISTLE_BASE_WEIGHTS: tuple[float, ...] = (34.0, 27.0, 16.0, 12.0, 7.0, 4.0)
+LUCKY_WHISTLE_BASE_WEIGHTS: tuple[float, ...] = (35.0, 27.0, 16.0, 12.0, 7.0, 3.0)
 SUPER_LUCKY_WHISTLE_BASE_WEIGHTS: tuple[float, ...] = (
-    27.0,
+    29.0,
     23.0,
     15.0,
     15.0,
     12.0,
-    8.0,
+    6.0,
 )
-STAR_PIG_RADAR_BASE_WEIGHTS: tuple[float, ...] = (0.0, 0.0, 45.0, 30.0, 18.0, 7.0)
+STAR_PIG_RADAR_BASE_WEIGHTS: tuple[float, ...] = (0.0, 0.0, 47.0, 30.0, 18.0, 5.0)
 FEED_RARITY_MULTIPLIER_STEPS: tuple[float, ...] = (
+    0.0,
+    0.0,
+    0.0,
+    0.01,
+    0.02,
+    0.03,
+)
+PLAYER_LEVEL_RARITY_MULTIPLIER_STEPS: tuple[float, ...] = (
     0.0,
     0.0,
     0.0,
@@ -26,6 +34,7 @@ FEED_RARITY_MULTIPLIER_STEPS: tuple[float, ...] = (
     0.04,
     0.06,
 )
+MAX_FEED_LEVEL = 10
 LEVEL_CATCH_BONUS_INTERVAL = 4
 LEVEL_CATCH_BONUS_MAX_SCALE = 5.0
 LEVEL_CATCH_BONUS_CAP_LEVEL = int(LEVEL_CATCH_BONUS_MAX_SCALE) * LEVEL_CATCH_BONUS_INTERVAL + 1
@@ -83,8 +92,8 @@ def feed_rarity_multipliers(feed_level: int) -> tuple[float, ...]:
     """返回猪饲料对六档抓猪权重的逐级相对乘数。"""
 
     normalized_level = int(feed_level)
-    if not 0 <= normalized_level <= 5:
-        raise DomainValidationError("猪饲料等级必须位于 0 至 5。")
+    if not 0 <= normalized_level <= MAX_FEED_LEVEL:
+        raise DomainValidationError(f"猪饲料等级必须位于 0 至 {MAX_FEED_LEVEL}。")
     return tuple(1.0 + step * normalized_level for step in FEED_RARITY_MULTIPLIER_STEPS)
 
 
@@ -103,7 +112,7 @@ def level_catch_rarity_multipliers(player_level: int) -> tuple[float, ...]:
     """返回数值等级对六档抓猪权重的封顶相对乘数。"""
 
     scale = level_catch_bonus_scale(player_level)
-    return tuple(1.0 + step * scale for step in FEED_RARITY_MULTIPLIER_STEPS)
+    return tuple(1.0 + step * scale for step in PLAYER_LEVEL_RARITY_MULTIPLIER_STEPS)
 
 
 def apply_monotonic_high_rarity_multipliers(

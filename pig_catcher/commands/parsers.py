@@ -15,7 +15,7 @@ from ..domain.social import (
 
 INVENTORY_SORTS = frozenset({"获得时间", "品质", "价值", "体型", "重量", "名称"})
 FOOD_INVENTORY_SORTS = frozenset({"获得时间", "品质", "价值", "份量", "名称"})
-STORE_CATEGORIES = frozenset({"全部", "抓猪", "做菜", "升级"})
+STORE_CATEGORIES = frozenset({"全部", "抓猪", "做菜", "升级", "派遣", "巡演", "对战"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -387,7 +387,7 @@ def parse_records_page(arguments: str) -> int:
 
 
 def parse_store_query(arguments: str) -> StoreQuery:
-    """解析单页 `/猪猪商城 [分类=全部|抓猪|做菜|升级]`。"""
+    """解析主商城筛选或派遣、巡演、对战独立商城。"""
 
     page = 1
     category = "全部"
@@ -403,7 +403,7 @@ def parse_store_query(arguments: str) -> StoreQuery:
             if category_seen:
                 raise DomainValidationError("商城分类不能重复填写。")
             if candidate not in STORE_CATEGORIES:
-                raise DomainValidationError("商城分类只能是：全部、抓猪、做菜、升级。")
+                raise DomainValidationError("商城分类只能是：全部、抓猪、做菜、升级、派遣、巡演、对战。")
             category = candidate
             category_seen = True
             continue

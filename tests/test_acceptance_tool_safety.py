@@ -2,11 +2,17 @@
 
 import hashlib
 import sqlite3
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
-from tools.accept_v2_production_clone import backup_readonly, complete_data_digest, readonly
+from tools.accept_v2_production_clone import (
+    backup_readonly,
+    complete_data_digest,
+    expected_legacy_row,
+    readonly,
+)
 from tools.uat_catching_and_collection import clone_formal_data, create_plugin, validate_components
 from tools.uat_production_recovery import configure_plugin as recovery_config
 from tools.uat_recent_mechanics import configure_plugin as mechanic_config
@@ -38,6 +44,25 @@ def test_readonly_rejects_writes_and_does_not_create_missing_source(tmp_path):
     assert hashlib.sha256(source.read_bytes()).hexdigest() == digest
     with pytest.raises(FileExistsError):
         backup_readonly(source, target)
+
+
+def test_production_clone_accepts_only_the_reviewed_upgrade_level_mapping() -> None:
+    old = {
+        "player_id": "qq:group:user",
+        "upgrade_type": "feed",
+        "level": 4,
+        "updated_at": "2026-08-28T00:00:00.000Z",
+    }
+    new = {**old, "level": 8}
+    expected, transformed = expected_legacy_row(
+        "upgrades",
+        old,
+        new,
+        mist_food_ids=set(),
+        migration_started=datetime(2026, 8, 29, tzinfo=UTC),
+    )
+    assert transformed is True
+    assert expected == new
 
 
 @pytest.mark.parametrize("filename", ["../escaped.sqlite3", "C:/escaped.sqlite3", ""])

@@ -176,7 +176,7 @@ def test_traits_and_tools_are_small_one_time_adjustments(tool, expected):
 @pytest.mark.parametrize("available", [True, False])
 def test_loot_permanent_distribution_monotonic(available):
     base = loot_weights(level=1, feed=0, cloud=0, six_available=available)
-    full = loot_weights(level=21, feed=5, cloud=5, six_available=available)
+    full = loot_weights(level=21, feed=10, cloud=5, six_available=available)
     assert sum(full) == pytest.approx(100)
     assert all(full[i] >= base[i] - 1e-9 for i in (3, 4, 5))
     if available:
@@ -184,4 +184,4 @@ def test_loot_permanent_distribution_monotonic(available):
         assert full == pytest.approx((3.1554, 6.3108, 6.3108, 25, 32.6654, 26.5577), abs=0.001)
     else:
         assert full[5] == 0 and base[4] == 50
-        assert full == loot_weights(level=21, feed=5, cloud=0, six_available=False)
+        assert full == loot_weights(level=21, feed=10, cloud=0, six_available=False)

@@ -347,6 +347,9 @@ def test_store_command_patterns_do_not_claim_livehouse_commands() -> None:
         "/购买 幸运猪哨 2",
         "/购买 超级幸运猪哨",
         "/购买 超级主厨香料 2",
+        "/购买 区域地图 2",
+        "/购买 留声机",
+        "/购买 练习护腕 3",
         "/购买 超级幸运猪哨 数量错误",
         "@小马哥bot测试机 /购买 超级幸运猪哨",
         "<@!bot-openid> /购买 超级幸运猪哨",
@@ -487,7 +490,9 @@ async def test_help_reads_the_plugins_current_settings(tmp_path: Path) -> None:
         config_updates={
             "catching": {"daily_limit": 9, "cooldown_seconds": 17, "quota_refresh_hours": [0, 6, 18]},
             "features": {"battle_enabled": False},
-            "economy": {"feed_upgrade_prices": [321, 654, 1987, 4321, 8765]},
+            "economy": {
+                "feed_upgrade_prices": [321, 654, 1987, 4321, 8765, 12001, 15001, 18001, 21001, 25001]
+            },
         },
     )
     try:
@@ -495,7 +500,7 @@ async def test_help_reads_the_plugins_current_settings(tmp_path: Path) -> None:
         assert success and "9次" in catching and "17秒" in catching
         assert "06:00" in catching and "18:00" in catching and "09:00" not in catching
         success, store, _ = await invoke_help(plugin, topic="商城")
-        assert success and "321 / 654 / 1987 / 4321 / 8765" in store
+        assert success and "321 / 654 / 1987 / 4321 / 8765 / 12001" in store
         success, battle, _ = await invoke_help(plugin, topic="对战")
         assert success and "未启用" in battle and "/比划比划" not in battle
         assert len(context.send.texts) == 3 and context.send.images == [] and context.render.calls == []
