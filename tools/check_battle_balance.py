@@ -11,7 +11,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from pig_catcher.domain.battle import mark_ready, new_state, play_chunk, resolve_round, roll_count  # noqa: E402
+from pig_catcher.domain.battle import new_state, play_chunk, resolve_round, roll_count  # noqa: E402
 from pig_catcher.domain.battle_catalog import BATTLE_VERSION  # noqa: E402
 
 
@@ -27,8 +27,6 @@ def simulate(samples: int, a_level: int, b_level: int) -> dict:
                 roll_count(state, side, seed)
                 while not state["sides"][side]["turn"]["done"]:
                     count += len(play_chunk(state, side, seed))
-            mark_ready(state, 0)
-            mark_ready(state, 1)
             resolve_round(state, seed)
         wins[state["winner"]] += 1
         rounds.append(state["round"])

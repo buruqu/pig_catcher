@@ -103,17 +103,24 @@ async def scenarios(output: Path):
         initial_state = loads(initial_match["state_json"])
         cases.append(("12-action-count", (await w.send(section="count")).view))
         cases.append(("13-moves", (await w.send(section="move")).view))
+        round_settlement = None
         for side, actor in enumerate((a, b)):
             while True:
                 current = loads((await w.match())["state_json"])
+                if current["status"] != "active" or current["round"] != initial_state["round"]:
+                    break
                 turn = current["sides"][side]["turn"]
                 if turn["raw"] is None:
                     await w.send(section="count", actor=actor)
                 elif not turn["done"]:
-                    await w.send(section="move", actor=actor)
+                    result = await w.send(section="move", actor=actor)
+                    if result.view.title == "双方出招 · 回合结算":
+                        round_settlement = result.view
                 else:
                     break
-        cases.append(("13b-ready-waiting", (await w.send(section="ready", actor=a)).view))
+        if round_settlement is None:
+            raise AssertionError("首回合未生成双方即时结算图")
+        cases.append(("13b-round-settlement", round_settlement))
         finished = await w.fight(already_started=True)
         cases.append(("14-natural-finale", (await w.send(section="status")).view))
         winner = loads(finished["state_json"])["winner"]

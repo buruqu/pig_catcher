@@ -236,9 +236,9 @@ async def test_group_reset_command_rejects_unconfigured_user_before_backup(
 def test_plugin_registers_only_explicit_production_commands() -> None:
     plugin = create_plugin()
     components = plugin.get_components()
-    assert len(components) == 87
+    assert len(components) == 86
     commands = {component["name"] for component in components if component["type"] == "COMMAND"}
-    assert len(commands) == 86
+    assert len(commands) == 85
     assert commands == {
         "pig_catcher_achievement_badges",
         "pig_catcher_item_bag",
@@ -248,7 +248,6 @@ def test_plugin_registers_only_explicit_production_commands() -> None:
         "pig_catcher_battle_challenge",
         "pig_catcher_battle_count",
         "pig_catcher_battle_move",
-        "pig_catcher_battle_ready",
         "pig_catcher_battle_status",
         "pig_catcher_battle_history",
         "pig_catcher_battle_loot",
@@ -521,7 +520,7 @@ async def test_help_topic_and_unknown_topic_are_explicit(tmp_path: Path) -> None
     assert success
     assert "/接受交易 <交易号>" in text
     success, battle, _ = await invoke_help(plugin, topic="对战")
-    assert success and "/战斗猪 帮助" in battle and "/出招数 → /出招 → 双方 /会赢的" in battle
+    assert success and "/战斗猪 帮助" in battle and "/出招数 → /出招（双方完成后立即结算" in battle
     _, unknown, _ = await invoke_help(plugin, topic="不存在")
     assert "未知帮助主题：不存在" in unknown
     await plugin.on_unload()

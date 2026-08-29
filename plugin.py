@@ -5045,14 +5045,6 @@ class PigCatcherPlugin(MaiBotPlugin):
         return await self._battle_command(stream_id, kwargs, "move")
 
     @Command(
-        "pig_catcher_battle_ready",
-        description="看完双方招式后确认本回合；双方都确认才结算胜负",
-        pattern=rf"^{_COMMAND_LEADING_MENTION_PATTERN}/会赢的\s*$",
-    )
-    async def handle_battle_ready(self, stream_id: str = "", **kwargs: Any) -> tuple[bool, str, int]:
-        return await self._battle_command(stream_id, kwargs, "ready")
-
-    @Command(
         "pig_catcher_battle_status",
         description="观战与查看双方当前状态",
         pattern=rf"^{_COMMAND_LEADING_MENTION_PATTERN}/对战状态\s*$",

@@ -27,7 +27,6 @@ COMMANDS = {
     "pig_catcher_battle_challenge": "比划比划",
     "pig_catcher_battle_count": "出招数",
     "pig_catcher_battle_move": "出招",
-    "pig_catcher_battle_ready": "会赢的",
     "pig_catcher_battle_status": "对战状态",
     "pig_catcher_battle_history": "对战记录",
     "pig_catcher_battle_loot": "战利品抓猪",
@@ -192,10 +191,7 @@ async def test_sdk_full_match_rendered_fallback_and_disabled_safety(tmp_path):
                     "handle_battle_count"
                     if turn["raw"] is None
                     else "handle_battle_move"
-                    if not turn["done"]
-                    else "handle_battle_ready"
-                    if all(item["turn"]["done"] for item in current["sides"])
-                    and not turn.get("ready", False)
+                    if not turn["done"] or all(item["turn"]["done"] for item in current["sides"])
                     else ""
                 )
                 if handler:

@@ -13,7 +13,7 @@ import pytest
 
 from pig_catcher.commands.battle import BattleRequest, parse_battle_request
 from pig_catcher.config.model import CatchingSection
-from pig_catcher.domain.battle import loads
+from pig_catcher.domain.battle import dumps, loads
 from pig_catcher.domain.battle_catalog import ACTION_TTL_MS, BattleError
 from pig_catcher.domain.dispatch import MATERIAL_SCALE
 from pig_catcher.domain.errors import (
@@ -87,8 +87,9 @@ class BattleWorld:
                     await self.send(section="count", actor=actor)
                 elif not turn["done"]:
                     await self.send(section="move", actor=actor)
-                elif all(item["turn"]["done"] for item in current["sides"]) and not turn.get("ready", False):
-                    await self.send(section="ready", actor=actor)
+                elif all(item["turn"]["done"] for item in current["sides"]):
+                    # 兼容热更新前已停在 /会赢的 阶段，以及贷款把出招数扣到0的回合。
+                    await self.send(section="move", actor=actor)
         raise AssertionError("fixture match did not end in 200 actions")
 
     async def fund(self, actor=None):
@@ -208,42 +209,53 @@ async def test_auto_loot_does_not_replace_an_existing_normal_catch_receipt(world
     assert (await world.db.fetch_one("SELECT used FROM battle_loot"))[0] == 0
 
 
-async def test_round_waits_for_both_win_declarations_and_actions_stay_with_fighter(world):
+async def test_round_settles_after_both_moves_and_shows_every_action_for_both_fighters(world):
     await world.start()
+    settled = None
     for side, actor in enumerate((world.a, world.b)):
         count_result = await world.send(section="count", actor=actor)
         assert count_result.view.fighters[side].count_wheel is not None
         assert not count_result.view.wheels
         while True:
             state = loads((await world.match())["state_json"])
+            if state["round"] != 1 or state["status"] != "active":
+                break
             if state["sides"][side]["turn"]["done"]:
                 break
             move_result = await world.send(section="move", actor=actor)
             assert move_result.view.fighters[side].move_wheel is not None
             assert move_result.view.fighters[side].action_lines
-            assert not move_result.view.wheels
-    state = loads((await world.match())["state_json"])
-    assert all(item["turn"]["done"] and not item["turn"].get("ready", False) for item in state["sides"])
-    assert not await world.db.fetch_all("SELECT * FROM battle_rounds")
-
-    first = await world.send(section="ready", actor=world.a, mid="ready-a")
-    assert first.view.title == "会赢的 · 等待对方"
-    assert first.view.fighters[0].ready == "已输入 /会赢的"
-    assert first.view.fighters[1].ready == "等待 /会赢的"
-    expires = (await world.match())["expires_ms"]
-    duplicate = await world.send(section="ready", actor=world.a, mid="ready-a-again")
-    assert duplicate.view.title == "会赢的 · 等待对方"
-    assert (await world.match())["expires_ms"] == expires
-    assert not await world.db.fetch_all("SELECT * FROM battle_rounds")
-
-    settled = await world.send(section="ready", actor=world.b, mid="ready-b")
-    assert settled.view.title == "会赢的 · 回合结算"
+            if move_result.view.title != "双方出招 · 回合结算":
+                assert not move_result.view.wheels
+            if move_result.view.title == "双方出招 · 回合结算":
+                settled = move_result
+                break
+    assert settled is not None
+    assert settled.view.title == "双方出招 · 回合结算"
+    assert all(fighter.action_lines for fighter in settled.view.fighters)
+    assert all(fighter.ready == "本回合已结算" for fighter in settled.view.fighters)
+    stored_moves = await world.db.fetch_all(
+        "SELECT side,COUNT(*) FROM battle_moves WHERE round_number=1 GROUP BY side ORDER BY side"
+    )
+    assert [len(fighter.action_lines) for fighter in settled.view.fighters] == [row[1] for row in stored_moves]
     assert len(await world.db.fetch_all("SELECT * FROM battle_rounds")) == 1
-    assert (
-        await world.db.fetch_one(
-            "SELECT COUNT(*) FROM activity_facts WHERE subevent_id LIKE 'ready:%'"
+    assert (await world.db.fetch_one("SELECT COUNT(*) FROM activity_facts WHERE subevent_id LIKE 'ready:%'"))[0] == 0
+
+
+async def test_legacy_both_done_state_settles_on_next_move_without_reroll(world):
+    await world.start()
+    match = await world.match()
+    state = loads(match["state_json"])
+    for side in (0, 1):
+        state["sides"][side]["turn"].update(raw=0, debt=0, effective=0, pending=0, done=True, ready=False)
+    async with world.db.transaction() as session:
+        await session.execute(
+            "UPDATE battle_matches SET state_json=? WHERE battle_id=?",
+            (dumps(state), match["battle_id"]),
         )
-    )[0] == 2
+    result = await world.send(section="move", actor=world.a, mid="legacy-finish")
+    assert result.view.title == "双方出招 · 回合结算"
+    assert len(await world.db.fetch_all("SELECT * FROM battle_rounds")) == 1
 
 
 async def test_confirm_binding_costs_all_levels_and_inherited_protection(world):

@@ -41,7 +41,7 @@ def test_v2_registry_contains_the_frozen_first_season_shape() -> None:
     assert categories["隐藏彩蛋"] == 20
     assert categories["终极收藏"] == 2
     assert SCHEMA_VERSION == 49
-    assert RULESET_VERSION == 43
+    assert RULESET_VERSION == 44
 
 
 @pytest.mark.asyncio

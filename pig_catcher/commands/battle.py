@@ -14,7 +14,7 @@ BATTLE_HELP = """【PiG Dream! 猪猪对战】
 /战斗猪 轮盘 宿傩猪；/战斗猪 轮盘 五条猪
 /战斗猪 器具；/战斗猪 制作 练习护腕 2；/战斗猪 器具 练习护腕（或 无）
 /比划比划 @群友；/比划比划 接受；/比划比划 拒绝；/比划比划 取消
-/出招数 → /出招 → 双方 /会赢的（看完招式后各自确认，两人都确认才结算）
+/出招数 → /出招（第二位完成出招后立即结算，结算图完整展示双方本回合招式）
 /对战状态；/比划比划 认输（两分钟内 /比划比划 确认认输）
 /对战记录 [页码]；/对战记录 B对战号 [回合] [页码]
 自然力竭败者接下来5次普通 /抓猪 会自动结算战利品，猪直接归胜者且不占普通额度
@@ -47,7 +47,7 @@ def parse_battle_request(
         raise BattleError("对战参数过长或含控制字符。")
     if value in {"帮助", "help", "?"}:
         return BattleRequest("help", {})
-    if section in {"count", "move", "ready", "status", "loot"}:
+    if section in {"count", "move", "status", "loot"}:
         if value:
             raise BattleError("该指令不需要额外参数。")
         return BattleRequest(section, {})

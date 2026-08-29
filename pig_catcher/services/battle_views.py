@@ -119,21 +119,27 @@ def matchup(
                 f"原始{turn['raw']}招 - 贷款{weight_label(turn['debt'])}招 = 实际{turn['effective']}招。",
             )
     if events:
-        event_side = int(events[0]["side"])
-        last = events[-1]
-        moves = FIGHTERS_BY_ID[last["fighter_id"]].moves
-        move_cards[event_side] = wheel_card(
-            "move",
-            "第" + str(last["ordinal"]) + "招落点",
-            tuple((move.name, move.draw_weight) for move in moves),
-            last["name"],
-            "本卡展示本次最后一招的真实落点；逐招数值均为已提交事实。",
-        )
-        action_lines[event_side] = tuple(move_line(event) for event in events[-8:])
-        action_notes[event_side] = (
-            f"本次实际执行{len(events)}招；超过8招展示末8招，全部事实可用 "
-            f"/对战记录 {match['battle_id']} {events[0]['round']} 查看。"
-        )
+        for event_side in (0, 1):
+            side_events = [event for event in events if int(event["side"]) == event_side]
+            if not side_events:
+                continue
+            last = side_events[-1]
+            moves = FIGHTERS_BY_ID[last["fighter_id"]].moves
+            move_cards[event_side] = wheel_card(
+                "move",
+                "第" + str(last["ordinal"]) + "招落点",
+                tuple((move.name, move.draw_weight) for move in moves),
+                last["name"],
+                "本卡展示最后一招的真实落点；逐招数值均为已提交事实。",
+            )
+            visible_events = side_events if round_result else side_events[-8:]
+            action_lines[event_side] = tuple(move_line(event) for event in visible_events)
+            action_notes[event_side] = (
+                f"本回合共{len(side_events)}招，以上为完整出招记录。"
+                if round_result
+                else f"本次实际执行{len(side_events)}招；超过8招展示末8招，全部事实可用 "
+                f"/对战记录 {match['battle_id']} {side_events[0]['round']} 查看。"
+            )
     all_done = all(side["turn"].get("done", False) for side in count_sides)
     for index, side in enumerate(display_sides):
         snap, turn = side["snapshot"], side["turn"]
@@ -173,13 +179,7 @@ def matchup(
             else TOOLS_BY_ID[tool].name + (" · 已触发" if side["tool_used"] else " · 待触发/终局退回")
         )
         if turn["done"]:
-            ready = (
-                "已输入 /会赢的"
-                if turn["ready"]
-                else "等待 /会赢的"
-                if all_done
-                else "已出完，等待对方"
-            )
+            ready = "本回合已结算" if round_result and all_done else "已出完，等待对方"
         else:
             ready = "尚未出完"
         cards.append(
@@ -246,12 +246,12 @@ def matchup(
     elif state["status"] == "active":
         if all(side["turn"].get("done", False) for side in state["sides"]):
             hints = (
-                "双方查看完招式后，各自输入 /会赢的；两人都确认才会结算本回合。",
-                f"{remaining}秒内需完成确认；重复确认不会重新抽取或延长时间。",
+                "该对局从旧确认流程恢复：任一参战者再输入一次 /出招，即按已保存招式结算本回合。",
+                f"{remaining}秒内需推进；不会重新抽取已经保存的出招数或招式。",
             )
         else:
             hints = (
-                f"第{state['round']}回合：双方各自 /出招数 → /出招。长连锁可继续 /出招；0招也需 /会赢的。",
+                f"第{state['round']}回合：双方各自 /出招数 → /出招；第二位完成出招时自动结算。长连锁可继续 /出招。",
                 f"{remaining}秒内需有有效推进，查询和重复消息不延长；超时或认输不发战利品。",
             )
     elif state["status"] == "completed":

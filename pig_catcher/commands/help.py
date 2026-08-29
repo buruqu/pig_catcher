@@ -283,7 +283,7 @@ _TOPICS: dict[str, HelpTopic] = {
             HelpLine("/战斗猪；/战斗猪 强化", "battle"),
             HelpLine("/比划比划 @成员；/比划比划 接受", "battle"),
             HelpLine("/比划比划 拒绝；/比划比划 取消", "battle"),
-            HelpLine("/出招数 → /出招 → 双方 /会赢的（两人确认后结算）", "battle"),
+            HelpLine("/出招数 → /出招（双方完成后立即结算并展示完整招式）", "battle"),
             HelpLine("/对战状态；/对战记录 [页码]", "battle"),
             HelpLine("/战利品抓猪", "loot"),
             HelpLine("/战斗猪 帮助（轮盘、器具、认输与解除保护）", "battle"),

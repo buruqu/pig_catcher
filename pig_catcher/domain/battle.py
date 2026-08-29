@@ -212,20 +212,6 @@ def play_chunk(state: dict, side: int, seed: str, *, chunk_size: int = MOVE_CHUN
     return events
 
 
-def mark_ready(state: dict, side: int) -> dict:
-    """玩家看完双方招式后确认结算；只有双方都确认，回合才可抽胜负。"""
-
-    player = _side(state, side)
-    for other in state["sides"]:
-        other["turn"].setdefault("ready", False)
-    if not all(other["turn"]["done"] for other in state["sides"]):
-        raise BattleError("请等待双方都出完招，再输入 /会赢的。")
-    if player["turn"]["ready"]:
-        return {"changed": False, "side": side, "round": state["round"]}
-    player["turn"]["ready"] = True
-    return {"changed": True, "side": side, "round": state["round"]}
-
-
 def apply_injury(player: dict, injury: str) -> None:
     if injury == "light":
         player["risk"] = max(player["risk"], 1)
@@ -240,9 +226,7 @@ def apply_injury(player: dict, injury: str) -> None:
 
 def resolve_round(state: dict, seed: str) -> dict | None:
     _side(state, 0)
-    for side in state["sides"]:
-        side["turn"].setdefault("ready", False)
-    if not all(side["turn"]["done"] and side["turn"]["ready"] for side in state["sides"]):
+    if not all(side["turn"]["done"] for side in state["sides"]):
         return None
     before = deepcopy(state["sides"])
     roll = randbelow(seed, f"{state['round']}:winner", sum(side["weight"] for side in before))

@@ -8,7 +8,7 @@ from uuid import uuid4
 
 from ..commands.battle import BattleRequest
 from ..config.model import CatchingSection
-from ..domain.battle import dumps, loads, mark_ready, new_state, play_chunk, resolve_round, roll_count
+from ..domain.battle import dumps, loads, new_state, play_chunk, resolve_round, roll_count
 from ..domain.battle_catalog import ACTION_TTL_MS, BATTLE_VERSION, INVITE_COOLDOWN_MS, INVITE_TTL_MS, BattleError
 from ..domain.battle_views import BattleView
 from ..domain.dispatch_views import DispatchLine as Line
@@ -57,7 +57,6 @@ MUTATIONS = SETUP - QUERIES | frozenset(
         "surrender_confirm",
         "count",
         "move",
-        "ready",
         "loot",
     )
 )
@@ -478,20 +477,9 @@ class BattleService:
                     now_ms,
                     event,
                 )
-        elif action == "ready":
-            result = mark_ready(state, side)
-            changed = bool(result.pop("changed"))
-            if changed:
-                await self.repo.fact(
-                    session,
-                    identity.player_id,
-                    identity.scope.value,
-                    match["battle_id"],
-                    f"ready:{round_number}",
-                    now_ms,
-                    result,
-                )
-                summary = resolve_round(state, match["random_seed"])
+            summary = resolve_round(state, match["random_seed"])
+            if summary:
+                changed = True
         else:
             raise BattleError("未知对战操作。")
         if summary:
@@ -508,6 +496,11 @@ class BattleService:
                     now_ms,
                     {"side": index, "result": summary},
                 )
+            rows = await session.fetch_all(
+                "SELECT event_json FROM battle_moves WHERE battle_id=? AND round_number=? ORDER BY side,ordinal",
+                (match["battle_id"], round_number),
+            )
+            events = [loads(row[0]) for row in rows]
         if state["status"] == "completed":
             await self.repo.finish(session, match, state, "completed", now_ms, winner_id=ids[state["winner"]])
             match["status"] = "completed"
@@ -529,21 +522,15 @@ class BattleService:
                 else "本回合出招数已经确定，不会重新抽取。"
             )
         elif action == "move":
-            title = "招式已展示"
-            banner = (
-                "本次招式与逐招数值已显示在你的战斗猪下方；双方出完后再各自输入 /会赢的。"
-                if changed
-                else "本回合已经出完招；请看完双方招式后输入 /会赢的。"
-            )
-        else:
-            title = "会赢的 · 回合结算" if summary else "会赢的 · 等待对方"
-            banner = (
-                "双方都已确认，以下为本回合唯一结算结果。"
-                if summary
-                else "你的胜负宣言已锁定，等待对方输入 /会赢的。"
-                if changed
-                else "你已经输入过 /会赢的；等待对方确认，不会重复结算。"
-            )
+            title = "双方出招 · 回合结算" if summary else "招式已展示"
+            if summary:
+                banner = "双方都已完成出招，本回合立即结算；以下完整展示双方本回合全部招式与伤势结果。"
+            elif state["sides"][side]["turn"]["done"]:
+                banner = "你的本回合招式已完整展示，等待对方完成出招后自动结算。"
+            elif changed:
+                banner = "本次招式与逐招数值已显示在你的战斗猪下方；仍有连锁招式，请继续输入 /出招。"
+            else:
+                banner = "你已完成本回合出招，等待对方完成后自动结算。"
         return matchup(
             identity,
             match,
