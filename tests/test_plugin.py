@@ -372,6 +372,29 @@ def test_pig_detail_command_supports_new_and_legacy_names() -> None:
     assert re.search(pattern, "/猪详情 地球猪#pig9fun") is None
 
 
+def test_command_session_allowlist_is_exported_only_on_command_components() -> None:
+    plugin = create_plugin()
+    config = plugin.get_default_config()
+    config["access"]["command_session_allowlist"] = ["session-alpha", "session-beta"]
+    plugin.set_plugin_config(config)
+
+    components = plugin.get_components()
+
+    commands = [component for component in components if component["type"] == "COMMAND"]
+    non_commands = [component for component in components if component["type"] != "COMMAND"]
+    assert commands
+    assert all(
+        component["allowed_session"] == ["session-alpha", "session-beta"]
+        for component in commands
+    )
+    assert all("allowed_session" not in component for component in non_commands)
+
+
+def test_empty_command_session_allowlist_keeps_normal_global_registration() -> None:
+    components = create_plugin().get_components()
+    assert all("allowed_session" not in component for component in components)
+
+
 def test_daily_giants_command_claims_only_the_exact_query() -> None:
     components = {
         component["name"]: component

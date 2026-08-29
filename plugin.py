@@ -201,6 +201,23 @@ class PigCatcherPlugin(MaiBotPlugin):
         self._delivery: RenderDelivery | None = None
         self._maintenance: MaintenanceRunner | None = None
 
+    def get_components(self) -> list[dict[str, Any]]:
+        """Expose commands only to configured sessions during a dual-version rollout."""
+
+        components = super().get_components()
+        configured = self._plugin_config_instance
+        allowed_sessions = (
+            list(cast(PigCatcherConfig, configured).access.command_session_allowlist)
+            if configured is not None
+            else []
+        )
+        if not allowed_sessions:
+            return components
+        for component in components:
+            if component.get("type") == "COMMAND":
+                component["allowed_session"] = allowed_sessions.copy()
+        return components
+
     @property
     def settings(self) -> PigCatcherConfig:
         """返回强类型配置，集中隔离 SDK 基类的宽类型。"""

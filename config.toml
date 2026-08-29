@@ -1,6 +1,6 @@
 [plugin]
 enabled = true
-config_version = "1.29.1"
+config_version = "1.29.2"
 framework_phase = "6"
 
 [features]
@@ -27,6 +27,7 @@ group_blacklist = []
 user_whitelist = []
 user_blacklist = []
 admin_user_ids = ["1455722694", "qq-official:1653F5B1D9080DF8848CAC1A23E5B309", "qq-official:D5CE7CA3F4339D1B7D1D52938419DAD4"]
+command_session_allowlist = []
 notify_denied = true
 denied_message = "当前群或账号未启用抓猪插件。"
 
