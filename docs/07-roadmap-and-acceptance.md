@@ -1895,3 +1895,9 @@ Schema46补齐真实三格徽章，Ruleset40修正巨物成就的单轴/双轴�
 - 规则版本为 `2.0.3 / Schema49 / Ruleset44 / Manifest4`，当前组件为85个Command和1个HomeCard，不新增表或迁移。
 - 按用户本轮快速门禁要求未重复运行1863项全量回归；对战、SDK、帮助、命令路由、元数据和版本专项
   共 `321 passed`，Ruff、compileall、锁文件及差异检查通过。对战图片验收 `26/26` 通过，已人工复核即时结算卡完整显示双方招式。
+- 内部包由提交 `c6e0c27` 构建，复制密钥输入为否，只允许既定的一对 QQ/QQ Official scope；构建包位于
+  `D:\MaiBotArchives\pig_catcher\internal-preview\pig_catcher_v2_internal-2.0.3-20260829-224628`。
+- 上线前确认无等待或进行中对战，并完成在线数据库及2.0.2插件备份：
+  `D:\MaiBotArchives\pig_catcher\releases\2.0.3-20260829-224722`；备份 user_version49、quick_check=ok、外键0。
+- 2026-08-29 22:50无删档替换并通过MaiBot自身接口重启。宿主实际加载2.0.3，静态注册85个Command+1个HomeCard，
+  `/会赢的` 组件为0；内部库完整性正常，既有战利品使用进度保持2，1.29.2正式插件未变，重启后内部插件日志无warning/error。
