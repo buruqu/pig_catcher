@@ -54,6 +54,21 @@ def _validate_user_ids(values: list[str]) -> list[str]:
     return normalized
 
 
+def _validate_session_ids(values: list[str]) -> list[str]:
+    """Normalize stable MaiBot session or platform/group routing keys."""
+
+    normalized: list[str] = []
+    for raw_value in values:
+        value = str(raw_value or "").strip()
+        if not value:
+            continue
+        if len(value) > 320 or any(ord(character) < 32 for character in value):
+            raise ValueError("命令会话或作用域 ID 不合法")
+        if value not in normalized:
+            normalized.append(value)
+    return normalized
+
+
 def _validate_scope_ids(values: list[str]) -> list[str]:
     normalized: list[str] = []
     for raw_value in values:
@@ -271,6 +286,15 @@ class AccessSection(PluginConfigBase):
             "每行一个身份；NapCat 可填 QQ 号，QQ 官方机器人需填成员 OpenID，也支持 platform:user_id",
         ),
     )
+    command_session_allowlist: list[str] = Field(
+        default_factory=list,
+        max_length=500,
+        description="仅向指定 MaiBot 聊天会话或群作用域注册本插件的命令组件",
+        json_schema_extra=_ui(
+            "命令路由白名单",
+            "用于双版本灰度；优先填写稳定的 platform:group_id，也兼容 session_id。留空表示全局注册。",
+        ),
+    )
     notify_denied: bool = Field(
         default=True,
         description="访问被拒绝时是否发送提示",
@@ -283,6 +307,11 @@ class AccessSection(PluginConfigBase):
         description="访问控制拒绝时发送的文字",
         json_schema_extra=_ui("拒绝提示文字", "仅在“拒绝时提示”开启时发送"),
     )
+
+    @field_validator("command_session_allowlist")
+    @classmethod
+    def validate_command_session_allowlist(cls, value: list[str]) -> list[str]:
+        return _validate_session_ids(value)
 
 
 class StorageSection(PluginConfigBase):

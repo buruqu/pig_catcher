@@ -325,6 +325,29 @@ def test_plugin_registers_only_explicit_production_commands() -> None:
         "pig_catcher_achievement_ranking",
         "pig_catcher_weekly_competition",
     }
+
+
+def test_command_session_allowlist_is_exported_only_on_command_components() -> None:
+    plugin = create_plugin()
+    config = plugin.get_default_config()
+    config["access"]["command_session_allowlist"] = ["session-alpha", "session-beta"]
+    plugin.set_plugin_config(config)
+
+    components = plugin.get_components()
+
+    commands = [component for component in components if component["type"] == "COMMAND"]
+    non_commands = [component for component in components if component["type"] != "COMMAND"]
+    assert commands
+    assert all(
+        component["allowed_session"] == ["session-alpha", "session-beta"]
+        for component in commands
+    )
+    assert all("allowed_session" not in component for component in non_commands)
+
+
+def test_empty_command_session_allowlist_keeps_normal_global_registration() -> None:
+    components = create_plugin().get_components()
+    assert all("allowed_session" not in component for component in components)
     home_card = next(component for component in components if component["type"] == "HOME_CARD")
     assert home_card["name"] == "pig_catcher_quota_control"
     assert "打开运营控制" in str(home_card)
@@ -332,10 +355,28 @@ def test_plugin_registers_only_explicit_production_commands() -> None:
     assert "自动监管" in str(home_card)
     assert "群公告" in str(home_card)
     assert "/plugin-config?plugin=local.pig-catcher" in str(home_card)
+    assert "以当前部署配置的作用域为准" in str(home_card)
     serialized = str(components)
     assert "EVENT_HANDLER" not in serialized
     assert "LLM" not in serialized
     assert "TOOL" not in serialized
+
+
+def test_command_routing_allowlist_can_be_removed_without_stale_component_state() -> None:
+    plugin = create_plugin()
+    config = plugin.get_default_config()
+    config["access"]["command_session_allowlist"] = ["qq:1092931381"]
+    plugin.set_plugin_config(config)
+    assert all(
+        component.get("allowed_session") == ["qq:1092931381"]
+        for component in plugin.get_components()
+        if component["type"] == "COMMAND"
+    )
+
+    config["access"]["command_session_allowlist"] = []
+    plugin.set_plugin_config(config)
+
+    assert all("allowed_session" not in component for component in plugin.get_components())
 
 
 def test_store_command_patterns_do_not_claim_livehouse_commands() -> None:

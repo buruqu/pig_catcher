@@ -79,6 +79,7 @@ from .pig_catcher.domain.special_content import (
 )
 from .pig_catcher.domain.tour_views import TourView
 from .pig_catcher.infrastructure import PigCatcherDatabase, safe_database_path
+from .pig_catcher.plugin_metadata import PLUGIN_CONFIG_URL
 from .pig_catcher.rendering import (
     AnimatedCardComposer,
     EconomyReceiptRowViewModel,
@@ -239,6 +240,23 @@ class PigCatcherPlugin(MaiBotPlugin):
         self._animation_composer: AnimatedCardComposer | None = None
         self._delivery: RenderDelivery | None = None
         self._maintenance: MaintenanceRunner | None = None
+
+    def get_components(self) -> list[dict[str, Any]]:
+        """Expose commands only to configured sessions during a dual-version rollout."""
+
+        components = super().get_components()
+        configured = self._plugin_config_instance
+        allowed_sessions = (
+            list(cast(PigCatcherConfig, configured).access.command_session_allowlist)
+            if configured is not None
+            else []
+        )
+        if not allowed_sessions:
+            return components
+        for component in components:
+            if component.get("type") == "COMMAND":
+                component["allowed_session"] = allowed_sessions.copy()
+        return components
 
     @property
     def settings(self) -> PigCatcherConfig:
@@ -723,7 +741,7 @@ class PigCatcherPlugin(MaiBotPlugin):
                 "entries": {
                     "每日刷新": "00:00 / 09:00 / 12:00 / 19:00",
                     "黑名单": "赠送/收赠与交易分别管理",
-                    "自动监管": "237716658 / 官方群 CEAB3520",
+                    "自动监管": "以当前部署配置的作用域为准",
                     "群公告": "使用目标群最近活跃线路",
                 },
             },
@@ -740,12 +758,12 @@ class PigCatcherPlugin(MaiBotPlugin):
                 "actions": [
                     {
                         "label": "打开运营控制",
-                        "url": "/plugin-config?plugin=local.pig-catcher",
+                        "url": PLUGIN_CONFIG_URL,
                     }
                 ],
             },
         ],
-        link_url="/plugin-config?plugin=local.pig-catcher",
+        link_url=PLUGIN_CONFIG_URL,
         link_label="打开运营控制",
         icon="shield-check",
         width="medium",

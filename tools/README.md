@@ -1,8 +1,21 @@
 # 开发与验收工具
 
-当前隔离开发基线：`2.0.0.dev13 / Schema48 / Ruleset41`，84个显式 Command + 1个 HOME_CARD。
+当前隔离开发基线：`2.0.0.dev14 / Schema48 / Ruleset41`，84个显式 Command + 1个 HOME_CARD。
 本页下方保留各阶段的历史验证记录；历史测试数量不等于本轮全量验收结果。
 验收只在独立输出和数据库副本上执行，不启动正式MaiBot、不连接QQ、不对生产库运行迁移。
+
+## 内部灰度发布包
+
+`build_internal_preview.py` 从正式2.0工作树构建固定ID
+`local.pig-catcher-v2-internal` 的独立包。它强制要求
+`qq:1092931381` 与 `qq-official:5E5854406D0297D6FEAE696A13E3A339` 两条精确作用域作为
+命令路由白名单，只复制运行代码、正式素材和素材导入工具，并拒绝数据库、Excel、`.env`、
+链接、Junction、覆盖输出或第三个群。完整构建、安装、克隆升级和回退步骤见
+[单群内部灰度包](../docs/37-internal-v2-preview-package.md)。
+
+```powershell
+uv run python .\tools\build_internal_preview.py --help
+```
 
 ## 素材
 

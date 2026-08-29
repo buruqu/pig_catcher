@@ -1,7 +1,7 @@
 # MaiBot 抓猪插件
 
 这是“抓猪插件”的独立 MaiBot 插件仓库。当前线上正式版本仍为 `1.29.1`；本工作树是隔离开发的
-`2.0.0.dev13`（Schema48 / Ruleset41 / Manifest4），商城与永久升级重平衡已经完成离线验收；
+`2.0.0.dev14`（Schema48 / Ruleset41 / Manifest4），商城与永久升级重平衡已经完成离线验收；
 尚未部署到 MaiBot 或官方群。已有数据驱动的 PiG Dream! 成就系统和可扩展周冲榜，
 第一期活动为“抓猪冲刺！！！”；派遣、巡演、对战及 48 项新增成就四轮开发已完成离线验收，
 成就目录共 130 项。第九期首批32猪14菜及全猪标签/物理范围已完成；本轮再加入梦限大五人等
@@ -516,6 +516,7 @@ uv run python .\tools\uat_production_recovery.py `
 - [第四轮新增成就与 2.0 离线整体验收](docs/26-activity-achievements-and-v2-acceptance.md)
 - [抓猪 2.0 隔离开发与大版本上线方案](docs/16-v2-development-and-release-plan.md)
 - [抓猪 2.0 开发总结与 2026-09-01 删档上线方案](docs/36-v2-development-summary-and-20260901-launch-plan.md)
+- [抓猪 2.0 第一组群不删档内部灰度构建与安装](docs/37-internal-v2-preview-package.md)
 
 ## 不变原则
 
