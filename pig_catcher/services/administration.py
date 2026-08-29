@@ -34,6 +34,7 @@ from ..infrastructure.repositories import (
     SocialRepository,
 )
 from ..infrastructure.repositories.activity_locks import require_unoccupied
+from ..infrastructure.repositories.battle import BattleRepository, beijing_day
 from ..infrastructure.repositories.dispatch import DispatchRepository
 from ..infrastructure.repositories.restrictions import (
     GIFT_TRANSFER_BAN,
@@ -79,6 +80,7 @@ class AdministrationService:
         receipt_repository: ReceiptRepository | None = None,
         restriction_repository: RestrictionRepository | None = None,
         social_repository: SocialRepository | None = None,
+        battle_repository: BattleRepository | None = None,
         clock: Clock | None = None,
         random_source: RandomSource | None = None,
         id_factory: Callable[[], str] | None = None,
@@ -93,6 +95,7 @@ class AdministrationService:
         self.receipt_repository = receipt_repository or ReceiptRepository()
         self.restriction_repository = restriction_repository or RestrictionRepository()
         self.social_repository = social_repository or SocialRepository()
+        self.battle_repository = battle_repository or BattleRepository()
         self.clock = clock or SystemClock()
         self.random_source = random_source or SystemRandomSource()
         self.id_factory = id_factory or (lambda: uuid4().hex)
@@ -800,6 +803,153 @@ class AdministrationService:
             receipt_created=True,
             action="player-quota-reset",
             affected_players=1,
+        )
+
+    async def reset_battle_quota(
+        self,
+        identity: CommandIdentity,
+        *,
+        command_name: str,
+        target_user_id: str = "",
+        all_players: bool = False,
+    ) -> AdminCommandResult:
+        """Reset both current-day battle roles for one player or this scope."""
+
+        normalized_target = "" if all_players else self._normalize_target_user_id(identity, target_user_id)
+        request_payload = {
+            "command_version": 1,
+            "all_players": bool(all_players),
+            "target_user_id": normalized_target,
+        }
+        idempotency_key = MessageKeyFactory.build(identity, command_name)
+        now_datetime = self.clock.now()
+        now = iso_timestamp(now_datetime)
+        now_ms = int(now_datetime.timestamp() * 1000) // 1000 * 1000
+        day = beijing_day(now_ms)
+        audit_event_id = self.id_factory()
+        async with self.database.transaction() as session:
+            existing = await self.receipt_repository.get_by_key(session, idempotency_key)
+            if existing is not None:
+                return self._existing_result(
+                    existing,
+                    identity=identity,
+                    command_name=command_name,
+                    request_payload=request_payload,
+                )
+            await self.framework_repository.touch_identity(session, identity=identity, now=now)
+            if all_players:
+                players = await self.repository.players_in_scope(session, scope_id=identity.scope.value)
+            else:
+                players = [
+                    await self._require_target_player(
+                        session,
+                        identity=identity,
+                        platform_user_id=normalized_target,
+                    )
+                ]
+            if not players:
+                raise DomainValidationError("当前群没有已登记玩家，未执行比划机会重置。")
+
+            plans: list[dict[str, object]] = []
+            for player in players:
+                player_id = str(player["player_id"])
+                before_roles = await self.battle_repository.used_roles(session, player_id, day)
+                generation = await self.battle_repository.quota_generation(session, player_id, day)
+                plans.append(
+                    {
+                        "player_id": player_id,
+                        "platform_user_id": str(player["platform_user_id"]),
+                        "display_name": str(player["display_name"]),
+                        "used_roles_before": sorted(before_roles),
+                        "generation_before": generation,
+                        "generation_after": generation + 1,
+                    }
+                )
+            detail = {
+                "day": day,
+                "all_players": bool(all_players),
+                "affected_players": len(plans),
+                "players": plans,
+                "roles_reset": ["initiator", "opponent"],
+            }
+            await self.repository.insert_audit_event(
+                session,
+                audit_event_id=audit_event_id,
+                scope_id=identity.scope.value,
+                actor_user_id=identity.user_id,
+                action="admin-battle-quota-reset",
+                object_type="player-batch" if all_players else "player",
+                object_id=identity.scope.value if all_players else str(players[0]["player_id"]),
+                detail_json=self._json(detail),
+                now=now,
+            )
+            for plan in plans:
+                player_id = str(plan["player_id"])
+                generation, before_roles = await self.battle_repository.reset_quota_generation(
+                    session,
+                    player_id=player_id,
+                    scope_id=identity.scope.value,
+                    day=day,
+                    reset_audit_id=audit_event_id,
+                    now_ms=now_ms,
+                )
+                if generation != int(plan["generation_after"]) or sorted(before_roles) != plan["used_roles_before"]:
+                    raise RuntimeError("比划机会重置计划在事务内发生变化，本次未提交。")
+                await self.battle_repository.fact(
+                    session,
+                    player_id,
+                    identity.scope.value,
+                    audit_event_id,
+                    f"quota-reset:{day}",
+                    now_ms,
+                    {
+                        "actor_user_id": identity.user_id,
+                        "day": day,
+                        "used_roles_before": sorted(before_roles),
+                        "generation": generation,
+                        "initiator_remaining": 1,
+                        "opponent_remaining": 1,
+                    },
+                )
+
+            active_before = sum(bool(plan["used_roles_before"]) for plan in plans)
+            if all_players:
+                summary = (
+                    "【猪管·全员比划机会重置完成】\n"
+                    f"日期：{day}（北京时间）\n"
+                    f"当前群已登记玩家：{len(plans)} 人\n"
+                    f"其中重置前已使用过机会：{active_before} 人\n"
+                    "现均可主动比划 1 次、被比划 1 次\n"
+                    f"审计号：{audit_event_id}"
+                )
+            else:
+                target = plans[0]
+                role_labels = {"initiator": "主动比划", "opponent": "被比划"}
+                used_text = "、".join(role_labels[role] for role in target["used_roles_before"]) or "无"
+                summary = (
+                    "【猪管·玩家比划机会重置完成】\n"
+                    f"玩家：{target['display_name']}（{target['platform_user_id']}）\n"
+                    f"重置前今日已用：{used_text}\n"
+                    "现可主动比划 1 次、被比划 1 次\n"
+                    f"审计号：{audit_event_id}"
+                )
+            receipt = await self._reserve_receipt(
+                session,
+                identity=identity,
+                idempotency_key=idempotency_key,
+                command_name=command_name,
+                request_payload=request_payload,
+                result_type="admin-battle-quota-reset",
+                result_object_id=audit_event_id,
+                result_payload=detail,
+                text_summary=summary,
+                now=now,
+            )
+        return AdminCommandResult(
+            receipt=receipt,
+            receipt_created=True,
+            action="battle-quota-reset",
+            affected_players=len(plans),
         )
 
     async def _require_target_player(

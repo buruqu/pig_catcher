@@ -1,6 +1,6 @@
 # 技术架构设计
 
-> 当前2.0隔离开发目标为dev13 / Schema48 / Ruleset41 / Manifest4，SDK锁定2.7.1、
+> 当前内部测试版为2.0.1 / Schema49 / Ruleset42 / Manifest4，SDK锁定2.7.1、
 > 本地Python3.13.12。dev12全量结果见[验收报告](34-v2-final-acceptance.md)；dev13已完成
 > 十层升级、主商城重平衡和三套独立器具商城的离线统一验收。下文1.x兼容基线和迁移历史保留原记录，
 > 不表示本次启动、升级或修改了正式MaiBot。

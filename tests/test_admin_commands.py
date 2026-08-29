@@ -440,3 +440,71 @@ async def test_admin_resets_only_one_players_current_window_and_rejects_non_admi
         """
     ) is None
     await plugin.on_unload()
+
+
+@pytest.mark.asyncio
+async def test_admin_resets_one_or_all_battle_roles_idempotently_and_scope_locally(
+    tmp_path: Path,
+) -> None:
+    plugin, _ = await create_test_plugin(
+        tmp_path,
+        config_updates={"access": {"admin_user_ids": ["admin"]}},
+    )
+    await _seed_player(plugin, user_id="target", display_name="目标玩家")
+    await _seed_player(plugin, user_id="other", display_name="其他玩家")
+    await _seed_player(plugin, user_id="target", display_name="另群目标", group_id="20002")
+
+    single_message = _admin_message(message_id="battle-reset-target", target_user_id="target")
+    single = await plugin.handle_admin_reset_battle_quota(
+        stream_id="stream-10001",
+        **_command_kwargs(single_message, arguments="@目标玩家"),
+    )
+    assert single[0] is True and "主动比划 1 次、被比划 1 次" in single[1]
+    duplicate = await plugin.handle_admin_reset_battle_quota(
+        stream_id="stream-10001",
+        **_command_kwargs(single_message, arguments="@目标玩家"),
+    )
+    assert duplicate == (True, "该消息已处理，不重复公示。", 0)
+    assert (
+        await plugin.database.fetch_one(
+            "SELECT generation FROM battle_daily_quota_state WHERE player_id='qq:10001:target'"
+        )
+    )[0] == 1
+
+    all_result = await plugin.handle_admin_reset_battle_quota(
+        stream_id="stream-10001",
+        **_command_kwargs(_admin_message(message_id="battle-reset-all"), arguments="全员"),
+    )
+    assert all_result[0] is True and "全员比划机会重置完成" in all_result[1]
+    rows = await plugin.database.fetch_all(
+        """SELECT player_id,generation FROM battle_daily_quota_state
+        WHERE scope_id='qq:10001' ORDER BY player_id"""
+    )
+    assert [(row["player_id"], row["generation"]) for row in rows] == [
+        ("qq:10001:admin", 1),
+        ("qq:10001:other", 1),
+        ("qq:10001:target", 2),
+    ]
+    assert await plugin.database.fetch_one(
+        "SELECT 1 FROM battle_daily_quota_state WHERE player_id='qq:20002:target'"
+    ) is None
+    assert (
+        await plugin.database.fetch_one(
+            "SELECT COUNT(*) FROM audit_events WHERE action='admin-battle-quota-reset'"
+        )
+    )[0] == 2
+    assert (
+        await plugin.database.fetch_one(
+            "SELECT COUNT(*) FROM activity_facts WHERE subevent_id LIKE 'quota-reset:%'"
+        )
+    )[0] == 4
+
+    denied = await plugin.handle_admin_reset_battle_quota(
+        stream_id="stream-10001",
+        **_command_kwargs(
+            build_message(user_id="ordinary", message_id="battle-reset-denied"),
+            arguments="全员",
+        ),
+    )
+    assert denied[0] is False and "只有插件配置中的管理员" in denied[1]
+    await plugin.on_unload()

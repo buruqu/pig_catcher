@@ -8,7 +8,7 @@ from uuid import uuid4
 
 from ..commands.battle import BattleRequest
 from ..config.model import CatchingSection
-from ..domain.battle import dumps, loads, new_state, play_chunk, resolve_round, roll_count, weight_label
+from ..domain.battle import dumps, loads, mark_ready, new_state, play_chunk, resolve_round, roll_count
 from ..domain.battle_catalog import ACTION_TTL_MS, BATTLE_VERSION, INVITE_COOLDOWN_MS, INVITE_TTL_MS, BattleError
 from ..domain.battle_views import BattleView
 from ..domain.dispatch_views import DispatchLine as Line
@@ -46,7 +46,18 @@ SETUP = frozenset(
     )
 )
 MUTATIONS = SETUP - QUERIES | frozenset(
-    ("invite", "accept", "decline", "cancel_invite", "surrender_preview", "surrender_confirm", "count", "move", "loot")
+    (
+        "invite",
+        "accept",
+        "decline",
+        "cancel_invite",
+        "surrender_preview",
+        "surrender_confirm",
+        "count",
+        "move",
+        "ready",
+        "loot",
+    )
 )
 
 
@@ -161,9 +172,7 @@ class BattleService:
     async def check_quota(self, session, ids, now_ms):
         day = beijing_day(now_ms)
         for pid, role in zip(ids, ("initiator", "opponent"), strict=True):
-            if await session.fetch_one(
-                "SELECT 1 FROM battle_daily_uses WHERE player_id=? AND day=? AND role=?", (pid, day, role)
-            ):
+            if await self.repo.quota_used(session, pid, day, role):
                 raise BattleError("发起方今日主动次数或应战方今日被挑战次数已用完；北京时间00:00刷新。")
 
     async def _perform(self, session, identity, action, args, now_ms, key):
@@ -291,8 +300,14 @@ class BattleService:
                 (dumps(state), day, now_ms + ACTION_TTL_MS, match["battle_id"]),
             )
             for index, (pid, snap, role) in enumerate(zip(ids, snapshots, ("initiator", "opponent"), strict=True)):
-                await session.execute(
-                    "INSERT INTO battle_daily_uses VALUES(?,?,?,?)", (pid, day, role, match["battle_id"])
+                await self.repo.record_quota_use(
+                    session,
+                    player_id=pid,
+                    scope_id=identity.scope.value,
+                    day=day,
+                    role=role,
+                    battle_id=match["battle_id"],
+                    now_ms=now_ms,
                 )
                 await session.execute(
                     "INSERT INTO asset_occupancies VALUES(?,?,?,'battle',?,?,?)",
@@ -369,8 +384,9 @@ class BattleService:
                 identity, match, state, now_ms, banner="已认输。本场不记自然力竭胜场，不发战利品；未触发器具退回。"
             )
         await self.check_participants(session, identity.scope.value, ids, now_ms, social=False)
-        events, extra = [], ()
+        events = []
         round_number = state["round"]
+        summary = None
         if action == "count":
             result = roll_count(state, side, match["random_seed"])
             changed = result.pop("changed")
@@ -384,18 +400,6 @@ class BattleService:
                     now_ms,
                     result,
                 )
-            extra = (
-                Panel(
-                    "出招数落定",
-                    (
-                        Line(
-                            "本回合",
-                            f"{result['raw']} - {weight_label(result['debt'])} = {result['effective']}招",
-                            "贷款债务只扣本回合，多余债务清零；0招不是直接判负。",
-                        ),
-                    ),
-                ),
-            )
         elif action == "move":
             events = play_chunk(state, side, match["random_seed"])
             changed = bool(events)
@@ -413,9 +417,22 @@ class BattleService:
                     now_ms,
                     event,
                 )
+        elif action == "ready":
+            result = mark_ready(state, side)
+            changed = bool(result.pop("changed"))
+            if changed:
+                await self.repo.fact(
+                    session,
+                    identity.player_id,
+                    identity.scope.value,
+                    match["battle_id"],
+                    f"ready:{round_number}",
+                    now_ms,
+                    result,
+                )
+                summary = resolve_round(state, match["random_seed"])
         else:
             raise BattleError("未知对战操作。")
-        summary = resolve_round(state, match["random_seed"]) if changed else None
         if summary:
             await session.execute(
                 "INSERT INTO battle_rounds VALUES(?,?,?,?)", (match["battle_id"], round_number, dumps(summary), now_ms)
@@ -443,16 +460,38 @@ class BattleService:
                 "UPDATE asset_occupancies SET busy_until_ms=? WHERE purpose='battle' AND activity_id=?",
                 (match["expires_ms"], match["battle_id"]),
             )
+        if action == "count":
+            title = "出招数已确定"
+            banner = (
+                "出招数已显示在你的战斗猪下方；0招也不是直接判负。"
+                if changed
+                else "本回合出招数已经确定，不会重新抽取。"
+            )
+        elif action == "move":
+            title = "招式已展示"
+            banner = (
+                "本次招式与逐招数值已显示在你的战斗猪下方；双方出完后再各自输入 /会赢的。"
+                if changed
+                else "本回合已经出完招；请看完双方招式后输入 /会赢的。"
+            )
+        else:
+            title = "会赢的 · 回合结算" if summary else "会赢的 · 等待对方"
+            banner = (
+                "双方都已确认，以下为本回合唯一结算结果。"
+                if summary
+                else "你的胜负宣言已锁定，等待对方输入 /会赢的。"
+                if changed
+                else "你已经输入过 /会赢的；等待对方确认，不会重复结算。"
+            )
         return matchup(
             identity,
             match,
             state,
             now_ms,
-            title="出招数已确定" if action == "count" else "招式结算",
-            banner="已完成本回合操作，等待另一方；不会重新抽取。" if not changed else "",
+            title=title,
+            banner=banner,
             events=events,
             round_result=summary,
-            extra_panels=extra,
         )
 
     async def history(self, session, identity, action, args, now_ms):

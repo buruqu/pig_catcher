@@ -45,6 +45,91 @@ class BattleRepository:
             (key, player_id, scope_id, "battle", source_id, subevent, BATTLE_VERSION, now_ms, encoded),
         )
 
+    async def quota_generation(self, session: DatabaseSession, player_id: str, day: str) -> int:
+        row = await session.fetch_one(
+            "SELECT generation FROM battle_daily_quota_state WHERE player_id=? AND day=?",
+            (player_id, day),
+        )
+        return int(row[0]) if row else 0
+
+    async def quota_used(self, session: DatabaseSession, player_id: str, day: str, role: str) -> bool:
+        generation = await self.quota_generation(session, player_id, day)
+        if generation == 0:
+            row = await session.fetch_one(
+                "SELECT 1 FROM battle_daily_uses WHERE player_id=? AND day=? AND role=?",
+                (player_id, day, role),
+            )
+        else:
+            row = await session.fetch_one(
+                """SELECT 1 FROM battle_daily_reuses
+                WHERE player_id=? AND day=? AND role=? AND generation=?""",
+                (player_id, day, role, generation),
+            )
+        return row is not None
+
+    async def used_roles(self, session: DatabaseSession, player_id: str, day: str) -> set[str]:
+        return {
+            role
+            for role in ("initiator", "opponent")
+            if await self.quota_used(session, player_id, day, role)
+        }
+
+    async def record_quota_use(
+        self,
+        session: DatabaseSession,
+        *,
+        player_id: str,
+        scope_id: str,
+        day: str,
+        role: str,
+        battle_id: str,
+        now_ms: int,
+    ) -> None:
+        generation = await self.quota_generation(session, player_id, day)
+        if generation == 0:
+            await session.execute(
+                """INSERT INTO battle_daily_uses(player_id,day,role,battle_id)
+                VALUES(?,?,?,?)""",
+                (player_id, day, role, battle_id),
+            )
+            return
+        await session.execute(
+            """INSERT INTO battle_daily_reuses(
+                player_id,scope_id,day,role,generation,battle_id,occurred_ms
+            ) VALUES(?,?,?,?,?,?,?)""",
+            (player_id, scope_id, day, role, generation, battle_id, now_ms),
+        )
+
+    async def reset_quota_generation(
+        self,
+        session: DatabaseSession,
+        *,
+        player_id: str,
+        scope_id: str,
+        day: str,
+        reset_audit_id: str,
+        now_ms: int,
+    ) -> tuple[int, set[str]]:
+        used_before = await self.used_roles(session, player_id, day)
+        generation = await self.quota_generation(session, player_id, day)
+        if generation == 0:
+            next_generation = 1
+            await session.execute(
+                """INSERT INTO battle_daily_quota_state(
+                    player_id,day,scope_id,generation,reset_audit_id,updated_ms
+                ) VALUES(?,?,?,?,?,?)""",
+                (player_id, day, scope_id, next_generation, reset_audit_id, now_ms),
+            )
+        else:
+            next_generation = generation + 1
+            await session.execute(
+                """UPDATE battle_daily_quota_state
+                SET generation=?,reset_audit_id=?,updated_ms=?
+                WHERE player_id=? AND day=? AND scope_id=?""",
+                (next_generation, reset_audit_id, now_ms, player_id, day, scope_id),
+            )
+        return next_generation, used_before
+
     async def profile(self, session: DatabaseSession, player_id: str) -> dict:
         await session.execute("INSERT INTO battle_profiles(player_id) VALUES(?) ON CONFLICT DO NOTHING", (player_id,))
         return dict(await session.fetch_one("SELECT * FROM battle_profiles WHERE player_id=?", (player_id,)))

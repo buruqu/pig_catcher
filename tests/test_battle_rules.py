@@ -9,6 +9,7 @@ from pig_catcher.domain.battle import (
     dumps,
     loads,
     loot_weights,
+    mark_ready,
     new_state,
     play_chunk,
     randbelow,
@@ -131,6 +132,8 @@ def test_zero_actions_still_resolve_and_weight_is_cumulative():
         p.update(next_debt=50, weight=10 + index * 5)
         assert roll_count(s, index, "zero")["effective"] == 0
         assert play_chunk(s, index, "zero") == []
+    for index in (0, 1):
+        mark_ready(s, index)
     summary = resolve_round(s, "zero")
     assert summary and [p["weight"] for p in s["sides"]] == [10, 15]
     assert all(p["next_debt"] == 0 for p in s["sides"])
@@ -145,6 +148,8 @@ def test_command_order_and_chunk_size_do_not_change_outcome(seed):
             while not s["sides"][side]["turn"]["done"]:
                 play_chunk(s, side, seed, chunk_size=size)
                 s.update(loads(dumps(s)))
+        for side in order:
+            mark_ready(s, side)
         resolve_round(s, seed)
     assert a == b
 
@@ -159,6 +164,8 @@ def test_exact_random_with_huge_bounds_no_float_overflow():
     for side in s["sides"]:
         side["weight"] = bound
         side["turn"]["done"] = True
+    mark_ready(s, 0)
+    mark_ready(s, 1)
     assert resolve_round(s, "huge")["winner"] in (0, 1)
 
 

@@ -31,6 +31,7 @@ from pig_catcher.infrastructure.repositories.economy import EconomyRepository
 from pig_catcher.infrastructure.repositories.framework import FrameworkRepository
 from pig_catcher.infrastructure.repositories.materials import MaterialRepository
 from pig_catcher.infrastructure.repositories.restrictions import GIFT_TRANSFER_BAN, RestrictionRepository
+from pig_catcher.services.administration import AdministrationService
 from pig_catcher.services.battle import BattleService
 from pig_catcher.services.gameplay import GameplayService
 
@@ -86,6 +87,8 @@ class BattleWorld:
                     await self.send(section="count", actor=actor)
                 elif not turn["done"]:
                     await self.send(section="move", actor=actor)
+                elif all(item["turn"]["done"] for item in current["sides"]) and not turn.get("ready", False):
+                    await self.send(section="ready", actor=actor)
         raise AssertionError("fixture match did not end in 200 actions")
 
     async def fund(self, actor=None):
@@ -185,6 +188,44 @@ async def test_full_battle_and_five_direct_deliveries(world):
     assert [r[0] for r in await world.db.fetch_all("PRAGMA integrity_check")] == ["ok"]
 
 
+async def test_round_waits_for_both_win_declarations_and_actions_stay_with_fighter(world):
+    await world.start()
+    for side, actor in enumerate((world.a, world.b)):
+        count_result = await world.send(section="count", actor=actor)
+        assert count_result.view.fighters[side].count_wheel is not None
+        assert not count_result.view.wheels
+        while True:
+            state = loads((await world.match())["state_json"])
+            if state["sides"][side]["turn"]["done"]:
+                break
+            move_result = await world.send(section="move", actor=actor)
+            assert move_result.view.fighters[side].move_wheel is not None
+            assert move_result.view.fighters[side].action_lines
+            assert not move_result.view.wheels
+    state = loads((await world.match())["state_json"])
+    assert all(item["turn"]["done"] and not item["turn"].get("ready", False) for item in state["sides"])
+    assert not await world.db.fetch_all("SELECT * FROM battle_rounds")
+
+    first = await world.send(section="ready", actor=world.a, mid="ready-a")
+    assert first.view.title == "会赢的 · 等待对方"
+    assert first.view.fighters[0].ready == "已输入 /会赢的"
+    assert first.view.fighters[1].ready == "等待 /会赢的"
+    expires = (await world.match())["expires_ms"]
+    duplicate = await world.send(section="ready", actor=world.a, mid="ready-a-again")
+    assert duplicate.view.title == "会赢的 · 等待对方"
+    assert (await world.match())["expires_ms"] == expires
+    assert not await world.db.fetch_all("SELECT * FROM battle_rounds")
+
+    settled = await world.send(section="ready", actor=world.b, mid="ready-b")
+    assert settled.view.title == "会赢的 · 回合结算"
+    assert len(await world.db.fetch_all("SELECT * FROM battle_rounds")) == 1
+    assert (
+        await world.db.fetch_one(
+            "SELECT COUNT(*) FROM activity_facts WHERE subevent_id LIKE 'ready:%'"
+        )
+    )[0] == 2
+
+
 async def test_confirm_binding_costs_all_levels_and_inherited_protection(world):
     await world.fund()
     for level in range(1, 6):
@@ -278,6 +319,38 @@ async def test_group_mutex_roles_daily_quota_and_scopes(world):
     await world.invite(actor=world.b, target=world.a)
     await world.send("接受", "challenge", actor=world.a)
     assert (await world.db.fetch_one("SELECT COUNT(*) FROM battle_daily_uses"))[0] == 4
+
+
+async def test_admin_generation_reset_reopens_both_roles_without_deleting_original_usage(world):
+    await world.fight()
+    with pytest.raises(BattleError, match="次数已用完"):
+        await world.invite()
+    admin = AdministrationService(
+        world.db,
+        refresh_hours=(0, 8, 16),
+        timezone_name="Asia/Shanghai",
+        clock=world.clock,
+        id_factory=lambda: "battle-reset-audit",
+    )
+    reset = await admin.reset_battle_quota(
+        replace(world.a, message_id="reset-all-battle-roles"),
+        command_name="pig-catcher.admin-reset-battle-quota",
+        all_players=True,
+    )
+    assert reset.affected_players == 2
+    assert (await world.db.fetch_one("SELECT COUNT(*) FROM battle_daily_uses"))[0] == 2
+    assert (await world.db.fetch_one("SELECT COUNT(*) FROM battle_daily_quota_state"))[0] == 2
+
+    world.clock.value += timedelta(seconds=61)
+    await world.invite()
+    await world.send("接受", "challenge", actor=world.b)
+    assert (await world.db.fetch_one("SELECT COUNT(*) FROM battle_daily_reuses"))[0] == 2
+    assert {
+        row[0]
+        for row in await world.db.fetch_all(
+            "SELECT role FROM battle_daily_reuses WHERE generation=1"
+        )
+    } == {"initiator", "opponent"}
 
 
 async def test_expiry_accept_day_and_no_non_natural_loot(world):

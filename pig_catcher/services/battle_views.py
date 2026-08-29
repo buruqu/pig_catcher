@@ -100,23 +100,44 @@ def matchup(
     display_sides = round_result["after"] if round_result else state["sides"]
     total = sum(side["weight"] for side in display_sides)
     cards, panels, wheel_cards = [], list(extra_panels), []
+    count_cards: list[BattleWheelCard | None] = [None, None]
+    move_cards: list[BattleWheelCard | None] = [None, None]
+    action_lines: list[tuple[Line, ...]] = [(), ()]
+    action_notes = ["", ""]
     # 伤势结算后可能已治愈；出招数图必须使用抽取时(before)的盘，而非刚变化的伤势。
     count_sides = round_result["before"] if round_result else display_sides
-    for count_side in count_sides:
+    for index, count_side in enumerate(count_sides):
         turn = count_side["turn"]
+        turn.setdefault("ready", False)
         if turn["raw"] is not None:
             options = HEAVY_COUNT_WHEEL if count_side["heavy"] else COUNT_WHEEL
-            wheel_cards.append(
-                wheel_card(
-                    "count",
-                    count_side["snapshot"]["player_name"] + " · 出招数落点",
-                    tuple((f"{number}招", weight) for number, weight in options),
-                    f"{turn['raw']}招",
-                    f"原始{turn['raw']}招 - 贷款{weight_label(turn['debt'])}招 = 实际{turn['effective']}招。",
-                )
+            count_cards[index] = wheel_card(
+                "count",
+                "本回合出招数落点",
+                tuple((f"{number}招", weight) for number, weight in options),
+                f"{turn['raw']}招",
+                f"原始{turn['raw']}招 - 贷款{weight_label(turn['debt'])}招 = 实际{turn['effective']}招。",
             )
-    for side in display_sides:
+    if events:
+        event_side = int(events[0]["side"])
+        last = events[-1]
+        moves = FIGHTERS_BY_ID[last["fighter_id"]].moves
+        move_cards[event_side] = wheel_card(
+            "move",
+            "第" + str(last["ordinal"]) + "招落点",
+            tuple((move.name, move.draw_weight) for move in moves),
+            last["name"],
+            "本卡展示本次最后一招的真实落点；逐招数值均为已提交事实。",
+        )
+        action_lines[event_side] = tuple(move_line(event) for event in events[-8:])
+        action_notes[event_side] = (
+            f"本次实际执行{len(events)}招；超过8招展示末8招，全部事实可用 "
+            f"/对战记录 {match['battle_id']} {events[0]['round']} 查看。"
+        )
+    all_done = all(side["turn"].get("done", False) for side in count_sides)
+    for index, side in enumerate(display_sides):
         snap, turn = side["snapshot"], side["turn"]
+        turn.setdefault("ready", False)
         if match["status"] == "pending" and snap.get("coupon_preview"):
             panels.append(
                 Panel(
@@ -151,6 +172,16 @@ def matchup(
             if not tool
             else TOOLS_BY_ID[tool].name + (" · 已触发" if side["tool_used"] else " · 待触发/终局退回")
         )
+        if turn["done"]:
+            ready = (
+                "已输入 /会赢的"
+                if turn["ready"]
+                else "等待 /会赢的"
+                if all_done
+                else "已出完，等待对方"
+            )
+        else:
+            ready = "尚未出完"
         cards.append(
             FighterCard(
                 snap["player_name"],
@@ -166,26 +197,11 @@ def matchup(
                 f"下回合待扣{weight_label(side['next_debt'])}招",
                 "已出完" if turn["done"] else f"待连抽{weight_label(turn['pending'])}次",
                 tool_note,
-            )
-        )
-    if events:
-        last = events[-1]
-        moves = FIGHTERS_BY_ID[last["fighter_id"]].moves
-        wheel_cards.append(
-            wheel_card(
-                "move",
-                FIGHTERS_BY_ID[last["fighter_id"]].name + " · 第" + str(last["ordinal"]) + "招落点",
-                tuple((move.name, move.draw_weight) for move in moves),
-                last["name"],
-                "本图展示本次最后一招的真实落点；下方保留逐招数值，不重新抽取。",
-            )
-        )
-        panels.append(
-            Panel(
-                "本次招式结算",
-                tuple(move_line(e) for e in events[-8:]),
-                f"本次实际执行{len(events)}招；超过8招展示末8招，全部逐招事实可在 "
-                f"/对战记录 {match['battle_id']} {events[0]['round']} 查看。",
+                ready,
+                count_cards[index],
+                move_cards[index],
+                action_lines[index],
+                action_notes[index],
             )
         )
     if round_result:
@@ -228,10 +244,16 @@ def matchup(
             banner or f"{display_sides[1]['snapshot']['player_name']}，请在{remaining}秒内应战。尚未消耗额度或器具。"
         )
     elif state["status"] == "active":
-        hints = (
-            f"第{state['round']}回合：双方各自 /出招数 → /出招。长连锁可继续 /出招；0招自动等待对方。",
-            f"{remaining}秒内需有有效推进，查询和重复消息不延长；超时或认输不发战利品。",
-        )
+        if all(side["turn"].get("done", False) for side in state["sides"]):
+            hints = (
+                "双方查看完招式后，各自输入 /会赢的；两人都确认才会结算本回合。",
+                f"{remaining}秒内需完成确认；重复确认不会重新抽取或延长时间。",
+            )
+        else:
+            hints = (
+                f"第{state['round']}回合：双方各自 /出招数 → /出招。长连锁可继续 /出招；0招也需 /会赢的。",
+                f"{remaining}秒内需有有效推进，查询和重复消息不延长；超时或认输不发战利品。",
+            )
     elif state["status"] == "completed":
         winner = display_sides[state["winner"]]["snapshot"]["player_name"]
         loser = display_sides[1 - state["winner"]]["snapshot"]["player_name"]

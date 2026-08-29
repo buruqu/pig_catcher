@@ -103,6 +103,17 @@ async def scenarios(output: Path):
         initial_state = loads(initial_match["state_json"])
         cases.append(("12-action-count", (await w.send(section="count")).view))
         cases.append(("13-moves", (await w.send(section="move")).view))
+        for side, actor in enumerate((a, b)):
+            while True:
+                current = loads((await w.match())["state_json"])
+                turn = current["sides"][side]["turn"]
+                if turn["raw"] is None:
+                    await w.send(section="count", actor=actor)
+                elif not turn["done"]:
+                    await w.send(section="move", actor=actor)
+                else:
+                    break
+        cases.append(("13b-ready-waiting", (await w.send(section="ready", actor=a)).view))
         finished = await w.fight(already_started=True)
         cases.append(("14-natural-finale", (await w.send(section="status")).view))
         winner = loads(finished["state_json"])["winner"]

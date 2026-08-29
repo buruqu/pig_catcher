@@ -33,10 +33,7 @@ class BattleSetup:
 
     async def profile(self, session, identity, now_ms):
         profile = await self.repo.profile(session, identity.player_id)
-        quota = await session.fetch_all(
-            "SELECT role FROM battle_daily_uses WHERE player_id=? AND day=?", (identity.player_id, beijing_day(now_ms))
-        )
-        used = {row[0] for row in quota}
+        used = await self.repo.used_roles(session, identity.player_id, beijing_day(now_ms))
         pig = (
             await self.repo.member(session, identity.player_id, profile["pig_instance_id"])
             if profile["pig_instance_id"]

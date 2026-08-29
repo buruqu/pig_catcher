@@ -215,6 +215,8 @@ class PigCatcherDatabase:
         from .migrations.v0043_reward_coupon_bag import TABLES as COUPON_TABLES
         from .migrations.v0048_feature_tool_store_ledger import GUARDS as FEATURE_STORE_GUARDS
         from .migrations.v0048_feature_tool_store_ledger import TABLES as FEATURE_STORE_TABLES
+        from .migrations.v0049_battle_quota_reset import GUARDS as BATTLE_QUOTA_GUARDS
+        from .migrations.v0049_battle_quota_reset import TABLES as BATTLE_QUOTA_TABLES
 
         required_tables = {
             "player_food_effects",
@@ -269,6 +271,7 @@ class PigCatcherDatabase:
         required_tables.update(ACTIVITY_TABLES)
         required_tables.update(COUPON_TABLES)
         required_tables.update(FEATURE_STORE_TABLES)
+        required_tables.update(BATTLE_QUOTA_TABLES)
         required_tables.add("achievement_badge_slots")
         table_rows = await (
             await connection.execute(
@@ -345,6 +348,7 @@ class PigCatcherDatabase:
         required_guards.update(ASSET_CODE_GUARDS)
         required_guards.update(COUPON_GUARDS)
         required_guards.update(FEATURE_STORE_GUARDS)
+        required_guards.update(BATTLE_QUOTA_GUARDS)
         required_guards.update({"achievement_badge_slot_insert_guard", "achievement_badge_slot_update_guard"})
         guard_rows = await (
             await connection.execute("SELECT name FROM sqlite_master WHERE type IN ('trigger','index')")

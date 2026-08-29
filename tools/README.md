@@ -1,6 +1,6 @@
 # 开发与验收工具
 
-当前隔离开发基线：`2.0.0 / Schema48 / Ruleset41`，84个显式 Command + 1个 HOME_CARD。
+当前内部测试基线：`2.0.1 / Schema49 / Ruleset42`，86个显式 Command + 1个 HOME_CARD。
 本页下方保留各阶段的历史验证记录；历史测试数量不等于本轮全量验收结果。
 验收只在独立输出和数据库副本上执行，不启动正式MaiBot、不连接QQ、不对生产库运行迁移。
 
@@ -52,7 +52,7 @@ uv run python .\tools\build_internal_preview.py --help
 .\.venv\Scripts\python.exe tools/check_battle_balance.py --samples 3000
 ```
 
-`accept_battle_views.py` 生成 25 张完整状态流图卡、DOM 诊断与联系表，使用临时合成数据和已有公开素材；
+`accept_battle_views.py` 当前生成 26 张完整状态流图卡（含双方 `/会赢的` 等待态）、DOM 诊断与联系表，使用临时合成数据和已有公开素材；
 输出路径必须不存在。浏览器是独立无头进程，不连接用户已打开的浏览器、不连生产或 QQ。
 `check_battle_balance.py` 对四种强化组合各模拟指定场数，比较观测胜率/回合/连招，不修改实际规则。
 第三轮交付时记录为127项对战专项、670项全量回归通过；这是历史结果，完整步骤与接线见 [第三轮交付](../docs/25-battle-implementation-and-acceptance.md)。
@@ -68,7 +68,7 @@ uv run python .\tools\build_internal_preview.py --help
 
 `uat_catching_and_collection.py` 及复用它的恢复验收按实际导出组件动态校验：
 名称唯一、处理器存在且可调用、正则可编译、关键功能路由齐备，以及恰好一个 HOME_CARD。
-报告记录实际组件数量，不再把历史命令数写死为加载门禁；当前84+1不代表84个无别名的文字入口。
+报告记录实际组件数量，不再把历史命令数写死为加载门禁；当前86+1不代表86个无别名的文字入口。
 共享克隆函数用SQLite只读连接加在线备份，不直接复制运行中数据库主文件；拒绝源/目标重叠、
 越界数据库文件名及已经存在的目标。`--data-dir` 是只读输入，实际业务只在输出内的克隆运行。
 

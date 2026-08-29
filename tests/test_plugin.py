@@ -236,9 +236,9 @@ async def test_group_reset_command_rejects_unconfigured_user_before_backup(
 def test_plugin_registers_only_explicit_production_commands() -> None:
     plugin = create_plugin()
     components = plugin.get_components()
-    assert len(components) == 85
+    assert len(components) == 87
     commands = {component["name"] for component in components if component["type"] == "COMMAND"}
-    assert len(commands) == 84
+    assert len(commands) == 86
     assert commands == {
         "pig_catcher_achievement_badges",
         "pig_catcher_item_bag",
@@ -248,6 +248,7 @@ def test_plugin_registers_only_explicit_production_commands() -> None:
         "pig_catcher_battle_challenge",
         "pig_catcher_battle_count",
         "pig_catcher_battle_move",
+        "pig_catcher_battle_ready",
         "pig_catcher_battle_status",
         "pig_catcher_battle_history",
         "pig_catcher_battle_loot",
@@ -273,6 +274,7 @@ def test_plugin_registers_only_explicit_production_commands() -> None:
         "pig_catcher_admin_regulation",
         "pig_catcher_admin_regulation_release",
         "pig_catcher_admin_reset_player_quota",
+        "pig_catcher_admin_reset_battle_quota",
         "pig_catcher_catch",
         "pig_catcher_profile",
         "pig_catcher_pig_detail",
@@ -459,6 +461,7 @@ def test_admin_command_patterns_claim_only_the_documented_syntax() -> None:
         ),
         "pig_catcher_admin_regulation_release": ("/猪管监管解除 ABCD1234 人工复核通过",),
         "pig_catcher_admin_reset_player_quota": ("/猪管重置玩家 @玩家",),
+        "pig_catcher_admin_reset_battle_quota": ("/猪管重置比划 @玩家", "/猪管重置比划 全员"),
     }
     for component_name, commands in examples.items():
         pattern = components[component_name]["metadata"]["command_pattern"]
@@ -518,7 +521,7 @@ async def test_help_topic_and_unknown_topic_are_explicit(tmp_path: Path) -> None
     assert success
     assert "/接受交易 <交易号>" in text
     success, battle, _ = await invoke_help(plugin, topic="对战")
-    assert success and "/战斗猪 帮助" in battle and "/出招数 → /出招" in battle
+    assert success and "/战斗猪 帮助" in battle and "/出招数 → /出招 → 双方 /会赢的" in battle
     _, unknown, _ = await invoke_help(plugin, topic="不存在")
     assert "未知帮助主题：不存在" in unknown
     await plugin.on_unload()

@@ -78,7 +78,16 @@ def choose(seed: str, key: str, wheel: tuple) -> tuple[Any, int]:
 
 
 def fresh_turn() -> dict:
-    return {"raw": None, "debt": 0, "effective": None, "pending": 0, "draws": 0, "done": False, "trait_used": False}
+    return {
+        "raw": None,
+        "debt": 0,
+        "effective": None,
+        "pending": 0,
+        "draws": 0,
+        "done": False,
+        "ready": False,
+        "trait_used": False,
+    }
 
 
 def new_state(fighters: list[dict]) -> dict:
@@ -109,7 +118,10 @@ def _side(state: dict, side: int) -> dict:
         raise BattleError("该对战使用另一版本规则，需要相应规则引擎恢复，不能重新抽取。")
     if state["status"] != "active" or side not in (0, 1):
         raise BattleError("对战已结束或不是本场参与者。")
-    return state["sides"][side]
+    player = state["sides"][side]
+    # 2.0.0 已开始但尚未结束的现场没有 ready 字段；原地补默认值即可无损恢复。
+    player["turn"].setdefault("ready", False)
+    return player
 
 
 def roll_count(state: dict, side: int, seed: str) -> dict:
@@ -200,6 +212,20 @@ def play_chunk(state: dict, side: int, seed: str, *, chunk_size: int = MOVE_CHUN
     return events
 
 
+def mark_ready(state: dict, side: int) -> dict:
+    """玩家看完双方招式后确认结算；只有双方都确认，回合才可抽胜负。"""
+
+    player = _side(state, side)
+    for other in state["sides"]:
+        other["turn"].setdefault("ready", False)
+    if not all(other["turn"]["done"] for other in state["sides"]):
+        raise BattleError("请等待双方都出完招，再输入 /会赢的。")
+    if player["turn"]["ready"]:
+        return {"changed": False, "side": side, "round": state["round"]}
+    player["turn"]["ready"] = True
+    return {"changed": True, "side": side, "round": state["round"]}
+
+
 def apply_injury(player: dict, injury: str) -> None:
     if injury == "light":
         player["risk"] = max(player["risk"], 1)
@@ -214,7 +240,9 @@ def apply_injury(player: dict, injury: str) -> None:
 
 def resolve_round(state: dict, seed: str) -> dict | None:
     _side(state, 0)
-    if not all(side["turn"]["done"] for side in state["sides"]):
+    for side in state["sides"]:
+        side["turn"].setdefault("ready", False)
+    if not all(side["turn"]["done"] and side["turn"]["ready"] for side in state["sides"]):
         return None
     before = deepcopy(state["sides"])
     roll = randbelow(seed, f"{state['round']}:winner", sum(side["weight"] for side in before))

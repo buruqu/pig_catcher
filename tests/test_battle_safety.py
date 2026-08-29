@@ -16,7 +16,9 @@ from pig_catcher.domain.models import ScopeKey
 from pig_catcher.domain.special_content import SUKUNA_PIG_TEMPLATE_ID
 from pig_catcher.infrastructure.database import PigCatcherDatabase
 from pig_catcher.infrastructure.migrations import MIGRATIONS
-from pig_catcher.infrastructure.migrations.v0039_battles import GUARDS, TABLES
+from pig_catcher.infrastructure.migrations.v0039_battles import GUARDS as BATTLE_GUARDS
+from pig_catcher.infrastructure.migrations.v0039_battles import TABLES
+from pig_catcher.infrastructure.migrations.v0049_battle_quota_reset import GUARDS as BATTLE_QUOTA_GUARDS
 from pig_catcher.infrastructure.repositories.dispatch import iso_ms, timestamp_ms
 from pig_catcher.infrastructure.repositories.economy import EconomyRepository
 from pig_catcher.infrastructure.repositories.gameplay import GameplayRepository
@@ -276,7 +278,7 @@ async def test_temporary_food_items_and_group_technique_untouched(world):
     assert not await WeeklyCompetitionService(w.db, clock=w.clock).process_receipt(result.receipt)
 
 
-@pytest.mark.parametrize("guard", GUARDS)
+@pytest.mark.parametrize("guard", (*BATTLE_GUARDS, *sorted(BATTLE_QUOTA_GUARDS)))
 async def test_every_battle_guard_is_required(tmp_path, guard):
     db = PigCatcherDatabase(tmp_path / "guard.sqlite3")
     await db.open()

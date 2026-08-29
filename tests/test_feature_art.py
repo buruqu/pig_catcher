@@ -233,7 +233,8 @@ def test_count_wheel_uses_pre_injury_state_after_core_heals():
     match = {"status": "active", "expires_ms": 999999, "battle_id": "battle-art"}
     snapshot = deepcopy(state)
     rendered = matchup(identity(), match, state, 0, round_result=result)
-    first = rendered.wheels[0]
+    first = rendered.fighters[0].count_wheel
+    assert first is not None
     assert [s.weight for s in first.segments] == [5, 4, 3, 2]
     assert first.selected_index == 3
     injury = rendered.wheels[-1]

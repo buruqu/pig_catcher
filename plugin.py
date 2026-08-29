@@ -1658,6 +1658,7 @@ class PigCatcherPlugin(MaiBotPlugin):
                 "/猪管监管 [案件号]",
                 "/猪管监管解除 <案件号> [原因]",
                 "/猪管重置玩家 <@玩家|用户ID>",
+                "/猪管重置比划 <@玩家|用户ID|全员>（主动与被挑战机会一起重置）",
                 "",
                 "所有操作只作用于当前群；全员指当前群已登记玩家。",
                 "管理员发放资产不增加抓猪/做菜统计；删除保留历史实例与图鉴。",
@@ -2137,6 +2138,53 @@ class PigCatcherPlugin(MaiBotPlugin):
             return await self._command_error(
                 stream_id=identity.stream_id,
                 operation="管理员重置玩家抓猪次数",
+                error=exc,
+            )
+
+    @Command(
+        "pig_catcher_admin_reset_battle_quota",
+        description="插件管理员重置当前群一人或全员的主动与被挑战机会",
+        pattern=r"^/猪管重置比划(?:\s+(?P<arguments>.*?))?\s*$",
+    )
+    async def handle_admin_reset_battle_quota(
+        self,
+        stream_id: str = "",
+        **kwargs: Any,
+    ) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_admin_command(stream_id, kwargs)
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            arguments = matched_group(kwargs, "arguments")
+            service = cast(AdministrationService, self._administration_service)
+            if arguments in {"全员", "所有人"}:
+                result = await service.reset_battle_quota(
+                    identity,
+                    command_name="pig-catcher.admin-reset-battle-quota",
+                    all_players=True,
+                )
+            else:
+                mention = self._optional_mention_target(kwargs)
+                target = parse_admin_target_arguments(
+                    arguments,
+                    mentioned_user_id=mention.user_id if mention is not None else "",
+                    mentioned_display_name=(mention.display_name if mention is not None else ""),
+                )
+                if target.remaining:
+                    raise MentionTargetError("比划机会重置只能指定一名玩家，或输入“全员”。")
+                result = await service.reset_battle_quota(
+                    identity,
+                    command_name="pig-catcher.admin-reset-battle-quota",
+                    target_user_id=target.user_id,
+                )
+            return await self._deliver_text_receipt(
+                stream_id=identity.stream_id,
+                receipt=result.receipt,
+            )
+        except Exception as exc:
+            return await self._command_error(
+                stream_id=identity.stream_id,
+                operation="管理员重置比划机会",
                 error=exc,
             )
 
@@ -4978,11 +5026,19 @@ class PigCatcherPlugin(MaiBotPlugin):
 
     @Command(
         "pig_catcher_battle_move",
-        description="自动执行本回合招式连锁并结算回合",
+        description="自动执行本回合招式连锁并展示在对应战斗猪下方",
         pattern=rf"^{_COMMAND_LEADING_MENTION_PATTERN}/出招\s*$",
     )
     async def handle_battle_move(self, stream_id: str = "", **kwargs: Any) -> tuple[bool, str, int]:
         return await self._battle_command(stream_id, kwargs, "move")
+
+    @Command(
+        "pig_catcher_battle_ready",
+        description="看完双方招式后确认本回合；双方都确认才结算胜负",
+        pattern=rf"^{_COMMAND_LEADING_MENTION_PATTERN}/会赢的\s*$",
+    )
+    async def handle_battle_ready(self, stream_id: str = "", **kwargs: Any) -> tuple[bool, str, int]:
+        return await self._battle_command(stream_id, kwargs, "ready")
 
     @Command(
         "pig_catcher_battle_status",

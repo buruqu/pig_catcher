@@ -27,6 +27,7 @@ COMMANDS = {
     "pig_catcher_battle_challenge": "比划比划",
     "pig_catcher_battle_count": "出招数",
     "pig_catcher_battle_move": "出招",
+    "pig_catcher_battle_ready": "会赢的",
     "pig_catcher_battle_status": "对战状态",
     "pig_catcher_battle_history": "对战记录",
     "pig_catcher_battle_loot": "战利品抓猪",
@@ -69,6 +70,7 @@ def test_challenge_at_filters_leading_bot_for_both_adapters(field):
     [
         ("数量", "count"),
         ("/领域展开", "move"),
+        ("提前", "ready"),
         ("不存在的猪", "challenge"),
         ("强化\n所有人", "profile"),
         ("轮盘 普通猪", "profile"),
@@ -186,7 +188,14 @@ async def test_sdk_full_match_rendered_fallback_and_disabled_safety(tmp_path):
                     break
                 turn = current["sides"][side]["turn"]
                 handler = (
-                    "handle_battle_count" if turn["raw"] is None else "handle_battle_move" if not turn["done"] else ""
+                    "handle_battle_count"
+                    if turn["raw"] is None
+                    else "handle_battle_move"
+                    if not turn["done"]
+                    else "handle_battle_ready"
+                    if all(item["turn"]["done"] for item in current["sides"])
+                    and not turn.get("ready", False)
+                    else ""
                 )
                 if handler:
                     assert (await invoke(plugin, handler, actor=actor))[0]
