@@ -515,6 +515,7 @@ uv run python .\tools\uat_production_recovery.py `
 - [第三轮对战交付与离线验收](docs/25-battle-implementation-and-acceptance.md)
 - [第四轮新增成就与 2.0 离线整体验收](docs/26-activity-achievements-and-v2-acceptance.md)
 - [抓猪 2.0 隔离开发与大版本上线方案](docs/16-v2-development-and-release-plan.md)
+- [抓猪 2.0 开发总结与 2026-09-01 删档上线方案](docs/36-v2-development-summary-and-20260901-launch-plan.md)
 
 ## 不变原则
 
