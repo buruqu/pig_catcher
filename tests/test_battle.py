@@ -153,7 +153,7 @@ async def world(tmp_path: Path):
         await db.close()
 
 
-async def test_full_battle_and_five_direct_deliveries(world):
+async def test_full_battle_and_five_normal_catches_auto_deliver_to_winner(world):
     match = await world.fight()
     assert match["status"] == "completed"
     assert len(await world.db.fetch_all("SELECT * FROM battle_daily_uses")) == 2
@@ -163,29 +163,49 @@ async def test_full_battle_and_five_direct_deliveries(world):
     assert f"{winner.display_name} 获胜" in (await world.send(section="status")).view.banner
     assert (await world.db.fetch_one("SELECT recipient_id FROM battle_loot"))[0] == winner.player_id
     for ordinal in range(1, 6):
-        result = await world.send(section="loot", actor=loser, mid=f"loot-{ordinal}")
+        identity = replace(loser, message_id=f"loot-{ordinal}")
+        result = await world.service.execute_pending_loot(identity)
+        assert result is not None
         assert f"{5 - ordinal}/5" in result.view.text()
         assert "最终概率" in result.view.text() and winner.display_name in result.view.text()
-        repeated = await world.send(section="loot", actor=loser, mid=f"loot-{ordinal}")
+        repeated = await world.service.execute_pending_loot(identity)
+        assert repeated is not None
         assert repeated.receipt.receipt_id == result.receipt.receipt_id
     deliveries = await world.db.fetch_all(
         "SELECT p.* FROM battle_loot_deliveries d JOIN pig_instances p USING(pig_instance_id)"
     )
     assert len(deliveries) == 5 and all(row["owner_player_id"] == winner.player_id for row in deliveries)
     assert (await world.db.fetch_one("SELECT used FROM battle_loot"))[0] == 5
-    assert (await world.db.fetch_one("SELECT COUNT(*) FROM command_receipts WHERE command_name='pig-catcher.catch'"))[
-        0
-    ] == 0
+    catch_receipts = await world.db.fetch_one(
+        "SELECT COUNT(*) FROM command_receipts WHERE command_name='pig-catcher.catch'"
+    )
+    assert catch_receipts[0] == 5
     assert (await world.db.fetch_one("SELECT SUM(coin_balance) FROM players"))[0] == 0
     assert (await world.db.fetch_one("SELECT SUM(experience) FROM players"))[0] == 0
     facts = await world.db.fetch_all(
         "SELECT * FROM activity_facts WHERE source_type='battle' AND subevent_id LIKE 'loot:%'"
     )
     assert len(facts) == 10 and all(loads(row["payload_json"])["battle_id"] == match["battle_id"] for row in facts)
+    assert await world.service.execute_pending_loot(replace(loser, message_id="loot-sixth")) is None
     with pytest.raises(BattleError, match="没有待交付"):
         await world.send(section="loot", actor=loser)
     assert await world.db.fetch_all("PRAGMA foreign_key_check") == []
     assert [r[0] for r in await world.db.fetch_all("PRAGMA integrity_check")] == ["ok"]
+
+
+async def test_auto_loot_does_not_replace_an_existing_normal_catch_receipt(world):
+    normal = GameplayService(world.db, world.service.catching, clock=world.clock)
+    before: dict[str, str] = {}
+    for actor in (world.a, world.b):
+        identity = replace(actor, message_id="ordinary-before-battle")
+        before[actor.player_id] = (await normal.catch(identity)).receipt.receipt_id
+    await world.fight()
+    grant = await world.db.fetch_one("SELECT * FROM battle_loot")
+    loser = world.a if grant["actor_id"] == world.a.player_id else world.b
+    identity = replace(loser, message_id="ordinary-before-battle")
+    assert await world.service.execute_pending_loot(identity) is None
+    assert (await normal.catch(identity)).receipt.receipt_id == before[loser.player_id]
+    assert (await world.db.fetch_one("SELECT used FROM battle_loot"))[0] == 0
 
 
 async def test_round_waits_for_both_win_declarations_and_actions_stay_with_fighter(world):

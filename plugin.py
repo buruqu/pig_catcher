@@ -188,7 +188,7 @@ from .pig_catcher.services import (
     is_group_event_food,
     reward_label,
 )
-from .pig_catcher.services.battle import BattleService
+from .pig_catcher.services.battle import BattleResult, BattleService
 from .pig_catcher.services.dispatch import DispatchResult, DispatchService
 from .pig_catcher.services.item_bag import ItemBagService
 from .pig_catcher.services.tour import TourService
@@ -2262,6 +2262,10 @@ class PigCatcherPlugin(MaiBotPlugin):
         if rejected is not None or identity is None:
             return rejected or (False, "", 0)
         try:
+            if self.settings.features.battle_enabled and self._battle_service is not None:
+                battle_loot = await self._battle_service.execute_pending_loot(identity)
+                if battle_loot is not None:
+                    return await self._deliver_battle_result(identity, battle_loot)
             result = await cast(GameplayService, self._gameplay_service).catch(identity)
             fallback = result.receipt.text_summary or format_catch_summary(result)
             if result.receipt_created and result.technique_resolution is None and result.pig.alternate_image_relpath:
@@ -4928,6 +4932,34 @@ class PigCatcherPlugin(MaiBotPlugin):
     async def handle_joint_tour(self, stream_id: str = "", **kwargs: Any) -> tuple[bool, str, int]:
         return await self._tour_command(stream_id, kwargs, "joint")
 
+    async def _deliver_battle_result(
+        self,
+        identity: CommandIdentity,
+        result: BattleResult,
+    ) -> tuple[bool, str, int]:
+        renderer = self._renderer
+        root = Path(self.ctx.paths.data_dir).resolve()
+        paths = {pig.short_code: media_path(root, pig.image_relpath) for pig in result.view.pigs if pig.image_relpath}
+
+        async def render() -> RenderedImage:
+            if renderer is None:
+                raise RuntimeError("对战渲染器尚未就绪。")
+            return await renderer.render_battle(await self._activity_view_cosmetics(identity, result.view), paths)
+
+        if result.receipt:
+            return await self._deliver_receipt(
+                stream_id=identity.stream_id,
+                receipt=result.receipt,
+                render=render,
+                fallback_text=result.view.text(),
+            )
+        return await self._deliver_query(
+            stream_id=identity.stream_id,
+            render=render,
+            fallback_text=result.view.text(),
+            activity_identity=identity,
+        )
+
     async def _battle_command(self, stream_id: str, kwargs: Mapping[str, Any], section: str) -> tuple[bool, str, int]:
         identity, rejected = await self._prepare_command(
             stream_id,
@@ -4966,27 +4998,7 @@ class PigCatcherPlugin(MaiBotPlugin):
             if service is None or renderer is None:
                 raise RuntimeError("对战服务尚未就绪。")
             result = await service.execute(identity, request)
-            root = Path(self.ctx.paths.data_dir).resolve()
-            paths = {
-                pig.short_code: media_path(root, pig.image_relpath) for pig in result.view.pigs if pig.image_relpath
-            }
-
-            async def render() -> RenderedImage:
-                return await renderer.render_battle(await self._activity_view_cosmetics(identity, result.view), paths)
-
-            if result.receipt:
-                return await self._deliver_receipt(
-                    stream_id=identity.stream_id,
-                    receipt=result.receipt,
-                    render=render,
-                    fallback_text=result.view.text(),
-                )
-            return await self._deliver_query(
-                stream_id=identity.stream_id,
-                render=render,
-                fallback_text=result.view.text(),
-                activity_identity=identity,
-            )
+            return await self._deliver_battle_result(identity, result)
         except PigCatcherError as exc:
             if renderer is None:
                 return await self._command_error(stream_id=identity.stream_id, operation="猪猪对战", error=exc)

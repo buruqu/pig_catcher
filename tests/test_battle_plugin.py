@@ -149,6 +149,7 @@ async def test_queries_help_and_errors_are_images_except_copyable_help(tmp_path)
         )
         assert (await invoke(plugin, "handle_battle_pig", "帮助"))[0]
         assert "/战利品抓猪" in ctx.send.texts[-1][1]
+        assert "普通 /抓猪 会自动结算战利品" in ctx.send.texts[-1][1]
         assert not (await invoke(plugin, "handle_battle_count"))[0]
         assert "对战提示" in ctx.render.calls[-1][0]
     finally:
@@ -202,15 +203,19 @@ async def test_sdk_full_match_rendered_fallback_and_disabled_safety(tmp_path):
         else:
             pytest.fail("SDK match did not naturally finish")
         loser = a if state["winner"] == 1 else b
-        assert (await invoke(plugin, "handle_battle_loot", actor=loser, mid="loot"))[0]
+        assert (await invoke(plugin, "handle_catch", actor=loser, mid="loot-auto"))[0]
         assert "战利品抓猪" in ctx.render.calls[-1][0] and "本次最终概率" in ctx.render.calls[-1][0]
+        assert (await plugin.database.fetch_one("SELECT used FROM battle_loot"))[0] == 1
+        # The old explicit entry remains available and consumes the same queue.
+        assert (await invoke(plugin, "handle_battle_loot", actor=loser, mid="loot-manual"))[0]
+        assert (await plugin.database.fetch_one("SELECT used FROM battle_loot"))[0] == 2
         assert (await invoke(plugin, "handle_battle_history", match["battle_id"] + " 1 1"))[0]
         assert "逐招记录" in ctx.render.calls[-1][0]
         config = plugin.get_plugin_config_data()
         config["features"]["battle_enabled"] = False
         plugin.set_plugin_config(config)
         assert not (await invoke(plugin, "handle_battle_loot", actor=loser))[0]
-        assert (await plugin.database.fetch_one("SELECT used FROM battle_loot"))[0] == 1
+        assert (await plugin.database.fetch_one("SELECT used FROM battle_loot"))[0] == 2
     finally:
         await plugin.on_unload()
 

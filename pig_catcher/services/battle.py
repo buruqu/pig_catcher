@@ -32,6 +32,8 @@ from .dispatch import DispatchService
 from .receipts import request_fingerprint
 
 QUERIES = frozenset(("profile", "tools", "wheels", "status", "history", "detail"))
+AUTO_LOOT_COMMAND = "pig-catcher.catch"
+AUTO_LOOT_REQUEST = {"command_version": 1}
 SETUP = frozenset(
     (
         "profile",
@@ -126,6 +128,65 @@ class BattleService:
                 result_type="battle",
                 result_object_id=result_view.battle_id or key,
                 result_json=dumps({"version": BATTLE_VERSION, "action": request.action, "view": result_view.payload()}),
+                text_summary=result_view.text(),
+                now=now,
+                catch_quota_cost=0,
+            )
+            return BattleResult(result_view, receipt.receipt)
+
+    async def execute_pending_loot(self, identity: CommandIdentity) -> BattleResult | None:
+        """Route a normal catch to the oldest pending battle reward, if one exists.
+
+        The command name and payload deliberately match ``GameplayService.catch`` so one
+        source message can commit either a normal pig or a battle reward, never both.
+        ``/战利品抓猪`` remains a compatible explicit alias with its own command receipt.
+        """
+
+        now_ms = timestamp_ms(self.clock.now()) // 1000 * 1000
+        now = iso_ms(now_ms)
+        key = MessageKeyFactory.build(identity, AUTO_LOOT_COMMAND)
+        async with self.database.transaction() as session:
+            old = await self.receipts.get_by_key(session, key)
+            if old:
+                validate_existing_receipt(
+                    old,
+                    identity=identity,
+                    command_name=AUTO_LOOT_COMMAND,
+                    request_payload=AUTO_LOOT_REQUEST,
+                )
+                # A previously committed ordinary catch must still be replayed by the
+                # ordinary service even if a battle finishes before the duplicate arrives.
+                if old.result_type != "battle":
+                    return None
+                payload = loads(old.result_json)
+                if payload.get("action") != "loot":
+                    raise BattleError("抓猪回执中的战利品结果类型无效。")
+                result_view = await DispatchService._restrict_media(
+                    session,
+                    identity,
+                    BattleView.from_payload(payload["view"]),
+                )
+                return BattleResult(result_view, old)
+            if not await self.repo.has_pending_loot(session, identity.player_id, identity.scope.value):
+                return None
+            await self.framework.touch_identity(session, identity=identity, now=now)
+            scope = await session.fetch_one("SELECT enabled FROM scopes WHERE scope_id=?", (identity.scope.value,))
+            if not scope or not scope[0]:
+                raise BattleError("本群玩法已关闭。")
+            from .battle_loot import claim_loot
+
+            result_view = await claim_loot(self, session, identity, now_ms, key)
+            result_view = await DispatchService._restrict_media(session, identity, result_view)
+            receipt = await self.receipts.reserve(
+                session,
+                idempotency_key=key,
+                scope_id=identity.scope.value,
+                player_id=identity.player_id,
+                command_name=AUTO_LOOT_COMMAND,
+                request_fingerprint=request_fingerprint(AUTO_LOOT_REQUEST),
+                result_type="battle",
+                result_object_id=result_view.battle_id or key,
+                result_json=dumps({"version": BATTLE_VERSION, "action": "loot", "view": result_view.payload()}),
                 text_summary=result_view.text(),
                 now=now,
                 catch_quota_cost=0,

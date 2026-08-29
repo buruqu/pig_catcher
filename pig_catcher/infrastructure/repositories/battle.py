@@ -302,6 +302,15 @@ class BattleRepository:
         )
         return dict(row) if row else None
 
+    async def has_pending_loot(self, session: DatabaseSession, player_id: str, scope_id: str) -> bool:
+        """Return whether the player must settle an older natural-loss reward first."""
+
+        row = await session.fetch_one(
+            "SELECT 1 FROM battle_loot WHERE actor_id=? AND scope_id=? AND used<5 LIMIT 1",
+            (player_id, scope_id),
+        )
+        return row is not None
+
     async def expire_scope(self, session: DatabaseSession, scope_id: str, now: str) -> None:
         now_ms = timestamp_ms(now)
         match = await self.active(session, scope_id)
