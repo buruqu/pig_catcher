@@ -22,12 +22,12 @@ showcase_enabled = true
 ranking_enabled = true
 
 [access]
-group_whitelist = ["1092931381", "237716658", "5E5854406D0297D6FEAE696A13E3A339", "9EA2810F378FBD7DC3219C56CEAB3520"]
+group_whitelist = ["237716658", "9EA2810F378FBD7DC3219C56CEAB3520"]
 group_blacklist = []
 user_whitelist = []
 user_blacklist = []
 admin_user_ids = ["1455722694", "qq-official:1653F5B1D9080DF8848CAC1A23E5B309", "qq-official:D5CE7CA3F4339D1B7D1D52938419DAD4"]
-command_session_allowlist = []
+command_session_allowlist = ["qq:237716658", "qq-official:9EA2810F378FBD7DC3219C56CEAB3520"]
 notify_denied = true
 denied_message = "当前群或账号未启用抓猪插件。"
 
