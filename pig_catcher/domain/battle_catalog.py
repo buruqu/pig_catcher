@@ -9,7 +9,7 @@ from .special_content import GOJO_PIG_TEMPLATE_ID, SUKUNA_PIG_TEMPLATE_ID
 
 # 对战规则版本与活动成就事实版本分离：新版对战会改变随机命名空间，
 # 但新增字段仍是 activity_progress v1 可以向后兼容读取的事实载荷。
-BATTLE_RULE_VERSION = 2
+BATTLE_RULE_VERSION = 3
 BATTLE_FACT_VERSION = 1
 BATTLE_VERSION = BATTLE_RULE_VERSION
 INVITE_TTL_MS = 5 * 60 * 1000

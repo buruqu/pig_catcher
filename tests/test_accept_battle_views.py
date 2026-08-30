@@ -44,9 +44,13 @@ def test_deterministic_mechanic_cards_cover_new_battle_rules() -> None:
         "13d-domain-clash-tie",
         "13e-solo-simple-domain",
         "13f-black-flash-loan-infinity-space",
+        "13g-purple-reset-cycle",
+        "13h-round-carry",
     ]
     assert evidence[names[0]]["wheel"] == (("side-0", 4), ("side-1", 3), ("tie", 3))
     assert evidence[names[0]]["outcome"] == "side-0"
+    assert evidence[names[0]]["boost_side"] == 0
+    assert evidence[names[0]]["bonus_gain"] > 0
     assert evidence[names[1]]["outcome"] == "tie"
     assert evidence[names[2]]["wheel"] == (("hit", 8), ("simple-domain", 2))
     assert evidence[names[2]]["outcome"] == "simple-domain"
@@ -55,4 +59,12 @@ def test_deterministic_mechanic_cards_cover_new_battle_rules() -> None:
     assert evidence[names[3]]["space_slash_gain"] >= 29
     assert "无下限·防御" in str(evidence[names[3]]["infinity_adjustments"])
     assert all(view.fighters and view.wheels for _name, view in cases)
-    assert "空间斩" in cases[-1][1].text()
+    assert "空间斩" in dict(cases)["13f-black-flash-loan-infinity-space"].text()
+    purple = evidence["13g-purple-reset-cycle"]
+    assert purple["first_purple_used_steps"] == 2
+    assert purple["second_purple_used_steps"] == 1
+    assert purple["final_purple_weight_steps"] == 0
+    carry = evidence["13h-round-carry"]
+    assert carry["round"] == 3
+    assert [item["round_start_weight"] for item in carry["carryover"]] == [8, 8]
+    assert "历史折半继承3" in cases[-1][1].text()

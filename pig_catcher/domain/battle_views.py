@@ -38,6 +38,8 @@ class FighterCard:
     pending: str
     tool: str
     ready: str = ""
+    weight_breakdown: str = ""
+    next_weight: str = ""
     count_wheel: BattleWheelCard | None = None
     move_wheel: BattleWheelCard | None = None
     action_lines: tuple[DispatchLine, ...] = ()
@@ -53,6 +55,7 @@ class BattleView(DispatchView):
     win_percent: str = "50"
     celebration: bool = False
     wheels: tuple[BattleWheelCard, ...] = ()
+    retention_mode: str = "legacy-full"
 
     @classmethod
     def from_payload(cls, data: dict) -> "BattleView":
@@ -88,6 +91,8 @@ class BattleView(DispatchView):
                     )
                 },
                 ready=item.get("ready", ""),
+                weight_breakdown=item.get("weight_breakdown", ""),
+                next_weight=item.get("next_weight", ""),
                 count_wheel=parse_wheel(item.get("count_wheel")),
                 move_wheel=parse_wheel(item.get("move_wheel")),
                 action_lines=tuple(DispatchLine(**line) for line in item.get("action_lines", ())),
@@ -103,6 +108,7 @@ class BattleView(DispatchView):
             win_percent=data.get("win_percent", "50"),
             celebration=data.get("celebration", False),
             wheels=tuple(parse_wheel(card) for card in data.get("wheels", ()) if card),
+            retention_mode=data.get("retention_mode", "legacy-full"),
         )
 
     def text(self) -> str:
@@ -112,10 +118,14 @@ class BattleView(DispatchView):
         for fighter in self.fighters:
             lines.append(
                 f"{fighter.player_name}｜{fighter.pig_name}#{fighter.short_code} +{fighter.level}"
-                f"｜累计权重{fighter.weight}"
+                f"｜{'本回合结算权重' if self.retention_mode == 'half-round' else '累计权重'}{fighter.weight}"
                 f"｜回合胜率{fighter.chance}｜{fighter.count}｜{fighter.injury}｜{fighter.risk}"
                 f"｜核心{fighter.core}｜{fighter.debt}｜{fighter.pending}｜{fighter.ready}｜{fighter.tool}"
             )
+            if fighter.weight_breakdown:
+                lines.append(f"  权重构成：{fighter.weight_breakdown}")
+            if fighter.next_weight:
+                lines.append(f"  {fighter.next_weight}")
             lines.extend(
                 f"  {item.label}：{item.value} {item.note}".strip() for item in fighter.action_lines
             )

@@ -56,6 +56,8 @@ def _fresh_mechanic_state(initial_state: dict) -> dict:
             tool_used=False,
             black_flash_stacks=0,
             purple_weight_steps=0,
+            round_start_weight=5,
+            round_gains=[],
         )
         side["turn"] = {
             "raw": None,
@@ -171,6 +173,9 @@ def deterministic_mechanic_cases(
             "wheel": domain["wheel"],
             "outcome": domain["outcome"],
             "domain_counts": domain["domain_counts"],
+            "boost_side": domain.get("boost_side"),
+            "boosted_ordinal": domain.get("boosted_ordinal"),
+            "bonus_gain": domain.get("bonus_gain", 0),
         }
 
     prepared = _fresh_mechanic_state(initial_state)
@@ -243,6 +248,71 @@ def deterministic_mechanic_cases(
         "loan_double_preserved_for_next_numeric": True,
         "space_slash_gain": space["gain"],
         "infinity_adjustments": adjustments,
+    }
+
+    prepared = _fresh_mechanic_state(initial_state)
+    _ready(prepared["sides"][0])
+    _record_move(prepared, 0, "dismantle")
+    _ready(prepared["sides"][1], 5)
+    sequence = [
+        _record_move(prepared, 1, move_id)
+        for move_id in ("blue", "red", "purple", "blue-fist", "unlimited-purple")
+    ]
+    state, result, seed = _resolve_fixed(prepared, "purple-reset-cycle")
+    name = "13g-purple-reset-cycle"
+    cases.append(
+        (
+            name,
+            matchup(
+                identity,
+                {**initial_match, "status": state["status"]},
+                state,
+                now_ms,
+                title="苍赫聚合 · 两次茈归零重算",
+                banner="苍、赫把茈盘推到+0.2；虚式·茈发动后归零，苍拳重新积到+0.1，再由无限制·茈消耗。",
+                events=_events(prepared),
+                round_result=result,
+            ),
+        )
+    )
+    evidence[name] = {
+        "seed": seed,
+        "first_purple_used_steps": sequence[2]["purple_weight_steps_used"],
+        "first_purple_wheel_units": sequence[2]["draw_wheel_units"],
+        "second_purple_used_steps": sequence[4]["purple_weight_steps_used"],
+        "final_purple_weight_steps": result["before"][1]["purple_weight_steps"],
+    }
+
+    prepared = _fresh_mechanic_state(initial_state)
+    prepared["round"] = 3
+    for side in prepared["sides"]:
+        side.update(weight=8, round_start_weight=8, round_gains=[1, 3])
+    _ready(prepared["sides"][0])
+    _record_move(prepared, 0, "elbow")
+    _ready(prepared["sides"][1])
+    _record_move(prepared, 1, "reverse")
+    state, result, seed = _resolve_fixed(prepared, "round-carry")
+    name = "13h-round-carry"
+    cases.append(
+        (
+            name,
+            matchup(
+                identity,
+                {**initial_match, "status": state["status"]},
+                state,
+                now_ms,
+                title="第三回合 · 逐轮折半继承",
+                banner="固定事实验收：基础5 + 第一回合1的半额1 + 第二回合3的半额2，再叠加本回合完整新增。",
+                events=_events(prepared),
+                round_result=result,
+            ),
+        )
+    )
+    evidence[name] = {
+        "seed": seed,
+        "round": result["round"],
+        "carryover": result["carryover"],
+        "next_weights": [side["weight"] for side in state["sides"]],
     }
     return cases, evidence
 

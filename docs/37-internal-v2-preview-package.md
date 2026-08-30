@@ -50,7 +50,7 @@ uv run python -c "from pathlib import Path; from tools.build_internal_preview im
 2. 用 SQLite 在线备份接口，把现有生产库生成到插件目录之外的一次性克隆；不得复制运行中的
    主库、WAL 或 SHM 文件。
 3. 将在线备份克隆放入新的 `data/plugins/local.pig-catcher-v2-internal/`，只让 2.0 代码打开该副本，
-   完成 Schema 34→49 迁移、重开幂等、`quick_check`、外键和账本校验。
+   完成当前内部数据库→Schema 51 迁移、重开幂等、`quick_check`、外键和账本校验。
 4. 用内部包内的 `tools/import_asset_catalog.py`，将包内
    `asset_library/current/assets.json` 导入内部数据目录；核对四群模板总清单中的目标两群各
    187 猪/69 菜，不能把开发验收数据库直接当作玩家库。
@@ -67,6 +67,6 @@ uv run python -c "from pathlib import Path; from tools.build_internal_preview im
 ## 4. 回退
 
 - 命令分流或加载失败时，先从路由中移除内部包的两个 `allowed_session`，恢复这两个会话命中 1.x。
-- 卸载 `local.pig-catcher-v2-internal` 只影响内部包；不得把 1.x 指向 Schema 49 内部库。
+- 卸载 `local.pig-catcher-v2-internal` 只影响内部包；不得把 1.x 指向 Schema 51 内部库。
 - 保留内部库及构建清单用于复盘。确认不再需要前不得删除；回退不要求回滚或覆盖生产库。
 - 真实 QQ 验收必须单独记录，离线测试和 Runner 加载不能代替群内收发、图片/GIF与双人交互验收。

@@ -1872,7 +1872,7 @@
         "kind": "event",
         "metric": "battle.zero_action_round_win",
         "target": 1,
-        "description": "因上回合贷款，本回合实际出招为0且没有抽取任何招式，仍凭累计权重赢下回合；整场随后自然结束。"
+        "description": "因上回合贷款，本回合实际出招为0且没有抽取任何招式，仍凭历史回合折半继承的权重赢下回合；整场随后自然结束。"
       },
       "rewards": [
         {

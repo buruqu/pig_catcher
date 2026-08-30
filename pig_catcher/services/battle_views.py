@@ -64,14 +64,23 @@ def _scaled_weight(value: int, scale: int) -> int | float:
     return value // scale if value % scale == 0 else value / scale
 
 
-def effective_total_after(event: dict, adjustments: dict[int, dict]) -> int:
+def effective_total_after(event: dict, adjustments: dict[int, dict], domain_bonus: dict | None = None) -> int:
     ordinal = int(event["ordinal"])
-    return int(event["total"]) - sum(
+    total = int(event["total"]) - sum(
         int(item["gain"]) for cancelled_ordinal, item in adjustments.items() if cancelled_ordinal <= ordinal
     )
+    if domain_bonus and int(domain_bonus.get("ordinal") or 0) <= ordinal:
+        total += int(domain_bonus.get("gain") or 0)
+    return total
 
 
-def move_line(event: dict, adjustment: dict | None = None, *, effective_total: int | None = None) -> Line:
+def move_line(
+    event: dict,
+    adjustment: dict | None = None,
+    *,
+    effective_total: int | None = None,
+    domain_bonus: dict | None = None,
+) -> Line:
     shown_total = int(event["total"]) if effective_total is None else effective_total
     if event["base"] > 0:
         note = (
@@ -98,11 +107,16 @@ def move_line(event: dict, adjustment: dict | None = None, *, effective_total: i
         note += f"；黑闪领悟现为+{event.get('black_flash_stacks', 0)}"
     if "blue-red" in event.get("tags", ()):
         note += f"；两种茈的抽取权重累计+{event.get('purple_weight_steps', 0) / 10:.1f}"
+    if "purple" in event.get("tags", ()):
+        used = int(event.get("purple_weight_steps_used", event.get("purple_weight_steps_before", 0)))
+        note += f"；本次茈盘加权+{used / 10:.1f}已消耗，使用后归零重新累计"
     if "infinity" in event.get("tags", ()):
         note += "；本回合无下限防御已展开（多次不叠加）"
     if adjustment:
         value = f"原+{weight_label(adjustment['gain'])} · 结算归零 → 累计{weight_label(shown_total)}"
         note += "；" + "、".join(adjustment["reasons"])
+    if domain_bonus:
+        note += f"；领域战获胜，本招额外+{weight_label(int(domain_bonus['gain']))}（本回合仅一次）"
     if event["tool_used"]:
         note += f"；{TOOLS_BY_ID[event['tool_used']].name}已消耗"
     return Line(f"{event['ordinal']}. {event['name']}", value, note)
@@ -142,9 +156,17 @@ def matchup(
     # 伤势结算后可能已治愈；出招数图必须使用抽取时(before)的盘，而非刚变化的伤势。
     count_sides = round_result["before"] if round_result else display_sides
     adjustment_maps = [{}, {}]
+    domain_bonus_maps: list[dict | None] = [None, None]
     if round_result:
         for side, entries in enumerate(round_result.get("interactions", {}).get("adjustments", ())):
             adjustment_maps[side] = {int(item["ordinal"]): item for item in entries}
+        domain = round_result.get("interactions", {}).get("domain") or {}
+        boost_side = domain.get("boost_side")
+        if boost_side in (0, 1) and domain.get("boosted_ordinal") is not None:
+            domain_bonus_maps[int(boost_side)] = {
+                "ordinal": int(domain["boosted_ordinal"]),
+                "gain": int(domain.get("bonus_gain") or 0),
+            }
     for index, count_side in enumerate(count_sides):
         turn = count_side["turn"]
         turn.setdefault("ready", False)
@@ -184,7 +206,19 @@ def matchup(
                     event,
                     adjustment_maps[event_side].get(int(event["ordinal"])),
                     effective_total=(
-                        effective_total_after(event, adjustment_maps[event_side]) if round_result else None
+                        effective_total_after(
+                            event,
+                            adjustment_maps[event_side],
+                            domain_bonus_maps[event_side],
+                        )
+                        if round_result
+                        else None
+                    ),
+                    domain_bonus=(
+                        domain_bonus_maps[event_side]
+                        if domain_bonus_maps[event_side]
+                        and int(domain_bonus_maps[event_side]["ordinal"]) == int(event["ordinal"])
+                        else None
                     ),
                 )
                 for event in visible_events
@@ -244,6 +278,34 @@ def matchup(
             ready = "本回合已结算" if round_result and all_done else "已出完，等待对方"
         else:
             ready = "尚未出完"
+        definition_version = int(match.get("definition_version") or 1)
+        if definition_version >= 3:
+            if round_result and round_result.get("carryover"):
+                carry = round_result["carryover"][index]
+                inherited = int(carry["round_start_weight"]) - 5
+                weight_breakdown = (
+                    f"基础5 + 历史折半继承{weight_label(inherited)} + "
+                    f"本回合净增{weight_label(int(carry['round_gain']))}"
+                )
+                next_weight = (
+                    "整场已结束，本回合权重不再迁移"
+                    if carry.get("next_round_weight") is None
+                    else (
+                        f"本回合净增按50%向上取整保留{weight_label(int(carry['retained_gain']))}；"
+                        f"下回合起始{weight_label(int(carry['next_round_weight']))}"
+                    )
+                )
+            else:
+                start = int(side.get("round_start_weight", side["weight"]))
+                inherited = start - 5
+                current = int(side["weight"]) - start
+                weight_breakdown = (
+                    f"基础5 + 历史折半继承{weight_label(inherited)} + 本回合净增{weight_label(current)}"
+                )
+                next_weight = "回合结算后，仅本回合净增的50%向上取整迁移"
+        else:
+            weight_breakdown = "旧规则：跨回合完整保留累计权重"
+            next_weight = ""
         cards.append(
             FighterCard(
                 snap["player_name"],
@@ -260,6 +322,8 @@ def matchup(
                 "已出完" if turn["done"] else f"待连抽{weight_label(turn['pending'])}次",
                 tool_note,
                 ready,
+                weight_breakdown,
+                next_weight,
                 count_cards[index],
                 move_cards[index],
                 action_lines[index],
@@ -312,14 +376,30 @@ def matchup(
                             f"{names[0]} ×{domain['domain_counts'][0]} / {names[1]} ×{domain['domain_counts'][1]}",
                             "每方即使多次展开，本回合仍只判一次。",
                         ),
+                        *(
+                            (
+                                Line(
+                                    "领域胜方加倍",
+                                    f"{names[int(domain['boost_side'])]} 第{domain['boosted_ordinal']}招额外 "
+                                    f"+{weight_label(int(domain['bonus_gain']))}",
+                                    "只翻倍一份仍有效的领域招式；同回合多开不重复翻倍。",
+                                ),
+                            )
+                            if domain.get("boost_side") in (0, 1) and domain.get("bonus_gain")
+                            else ()
+                        ),
                     ),
-                    "领域败方（或平手双方）的本回合领域胜利权重已在结算前归零。",
+                    "领域败方（或平手双方）的领域权重归零；双领域胜方仅一份领域权重翻倍。",
                 )
             )
         panel_note = (
             f"整场结束，败者获得{loot_attempts}次额外战利品抓猪，全部归胜者。"
             if round_result["natural_end"]
-            else "累计胜利权重保留，双方继续下一回合。"
+            else (
+                "本回合使用完整结算权重抽胜负；各自本回合净增的50%向上取整后迁移到下一回合。"
+                if int(match.get("definition_version") or 1) >= 3
+                else "旧规则累计胜利权重完整保留，双方继续下一回合。"
+            )
         )
         panels.append(
             Panel(
@@ -388,6 +468,7 @@ def matchup(
         panels=tuple(panels),
         hints=hints,
         wheels=tuple(wheel_cards),
+        retention_mode=("half-round" if int(match.get("definition_version") or 1) >= 3 else "legacy-full"),
         celebration=state["status"] == "completed"
         or (
             state["status"] == "active"
@@ -458,7 +539,8 @@ def wheels(identity: CommandIdentity, fighter_id: str, level: int = 0) -> Battle
         hints=(
             "每次核心解除重伤并使后续数值招式+1，无叠加上限；历史风险不降低。",
             "个体体型/体重在各自模板范围的平均位置≥75%：每回合首个数值招式另+1，不参与贷款翻倍。",
-            "黑闪基础+10并再抽2次；每次黑闪令后续数值招式再+1。苍/赫令两种茈的抽取权重各+0.1。",
+            "黑闪基础+10并再抽2次；每次黑闪令后续数值招式再+1。苍/赫令两种茈的抽取权重各+0.1，任意茈发动后归零重算。",
+            "双领域胜方仅一份仍有效的领域招式权重翻倍；本回合净增仅有50%向上取整迁移到后续回合。",
             "无下限每回合只免疫对方首个仍有效的数值招式；领域同回合只判定一次。",
         ),
     )

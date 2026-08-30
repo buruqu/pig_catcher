@@ -114,6 +114,8 @@ def new_state(fighters: list[dict]) -> dict:
                 "tool_used": snapshot.get("tool_id", "") == "confetti",
                 "black_flash_stacks": 0,
                 "purple_weight_steps": 0,
+                "round_start_weight": 5,
+                "round_gains": [],
                 "turn": fresh_turn(),
             }
         )
@@ -129,6 +131,8 @@ def _side(state: dict, side: int) -> dict:
     # 2.0.0 已开始但尚未结束的现场没有 ready 字段；原地补默认值即可无损恢复。
     player.setdefault("black_flash_stacks", 0)
     player.setdefault("purple_weight_steps", 0)
+    player.setdefault("round_start_weight", 5)
+    player.setdefault("round_gains", [])
     player["turn"].setdefault("ready", False)
     player["turn"].setdefault("events", [])
     player["turn"].setdefault("infinity_used", False)
@@ -180,6 +184,12 @@ def apply_move(player: dict, move: Move) -> dict:
         player["next_debt"] += 1
     if "black-flash" in move.tags:
         player["black_flash_stacks"] += 1
+    purple_weight_steps_before = player["purple_weight_steps"]
+    purple_weight_steps_used = purple_weight_steps_before if "purple" in move.tags else 0
+    if "purple" in move.tags:
+        # 茈享受抽取前已经累计的苍/赫加成；一经抽中即视为使用并清零，
+        # 即使该招的数值随后被无下限或领域结算抵消，也不会返还加成。
+        player["purple_weight_steps"] = 0
     if "blue-red" in move.tags:
         player["purple_weight_steps"] += 1
     if "infinity" in move.tags:
@@ -200,6 +210,8 @@ def apply_move(player: dict, move: Move) -> dict:
         "tool_gain": tool_gain,
         "black_flash_bonus": black_flash_bonus,
         "black_flash_stacks": player["black_flash_stacks"],
+        "purple_weight_steps_before": purple_weight_steps_before,
+        "purple_weight_steps_used": purple_weight_steps_used,
         "purple_weight_steps": player["purple_weight_steps"],
         "tool_used": snapshot.get("tool_id", "") if used_tool else "",
         "gain": gain,
@@ -351,6 +363,20 @@ def _settle_interactions(state: dict, seed: str) -> dict:
         deduction = sum(entry["gain"] for entry in entries.values())
         state["sides"][side]["weight"] -= deduction
         adjustments.append(tuple(entries[key] for key in sorted(entries)))
+    # 只有双领域战的明确胜者获得一次领域权重翻倍。若第一份领域数值被
+    # 无下限抵消，则顺延到第一份仍有效的领域；同回合多开也只加一份。
+    if domain is not None:
+        domain.update(boost_side=None, boosted_ordinal=None, bonus_gain=0)
+        winner = domain.get("winner")
+        if domain.get("mode") == "clash" and winner in (0, 1):
+            for event in state["sides"][winner]["turn"].get("events", ()):
+                ordinal = int(event["ordinal"])
+                if "domain" not in event.get("tags", ()) or ordinal in cancelled[winner]:
+                    continue
+                bonus = int(event["gain"])
+                state["sides"][winner]["weight"] += bonus
+                domain.update(boost_side=winner, boosted_ordinal=ordinal, bonus_gain=bonus)
+                break
     return {"domain": domain, "adjustments": tuple(adjustments)}
 
 
@@ -372,6 +398,24 @@ def resolve_round(state: dict, seed: str) -> dict | None:
     wheel = INJURY_WHEELS[before[loser]["risk"]]
     injury, injury_roll = choose(seed, f"{state['round']}:{loser}:injury", wheel, version=state["version"])
     apply_injury(state["sides"][loser], injury)
+    natural_end = injury == "exhausted"
+    carryover = []
+    for player in state["sides"]:
+        start_weight = int(player.get("round_start_weight", 5))
+        round_gain = int(player["weight"]) - start_weight
+        if round_gain < 0:
+            raise BattleError("本回合结算权重低于回合起始权重，拒绝生成错误继承。")
+        retained_gain = (round_gain + 1) // 2
+        carryover.append(
+            {
+                "round_start_weight": start_weight,
+                "round_gain": round_gain,
+                "retained_gain": retained_gain,
+                "settlement_weight": int(player["weight"]),
+                "next_round_weight": None if natural_end else start_weight + retained_gain,
+                "applied": not natural_end,
+            }
+        )
     result = {
         "round": state["round"],
         "winner": winner,
@@ -382,15 +426,19 @@ def resolve_round(state: dict, seed: str) -> dict | None:
         "injury_wheel": wheel,
         "provisional": provisional,
         "interactions": interactions,
+        "carryover": tuple(carryover),
         "before": before,
         "after": deepcopy(state["sides"]),
-        "natural_end": injury == "exhausted",
+        "natural_end": natural_end,
     }
-    if injury == "exhausted":
+    if natural_end:
         state.update(status="completed", winner=winner)
     else:
         state["round"] += 1
-        for player in state["sides"]:
+        for index, player in enumerate(state["sides"]):
+            player.setdefault("round_gains", []).append(carryover[index]["round_gain"])
+            player["weight"] = carryover[index]["next_round_weight"]
+            player["round_start_weight"] = carryover[index]["next_round_weight"]
             player["turn"] = fresh_turn()
     return result
 

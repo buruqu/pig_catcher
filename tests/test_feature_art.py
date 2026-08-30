@@ -198,6 +198,11 @@ def test_old_dispatch_payload_and_new_battle_art_payload_roundtrip():
     assert all(card.selected_index is None for card in rule_view.wheels)
     assert "private-openid" not in str(rule_view.payload())
 
+    battle_payload = rule_view.payload()
+    battle_payload.pop("retention_mode", None)
+    restored_old = BattleView.from_payload(battle_payload)
+    assert restored_old.retention_mode == "legacy-full"
+
 
 def test_count_wheel_uses_pre_injury_state_after_core_heals():
     snapshots = [

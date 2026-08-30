@@ -19,7 +19,7 @@ from pig_catcher.infrastructure.migrations import MIGRATIONS
 from pig_catcher.infrastructure.migrations.v0039_battles import GUARDS as BATTLE_GUARDS
 from pig_catcher.infrastructure.migrations.v0039_battles import TABLES
 from pig_catcher.infrastructure.migrations.v0049_battle_quota_reset import GUARDS as BATTLE_QUOTA_GUARDS
-from pig_catcher.infrastructure.migrations.v0050_battle_loot_total import GUARDS as BATTLE_LOOT_TOTAL_GUARDS
+from pig_catcher.infrastructure.migrations.v0051_battle_rule_v3 import GUARDS as BATTLE_LOOT_TOTAL_GUARDS
 from pig_catcher.infrastructure.repositories.dispatch import iso_ms, timestamp_ms
 from pig_catcher.infrastructure.repositories.economy import EconomyRepository
 from pig_catcher.infrastructure.repositories.gameplay import GameplayRepository
@@ -359,16 +359,16 @@ async def test_legacy_v1_loot_keeps_five_draw_random_sequence_and_distribution(w
         assert snapshot["total_uses"] == 5 and snapshot["remaining"] == 5 - ordinal
 
 
-@pytest.mark.parametrize("definition_version,total_uses", ((1, 3), (2, 5)))
+@pytest.mark.parametrize("definition_version,total_uses", ((1, 3), (2, 5), (3, 5)))
 async def test_loot_total_must_match_battle_rule_version(world, definition_version, total_uses):
     original = dict(await world.fight())
     match = original
     async with world.db.transaction() as session:
         await session.execute("DELETE FROM battle_loot WHERE battle_id=?", (original["battle_id"],))
-        if definition_version == 1:
+        if definition_version != int(original["definition_version"]):
             match = {key: value for key, value in original.items() if key != "sequence"}
-            match["battle_id"] = "BLEGACYWRONGTOTAL"
-            match["definition_version"] = 1
+            match["battle_id"] = f"BVERSION{definition_version}WRONGTOTAL"
+            match["definition_version"] = definition_version
             await session.execute(
                 f"INSERT INTO battle_matches({','.join(match)}) VALUES({','.join('?' for _ in match)})",
                 tuple(match.values()),
@@ -470,7 +470,7 @@ async def test_schema49_migration_preserves_existing_loot_as_five_uses(tmp_path)
         row = await db.fetch_one(
             "SELECT used,total_uses FROM battle_loot WHERE battle_id='BLEGACY49LOOT'"
         )
-        assert await db.schema_version() == 50
+        assert await db.schema_version() == 51
         assert tuple(row) == (2, 5)
         assert await db.fetch_all("PRAGMA foreign_key_check") == []
     finally:

@@ -1,5 +1,7 @@
 """用户定稿轮盘、核心无上限、分块精确重放和永久概率的纯规则验收。"""
 
+from copy import deepcopy
+
 import pytest
 
 from pig_catcher.domain.battle import (
@@ -127,14 +129,16 @@ def test_injury_never_regresses_history_or_recalculates_weight():
     assert apply_move(p, Move("a", "普通", 10))["gain"] == 10
 
 
-def test_zero_actions_still_resolve_and_weight_is_cumulative():
+def test_zero_actions_still_resolve_and_only_half_current_round_gain_carries():
     s = state()
     for index, p in enumerate(s["sides"]):
         p.update(next_debt=50, weight=10 + index * 5)
         assert roll_count(s, index, "zero")["effective"] == 0
         assert play_chunk(s, index, "zero") == []
     summary = resolve_round(s, "zero")
-    assert summary and [p["weight"] for p in s["sides"]] == [10, 15]
+    assert summary and [p["weight"] for p in s["sides"]] == [8, 10]
+    assert [item["round_gain"] for item in summary["carryover"]] == [5, 10]
+    assert [item["retained_gain"] for item in summary["carryover"]] == [3, 5]
     assert all(p["next_debt"] == 0 for p in s["sides"])
 
 
@@ -243,7 +247,7 @@ def test_cancelled_domain_updates_every_following_displayed_cumulative_total():
     assert "累计15" in move_line(follow_up, effective_total=final_total).value
 
 
-def test_blue_and_red_raise_both_purple_move_draw_weights_by_exact_tenths():
+def test_blue_and_red_raise_both_purple_moves_then_either_purple_resets_the_bonus():
     p = state()["sides"][1]
     moves = FIGHTERS[1].moves
     assert move_weight_units(p, moves[6]) == move_weight_units(p, moves[9]) == 10
@@ -253,6 +257,31 @@ def test_blue_and_red_raise_both_purple_move_draw_weights_by_exact_tenths():
     apply_move(p, moves[1])
     assert move_weight_units(p, moves[6]) == move_weight_units(p, moves[9]) == 12
     assert all(move_weight_units(p, move) == 10 for move in moves if "purple" not in move.tags)
+    p["turn"].update(pending=1, done=False)
+    purple = apply_move(p, moves[6])
+    assert purple["purple_weight_steps_before"] == purple["purple_weight_steps_used"] == 2
+    assert purple["purple_weight_steps"] == 0
+    assert move_weight_units(p, moves[6]) == move_weight_units(p, moves[9]) == 10
+    p["turn"].update(pending=2, done=False)
+    apply_move(p, moves[2])
+    assert move_weight_units(p, moves[6]) == move_weight_units(p, moves[9]) == 11
+    unlimited = apply_move(p, moves[9])
+    assert unlimited["purple_weight_steps_used"] == 1 and p["purple_weight_steps"] == 0
+
+
+def test_purple_reset_is_not_refunded_when_infinity_cancels_its_numeric_gain():
+    s = state()
+    s["sides"][1]["purple_weight_steps"] = 1
+    ready(s["sides"][1])
+    purple = _record(s["sides"][1], FIGHTERS[1].moves[6], 1)
+    ready(s["sides"][0])
+    _record(s["sides"][0], FIGHTERS[0].moves[1], 0)
+    # 直接标记宿傩一侧的无下限，隔离验证结算取消不会倒流招式使用状态。
+    s["sides"][0]["turn"]["infinity_used"] = True
+    summary = resolve_round(s, "purple-cancelled")
+    assert purple["purple_weight_steps_used"] == 1
+    assert s["sides"][1]["purple_weight_steps"] == 0
+    assert any(item["ordinal"] == 1 for item in summary["interactions"]["adjustments"][1])
 
 
 @pytest.mark.parametrize("outcome", ["side-0", "side-1", "tie"])
@@ -269,11 +298,16 @@ def test_domain_clash_is_once_and_zeroes_every_losing_domain_gain(outcome):
     assert domain["wheel"] == wheel
     if outcome == "side-0":
         assert summary["before"][1]["weight"] == 5
+        assert domain["boost_side"] == 0 and domain["boosted_ordinal"] == 1
+        assert domain["bonus_gain"] == 35 and summary["before"][0]["weight"] == 110
     elif outcome == "side-1":
         assert summary["before"][0]["weight"] == 5
         assert summary["before"][0]["next_debt"] == 1
+        assert domain["boost_side"] == 1 and domain["boosted_ordinal"] == 1
+        assert domain["bonus_gain"] == 30 and summary["before"][1]["weight"] == 95
     else:
         assert [side["weight"] for side in summary["before"]] == [5, 5]
+        assert domain["boost_side"] is None and domain["bonus_gain"] == 0
 
 
 @pytest.mark.parametrize("outcome", ["hit", "simple-domain"])
@@ -285,6 +319,7 @@ def test_single_gojo_domain_uses_eight_two_and_effect_only_on_hit(outcome):
     wheel = (("hit", 8), ("simple-domain", 2))
     summary = resolve_round(s, _seed_for("1:domain:solo:1", wheel, outcome))
     assert summary["interactions"]["domain"]["outcome"] == outcome
+    assert summary["interactions"]["domain"]["bonus_gain"] == 0
     if outcome == "hit":
         assert summary["before"][0]["next_debt"] == 1 and summary["before"][1]["weight"] == 35
     else:
@@ -316,3 +351,66 @@ def test_infinity_zeroes_black_flash_gain_but_keeps_its_function_and_stack():
     assert summary["before"][0]["weight"] == 5
     assert summary["before"][0]["black_flash_stacks"] == 1
     assert flash["extra_draws"] == 2
+
+
+def _resolve_non_terminal(source: dict, prefix: str) -> tuple[dict, dict]:
+    for index in range(10_000):
+        candidate = deepcopy(source)
+        result = resolve_round(candidate, f"{prefix}-{index}")
+        if result and not result["natural_end"]:
+            return candidate, result
+    raise AssertionError("无法找到非终局固定种子")
+
+
+def test_each_round_gain_is_halved_once_rounded_up_and_kept_for_later_rounds():
+    s = state()
+    for player, gain in zip(s["sides"], (1, 2), strict=True):
+        player["weight"] += gain
+        player["turn"]["done"] = True
+    s, first = _resolve_non_terminal(s, "carry-r1")
+    assert [item["retained_gain"] for item in first["carryover"]] == [1, 1]
+    assert [side["weight"] for side in s["sides"]] == [6, 6]
+
+    for player, gain in zip(s["sides"], (3, 4), strict=True):
+        player["weight"] += gain
+        player["turn"]["done"] = True
+    s, second = _resolve_non_terminal(s, "carry-r2")
+    assert [item["retained_gain"] for item in second["carryover"]] == [2, 2]
+    assert [side["weight"] for side in s["sides"]] == [8, 8]
+    assert [side["round_gains"] for side in s["sides"]] == [[1, 3], [2, 4]]
+    assert all(side["round_start_weight"] == 5 + 1 + 2 for side in s["sides"])
+
+    s["sides"][0]["weight"] += 5
+    assert s["sides"][0]["weight"] == 5 + 1 + 2 + 5
+
+
+def test_domain_bonus_enters_net_round_gain_and_displayed_cumulative_total():
+    s = state()
+    for side, move in ((0, FIGHTERS[0].moves[4]), (1, FIGHTERS[1].moves[7])):
+        ready(s["sides"][side])
+        event = _record(s["sides"][side], move, side)
+        if side == 0:
+            boosted_event = event
+    wheel = (("side-0", 4), ("side-1", 3), ("tie", 3))
+    summary = resolve_round(s, _seed_for("1:domain:clash", wheel, "side-0"))
+    domain = summary["interactions"]["domain"]
+    bonus = {"ordinal": domain["boosted_ordinal"], "gain": domain["bonus_gain"]}
+    assert summary["carryover"][0]["round_gain"] == 70
+    assert effective_total_after(boosted_event, {}, bonus) == summary["before"][0]["weight"] == 75
+    assert "领域战获胜" in move_line(
+        boosted_event,
+        effective_total=summary["before"][0]["weight"],
+        domain_bonus=bonus,
+    ).note
+
+
+def test_huge_odd_round_gain_uses_integer_ceiling_without_float_conversion():
+    s = state()
+    huge = 10**5000 + 1
+    for player in s["sides"]:
+        player["weight"] = 5 + huge
+        player["turn"]["done"] = True
+    next_state, result = _resolve_non_terminal(s, "huge-carry")
+    assert result["carryover"][0]["retained_gain"] == (huge + 1) // 2
+    assert next_state["sides"][0]["weight"] == 5 + (huge + 1) // 2
+    assert loads(dumps(next_state)) == next_state
