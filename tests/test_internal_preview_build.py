@@ -78,11 +78,13 @@ def test_build_internal_preview_rewrites_identity_and_isolates_both_groups(
     assert config["access"]["command_session_allowlist"] == list(REQUIRED_SCOPE_IDS)
     assert config["access"]["notify_denied"] is False
     assert config["regulation"]["enabled_scope_ids"] == []
+    assert config["features"]["weekly_competitions_enabled"] is False
     assert config["quota_administration"]["group_id"] == ""
     assert config["announcement_administration"]["execute_send"] is False
     assert not (output / "tests").exists()
     assert not (output / "docs").exists()
     assert report["plugin_id"] == INTERNAL_PLUGIN_ID
+    assert report["weekly_competitions_enabled"] is False
     assert report["secret_inputs_copied"] is False
     assert report == json.loads(
         (output / "INTERNAL_PREVIEW_BUILD.json").read_text(encoding="utf-8")

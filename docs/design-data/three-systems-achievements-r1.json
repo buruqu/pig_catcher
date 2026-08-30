@@ -2168,7 +2168,7 @@
         "kind": "event",
         "metric": "journey.five_trophies_delivered",
         "target": 1,
-        "description": "作为败者亲自用完同一场五次战利品抓猪，并全部按规则交付给该场胜者；不能用别场次数拼凑。"
+        "description": "作为败者亲自用完同一场全部战利品抓猪，并全部按规则交付给该场胜者；不能用别场次数拼凑。"
       },
       "rewards": [
         {

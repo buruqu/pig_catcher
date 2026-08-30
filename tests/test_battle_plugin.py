@@ -199,19 +199,42 @@ async def test_sdk_full_match_rendered_fallback_and_disabled_safety(tmp_path):
         else:
             pytest.fail("SDK match did not naturally finish")
         loser = a if state["winner"] == 1 else b
+        grant = await plugin.database.fetch_one("SELECT * FROM battle_loot")
+        assert grant["total_uses"] == 3 and grant["used"] == 0
         assert (await invoke(plugin, "handle_catch", actor=loser, mid="loot-auto"))[0]
         assert "战利品抓猪" in ctx.render.calls[-1][0] and "本次最终概率" in ctx.render.calls[-1][0]
         assert (await plugin.database.fetch_one("SELECT used FROM battle_loot"))[0] == 1
         # The old explicit entry remains available and consumes the same queue.
         assert (await invoke(plugin, "handle_battle_loot", actor=loser, mid="loot-manual"))[0]
         assert (await plugin.database.fetch_one("SELECT used FROM battle_loot"))[0] == 2
+        assert (await invoke(plugin, "handle_catch", actor=loser, mid="loot-auto-third"))[0]
+        assert "战利品抓猪" in ctx.render.calls[-1][0]
+        assert (await plugin.database.fetch_one("SELECT used FROM battle_loot"))[0] == 3
+
+        # New matches stop intercepting the fourth ordinary /抓猪. The pig now
+        # belongs to the former loser instead of being delivered to the winner.
+        before_normal = (
+            await plugin.database.fetch_one(
+                "SELECT COUNT(*) FROM pig_instances WHERE owner_player_id=? AND state='active'",
+                (loser.player_id,),
+            )
+        )[0]
+        assert (await invoke(plugin, "handle_catch", actor=loser, mid="ordinary-after-three-loot"))[0]
+        assert "战利品抓猪" not in ctx.render.calls[-1][0]
+        assert (await plugin.database.fetch_one("SELECT used FROM battle_loot"))[0] == 3
+        assert (
+            await plugin.database.fetch_one(
+                "SELECT COUNT(*) FROM pig_instances WHERE owner_player_id=? AND state='active'",
+                (loser.player_id,),
+            )
+        )[0] == before_normal + 1
         assert (await invoke(plugin, "handle_battle_history", match["battle_id"] + " 1 1"))[0]
         assert "逐招记录" in ctx.render.calls[-1][0]
         config = plugin.get_plugin_config_data()
         config["features"]["battle_enabled"] = False
         plugin.set_plugin_config(config)
         assert not (await invoke(plugin, "handle_battle_loot", actor=loser))[0]
-        assert (await plugin.database.fetch_one("SELECT used FROM battle_loot"))[0] == 2
+        assert (await plugin.database.fetch_one("SELECT used FROM battle_loot"))[0] == 3
     finally:
         await plugin.on_unload()
 

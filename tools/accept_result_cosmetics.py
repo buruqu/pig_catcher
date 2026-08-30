@@ -83,7 +83,25 @@ async def result_geometry(capability: PlaywrightRenderCapability) -> dict[str, A
             if (!el) return null;
             const b = el.getBoundingClientRect();
             return {x:b.left-rb.left, y:b.top-rb.top,
-              width:b.width, height:b.height, bottom:b.bottom-rb.top};
+              width:b.width, height:b.height, right:b.right-rb.left, bottom:b.bottom-rb.top};
+          };
+          const styledBox = selector => {
+            const el = root.querySelector(selector);
+            if (!el) return null;
+            const b = el.getBoundingClientRect();
+            const style = getComputedStyle(el);
+            const left = parseFloat(style.borderLeftWidth) || 0;
+            const top = parseFloat(style.borderTopWidth) || 0;
+            const right = parseFloat(style.borderRightWidth) || 0;
+            const bottom = parseFloat(style.borderBottomWidth) || 0;
+            return {
+              x:b.left-rb.left, y:b.top-rb.top, width:b.width, height:b.height,
+              right:b.right-rb.left, bottom:b.bottom-rb.top,
+              inner:{x:b.left-rb.left+left, y:b.top-rb.top+top,
+                width:b.width-left-right, height:b.height-top-bottom},
+              border:{left,top,right,bottom}, position:style.position,
+              pointerEvents:style.pointerEvents, overflow:style.overflow
+            };
           };
           const media = box('.pig-card__media');
           const header = box('.pig-card__header');
@@ -95,6 +113,12 @@ async def result_geometry(capability: PlaywrightRenderCapability) -> dict[str, A
           const facts = box('.pig-card__facts');
           const description = box('.pig-card__description');
           const cosmetics = box('.result-cosmetics');
+          const cosmeticFrame = {
+            layer:styledBox('.cosmetic-frame-layer'),
+            edge:styledBox('.cosmetic-edge'),
+            mediaEdge:styledBox('.cosmetic-media-edge'),
+            headerRail:styledBox('.cosmetic-header-rail')
+          };
           const overlaps=[];
           if (header && media && header.bottom > media.y+1) overlaps.push('header/media');
           if (heading && header && heading.bottom > header.bottom+1) overlaps.push('heading/header');
@@ -108,8 +132,10 @@ async def result_geometry(capability: PlaywrightRenderCapability) -> dict[str, A
           if (detail && receipt && receipt.y-detail.bottom > 80) {
             excessiveGaps.push({after:'detail', before:'receipt', pixels:receipt.y-detail.bottom});
           }
-          return {media,header,heading,eyebrow,detail,receipt,footer,
+          return {root:{width:rb.width,height:rb.height,clientWidth:root.clientWidth,clientHeight:root.clientHeight},
+            media,header,heading,eyebrow,detail,receipt,footer,
             facts,description,cosmetics,overlaps,excessiveGaps,
+            cosmeticFrame,
             probability:root.querySelector('[data-catch-probability], [data-food-probability]')
               ?.textContent.trim() || '',
             text:root.textContent,
@@ -118,6 +144,62 @@ async def result_geometry(capability: PlaywrightRenderCapability) -> dict[str, A
             cosmeticImages:root.querySelectorAll('.cosmetic-plate img, .cosmetic-preview img').length};
         }"""
     )
+
+
+def result_frame_geometry(geometry: dict[str, Any]) -> dict[str, Any]:
+    """Validate that decorative frame geometry preserves the fixed animation slot."""
+    root = geometry["root"]
+    frame = geometry["cosmeticFrame"]
+    layer = frame["layer"]
+    media_edge = frame["mediaEdge"]
+    header_rail = frame["headerRail"]
+
+    def near(value: float, expected: float, tolerance: float = 1.0) -> bool:
+        return abs(value - expected) <= tolerance
+
+    layer_matches_root = bool(
+        layer
+        and near(layer["x"], 0)
+        and near(layer["y"], 0)
+        and near(layer["width"], root["clientWidth"])
+        and near(layer["height"], root["clientHeight"])
+    )
+    media_inner = media_edge["inner"] if media_edge else None
+    media_inner_matches_slot = bool(
+        media_inner
+        and all(
+            near(media_inner[key], expected)
+            for key, expected in {"x": 38, "y": 164, "width": 480, "height": 480}.items()
+        )
+    )
+    media_outer_matches_design = bool(
+        media_edge
+        and all(
+            near(media_edge[key], expected)
+            for key, expected in {"x": 14, "y": 140, "width": 528, "height": 528}.items()
+        )
+    )
+    header_rail_matches_design = bool(
+        header_rail
+        and near(header_rail["x"], 38)
+        and near(header_rail["y"], 122)
+        and near(header_rail["height"], 4)
+        and near(root["width"] - header_rail["right"], 38)
+    )
+    checks = {
+        "layer_present": layer is not None,
+        "layer_absolute": bool(layer and layer["position"] == "absolute"),
+        "layer_pointer_events_none": bool(layer and layer["pointerEvents"] == "none"),
+        "layer_matches_root": layer_matches_root,
+        "media_edge_present": media_edge is not None,
+        "media_edge_absolute": bool(media_edge and media_edge["position"] == "absolute"),
+        "media_edge_outer_matches_design": media_outer_matches_design,
+        "media_edge_inner_matches_38_164_480_slot": media_inner_matches_slot,
+        "header_rail_present": header_rail is not None,
+        "header_rail_absolute": bool(header_rail and header_rail["position"] == "absolute"),
+        "header_rail_matches_design": header_rail_matches_design,
+    }
+    return {"checks": checks, "passed": all(checks.values())}
 
 
 async def accept(args: argparse.Namespace) -> dict[str, Any]:
@@ -158,6 +240,9 @@ async def accept(args: argparse.Namespace) -> dict[str, Any]:
         "achievement_frame": "all-giants-dynamic",
         "achievement_badge": "weekly-001-catch-value-rank-10",
     }
+    frame_ids = sorted(key for key, value in COSMETIC_DEFINITIONS.items() if value["kind"] == "frame")
+    if len(frame_ids) != 16:
+        raise AssertionError(f"Expected 16 registered frames for this acceptance matrix, found {len(frame_ids)}")
     blank_cosmetics = {key: "" for key in rain}
     player = "离线视觉验收员 · 非实服数据"
     base_pig = replace(
@@ -250,6 +335,14 @@ async def accept(args: argparse.Namespace) -> dict[str, Any]:
         hints=("通过 /猪猪成就 查看自己已经解锁的奖励。",),
         **rain,
     )
+    frame_matrix_view = replace(
+        base_pig,
+        achievement_title="",
+        achievement_frame="",
+        achievement_badge="",
+        effect_summaries=(),
+        excluded_summaries=(),
+    )
     cases = [
         ("01-pig-rain-weekly-frame", "pig", base_pig, pig_path),
         ("02-pig-long-title-description", "pig", long_pig, pig_path),
@@ -298,6 +391,12 @@ async def accept(args: argparse.Namespace) -> dict[str, Any]:
             None,
         ),
     ]
+    frame_matrix: dict[str, str] = {"13-frame-matrix-baseline": ""}
+    cases.append(("13-frame-matrix-baseline", "pig", frame_matrix_view, pig_path))
+    for index, frame_id in enumerate(frame_ids, 1):
+        label = f"14-frame-matrix-{index:02d}-{frame_id}"
+        frame_matrix[label] = frame_id
+        cases.append((label, "pig", replace(frame_matrix_view, achievement_frame=frame_id), pig_path))
     options = render_options()
     outputs: list[tuple[str, Path]] = []
     records: list[dict[str, Any]] = []
@@ -352,6 +451,10 @@ async def accept(args: argparse.Namespace) -> dict[str, Any]:
                 else:
                     slot_aligned = None
                 diagnostic = capability.diagnostics[-1]
+                is_frame_matrix = label in frame_matrix
+                frame_geometry = (
+                    result_frame_geometry(geometry) if is_frame_matrix and frame_matrix[label] else None
+                )
                 records.append(
                     {
                         "label": label,
@@ -363,6 +466,8 @@ async def accept(args: argparse.Namespace) -> dict[str, Any]:
                         "frame_count": rendered.frame_count,
                         "geometry": geometry,
                         "media_slot_aligned_within_css_border": slot_aligned,
+                        "frame_matrix_id": frame_matrix.get(label) if is_frame_matrix else None,
+                        "frame_geometry": frame_geometry,
                         "missing_text": missing,
                         "dom": diagnostic,
                     }
@@ -381,6 +486,17 @@ async def accept(args: argparse.Namespace) -> dict[str, Any]:
         finally:
             await capability.close()
             await browser.close()
+    baseline = next(record for record in records if record["label"] == "13-frame-matrix-baseline")
+    baseline_root = baseline["geometry"]["root"]
+    baseline_frame = baseline["geometry"]["cosmeticFrame"]
+    baseline["frame_baseline_is_unframed"] = not any(baseline_frame.values())
+    for record in records:
+        if record["label"] not in frame_matrix or not frame_matrix[record["label"]]:
+            continue
+        root = record["geometry"]["root"]
+        record["root_size_matches_frame_baseline"] = all(
+            abs(root[key] - baseline_root[key]) <= 1 for key in ("width", "height", "clientWidth", "clientHeight")
+        )
     preserved = all(hashlib.sha256(path.read_bytes()).hexdigest() == digest for path, digest in originals.items())
     contacts = write_contact_sheet(outputs, output)
     issues = [
@@ -392,12 +508,30 @@ async def accept(args: argparse.Namespace) -> dict[str, Any]:
         or record["geometry"]["legacyFramePseudo"] not in {"none", "normal"}
         or record["geometry"]["outline"] != "none"
         or record["media_slot_aligned_within_css_border"] is False
+        or (record["frame_geometry"] is not None and not record["frame_geometry"]["passed"])
+        or record.get("root_size_matches_frame_baseline") is False
+        or record.get("frame_baseline_is_unframed") is False
         or any(record["dom"][key] for key in ("clippedText", "outside", "brokenImages"))
     ]
     report = {
         "scope": "Isolated phase-3 visual DTO fixtures; no business acceptance, no live data, no settlement.",
         "longest_registered_title": longest_title,
         "count": len(records),
+        "frame_matrix": {
+            "count": len(frame_ids),
+            "ids": frame_ids,
+            "baseline_root": baseline_root,
+            "all_geometry_passed": all(
+                record["frame_geometry"] and record["frame_geometry"]["passed"]
+                for record in records
+                if record["label"] in frame_matrix and frame_matrix[record["label"]]
+            ),
+            "all_root_sizes_unchanged": all(
+                record.get("root_size_matches_frame_baseline") is True
+                for record in records
+                if record["label"] in frame_matrix and frame_matrix[record["label"]]
+            ),
+        },
         "contact_sheet": str(contacts),
         "records": records,
         "thumbnails": {"width": 320, "directory": str(thumbs)},

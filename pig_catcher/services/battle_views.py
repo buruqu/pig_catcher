@@ -8,9 +8,14 @@ from ..domain.battle_catalog import (
     FIGHTERS_BY_ID,
     HEAVY_COUNT_WHEEL,
     INJURY_NAMES,
+    INJURY_WEIGHT_SCALE,
     INJURY_WHEELS,
+    LEGACY_LOOT_ATTEMPTS,
+    LOOT_ATTEMPTS,
     MATERIAL_IDS,
+    MOVE_WEIGHT_SCALE,
     TOOLS_BY_ID,
+    fighter_moves,
 )
 from ..domain.battle_views import BattleView, BattleWheelCard, BattleWheelSegment, FighterCard
 from ..domain.dispatch import MATERIALS, safe_display_name
@@ -55,20 +60,49 @@ def view(identity: CommandIdentity, title: str, **kwargs) -> BattleView:
     return BattleView(title=title, player_name=safe_display_name(identity.display_name, identity.user_id), **kwargs)
 
 
-def move_line(event: dict) -> Line:
+def _scaled_weight(value: int, scale: int) -> int | float:
+    return value // scale if value % scale == 0 else value / scale
+
+
+def effective_total_after(event: dict, adjustments: dict[int, dict]) -> int:
+    ordinal = int(event["ordinal"])
+    return int(event["total"]) - sum(
+        int(item["gain"]) for cancelled_ordinal, item in adjustments.items() if cancelled_ordinal <= ordinal
+    )
+
+
+def move_line(event: dict, adjustment: dict | None = None, *, effective_total: int | None = None) -> Line:
+    shown_total = int(event["total"]) if effective_total is None else effective_total
     if event["base"] > 0:
         note = (
             f"({event['base']} + 强化{event['training']} + 核心{weight_label(event['core'])} "
             f"- 伤势{event['penalty']}) ×{event['multiplier']}"
         )
+        if event.get("black_flash_bonus", 0):
+            note += f"，黑闪领悟+{event['black_flash_bonus']}（不翻倍）"
         if event["trait_gain"] or event["tool_gain"]:
             note += f"，个体+{event['trait_gain']} / 器具+{event['tool_gain']}（不翻倍）"
-        value = f"+{weight_label(event['gain'])} → 累计{weight_label(event['total'])}"
+        value = f"+{weight_label(event['gain'])} → 累计{weight_label(shown_total)}"
     else:
-        value = f"再抽{event['extra_draws']}次"
+        value = (
+            f"黑闪领悟+{weight_label(event['black_flash_bonus'])} → 累计{weight_label(shown_total)}"
+            if event.get("black_flash_bonus", 0)
+            else f"再抽{event['extra_draws']}次"
+        )
         note = "功能招式不加战斗强化；待用×2保留" if event["double_pending"] else "功能招式不加战斗强化"
     if event["loan"]:
         note += f"；下回合扣招累计{weight_label(event['next_debt'])}，仅保留一份×2"
+    if event.get("extra_draws"):
+        note += f"；再抽{event['extra_draws']}次"
+    if "black-flash" in event.get("tags", ()):
+        note += f"；黑闪领悟现为+{event.get('black_flash_stacks', 0)}"
+    if "blue-red" in event.get("tags", ()):
+        note += f"；两种茈的抽取权重累计+{event.get('purple_weight_steps', 0) / 10:.1f}"
+    if "infinity" in event.get("tags", ()):
+        note += "；本回合无下限防御已展开（多次不叠加）"
+    if adjustment:
+        value = f"原+{weight_label(adjustment['gain'])} · 结算归零 → 累计{weight_label(shown_total)}"
+        note += "；" + "、".join(adjustment["reasons"])
     if event["tool_used"]:
         note += f"；{TOOLS_BY_ID[event['tool_used']].name}已消耗"
     return Line(f"{event['ordinal']}. {event['name']}", value, note)
@@ -97,6 +131,7 @@ def matchup(
     round_result: dict | None = None,
     extra_panels: tuple[Panel, ...] = (),
 ) -> BattleView:
+    loot_attempts = LEGACY_LOOT_ATTEMPTS if int(match.get("definition_version") or 1) == 1 else LOOT_ATTEMPTS
     display_sides = round_result["after"] if round_result else state["sides"]
     total = sum(side["weight"] for side in display_sides)
     cards, panels, wheel_cards = [], list(extra_panels), []
@@ -106,6 +141,10 @@ def matchup(
     action_notes = ["", ""]
     # 伤势结算后可能已治愈；出招数图必须使用抽取时(before)的盘，而非刚变化的伤势。
     count_sides = round_result["before"] if round_result else display_sides
+    adjustment_maps = [{}, {}]
+    if round_result:
+        for side, entries in enumerate(round_result.get("interactions", {}).get("adjustments", ())):
+            adjustment_maps[side] = {int(item["ordinal"]): item for item in entries}
     for index, count_side in enumerate(count_sides):
         turn = count_side["turn"]
         turn.setdefault("ready", False)
@@ -124,16 +163,32 @@ def matchup(
             if not side_events:
                 continue
             last = side_events[-1]
-            moves = FIGHTERS_BY_ID[last["fighter_id"]].moves
+            moves = fighter_moves(last["fighter_id"], int(match.get("definition_version") or 1))
+            units = last.get("draw_wheel_units")
+            scale = int(last.get("draw_weight_scale") or MOVE_WEIGHT_SCALE)
+            options = (
+                tuple((move.name, _scaled_weight(int(units[index]), scale)) for index, move in enumerate(moves))
+                if units and len(units) == len(moves)
+                else tuple((move.name, move.draw_weight) for move in moves)
+            )
             move_cards[event_side] = wheel_card(
                 "move",
                 "第" + str(last["ordinal"]) + "招落点",
-                tuple((move.name, move.draw_weight) for move in moves),
+                options,
                 last["name"],
                 "本卡展示最后一招的真实落点；逐招数值均为已提交事实。",
             )
             visible_events = side_events if round_result else side_events[-8:]
-            action_lines[event_side] = tuple(move_line(event) for event in visible_events)
+            action_lines[event_side] = tuple(
+                move_line(
+                    event,
+                    adjustment_maps[event_side].get(int(event["ordinal"])),
+                    effective_total=(
+                        effective_total_after(event, adjustment_maps[event_side]) if round_result else None
+                    ),
+                )
+                for event in visible_events
+            )
             action_notes[event_side] = (
                 f"本回合共{len(side_events)}招，以上为完整出招记录。"
                 if round_result
@@ -178,6 +233,13 @@ def matchup(
             if not tool
             else TOOLS_BY_ID[tool].name + (" · 已触发" if side["tool_used"] else " · 待触发/终局退回")
         )
+        mechanic_notes = []
+        if side.get("black_flash_stacks"):
+            mechanic_notes.append(f"黑闪领悟+{weight_label(side['black_flash_stacks'])}")
+        if side.get("purple_weight_steps"):
+            mechanic_notes.append(f"茈盘+{side['purple_weight_steps'] / 10:.1f}")
+        if mechanic_notes:
+            tool_note += " · " + " · ".join(mechanic_notes)
         if turn["done"]:
             ready = "本回合已结算" if round_result and all_done else "已出完，等待对方"
         else:
@@ -211,13 +273,51 @@ def matchup(
             wheel_card(
                 "injury",
                 loser + " · 伤势盘落点",
-                tuple((INJURY_NAMES[key], weight) for key, weight in round_result["injury_wheel"]),
+                tuple(
+                    (INJURY_NAMES[key], _scaled_weight(weight, INJURY_WEIGHT_SCALE))
+                    for key, weight in round_result["injury_wheel"]
+                ),
                 INJURY_NAMES[round_result["injury"]],
                 "扇区按本轮抽取时的风险权重绘制；标记是已经保存的结果。",
             )
         )
+        domain = round_result.get("interactions", {}).get("domain")
+        if domain:
+            names = [side["snapshot"]["player_name"] for side in display_sides]
+            labels = {
+                "side-0": names[0] + "领域胜",
+                "side-1": names[1] + "领域胜",
+                "tie": "领域平手",
+                "hit": "领域命中",
+                "simple-domain": "简易领域免疫",
+            }
+            domain_options = tuple((labels[key], weight) for key, weight in domain["wheel"])
+            wheel_cards.insert(
+                0,
+                wheel_card(
+                    "domain",
+                    "领域战判定" if domain["mode"] == "clash" else "领域命中判定",
+                    domain_options,
+                    labels[domain["outcome"]],
+                    "同回合多次领域只判定一次；图中落点是已提交事实。",
+                ),
+            )
+            panels.append(
+                Panel(
+                    "本回合领域判定",
+                    (
+                        Line("判定结果", labels[domain["outcome"]], domain.get("effect") or "没有追加领域效果"),
+                        Line(
+                            "领域次数",
+                            f"{names[0]} ×{domain['domain_counts'][0]} / {names[1]} ×{domain['domain_counts'][1]}",
+                            "每方即使多次展开，本回合仍只判一次。",
+                        ),
+                    ),
+                    "领域败方（或平手双方）的本回合领域胜利权重已在结算前归零。",
+                )
+            )
         panel_note = (
-            "整场结束，败者获得5次额外战利品抓猪，全部归胜者。"
+            f"整场结束，败者获得{loot_attempts}次额外战利品抓猪，全部归胜者。"
             if round_result["natural_end"]
             else "累计胜利权重保留，双方继续下一回合。"
         )
@@ -228,7 +328,11 @@ def matchup(
                     Line(
                         loser + "的伤势盘",
                         INJURY_NAMES[round_result["injury"]],
-                        "抽取权重：" + " / ".join(f"{INJURY_NAMES[k]} {v}" for k, v in round_result["injury_wheel"]),
+                        "抽取权重："
+                        + " / ".join(
+                            f"{INJURY_NAMES[k]} {_scaled_weight(v, INJURY_WEIGHT_SCALE)}"
+                            for k, v in round_result["injury_wheel"]
+                        ),
                     ),
                 ),
                 panel_note,
@@ -238,7 +342,7 @@ def matchup(
     if match["status"] == "pending":
         hints = (
             "受邀者：/比划比划 接受 或 /比划比划 拒绝；邀请者：/比划比划 取消。",
-            "接受后才扣今日各自角色额度并锁定猪猪；自然力竭败者的5只战利品归胜者。",
+            f"接受后才扣今日各自角色额度并锁定猪猪；自然力竭败者的{loot_attempts}只战利品归胜者。",
         )
         banner = (
             banner or f"{display_sides[1]['snapshot']['player_name']}，请在{remaining}秒内应战。尚未消耗额度或器具。"
@@ -257,7 +361,10 @@ def matchup(
     elif state["status"] == "completed":
         winner = display_sides[state["winner"]]["snapshot"]["player_name"]
         loser = display_sides[1 - state["winner"]]["snapshot"]["player_name"]
-        banner = banner or f"{winner} 获胜！{loser} 力竭倒下，获得5次额外战利品抓猪，抓到的猪全部归 {winner}。"
+        banner = banner or (
+            f"{winner} 获胜！{loser} 力竭倒下，获得{loot_attempts}次额外战利品抓猪，"
+            f"抓到的猪全部归 {winner}。"
+        )
         hints = (
             "/战利品抓猪 领取自然力竭败者专属次数；/对战记录 查看完整过程。",
             "未触发器具退回；本场临时核心、伤势、贷款全部结束，不修改普通抓猪加成。",
@@ -319,7 +426,10 @@ def wheels(identity: CommandIdentity, fighter_id: str, level: int = 0) -> Battle
                 wheel_card(
                     "injury",
                     ("初始风险", "轻伤风险", "重伤风险")[i],
-                    tuple((INJURY_NAMES[key], weight) for key, weight in options),
+                    tuple(
+                        (INJURY_NAMES[key], _scaled_weight(weight, INJURY_WEIGHT_SCALE))
+                        for key, weight in options
+                    ),
                     note="扇区面积为抽取权重占比；不是胜利概率。",
                 )
                 for i, options in enumerate(INJURY_WHEELS)
@@ -335,7 +445,9 @@ def wheels(identity: CommandIdentity, fighter_id: str, level: int = 0) -> Battle
                     *(
                         Line(
                             ("初始风险", "轻伤风险", "重伤风险")[i],
-                            " / ".join(f"{INJURY_NAMES[k]}:{w}" for k, w in wheel),
+                            " / ".join(
+                                f"{INJURY_NAMES[k]}:{_scaled_weight(w, INJURY_WEIGHT_SCALE)}" for k, w in wheel
+                            ),
                         )
                         for i, wheel in enumerate(INJURY_WHEELS)
                     ),
@@ -346,5 +458,7 @@ def wheels(identity: CommandIdentity, fighter_id: str, level: int = 0) -> Battle
         hints=(
             "每次核心解除重伤并使后续数值招式+1，无叠加上限；历史风险不降低。",
             "个体体型/体重在各自模板范围的平均位置≥75%：每回合首个数值招式另+1，不参与贷款翻倍。",
+            "黑闪基础+10并再抽2次；每次黑闪令后续数值招式再+1。苍/赫令两种茈的抽取权重各+0.1。",
+            "无下限每回合只免疫对方首个仍有效的数值招式；领域同回合只判定一次。",
         ),
     )

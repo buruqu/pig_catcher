@@ -8,7 +8,7 @@ from .dispatch_views import DispatchLine, DispatchView
 @dataclass(frozen=True, slots=True)
 class BattleWheelSegment:
     label: str
-    weight: int
+    weight: int | float
 
 
 @dataclass(frozen=True, slots=True)

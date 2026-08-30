@@ -70,6 +70,7 @@ MOVE_ALIASES = {
         )
     ),
 }
+MOVE_ALIASES["sukuna"]["world-cutting-slash"] = "world-cutting-slash"
 
 
 def add(state: dict, metric: str, amount: int = 1) -> None:
@@ -248,7 +249,8 @@ def battle(state: dict, event: str, source: str, at: int, data: dict, player_id:
             ordinal = int(event.split(":")[1])
             if ordinal not in deliveries:
                 deliveries.append(ordinal)
-            if set(deliveries) == {1, 2, 3, 4, 5}:
+            total_uses = int(data.get("total_uses", 5))
+            if set(deliveries) == set(range(1, total_uses + 1)):
                 flag(state, "journey.five_trophies_delivered")
                 state.pop("loot_deliveries", None)
         return
@@ -291,10 +293,11 @@ def battle(state: dict, event: str, source: str, at: int, data: dict, player_id:
             collect(state, "journey.three_systems", ["battle"])
             collect(state, "battle.finished_opponents", [other["snapshot"]["player_id"]])
             collect(state, "battle.finished_roles", ["initiator" if index == 0 else "opponent"])
+            recorded_moves = match["moves"]
             collect(
                 state,
                 f"battle.{archetype}_moves",
-                (MOVE_ALIASES[archetype][m] for m in match["moves"] if m in MOVE_ALIASES[archetype]),
+                (MOVE_ALIASES[archetype][move] for move in recorded_moves if move in MOVE_ALIASES[archetype]),
             )
             for metric in set(match["flags"]):
                 flag(state, metric)

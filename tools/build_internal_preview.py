@@ -127,6 +127,9 @@ def _rewrite_manifest(output_root: Path) -> dict[str, Any]:
 def _rewrite_config(output_root: Path) -> None:
     config_path = output_root / "config.toml"
     document = tomlkit.parse(config_path.read_text(encoding="utf-8"))
+    # 内部群在 2026-09-01 正式开榜前暂停周榜；构建产物必须保持关闭，
+    # 避免后续灰度覆盖把运行态意外重新打开。
+    document["features"]["weekly_competitions_enabled"] = False
     access = document["access"]
     access["group_whitelist"] = [scope.split(":", 1)[1] for scope in REQUIRED_SCOPE_IDS]
     access["group_blacklist"] = []
@@ -199,6 +202,8 @@ def verify_internal_preview_package(output_root: Path) -> dict[str, object]:
         raise ValueError("内部灰度包命令路由白名单不正确。")
     if config.get("regulation", {}).get("enabled_scope_ids") != []:
         raise ValueError("内部灰度包不应自动启用监管作用域。")
+    if config.get("features", {}).get("weekly_competitions_enabled") is not False:
+        raise ValueError("内部灰度包在 2026-09-01 前必须暂停周榜。")
 
     for path in root.rglob("*"):
         if _is_reparse_point(path):
@@ -219,6 +224,7 @@ def verify_internal_preview_package(output_root: Path) -> dict[str, object]:
         "group_scope_ids": list(REQUIRED_SCOPE_IDS),
         "group_ids": expected_group_ids,
         "command_routing_allowlist": list(REQUIRED_SCOPE_IDS),
+        "weekly_competitions_enabled": False,
         "file_count": len(inventory),
         "payload_bytes": sum(int(item["bytes"]) for item in inventory),
         "files": inventory,

@@ -19,8 +19,8 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from pig_catcher.assets import AssetCatalogStorage  # noqa: E402
 from pig_catcher.config.model import CatchingSection  # noqa: E402
-from pig_catcher.domain.battle import loads  # noqa: E402
-from pig_catcher.domain.battle_catalog import FIGHTERS  # noqa: E402
+from pig_catcher.domain.battle import apply_move, loads, move_weight_units, resolve_round  # noqa: E402
+from pig_catcher.domain.battle_catalog import FIGHTERS, FIGHTERS_BY_ID, MOVE_WEIGHT_SCALE  # noqa: E402
 from pig_catcher.domain.models import CommandIdentity, ScopeKey  # noqa: E402
 from pig_catcher.infrastructure.database import PigCatcherDatabase  # noqa: E402
 from pig_catcher.infrastructure.repositories.dispatch import timestamp_ms  # noqa: E402
@@ -37,6 +37,214 @@ from tools.accept_catching_and_collection_views import (  # noqa: E402
     write_image,
 )
 from tools.accept_dispatch_views import contact_sheet  # noqa: E402
+
+
+def _fresh_mechanic_state(initial_state: dict) -> dict:
+    """Return a clean round-one state that retains only the two public fighter snapshots."""
+
+    state = deepcopy(initial_state)
+    state.update(round=1, status="active", winner=None)
+    for side in state["sides"]:
+        side["snapshot"].update(tool_id="", trait_bonus=0)
+        side.update(
+            weight=5,
+            heavy=False,
+            risk=0,
+            core=0,
+            next_debt=0,
+            double=False,
+            tool_used=False,
+            black_flash_stacks=0,
+            purple_weight_steps=0,
+        )
+        side["turn"] = {
+            "raw": None,
+            "debt": 0,
+            "effective": None,
+            "pending": 0,
+            "draws": 0,
+            "done": False,
+            "ready": False,
+            "trait_used": False,
+            "events": [],
+            "infinity_used": False,
+        }
+    return state
+
+
+def _ready(player: dict, raw: int = 1) -> None:
+    player["turn"].update(raw=raw, debt=0, effective=raw, pending=raw, draws=0, done=raw == 0)
+
+
+def _record_move(state: dict, side: int, move_id: str) -> dict:
+    """Apply one explicit move and save a valid deterministic wheel snapshot for its card."""
+
+    player = state["sides"][side]
+    moves = FIGHTERS_BY_ID[player["snapshot"]["fighter_id"]].moves
+    move_index = next(index for index, move in enumerate(moves) if move.move_id == move_id)
+    wheel_units = [move_weight_units(player, move) for move in moves]
+    event = apply_move(player, moves[move_index])
+    event.update(
+        roll=sum(wheel_units[:move_index]),
+        round=state["round"],
+        side=side,
+        fighter_id=player["snapshot"]["fighter_id"],
+        draw_weight_scale=MOVE_WEIGHT_SCALE,
+        draw_wheel_units=wheel_units,
+    )
+    player["turn"]["events"].append(deepcopy(event))
+    return event
+
+
+def _events(state: dict) -> list[dict]:
+    return [deepcopy(event) for side in state["sides"] for event in side["turn"]["events"]]
+
+
+def _resolve_fixed(prepared: dict, slug: str, *, domain_outcome: str | None = None) -> tuple[dict, dict, str]:
+    """Find and return a named, reproducible seed without accepting an accidental terminal injury."""
+
+    for index in range(10_000):
+        seed = f"battle-visual-{slug}-{index}"
+        state = deepcopy(prepared)
+        result = resolve_round(state, seed)
+        if result is None or result["natural_end"]:
+            continue
+        domain = result["interactions"]["domain"]
+        if domain_outcome is not None and (domain is None or domain["outcome"] != domain_outcome):
+            continue
+        return state, result, seed
+    raise AssertionError(f"无法为离线对战样张找到固定结果：{slug}/{domain_outcome}")
+
+
+def deterministic_mechanic_cases(
+    initial_state: dict,
+    initial_match: dict,
+    identity: CommandIdentity,
+    now_ms: int,
+) -> tuple[list[tuple[str, object]], dict]:
+    """Build explicit rule cards so visual acceptance never depends on a lucky ordinary fight."""
+
+    cases: list[tuple[str, object]] = []
+    evidence: dict[str, dict] = {}
+
+    for suffix, expected, title, banner in (
+        (
+            "sukuna-win",
+            "side-0",
+            "双领域判定 · 宿傩领域胜",
+            "固定种子验收：宿傩领域战为40% / 对手30% / 平手30%，本次落在宿傩一侧。",
+        ),
+        (
+            "tie",
+            "tie",
+            "双领域判定 · 平手归零",
+            "固定种子验收：双方同回合展开领域，本次平手，双方领域胜利权重同时归零。",
+        ),
+    ):
+        prepared = _fresh_mechanic_state(initial_state)
+        for side, move_id in ((0, "shrine"), (1, "void")):
+            _ready(prepared["sides"][side])
+            _record_move(prepared, side, move_id)
+        state, result, seed = _resolve_fixed(prepared, "domain-" + suffix, domain_outcome=expected)
+        domain = result["interactions"]["domain"]
+        assert domain and tuple(domain["wheel"]) == (("side-0", 4), ("side-1", 3), ("tie", 3))
+        match = {**initial_match, "status": state["status"]}
+        name = "13c-domain-clash-sukuna-win" if expected == "side-0" else "13d-domain-clash-tie"
+        cases.append(
+            (
+                name,
+                matchup(
+                    identity,
+                    match,
+                    state,
+                    now_ms,
+                    title=title,
+                    banner=banner,
+                    events=_events(prepared),
+                    round_result=result,
+                ),
+            )
+        )
+        evidence[name] = {
+            "seed": seed,
+            "mode": domain["mode"],
+            "wheel": domain["wheel"],
+            "outcome": domain["outcome"],
+            "domain_counts": domain["domain_counts"],
+        }
+
+    prepared = _fresh_mechanic_state(initial_state)
+    _ready(prepared["sides"][0])
+    _record_move(prepared, 0, "dismantle")
+    _ready(prepared["sides"][1])
+    _record_move(prepared, 1, "void")
+    state, result, seed = _resolve_fixed(prepared, "solo-simple-domain", domain_outcome="simple-domain")
+    domain = result["interactions"]["domain"]
+    assert domain and tuple(domain["wheel"]) == (("hit", 8), ("simple-domain", 2))
+    assert state["sides"][0]["next_debt"] == 0
+    name = "13e-solo-simple-domain"
+    cases.append(
+        (
+            name,
+            matchup(
+                identity,
+                {**initial_match, "status": state["status"]},
+                state,
+                now_ms,
+                title="单方领域 · 简易领域免疫",
+                banner="固定种子验收：单方领域按8:2判定，本次落在简易领域，领域权重与无量空处效果均归零。",
+                events=_events(prepared),
+                round_result=result,
+            ),
+        )
+    )
+    evidence[name] = {
+        "seed": seed,
+        "mode": domain["mode"],
+        "wheel": domain["wheel"],
+        "outcome": domain["outcome"],
+        "gojo_next_round_debt_applied": False,
+    }
+
+    prepared = _fresh_mechanic_state(initial_state)
+    _ready(prepared["sides"][0])
+    flash = _record_move(prepared, 0, "black-flash")
+    loan = _record_move(prepared, 0, "loan")
+    _record_move(prepared, 0, "dismantle")
+    space = _record_move(prepared, 0, "world-cutting-slash")
+    _ready(prepared["sides"][1])
+    _record_move(prepared, 1, "defense")
+    assert all(side["turn"]["done"] for side in prepared["sides"])
+    state, result, seed = _resolve_fixed(prepared, "flash-loan-infinity-space")
+    adjustments = result["interactions"]["adjustments"][0]
+    assert loan["gain"] == 1 and prepared["sides"][0]["black_flash_stacks"] == 1
+    assert any(item["ordinal"] == flash["ordinal"] and "无下限·防御" in item["reasons"] for item in adjustments)
+    name = "13f-black-flash-loan-infinity-space"
+    cases.append(
+        (
+            name,
+            matchup(
+                identity,
+                {**initial_match, "status": state["status"]},
+                state,
+                now_ms,
+                title="黑闪领悟 · 贷款 · 无下限 · 空间斩",
+                banner="固定招式序列：黑闪功能与层数保留，贷款获得光环且不消耗翻倍；无下限仅令首个数值招式归零。",
+                events=_events(prepared),
+                round_result=result,
+            ),
+        )
+    )
+    evidence[name] = {
+        "seed": seed,
+        "black_flash_gain": flash["gain"],
+        "black_flash_stacks": prepared["sides"][0]["black_flash_stacks"],
+        "loan_gain": loan["gain"],
+        "loan_double_preserved_for_next_numeric": True,
+        "space_slash_gain": space["gain"],
+        "infinity_adjustments": adjustments,
+    }
+    return cases, evidence
 
 
 async def scenarios(output: Path):
@@ -121,6 +329,13 @@ async def scenarios(output: Path):
         if round_settlement is None:
             raise AssertionError("首回合未生成双方即时结算图")
         cases.append(("13b-round-settlement", round_settlement))
+        mechanic_cases, mechanic_evidence = deterministic_mechanic_cases(
+            initial_state,
+            initial_match,
+            a,
+            timestamp_ms(NOW),
+        )
+        cases.extend(mechanic_cases)
         finished = await w.fight(already_started=True)
         cases.append(("14-natural-finale", (await w.send(section="status")).view))
         winner = loads(finished["state_json"])["winner"]
@@ -186,7 +401,7 @@ async def scenarios(output: Path):
                 ),
             )
         )
-        return cases, data_root
+        return cases, data_root, mechanic_evidence
     finally:
         await db.close()
 
@@ -196,7 +411,7 @@ async def run(args):
     if output.exists():
         raise FileExistsError("请使用新的验收目录，不覆盖既有证据。")
     output.mkdir(parents=True)
-    cases, data_root = await scenarios(output)
+    cases, data_root, mechanic_evidence = await scenarios(output)
     outputs = []
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True, executable_path=str(args.browser_executable))
@@ -225,6 +440,7 @@ async def run(args):
         "count": len(outputs),
         "diagnostics": capability.diagnostics,
         "failures": failures,
+        "deterministic_mechanics": mechanic_evidence,
         "scope": "isolated offline data and public art; no production or QQ connection",
     }
     (output / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")

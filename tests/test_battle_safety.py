@@ -19,6 +19,7 @@ from pig_catcher.infrastructure.migrations import MIGRATIONS
 from pig_catcher.infrastructure.migrations.v0039_battles import GUARDS as BATTLE_GUARDS
 from pig_catcher.infrastructure.migrations.v0039_battles import TABLES
 from pig_catcher.infrastructure.migrations.v0049_battle_quota_reset import GUARDS as BATTLE_QUOTA_GUARDS
+from pig_catcher.infrastructure.migrations.v0050_battle_loot_total import GUARDS as BATTLE_LOOT_TOTAL_GUARDS
 from pig_catcher.infrastructure.repositories.dispatch import iso_ms, timestamp_ms
 from pig_catcher.infrastructure.repositories.economy import EconomyRepository
 from pig_catcher.infrastructure.repositories.gameplay import GameplayRepository
@@ -155,7 +156,7 @@ async def test_multiple_loot_grants_fifo_and_failed_claim_unchanged(world, monke
     monkeypatch.setattr(world.service.receipts, "reserve", original)
     result = await world.send(section="loot", actor=loser, mid="retry-loot")
     assert result.view.battle_id == first["battle_id"]
-    for _ in range(4):
+    for _ in range(2):
         assert (await world.send(section="loot", actor=loser)).view.battle_id == first["battle_id"]
     assert (await world.send(section="loot", actor=loser)).view.battle_id == second["battle_id"]
 
@@ -174,8 +175,18 @@ async def test_loot_timestamp_tie_uses_monotonic_match_sequence(world):
             tuple(clone.values()),
         )
         await session.execute(
-            "INSERT INTO battle_loot VALUES(?,?,?,?,?,?)",
-            (clone["battle_id"], grant["actor_id"], grant["recipient_id"], grant["scope_id"], 0, grant["created_ms"]),
+            """INSERT INTO battle_loot(
+                battle_id,actor_id,recipient_id,scope_id,used,created_ms,total_uses
+            ) VALUES(?,?,?,?,?,?,?)""",
+            (
+                clone["battle_id"],
+                grant["actor_id"],
+                grant["recipient_id"],
+                grant["scope_id"],
+                0,
+                grant["created_ms"],
+                grant["total_uses"],
+            ),
         )
     loser = world.a if grant["actor_id"] == world.a.player_id else world.b
     assert (await world.send(section="loot", actor=loser)).view.battle_id == first["battle_id"]
@@ -187,8 +198,10 @@ async def test_no_grant_before_natural_end_and_finished_facts_are_immutable(worl
     with pytest.raises(sqlite3.IntegrityError, match="自然力竭"):
         async with world.db.transaction() as session:
             await session.execute(
-                "INSERT INTO battle_loot VALUES(?,?,?,?,?,?)",
-                (match["battle_id"], world.a.player_id, world.b.player_id, world.a.scope.value, 0, 1),
+                """INSERT INTO battle_loot(
+                    battle_id,actor_id,recipient_id,scope_id,used,created_ms,total_uses
+                ) VALUES(?,?,?,?,?,?,?)""",
+                (match["battle_id"], world.a.player_id, world.b.player_id, world.a.scope.value, 0, 1, 3),
             )
     await world.fight(already_started=True)
     for statement in (
@@ -206,7 +219,9 @@ async def test_no_grant_before_natural_end_and_finished_facts_are_immutable(worl
 
 async def test_six_star_loot_replay_rechecks_revoked_media_without_redelivery(world):
     seed = next(
-        f"privacy-{i}" for i in range(100) if randbelow(f"privacy-{i}", "loot:1:rarity", 1 << 53) / (1 << 53) > 0.8
+        f"privacy-{i}"
+        for i in range(100)
+        if randbelow(f"privacy-{i}", "loot:1:rarity", 1 << 53) / (1 << 53) > 0.85
     )
     world.service.seed_factory = lambda: seed
     await world.fight()
@@ -278,7 +293,107 @@ async def test_temporary_food_items_and_group_technique_untouched(world):
     assert not await WeeklyCompetitionService(w.db, clock=w.clock).process_receipt(result.receipt)
 
 
-@pytest.mark.parametrize("guard", (*BATTLE_GUARDS, *sorted(BATTLE_QUOTA_GUARDS)))
+async def test_legacy_v1_loot_keeps_five_draw_random_sequence_and_distribution(world):
+    seed = "legacy-loot-sequence"
+    battle_id = "BLEGACYV1LOOT"
+    async with world.db.transaction() as session:
+        await session.execute(
+            """INSERT INTO battle_matches(
+                battle_id,scope_id,initiator_id,opponent_id,status,definition_version,
+                random_seed,state_json,invitation_json,accepted_day,expires_ms,
+                created_ms,finished_ms,winner_id
+            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (
+                battle_id,
+                world.a.scope.value,
+                world.a.player_id,
+                world.b.player_id,
+                "completed",
+                1,
+                seed,
+                "{}",
+                "{}",
+                "",
+                0,
+                1,
+                2,
+                world.b.player_id,
+            ),
+        )
+        await session.execute(
+            """INSERT INTO battle_loot(
+                battle_id,actor_id,recipient_id,scope_id,used,created_ms,total_uses
+            ) VALUES(?,?,?,?,?,?,?)""",
+            (battle_id, world.a.player_id, world.b.player_id, world.a.scope.value, 0, 2, 5),
+        )
+
+    expected_rolls = (
+        4670081251057666,
+        8349698545960878,
+        2321660796984544,
+        5603211966413326,
+        682136824594404,
+    )
+    expected_rarities = (5, 6, 4, 5, 2)
+    expected_weights = (5, 10, 10, 25, 30, 20)
+    bound = 1 << 53
+    assert loot_weights(level=1, feed=0, cloud=0, six_available=True, rule_version=1) == pytest.approx(
+        expected_weights
+    )
+    for ordinal, (expected_roll, expected_rarity) in enumerate(
+        zip(expected_rolls, expected_rarities, strict=True), start=1
+    ):
+        assert randbelow(seed, f"loot:{ordinal}:rarity", bound, version=1) == expected_roll
+        result = await world.send(section="loot", actor=world.a, mid=f"legacy-v1-loot-{ordinal}")
+        assert result.view.pigs[0].rarity == expected_rarity
+        snapshot = loads(
+            (
+                await world.db.fetch_one(
+                    "SELECT snapshot_json FROM battle_loot_deliveries WHERE battle_id=? AND ordinal=?",
+                    (battle_id, ordinal),
+                )
+            )[0]
+        )
+        assert snapshot["weights"] == pytest.approx(expected_weights)
+        assert snapshot["rarity_roll"] == expected_roll / bound
+        assert snapshot["total_uses"] == 5 and snapshot["remaining"] == 5 - ordinal
+
+
+@pytest.mark.parametrize("definition_version,total_uses", ((1, 3), (2, 5)))
+async def test_loot_total_must_match_battle_rule_version(world, definition_version, total_uses):
+    original = dict(await world.fight())
+    match = original
+    async with world.db.transaction() as session:
+        await session.execute("DELETE FROM battle_loot WHERE battle_id=?", (original["battle_id"],))
+        if definition_version == 1:
+            match = {key: value for key, value in original.items() if key != "sequence"}
+            match["battle_id"] = "BLEGACYWRONGTOTAL"
+            match["definition_version"] = 1
+            await session.execute(
+                f"INSERT INTO battle_matches({','.join(match)}) VALUES({','.join('?' for _ in match)})",
+                tuple(match.values()),
+            )
+    loser = world.a.player_id if match["winner_id"] == world.b.player_id else world.b.player_id
+    with pytest.raises(sqlite3.IntegrityError, match="规则版本不符"):
+        async with world.db.transaction() as session:
+            await session.execute(
+                """INSERT INTO battle_loot(
+                    battle_id,actor_id,recipient_id,scope_id,used,created_ms,total_uses
+                ) VALUES(?,?,?,?,0,?,?)""",
+                (
+                    match["battle_id"],
+                    loser,
+                    match["winner_id"],
+                    match["scope_id"],
+                    match["finished_ms"],
+                    total_uses,
+                ),
+            )
+
+
+@pytest.mark.parametrize(
+    "guard", (*BATTLE_GUARDS, *sorted(BATTLE_QUOTA_GUARDS), *sorted(BATTLE_LOOT_TOTAL_GUARDS))
+)
 async def test_every_battle_guard_is_required(tmp_path, guard):
     db = PigCatcherDatabase(tmp_path / "guard.sqlite3")
     await db.open()
@@ -288,6 +403,78 @@ async def test_every_battle_guard_is_required(tmp_path, guard):
     await db.close()
     with pytest.raises(MigrationError, match="约束"):
         await db.open()
+
+
+async def test_schema49_migration_preserves_existing_loot_as_five_uses(tmp_path):
+    path = tmp_path / "legacy49-loot.sqlite3"
+    conn = sqlite3.connect(path)
+    conn.execute("CREATE TABLE schema_migrations(version INTEGER PRIMARY KEY,name TEXT UNIQUE,applied_at TEXT)")
+    for migration in MIGRATIONS:
+        if migration.version > 49:
+            break
+        for sql in migration.statements:
+            conn.execute(sql)
+        conn.execute("INSERT INTO schema_migrations VALUES(?,?,?)", (migration.version, migration.name, "test"))
+    conn.execute(
+        """INSERT INTO scopes(
+            scope_id,platform,group_id,group_name,stream_id,enabled,created_at,updated_at
+        ) VALUES(?,?,?,?,?,?,?,?)""",
+        ("qq:legacy", "qq", "legacy", "旧版测试群", "legacy-stream", 1, "test", "test"),
+    )
+    conn.executemany(
+        """INSERT INTO players(
+            player_id,scope_id,platform_user_id,display_name,coin_balance,experience,
+            created_at,updated_at,batch_keep_highest
+        ) VALUES(?,?,?,?,?,?,?,?,?)""",
+        (
+            ("qq:legacy:loser", "qq:legacy", "loser", "旧败者", 0, 0, "test", "test", 0),
+            ("qq:legacy:winner", "qq:legacy", "winner", "旧胜者", 0, 0, "test", "test", 0),
+        ),
+    )
+    conn.execute(
+        """INSERT INTO battle_matches(
+            battle_id,scope_id,initiator_id,opponent_id,status,definition_version,
+            random_seed,state_json,invitation_json,accepted_day,expires_ms,
+            created_ms,finished_ms,winner_id
+        ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        (
+            "BLEGACY49LOOT",
+            "qq:legacy",
+            "qq:legacy:loser",
+            "qq:legacy:winner",
+            "completed",
+            1,
+            "legacy-seed",
+            "{}",
+            "{}",
+            "",
+            0,
+            1,
+            2,
+            "qq:legacy:winner",
+        ),
+    )
+    conn.execute(
+        """INSERT INTO battle_loot(
+            battle_id,actor_id,recipient_id,scope_id,used,created_ms
+        ) VALUES(?,?,?,?,?,?)""",
+        ("BLEGACY49LOOT", "qq:legacy:loser", "qq:legacy:winner", "qq:legacy", 2, 2),
+    )
+    conn.execute("PRAGMA user_version=49")
+    conn.commit()
+    conn.close()
+
+    db = PigCatcherDatabase(path)
+    await db.open()
+    try:
+        row = await db.fetch_one(
+            "SELECT used,total_uses FROM battle_loot WHERE battle_id='BLEGACY49LOOT'"
+        )
+        assert await db.schema_version() == 50
+        assert tuple(row) == (2, 5)
+        assert await db.fetch_all("PRAGMA foreign_key_check") == []
+    finally:
+        await db.close()
 
 
 async def test_schema38_migration_preserves_every_old_table(world, tmp_path):

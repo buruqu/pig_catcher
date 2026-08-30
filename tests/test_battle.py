@@ -154,7 +154,7 @@ async def world(tmp_path: Path):
         await db.close()
 
 
-async def test_full_battle_and_five_normal_catches_auto_deliver_to_winner(world):
+async def test_full_battle_and_three_normal_catches_auto_deliver_to_winner(world):
     match = await world.fight()
     assert match["status"] == "completed"
     assert len(await world.db.fetch_all("SELECT * FROM battle_daily_uses")) == 2
@@ -163,11 +163,11 @@ async def test_full_battle_and_five_normal_catches_auto_deliver_to_winner(world)
     winner, loser = (world.a, world.b) if state["winner"] == 0 else (world.b, world.a)
     assert f"{winner.display_name} 获胜" in (await world.send(section="status")).view.banner
     assert (await world.db.fetch_one("SELECT recipient_id FROM battle_loot"))[0] == winner.player_id
-    for ordinal in range(1, 6):
+    for ordinal in range(1, 4):
         identity = replace(loser, message_id=f"loot-{ordinal}")
         result = await world.service.execute_pending_loot(identity)
         assert result is not None
-        assert f"{5 - ordinal}/5" in result.view.text()
+        assert f"{3 - ordinal}/3" in result.view.text()
         assert "最终概率" in result.view.text() and winner.display_name in result.view.text()
         repeated = await world.service.execute_pending_loot(identity)
         assert repeated is not None
@@ -175,18 +175,18 @@ async def test_full_battle_and_five_normal_catches_auto_deliver_to_winner(world)
     deliveries = await world.db.fetch_all(
         "SELECT p.* FROM battle_loot_deliveries d JOIN pig_instances p USING(pig_instance_id)"
     )
-    assert len(deliveries) == 5 and all(row["owner_player_id"] == winner.player_id for row in deliveries)
-    assert (await world.db.fetch_one("SELECT used FROM battle_loot"))[0] == 5
+    assert len(deliveries) == 3 and all(row["owner_player_id"] == winner.player_id for row in deliveries)
+    assert (await world.db.fetch_one("SELECT used FROM battle_loot"))[0] == 3
     catch_receipts = await world.db.fetch_one(
         "SELECT COUNT(*) FROM command_receipts WHERE command_name='pig-catcher.catch'"
     )
-    assert catch_receipts[0] == 5
+    assert catch_receipts[0] == 3
     assert (await world.db.fetch_one("SELECT SUM(coin_balance) FROM players"))[0] == 0
     assert (await world.db.fetch_one("SELECT SUM(experience) FROM players"))[0] == 0
     facts = await world.db.fetch_all(
         "SELECT * FROM activity_facts WHERE source_type='battle' AND subevent_id LIKE 'loot:%'"
     )
-    assert len(facts) == 10 and all(loads(row["payload_json"])["battle_id"] == match["battle_id"] for row in facts)
+    assert len(facts) == 6 and all(loads(row["payload_json"])["battle_id"] == match["battle_id"] for row in facts)
     assert await world.service.execute_pending_loot(replace(loser, message_id="loot-sixth")) is None
     with pytest.raises(BattleError, match="没有待交付"):
         await world.send(section="loot", actor=loser)
@@ -549,7 +549,7 @@ async def test_normal_quota_exhaustion_preserves_extra_catches_and_reverse_coold
     with pytest.raises(CatchCooldownError):
         await world.send(section="loot", actor=loser)
     world.clock.value += timedelta(seconds=21)
-    assert "4/5" in (await world.send(section="loot", actor=loser)).view.text()
+    assert "2/3" in (await world.send(section="loot", actor=loser)).view.text()
     with pytest.raises(DailyCatchLimitError):
         await normal.catch(replace(loser, message_id="ordinary-still-limit"))
 

@@ -106,13 +106,26 @@ def test_runtime_pack_matches_reviewed_design_and_freezes_old_denominators():
     assert len([r for r in ACTIVITY_REWARDS.values() if r["kind"] in {"frame", "badge", "title"}]) == 38
     for fighter in FIGHTERS_BY_ID.values():
         assert set(MOVE_ALIASES[fighter.fighter_id]) == {m.move_id for m in fighter.moves}
-        assert set(MOVE_ALIASES[fighter.fighter_id].values()) == FIXED_SETS[f"battle-{fighter.fighter_id}-moves-v1"]
+        current = set(MOVE_ALIASES[fighter.fighter_id].values())
+        if fighter.fighter_id == "sukuna":
+            current.remove("world-cutting-slash")
+        assert current == FIXED_SETS[f"battle-{fighter.fighter_id}-moves-v1"]
     # 后续主题不能追溯扩大旧版成就的固定九主题条件。
     fixed_themes = FIXED_SETS["tour-band-themes-v1"]
     assert len(fixed_themes) == 9
     assert fixed_themes < {THEME_ALIASES.get(t.theme_id, t.theme_id) for t in THEMES}
     assert "yumemita" not in fixed_themes
     assert {VENUE_ALIASES.get(v.venue_id, v.venue_id) for v in VENUES} == FIXED_SETS["tour-venues-v1"]
+
+
+def test_space_slash_is_retained_for_future_achievements_but_not_old_nine_move_denominator():
+    state = {}
+    fact(state, "battle", "move:1:1", {"move_id": "world-cutting-slash", "gain": 28, "multiplier": 1})
+    fact(state, "battle", "finished", match_data("sukuna"))
+    assert "world-cutting-slash" in state["sets"]["battle.sukuna_moves"]
+    definition = ACHIEVEMENT_BY_ID["battle-sukuna-movebook"]
+    completed, details = progress(state, definition, set())
+    assert completed == 0 and details["items"] == []
 
 
 def complete_state(code):
@@ -256,8 +269,8 @@ def complete_state(code):
         for _ in range(3):
             fact(state, "tour", "completed", tour_data(), at=1000)
     elif code == "X06":
-        for n in range(1, 6):
-            fact(state, "battle", f"loot:{n}", {"role": "actor"})
+        for n in range(1, 4):
+            fact(state, "battle", f"loot:{n}", {"role": "actor", "total_uses": 3, "remaining": 3 - n})
     return state
 
 
@@ -353,7 +366,7 @@ async def test_real_tour_outbox_rewards_idempotency_and_material_ledger(tour_wor
     ] == 0
 
 
-async def test_real_battle_both_players_and_five_deliveries(battle_world):
+async def test_real_battle_both_players_and_all_three_deliveries(battle_world):
     w = battle_world
     match = await w.fight()
     service = AchievementService(w.db, clock=w.clock)
@@ -364,7 +377,7 @@ async def test_real_battle_both_players_and_five_deliveries(battle_world):
     assert len(rows) == 2
     assert await service.process_activity_facts(scope_id=w.a.scope.value, receipt_id="retry") == ()
     loser = w.b if match["winner_id"] == w.a.player_id else w.a
-    for _ in range(5):
+    for _ in range(3):
         await w.send(section="loot", actor=loser)
     await service.process_activity_facts(scope_id=w.a.scope.value, receipt_id="loot-unlocks")
     row = await w.db.fetch_one(

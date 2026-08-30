@@ -12,7 +12,7 @@
 <body>
   {% from 'cosmetic_components.html' import cosmetic_plate, cosmetic_badges, cosmetic_frame %}
   <main class="game-sheet pig-card rarity-{{ view.rarity }}{% if view.description|length > 160 %} pig-card--long{% endif %}{% if view.probability_line %} pig-card--probability{% endif %}{% if view.display_tags and view.media_visible %} pig-card--tagged{% endif %}" data-achievement-frame="{{ view.achievement_frame }}" data-pig-catcher-root data-render-ready="true">
-    {{ cosmetic_frame(view.achievement_frame) }}
+    {{ cosmetic_frame(view.achievement_frame, result_media=True) }}
     {% if view.achievement_firework %}<div class="achievement-firework"><span>✦ ✧ ✦</span><span>PiG Dream!</span><span>✦ ✧ ✦</span></div>{% endif %}
     <header class="game-header pig-card__header">
       <div class="game-header__copy">

@@ -7,7 +7,14 @@ from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 from ...domain.battle import dumps, loads
-from ...domain.battle_catalog import BATTLE_VERSION, FIGHTERS_BY_TEMPLATE, MATERIAL_IDS, TOOLS_BY_ID, BattleError
+from ...domain.battle_catalog import (
+    BATTLE_FACT_VERSION,
+    FIGHTERS_BY_TEMPLATE,
+    LOOT_ATTEMPTS,
+    MATERIAL_IDS,
+    TOOLS_BY_ID,
+    BattleError,
+)
 from ...domain.dispatch import MATERIAL_SCALE, safe_display_name
 from ...domain.models import CommandIdentity
 from ...domain.selectors import parse_asset_selector
@@ -42,7 +49,7 @@ class BattleRepository:
             return
         await session.execute(
             "INSERT INTO activity_facts VALUES(?,?,?,?,?,?,?,?,?)",
-            (key, player_id, scope_id, "battle", source_id, subevent, BATTLE_VERSION, now_ms, encoded),
+            (key, player_id, scope_id, "battle", source_id, subevent, BATTLE_FACT_VERSION, now_ms, encoded),
         )
 
     async def quota_generation(self, session: DatabaseSession, player_id: str, day: str) -> int:
@@ -306,7 +313,7 @@ class BattleRepository:
         """Return whether the player must settle an older natural-loss reward first."""
 
         row = await session.fetch_one(
-            "SELECT 1 FROM battle_loot WHERE actor_id=? AND scope_id=? AND used<5 LIMIT 1",
+            "SELECT 1 FROM battle_loot WHERE actor_id=? AND scope_id=? AND used<total_uses LIMIT 1",
             (player_id, scope_id),
         )
         return row is not None
@@ -371,6 +378,8 @@ class BattleRepository:
         if status == "completed":
             loser = match["opponent_id"] if winner_id == match["initiator_id"] else match["initiator_id"]
             await session.execute(
-                "INSERT INTO battle_loot(battle_id,actor_id,recipient_id,scope_id,created_ms) VALUES(?,?,?,?,?)",
-                (match["battle_id"], loser, winner_id, match["scope_id"], now_ms),
+                """INSERT INTO battle_loot(
+                    battle_id,actor_id,recipient_id,scope_id,used,created_ms,total_uses
+                ) VALUES(?,?,?,?,0,?,?)""",
+                (match["battle_id"], loser, winner_id, match["scope_id"], now_ms, LOOT_ATTEMPTS),
             )

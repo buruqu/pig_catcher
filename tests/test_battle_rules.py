@@ -9,6 +9,7 @@ from pig_catcher.domain.battle import (
     dumps,
     loads,
     loot_weights,
+    move_weight_units,
     new_state,
     play_chunk,
     randbelow,
@@ -24,6 +25,7 @@ from pig_catcher.domain.battle_catalog import (
     UPGRADE_COSTS,
     Move,
 )
+from pig_catcher.services.battle_views import effective_total_after, move_line
 
 
 def state(level=0, trait=0, tool=""):
@@ -37,13 +39,13 @@ def ready(player, pending=1):
 
 
 def test_exact_catalog_and_growth_costs():
-    assert [len(f.moves) for f in FIGHTERS] == [9, 10]
+    assert [len(f.moves) for f in FIGHTERS] == [10, 10]
     assert all(move.draw_weight == 1 for fighter in FIGHTERS for move in fighter.moves)
-    assert [m.gain for m in FIGHTERS[0].moves] == [0, 10, 15, 21, 35, 0, 14, 7, 12]
-    assert [m.gain for m in FIGHTERS[1].moves] == [13, 20, 14, 10, 0, 14, 24, 30, 14, 35]
+    assert [m.gain for m in FIGHTERS[0].moves] == [10, 10, 15, 21, 35, 0, 14, 7, 12, 28]
+    assert [m.gain for m in FIGHTERS[1].moves] == [13, 20, 14, 10, 10, 14, 24, 30, 14, 35]
     assert COUNT_WHEEL == ((1, 5), (2, 4), (3, 3), (4, 2), (5, 1))
     assert HEAVY_COUNT_WHEEL == COUNT_WHEEL[:-1]
-    assert [[w for _, w in wheel] for wheel in INJURY_WHEELS] == [[6, 2, 1, 1], [2, 6, 1, 1], [1, 2, 6, 1]]
+    assert [[w for _, w in wheel] for wheel in INJURY_WHEELS] == [[13, 5, 1, 1], [5, 12, 2, 1], [2, 5, 12, 1]]
     assert {k: sum(row[k] for row in UPGRADE_COSTS) for k in UPGRADE_COSTS[0]} == {
         "ore": 1950,
         "parts": 650,
@@ -79,7 +81,7 @@ def test_loans_keep_only_one_double_and_debt_once(loans):
     for _ in range(loans):
         event = apply_move(p, FIGHTERS[0].moves[5])
         assert event["gain"] == 0 and p["double"] and p["turn"]["pending"] == 1
-    apply_move(p, FIGHTERS[0].moves[0])
+    apply_move(p, Move("functional", "纯功能连抽", draws=2))
     assert p["double"] and p["turn"]["pending"] == 2
     hit = apply_move(p, FIGHTERS[0].moves[1])
     assert hit["gain"] == 30 and hit["multiplier"] == 2
@@ -180,8 +182,137 @@ def test_loot_permanent_distribution_monotonic(available):
     assert sum(full) == pytest.approx(100)
     assert all(full[i] >= base[i] - 1e-9 for i in (3, 4, 5))
     if available:
-        assert base == pytest.approx((5, 10, 10, 25, 30, 20))
-        assert full == pytest.approx((3.1554, 6.3108, 6.3108, 25, 32.6654, 26.5577), abs=0.001)
+        assert base == pytest.approx((5, 10, 10, 30, 30, 15))
+        assert full == pytest.approx((3.2417, 6.4833, 6.4833, 30, 33.2692, 20.5225), abs=0.001)
     else:
-        assert full[5] == 0 and base[4] == 50
+        assert full[5] == 0 and base[4] == 45
         assert full == loot_weights(level=21, feed=10, cloud=0, six_available=False)
+
+
+def _record(player: dict, move: Move, side: int) -> dict:
+    event = apply_move(player, move)
+    event.update(round=1, side=side, fighter_id=player["snapshot"]["fighter_id"])
+    player["turn"]["events"].append(event.copy())
+    return event
+
+
+def _seed_for(key: str, wheel: tuple, expected: str) -> str:
+    return next(seed for seed in (f"seed-{index}" for index in range(10000)) if choose(seed, key, wheel)[0] == expected)
+
+
+def test_black_flash_adds_weight_draws_and_unlimited_match_stacks():
+    p = state()["sides"][0]
+    ready(p, 4)
+    first = apply_move(p, FIGHTERS[0].moves[0])
+    assert first["gain"] == 10 and first["extra_draws"] == 2 and p["black_flash_stacks"] == 1
+    assert apply_move(p, FIGHTERS[0].moves[1])["gain"] == 11
+    second = apply_move(p, FIGHTERS[0].moves[0])
+    assert second["gain"] == 11 and p["black_flash_stacks"] == 2
+    p["turn"] = {**p["turn"], "pending": 1, "done": False}
+    assert apply_move(p, FIGHTERS[0].moves[1])["gain"] == 12
+
+
+def test_black_flash_aura_reaches_loan_without_consuming_double_or_becoming_infinity_target():
+    s = state()
+    ready(s["sides"][0], 3)
+    apply_move(s["sides"][0], FIGHTERS[0].moves[0])
+    loan = _record(s["sides"][0], FIGHTERS[0].moves[5], 0)
+    hit = _record(s["sides"][0], FIGHTERS[0].moves[1], 0)
+    s["sides"][0]["turn"].update(pending=0, done=True)
+    ready(s["sides"][1])
+    _record(s["sides"][1], FIGHTERS[1].moves[3], 1)
+    summary = resolve_round(s, "flash-loan-infinity")
+    assert loan["gain"] == 1 and loan["base"] == 0 and loan["multiplier"] == 1
+    assert hit["multiplier"] == 2 and hit["gain"] == 21
+    assert summary["interactions"]["adjustments"][0][0]["ordinal"] == hit["ordinal"]
+
+
+def test_cancelled_domain_updates_every_following_displayed_cumulative_total():
+    s = state()
+    ready(s["sides"][0], 2)
+    domain = _record(s["sides"][0], FIGHTERS[0].moves[4], 0)
+    follow_up = _record(s["sides"][0], FIGHTERS[0].moves[1], 0)
+    ready(s["sides"][1])
+    _record(s["sides"][1], FIGHTERS[1].moves[7], 1)
+    wheel = (("side-0", 4), ("side-1", 3), ("tie", 3))
+    summary = resolve_round(s, _seed_for("1:domain:clash", wheel, "side-1"))
+    adjustments = {item["ordinal"]: item for item in summary["interactions"]["adjustments"][0]}
+    assert adjustments[domain["ordinal"]]["gain"] == domain["gain"]
+    final_total = effective_total_after(follow_up, adjustments)
+    assert final_total == summary["before"][0]["weight"] == 15
+    assert "累计15" in move_line(follow_up, effective_total=final_total).value
+
+
+def test_blue_and_red_raise_both_purple_move_draw_weights_by_exact_tenths():
+    p = state()["sides"][1]
+    moves = FIGHTERS[1].moves
+    assert move_weight_units(p, moves[6]) == move_weight_units(p, moves[9]) == 10
+    ready(p, 2)
+    apply_move(p, moves[0])
+    assert move_weight_units(p, moves[6]) == move_weight_units(p, moves[9]) == 11
+    apply_move(p, moves[1])
+    assert move_weight_units(p, moves[6]) == move_weight_units(p, moves[9]) == 12
+    assert all(move_weight_units(p, move) == 10 for move in moves if "purple" not in move.tags)
+
+
+@pytest.mark.parametrize("outcome", ["side-0", "side-1", "tie"])
+def test_domain_clash_is_once_and_zeroes_every_losing_domain_gain(outcome):
+    s = state()
+    for side, move in ((0, FIGHTERS[0].moves[4]), (1, FIGHTERS[1].moves[7])):
+        ready(s["sides"][side], 2)
+        _record(s["sides"][side], move, side)
+        _record(s["sides"][side], move, side)
+    wheel = (("side-0", 4), ("side-1", 3), ("tie", 3))
+    summary = resolve_round(s, _seed_for("1:domain:clash", wheel, outcome))
+    domain = summary["interactions"]["domain"]
+    assert domain["outcome"] == outcome and domain["domain_counts"] == [2, 2]
+    assert domain["wheel"] == wheel
+    if outcome == "side-0":
+        assert summary["before"][1]["weight"] == 5
+    elif outcome == "side-1":
+        assert summary["before"][0]["weight"] == 5
+        assert summary["before"][0]["next_debt"] == 1
+    else:
+        assert [side["weight"] for side in summary["before"]] == [5, 5]
+
+
+@pytest.mark.parametrize("outcome", ["hit", "simple-domain"])
+def test_single_gojo_domain_uses_eight_two_and_effect_only_on_hit(outcome):
+    s = state()
+    s["sides"][0]["turn"]["done"] = True
+    ready(s["sides"][1])
+    _record(s["sides"][1], FIGHTERS[1].moves[7], 1)
+    wheel = (("hit", 8), ("simple-domain", 2))
+    summary = resolve_round(s, _seed_for("1:domain:solo:1", wheel, outcome))
+    assert summary["interactions"]["domain"]["outcome"] == outcome
+    if outcome == "hit":
+        assert summary["before"][0]["next_debt"] == 1 and summary["before"][1]["weight"] == 35
+    else:
+        assert summary["before"][0]["next_debt"] == 0 and summary["before"][1]["weight"] == 5
+
+
+def test_infinity_skips_loan_and_cancels_only_first_still_effective_numeric_move():
+    s = state()
+    ready(s["sides"][0], 2)
+    _record(s["sides"][0], FIGHTERS[0].moves[5], 0)
+    first = _record(s["sides"][0], FIGHTERS[0].moves[1], 0)
+    second = _record(s["sides"][0], FIGHTERS[0].moves[1], 0)
+    ready(s["sides"][1])
+    _record(s["sides"][1], FIGHTERS[1].moves[3], 1)
+    summary = resolve_round(s, "infinity")
+    adjustment = summary["interactions"]["adjustments"][0]
+    assert adjustment == ({"ordinal": 2, "gain": first["gain"], "reasons": ["无下限·防御"]},)
+    assert summary["before"][0]["weight"] == 5 + second["gain"]
+
+
+def test_infinity_zeroes_black_flash_gain_but_keeps_its_function_and_stack():
+    s = state()
+    ready(s["sides"][0])
+    flash = _record(s["sides"][0], FIGHTERS[0].moves[0], 0)
+    s["sides"][0]["turn"].update(pending=0, done=True)
+    ready(s["sides"][1])
+    _record(s["sides"][1], FIGHTERS[1].moves[3], 1)
+    summary = resolve_round(s, "flash-infinity")
+    assert summary["before"][0]["weight"] == 5
+    assert summary["before"][0]["black_flash_stacks"] == 1
+    assert flash["extra_draws"] == 2

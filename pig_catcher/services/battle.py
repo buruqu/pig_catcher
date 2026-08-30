@@ -26,7 +26,7 @@ from ..infrastructure.repositories.restrictions import (
     RestrictionRepository,
 )
 from .battle_setup import BattleSetup
-from .battle_views import STATUS_NAMES, matchup, move_line, view, wheels
+from .battle_views import STATUS_NAMES, effective_total_after, matchup, move_line, view, wheels
 from .command_state import validate_existing_receipt
 from .dispatch import DispatchService
 from .receipts import request_fingerprint
@@ -425,7 +425,7 @@ class BattleService:
                 state,
                 now_ms,
                 title="认输 · 请确认",
-                banner="确认认输将结束本场；不退每日次数、不发五次战利品。两分钟内 /比划比划 确认认输。",
+                banner="确认认输将结束本场；不退每日次数、不发战利品。两分钟内 /比划比划 确认认输。",
             )
         if action == "surrender_confirm":
             pending = await session.fetch_one("SELECT * FROM battle_pending WHERE player_id=?", (identity.player_id,))
@@ -601,10 +601,19 @@ class BattleService:
             "ORDER BY side,ordinal LIMIT 12 OFFSET ?",
             (match["battle_id"], round_number, (page - 1) * 12),
         )
+        adjustment_maps = [{}, {}]
+        if summary:
+            for side, entries in enumerate(summary.get("interactions", {}).get("adjustments", ())):
+                adjustment_maps[side] = {int(item["ordinal"]): item for item in entries}
         lines = []
         for item in rows:
             event = loads(item[0])
-            line = move_line(event)
+            side_adjustments = adjustment_maps[event["side"]]
+            line = move_line(
+                event,
+                side_adjustments.get(int(event["ordinal"])),
+                effective_total=effective_total_after(event, side_adjustments),
+            )
             lines.append(
                 replace(line, label=state["sides"][event["side"]]["snapshot"]["player_name"] + " · " + line.label)
             )

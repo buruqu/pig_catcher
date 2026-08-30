@@ -228,10 +228,15 @@ def test_jinja_components_hide_locked_and_unknown_and_render_weekly_as_plate(art
 
 def test_frame_css_is_decorative_and_does_not_shift_media_slot():
     css = (TEMPLATES / "cosmetic.css").read_text(encoding="utf-8")
+    layer = css.split(".cosmetic-frame-layer{", 1)[1].split("}", 1)[0]
     declaration = css.split(".cosmetic-edge{", 1)[1].split("}", 1)[0]
-    assert "position:absolute" in declaration and "pointer-events:none" in declaration
-    assert "border:20px" in declaration and "border-image-slice:64" in declaration
+    media = css.split(".cosmetic-media-edge{", 1)[1].split("}", 1)[0]
+    assert "position:absolute" in layer and "pointer-events:none" in layer
+    assert "border:32px" in declaration and "border-image-slice:64" in declaration
+    assert all(token in media for token in ("left:14px", "top:140px", "width:528px", "height:528px"))
+    assert "border:24px" in media and "border-image-slice:64" in media
     assert "padding:" not in declaration and "margin:" not in declaration
+    assert "padding:" not in media and "margin:" not in media
 
 
 def _weekly_environment() -> Environment:

@@ -7,7 +7,11 @@ from dataclasses import dataclass
 from .errors import PigCatcherError
 from .special_content import GOJO_PIG_TEMPLATE_ID, SUKUNA_PIG_TEMPLATE_ID
 
-BATTLE_VERSION = 1
+# 对战规则版本与活动成就事实版本分离：新版对战会改变随机命名空间，
+# 但新增字段仍是 activity_progress v1 可以向后兼容读取的事实载荷。
+BATTLE_RULE_VERSION = 2
+BATTLE_FACT_VERSION = 1
+BATTLE_VERSION = BATTLE_RULE_VERSION
 INVITE_TTL_MS = 5 * 60 * 1000
 ACTION_TTL_MS = 10 * 60 * 1000
 CONFIRM_TTL_MS = 2 * 60 * 1000
@@ -16,13 +20,19 @@ INVITE_COOLDOWN_MS = 60 * 1000
 MOVE_CHUNK_SIZE = 32
 COUNT_WHEEL = ((1, 5), (2, 4), (3, 3), (4, 2), (5, 1))
 HEAVY_COUNT_WHEEL = COUNT_WHEEL[:-1]
+INJURY_WEIGHT_SCALE = 2
+# 以二倍整数保存半点权重，抽签全程不使用浮点数。
 INJURY_WHEELS = (
-    (("light", 6), ("heavy", 2), ("exhausted", 1), ("core", 1)),
-    (("light", 2), ("heavy", 6), ("exhausted", 1), ("core", 1)),
-    (("light", 1), ("heavy", 2), ("exhausted", 6), ("core", 1)),
+    (("light", 13), ("heavy", 5), ("exhausted", 1), ("core", 1)),
+    (("light", 5), ("heavy", 12), ("exhausted", 2), ("core", 1)),
+    (("light", 2), ("heavy", 5), ("exhausted", 12), ("core", 1)),
 )
 INJURY_NAMES = {"light": "轻伤", "heavy": "重伤", "exhausted": "力竭倒下", "core": "我掌握了抓猪的核心！"}
-LOOT_WEIGHTS = (5, 10, 10, 25, 30, 20)
+MOVE_WEIGHT_SCALE = 10
+LEGACY_LOOT_WEIGHTS = (5, 10, 10, 25, 30, 20)
+LOOT_WEIGHTS = (5, 10, 10, 30, 30, 15)
+LEGACY_LOOT_ATTEMPTS = 5
+LOOT_ATTEMPTS = 3
 UPGRADE_COSTS = (
     {"ore": 60, "parts": 20, "fiber": 20, "supplies": 20, "coins": 300},
     {"ore": 150, "parts": 50, "fiber": 50, "supplies": 50, "coins": 800},
@@ -44,6 +54,7 @@ class Move:
     draws: int = 0
     loan: bool = False
     draw_weight: int = 1
+    tags: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,15 +71,16 @@ FIGHTERS = (
         SUKUNA_PIG_TEMPLATE_ID,
         "宿傩猪",
         (
-            Move("black-flash", "黑闪！", draws=2),
+            Move("black-flash", "黑闪！", 10, draws=2, tags=("black-flash",)),
             Move("dismantle", "解", 10),
             Move("cleave", "捌", 15),
             Move("furnace", "灶·开", 21),
-            Move("shrine", "领域展开·伏魔御厨子！", 35),
+            Move("shrine", "领域展开·伏魔御厨子！", 35, tags=("domain",)),
             Move("loan", "束缚·贷款", draws=1, loan=True),
             Move("reverse", "反转·修复", 14),
             Move("elbow", "肘击", 7),
             Move("net", "网格斩", 12),
+            Move("world-cutting-slash", "空间斩", 28),
         ),
     ),
     FighterDefinition(
@@ -76,21 +88,34 @@ FIGHTERS = (
         GOJO_PIG_TEMPLATE_ID,
         "五条猪",
         (
-            Move("blue", "术式顺转·苍！", 13),
-            Move("red", "术式反转·赫", 20),
-            Move("blue-fist", "肘击·苍拳！", 14),
-            Move("defense", "无下限·防御", 10),
-            Move("black-flash", "黑闪！", draws=2),
+            Move("blue", "术式顺转·苍！", 13, tags=("blue-red",)),
+            Move("red", "术式反转·赫", 20, tags=("blue-red",)),
+            Move("blue-fist", "肘击·苍拳！", 14, tags=("blue-red",)),
+            Move("defense", "无下限·防御", 10, tags=("infinity",)),
+            Move("black-flash", "黑闪！", 10, draws=2, tags=("black-flash",)),
             Move("teleport", "无下限·瞬移", 14),
-            Move("purple", "虚式·茈", 24),
-            Move("void", "领域展开·无量空处！", 30),
+            Move("purple", "虚式·茈", 24, tags=("purple",)),
+            Move("void", "领域展开·无量空处！", 30, tags=("domain",)),
             Move("reverse", "反转·修复", 14),
-            Move("unlimited-purple", "无限制·茈！", 35),
+            Move("unlimited-purple", "无限制·茈！", 35, tags=("purple",)),
         ),
     ),
 )
 FIGHTERS_BY_ID = {item.fighter_id: item for item in FIGHTERS}
 FIGHTERS_BY_TEMPLATE = {item.template_id: item for item in FIGHTERS}
+LEGACY_MOVE_IDS = {
+    "sukuna": frozenset(
+        ("black-flash", "dismantle", "cleave", "furnace", "shrine", "loan", "reverse", "elbow", "net")
+    ),
+    "gojo": frozenset(move.move_id for move in FIGHTERS_BY_ID["gojo"].moves),
+}
+
+
+def fighter_moves(fighter_id: str, rule_version: int = BATTLE_RULE_VERSION) -> tuple[Move, ...]:
+    moves = FIGHTERS_BY_ID[fighter_id].moves
+    if rule_version == 1:
+        return tuple(move for move in moves if move.move_id in LEGACY_MOVE_IDS[fighter_id])
+    return moves
 
 
 @dataclass(frozen=True, slots=True)

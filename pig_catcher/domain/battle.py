@@ -8,13 +8,16 @@ from copy import deepcopy
 from typing import Any
 
 from .battle_catalog import (
+    BATTLE_RULE_VERSION,
     BATTLE_VERSION,
     COUNT_WHEEL,
     FIGHTERS_BY_ID,
     HEAVY_COUNT_WHEEL,
     INJURY_WHEELS,
+    LEGACY_LOOT_WEIGHTS,
     LOOT_WEIGHTS,
     MOVE_CHUNK_SIZE,
+    MOVE_WEIGHT_SCALE,
     BattleError,
     Move,
 )
@@ -51,7 +54,7 @@ def weight_label(value: int) -> str:
     return f"超大权重（约{digits}位；精确整数结算）"
 
 
-def randbelow(seed: str, key: str, bound: int) -> int:
+def randbelow(seed: str, key: str, bound: int, *, version: int = BATTLE_RULE_VERSION) -> int:
     """带命名空间的拒绝采样；不取模、不转浮点，支持任意大的胜利权重。"""
     if type(bound) is not int or bound < 1:
         raise BattleError("轮盘总权重必须是正整数。")
@@ -60,15 +63,15 @@ def randbelow(seed: str, key: str, bound: int) -> int:
         return 0
     size, attempt = (bits + 7) // 8, 0
     while True:
-        raw = hashlib.shake_256(f"{BATTLE_VERSION}|{seed}|{key}|{attempt}".encode()).digest(size)
+        raw = hashlib.shake_256(f"{version}|{seed}|{key}|{attempt}".encode()).digest(size)
         number = int.from_bytes(raw, "big") & ((1 << bits) - 1)
         if number < bound:
             return number
         attempt += 1
 
 
-def choose(seed: str, key: str, wheel: tuple) -> tuple[Any, int]:
-    roll = randbelow(seed, key, sum(weight for _, weight in wheel))
+def choose(seed: str, key: str, wheel: tuple, *, version: int = BATTLE_RULE_VERSION) -> tuple[Any, int]:
+    roll = randbelow(seed, key, sum(weight for _, weight in wheel), version=version)
     cursor = roll
     for value, weight in wheel:
         if cursor < weight:
@@ -87,6 +90,8 @@ def fresh_turn() -> dict:
         "done": False,
         "ready": False,
         "trait_used": False,
+        "events": [],
+        "infinity_used": False,
     }
 
 
@@ -107,6 +112,8 @@ def new_state(fighters: list[dict]) -> dict:
                 "next_debt": 0,
                 "double": False,
                 "tool_used": snapshot.get("tool_id", "") == "confetti",
+                "black_flash_stacks": 0,
+                "purple_weight_steps": 0,
                 "turn": fresh_turn(),
             }
         )
@@ -120,7 +127,11 @@ def _side(state: dict, side: int) -> dict:
         raise BattleError("对战已结束或不是本场参与者。")
     player = state["sides"][side]
     # 2.0.0 已开始但尚未结束的现场没有 ready 字段；原地补默认值即可无损恢复。
+    player.setdefault("black_flash_stacks", 0)
+    player.setdefault("purple_weight_steps", 0)
     player["turn"].setdefault("ready", False)
+    player["turn"].setdefault("events", [])
+    player["turn"].setdefault("infinity_used", False)
     return player
 
 
@@ -130,7 +141,7 @@ def roll_count(state: dict, side: int, seed: str) -> dict:
     if turn["raw"] is not None:
         return {"changed": False, **deepcopy(turn)}
     wheel = HEAVY_COUNT_WHEEL if player["heavy"] else COUNT_WHEEL
-    raw, roll = choose(seed, f"{state['round']}:{side}:count", wheel)
+    raw, roll = choose(seed, f"{state['round']}:{side}:count", wheel, version=state["version"])
     debt = player["next_debt"]
     player["next_debt"] = 0  # 只扣下一回合，负数不会继续倒欠。
     turn.update(raw=raw, debt=debt, effective=max(0, raw - debt), pending=max(0, raw - debt), done=raw <= debt)
@@ -150,10 +161,13 @@ def apply_move(player: dict, move: Move) -> dict:
     penalty = int(player["heavy"] and not (numeric and tool == "bandage"))
     multiplier = 2 if numeric and player["double"] else 1
     base_gain = max(0, move.gain + snapshot["level"] + player["core"] - penalty) if numeric else 0
+    # 黑闪领悟是独立的整场光环，作用于后续所有招式；贷款等纯功能招式
+    # 仍不吃强化/核心/伤势/翻倍，也不会因此成为无下限的拦截目标。
+    black_flash_bonus = player["black_flash_stacks"]
     trait = int(numeric and snapshot.get("trait_bonus", 0) and not turn["trait_used"])
     tool_gain = 2 if numeric and tool == "wristband" else 0
     used_tool = bool(numeric and (tool == "wristband" or (tool == "bandage" and player["heavy"])))
-    gain = base_gain * multiplier + trait + tool_gain
+    gain = base_gain * multiplier + trait + tool_gain + black_flash_bonus
     if numeric:
         player["double"] = False
         turn["trait_used"] = True
@@ -164,6 +178,12 @@ def apply_move(player: dict, move: Move) -> dict:
     if move.loan:
         player["double"] = True  # 连续贷款保留同一x2，不是x4，也不排队多次翻倍。
         player["next_debt"] += 1
+    if "black-flash" in move.tags:
+        player["black_flash_stacks"] += 1
+    if "blue-red" in move.tags:
+        player["purple_weight_steps"] += 1
+    if "infinity" in move.tags:
+        turn["infinity_used"] = True
     turn["done"] = turn["pending"] == 0
     return {
         "ordinal": turn["draws"],
@@ -178,6 +198,9 @@ def apply_move(player: dict, move: Move) -> dict:
         "multiplier": multiplier,
         "trait_gain": trait,
         "tool_gain": tool_gain,
+        "black_flash_bonus": black_flash_bonus,
+        "black_flash_stacks": player["black_flash_stacks"],
+        "purple_weight_steps": player["purple_weight_steps"],
         "tool_used": snapshot.get("tool_id", "") if used_tool else "",
         "gain": gain,
         "total": player["weight"],
@@ -186,7 +209,16 @@ def apply_move(player: dict, move: Move) -> dict:
         "double_pending": player["double"],
         "next_debt": player["next_debt"],
         "pending": turn["pending"],
+        "tags": list(move.tags),
     }
+
+
+def move_weight_units(player: dict, move: Move) -> int:
+    """Return exact tenths used by the deterministic move wheel."""
+
+    return move.draw_weight * MOVE_WEIGHT_SCALE + (
+        player.get("purple_weight_steps", 0) if "purple" in move.tags else 0
+    )
 
 
 def play_chunk(state: dict, side: int, seed: str, *, chunk_size: int = MOVE_CHUNK_SIZE) -> list[dict]:
@@ -201,13 +233,23 @@ def play_chunk(state: dict, side: int, seed: str, *, chunk_size: int = MOVE_CHUN
         if player["turn"]["done"]:
             break
         ordinal = player["turn"]["draws"] + 1
+        wheel = tuple((index, move_weight_units(player, move)) for index, move in enumerate(moves))
         index, roll = choose(
             seed,
             f"{state['round']}:{side}:move:{ordinal}",
-            tuple((index, move.draw_weight) for index, move in enumerate(moves)),
+            wheel,
+            version=state["version"],
         )
         event = apply_move(player, moves[index])
-        event.update(roll=roll, round=state["round"], side=side, fighter_id=player["snapshot"]["fighter_id"])
+        event.update(
+            roll=roll,
+            round=state["round"],
+            side=side,
+            fighter_id=player["snapshot"]["fighter_id"],
+            draw_weight_scale=MOVE_WEIGHT_SCALE,
+            draw_wheel_units=[weight for _index, weight in wheel],
+        )
+        player["turn"]["events"].append(deepcopy(event))
         events.append(event)
     return events
 
@@ -224,16 +266,111 @@ def apply_injury(player: dict, injury: str) -> None:
         raise BattleError("未知伤势结果。")
 
 
+def _cancel_event(cancelled: list[dict[int, dict]], side: int, event: dict, reason: str) -> None:
+    entry = cancelled[side].setdefault(
+        int(event["ordinal"]), {"ordinal": int(event["ordinal"]), "gain": int(event["gain"]), "reasons": []}
+    )
+    if reason not in entry["reasons"]:
+        entry["reasons"].append(reason)
+
+
+def _domain_resolution(state: dict, seed: str, cancelled: list[dict[int, dict]]) -> dict | None:
+    domains = [
+        [event for event in side["turn"].get("events", ()) if "domain" in event.get("tags", ())]
+        for side in state["sides"]
+    ]
+    active = [index for index, events in enumerate(domains) if events]
+    if not active:
+        return None
+    version = state["version"]
+    if len(active) == 2:
+        fighters = [side["snapshot"]["fighter_id"] for side in state["sides"]]
+        if fighters.count("sukuna") == 1:
+            sukuna = fighters.index("sukuna")
+            weights = [3, 3]
+            weights[sukuna] = 4
+            wheel = (("side-0", weights[0]), ("side-1", weights[1]), ("tie", 3))
+        else:
+            wheel = (("side-0", 1), ("side-1", 1), ("tie", 1))
+        outcome, roll = choose(seed, f"{state['round']}:domain:clash", wheel, version=version)
+        if outcome == "tie":
+            losing = (0, 1)
+            winner = None
+        else:
+            winner = int(outcome[-1])
+            losing = (1 - winner,)
+        for side in losing:
+            for event in domains[side]:
+                _cancel_event(cancelled, side, event, "领域战落败" if winner is not None else "领域战平手")
+        hit_side = winner
+        mode = "clash"
+    else:
+        domain_side = active[0]
+        wheel = (("hit", 8), ("simple-domain", 2))
+        outcome, roll = choose(
+            seed,
+            f"{state['round']}:domain:solo:{domain_side}",
+            wheel,
+            version=version,
+        )
+        hit_side = domain_side if outcome == "hit" else None
+        if hit_side is None:
+            for event in domains[domain_side]:
+                _cancel_event(cancelled, domain_side, event, "简易领域免疫")
+        winner = hit_side
+        mode = "solo"
+    effect = ""
+    if hit_side is not None and state["sides"][hit_side]["snapshot"]["fighter_id"] == "gojo":
+        state["sides"][1 - hit_side]["next_debt"] += 1
+        effect = "无量空处命中：对方下回合出招数-1"
+    return {
+        "mode": mode,
+        "wheel": wheel,
+        "outcome": outcome,
+        "roll": roll,
+        "winner": winner,
+        "domain_counts": [len(events) for events in domains],
+        "effect": effect,
+    }
+
+
+def _settle_interactions(state: dict, seed: str) -> dict:
+    cancelled: list[dict[int, dict]] = [{}, {}]
+    domain = _domain_resolution(state, seed, cancelled)
+    for defender in (0, 1):
+        if not state["sides"][defender]["turn"].get("infinity_used"):
+            continue
+        attacker = 1 - defender
+        for event in state["sides"][attacker]["turn"].get("events", ()):
+            if event.get("base", 0) <= 0 or int(event["ordinal"]) in cancelled[attacker]:
+                continue
+            _cancel_event(cancelled, attacker, event, "无下限·防御")
+            break
+    adjustments = []
+    for side, entries in enumerate(cancelled):
+        deduction = sum(entry["gain"] for entry in entries.values())
+        state["sides"][side]["weight"] -= deduction
+        adjustments.append(tuple(entries[key] for key in sorted(entries)))
+    return {"domain": domain, "adjustments": tuple(adjustments)}
+
+
 def resolve_round(state: dict, seed: str) -> dict | None:
     _side(state, 0)
     if not all(side["turn"]["done"] for side in state["sides"]):
         return None
+    provisional = deepcopy(state["sides"])
+    interactions = _settle_interactions(state, seed)
     before = deepcopy(state["sides"])
-    roll = randbelow(seed, f"{state['round']}:winner", sum(side["weight"] for side in before))
+    roll = randbelow(
+        seed,
+        f"{state['round']}:winner",
+        sum(side["weight"] for side in before),
+        version=state["version"],
+    )
     winner = 0 if roll < before[0]["weight"] else 1
     loser = 1 - winner
     wheel = INJURY_WHEELS[before[loser]["risk"]]
-    injury, injury_roll = choose(seed, f"{state['round']}:{loser}:injury", wheel)
+    injury, injury_roll = choose(seed, f"{state['round']}:{loser}:injury", wheel, version=state["version"])
     apply_injury(state["sides"][loser], injury)
     result = {
         "round": state["round"],
@@ -243,6 +380,8 @@ def resolve_round(state: dict, seed: str) -> dict | None:
         "injury": injury,
         "injury_roll": injury_roll,
         "injury_wheel": wheel,
+        "provisional": provisional,
+        "interactions": interactions,
         "before": before,
         "after": deepcopy(state["sides"]),
         "natural_end": injury == "exhausted",
@@ -256,6 +395,9 @@ def resolve_round(state: dict, seed: str) -> dict | None:
     return result
 
 
-def loot_weights(*, level: int, feed: int, cloud: int, six_available: bool) -> tuple[float, ...]:
-    weights = catch_weights(LOOT_WEIGHTS, player_level=level, feed_level=feed, six_star_available=six_available)
+def loot_weights(
+    *, level: int, feed: int, cloud: int, six_available: bool, rule_version: int = BATTLE_RULE_VERSION
+) -> tuple[float, ...]:
+    base = LEGACY_LOOT_WEIGHTS if rule_version == 1 else LOOT_WEIGHTS
+    weights = catch_weights(base, player_level=level, feed_level=feed, six_star_available=six_available)
     return apply_six_star_progress(weights, stacks=cloud, bonus_per_stack=0.2, action="catch")

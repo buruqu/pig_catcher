@@ -46,7 +46,8 @@ class BattleSetup:
         )[0]
         loot = (
             await session.fetch_one(
-                "SELECT COALESCE(SUM(5-used),0) FROM battle_loot WHERE actor_id=?", (identity.player_id,)
+                "SELECT COALESCE(SUM(MAX(0,total_uses-used)),0) FROM battle_loot WHERE actor_id=?",
+                (identity.player_id,),
             )
         )[0]
         return view(

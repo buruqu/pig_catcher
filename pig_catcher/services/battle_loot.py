@@ -1,10 +1,10 @@
-"""败者五次独立抓猪：只继承永久加成，直接赋予胜者，不进入普通抓猪副作用链。"""
+"""败者专属战利品抓猪：只继承永久加成，直接赋予胜者。"""
 
 from datetime import UTC, datetime
 from uuid import uuid4
 
 from ..domain.battle import dumps, loot_weights, randbelow
-from ..domain.battle_catalog import BATTLE_VERSION, BattleError
+from ..domain.battle_catalog import BattleError
 from ..domain.dispatch import safe_display_name
 from ..domain.dispatch_views import DispatchLine as Line
 from ..domain.dispatch_views import DispatchPanel as Panel
@@ -28,13 +28,14 @@ from .gameplay import _cooldown_remaining
 
 async def claim_loot(service, session, identity, now_ms: int, key: str):
     row = await session.fetch_one(
-        """SELECT l.*,b.random_seed FROM battle_loot l
-        JOIN battle_matches b USING(battle_id) WHERE l.actor_id=? AND l.scope_id=? AND l.used<5
+        """SELECT l.*,b.random_seed,b.definition_version FROM battle_loot l
+        JOIN battle_matches b USING(battle_id)
+        WHERE l.actor_id=? AND l.scope_id=? AND l.used<l.total_uses
         ORDER BY l.created_ms,b.sequence LIMIT 1""",
         (identity.player_id, identity.scope.value),
     )
     if not row:
-        raise BattleError("没有待交付的战利品次数；仅自然力竭败者获得额外5次，猪直接归胜者。")
+        raise BattleError("没有待交付的战利品次数；新版自然力竭败者获得额外3次，猪直接归胜者。")
     grant = dict(row)
     recipient = await session.fetch_one(
         "SELECT * FROM players WHERE player_id=? AND scope_id=?", (grant["recipient_id"], identity.scope.value)
@@ -71,18 +72,28 @@ async def claim_loot(service, session, identity, now_ms: int, key: str):
     if not is_crazy_thursday(now_dt, timezone_name=service.catching.daily_reset_timezone):
         templates = [t for t in templates if t["template_id"] != KFC_PIG_TEMPLATE_ID]
     buckets = {star: [t for t in templates if t["rarity"] == star] for star in range(1, 7)}
-    weights = loot_weights(level=level, feed=feed, cloud=cloud, six_available=bool(buckets[6]))
+    rule_version = int(grant["definition_version"])
+    weights = loot_weights(
+        level=level,
+        feed=feed,
+        cloud=cloud,
+        six_available=bool(buckets[6]),
+        rule_version=rule_version,
+    )
     if any(weight > 0 and not buckets[index + 1] for index, weight in enumerate(weights)):
         raise NoDrawableTemplateError("本群素材池不完整，已保留战利品次数，请联系管理员。")
     ordinal = grant["used"] + 1
     prefix = f"loot:{ordinal}"
     seed = grant["random_seed"]
-    rarity_roll = randbelow(seed, prefix + ":rarity", 1 << 53) / (1 << 53)
+    rarity_roll = randbelow(seed, prefix + ":rarity", 1 << 53, version=rule_version) / (1 << 53)
     rarity = choose_rarity(weights, rarity_roll)
     candidates = buckets[int(rarity)]
-    template_roll = randbelow(seed, prefix + ":template", len(candidates))
+    template_roll = randbelow(seed, prefix + ":template", len(candidates), version=rule_version)
     template = candidates[template_roll]
-    attribute_rolls = tuple(randbelow(seed, prefix + f":attribute:{index}", 1 << 53) / (1 << 53) for index in range(5))
+    attribute_rolls = tuple(
+        randbelow(seed, prefix + f":attribute:{index}", 1 << 53, version=rule_version) / (1 << 53)
+        for index in range(5)
+    )
     attributes = generate_pig_attributes(
         rarity=rarity,
         length_min=float(template["length_min"]),
@@ -101,7 +112,7 @@ async def claim_loot(service, session, identity, now_ms: int, key: str):
     pig_id = uuid4().hex
     snapshot = {
         "source": "battle-loot",
-        "battle_version": BATTLE_VERSION,
+        "battle_version": rule_version,
         "battle_id": grant["battle_id"],
         "ordinal": ordinal,
         "actor_id": identity.player_id,
@@ -114,7 +125,8 @@ async def claim_loot(service, session, identity, now_ms: int, key: str):
         "rarity_roll": rarity_roll,
         "template_roll": template_roll,
         "attribute_rolls": attribute_rolls,
-        "remaining": 5 - ordinal,
+        "total_uses": int(grant["total_uses"]),
+        "remaining": int(grant["total_uses"]) - ordinal,
         "normal_catch": False,
         "weekly_value": 0,
         "experience_reward": 0,
@@ -171,7 +183,7 @@ async def claim_loot(service, session, identity, now_ms: int, key: str):
         identity,
         "战利品抓猪 · 已交付",
         battle_id=grant["battle_id"],
-        round_label=f"第{ordinal}/5次 · 归胜者所有",
+        round_label=f"第{ordinal}/{grant['total_uses']}次 · 归胜者所有",
         banner=(
             f"{safe_display_name(identity.display_name, identity.user_id)} 抓到的 {template['display_name']} "
             f"已直接进入 {recipient_name} 的背包。"
@@ -190,7 +202,11 @@ async def claim_loot(service, session, identity, now_ms: int, key: str):
             ),
         ),
         stats=(
-            Line("本场剩余", f"{5 - ordinal}/5", "不消耗正常额度"),
+            Line(
+                "本场剩余",
+                f"{int(grant['total_uses']) - ordinal}/{grant['total_uses']}",
+                "不消耗正常额度",
+            ),
             Line("最终归属", recipient_name, "新增图鉴" if discovered else "已有图鉴"),
             Line("永久加成", f"Lv.{level} · 饲料{feed}级", f"云冻{cloud}层"),
         ),

@@ -238,6 +238,6 @@ def test_count_wheel_uses_pre_injury_state_after_core_heals():
     assert [s.weight for s in first.segments] == [5, 4, 3, 2]
     assert first.selected_index == 3
     injury = rendered.wheels[-1]
-    assert [s.weight for s in injury.segments] == [1, 2, 6, 1]
+    assert [s.weight for s in injury.segments] == [1, 2.5, 6, 0.5]
     assert injury.selected_index == 3
     assert state == snapshot

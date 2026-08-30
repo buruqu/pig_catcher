@@ -37,7 +37,7 @@
   {% elif art.name %}<span class="cosmetic-missing">{{ art.name }} · 外观图暂缺</span>{% endif %}
 {%- endmacro %}
 
-{% macro cosmetic_frame(value) -%}
+{% macro cosmetic_frame(value, result_media=False) -%}
   {% set art = value if value is mapping else cosmetic_detail(value, kind='frame') %}
-  {% if art.kind == 'frame' and art.frame_data_url %}<div class="cosmetic-edge" aria-hidden="true" style="border-image-source:url('{{ art.frame_data_url }}')"></div>{% endif %}
+  {% if art.kind == 'frame' and art.frame_data_url %}<div class="cosmetic-frame-layer{% if result_media %} cosmetic-frame-layer--result-media{% endif %}" aria-hidden="true" style="--cosmetic-border:url('{{ art.frame_data_url }}');--cosmetic-accent:{{ art.color or '#c981a2' }}"><div class="cosmetic-edge"></div>{% if result_media %}<div class="cosmetic-media-edge"></div><div class="cosmetic-header-rail"></div>{% endif %}</div>{% endif %}
 {%- endmacro %}

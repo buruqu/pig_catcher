@@ -5062,7 +5062,7 @@ class PigCatcherPlugin(MaiBotPlugin):
 
     @Command(
         "pig_catcher_battle_loot",
-        description="败者额外五次战利品抓猪，直接交付胜者",
+        description="败者专属战利品抓猪，直接交付胜者",
         pattern=rf"^{_COMMAND_LEADING_MENTION_PATTERN}/战利品抓猪\s*$",
     )
     async def handle_battle_loot(self, stream_id: str = "", **kwargs: Any) -> tuple[bool, str, int]:
