@@ -8,10 +8,10 @@ from dataclasses import dataclass
 from ..domain.battle_catalog import BattleError, tool_id
 
 BATTLE_HELP = """【PiG Dream! 猪猪对战】
-/战斗猪 设置 宿傩猪（或五条猪；同名自动选低价值，收藏猪用全名#编号）
+/战斗猪 设置 宿傩猪（也支持五条猪、撅撅猪；同名自动选低价值，收藏猪用全名#编号）
 /战斗猪；/战斗猪 强化；/战斗猪 解除保护 名称#编号
 /战斗猪 确认（设置、强化、解除保护需2分钟内确认）；/战斗猪 取消
-/战斗猪 轮盘 宿傩猪；/战斗猪 轮盘 五条猪
+/战斗猪 轮盘 宿傩猪；/战斗猪 轮盘 五条猪；/战斗猪 轮盘 撅撅猪
 /战斗猪 器具；/战斗猪 制作 练习护腕 2；/战斗猪 器具 练习护腕（或 无）
 /比划比划 @群友；/比划比划 接受；/比划比划 拒绝；/比划比划 取消
 /出招数 → /出招（第二位完成出招后立即结算，结算图完整展示双方本回合招式）
@@ -24,6 +24,8 @@ BATTLE_HELP = """【PiG Dream! 猪猪对战】
 每回合以基础5和历史折半继承权重起步；本回合净增只向上取整保留50%到后续回合。
 黑闪会成长；苍/赫提高两种茈的出招盘权重，任意一次茈发动后加成归零重算；核心无上限。
 领域同回合只判一次；无下限每回合只免疫对方第一招仍有效的数值招式。
+撅撅猪入场随机采用时之沙或虚拟声；切换招式即时换盘，随后追加抽取立刻使用新盘。
+撅撅猪的加速、时延、模仿、相对静止时间·零及双领域均以结算图保存的真实落点为准。
 器具一人一个，实际触发才消耗；未触发的终局退回。战利品仅受败者永久加成。
 战斗招式与日常群术式互不触发；未使用战利品跨日保留。
 简明流程：/抓猪帮助 对战；其他玩法：/抓猪帮助"""
@@ -102,16 +104,23 @@ def parse_battle_request(
         return BattleRequest({"": "profile", "确认": "confirm", "取消": "cancel_setup"}[value], {})
     if head in {"设置", "强化", "解除保护"}:
         if head == "设置" and not tail:
-            raise BattleError("格式：/战斗猪 设置 宿傩猪（或五条猪）。")
+            raise BattleError("格式：/战斗猪 设置 宿傩猪（也支持五条猪、撅撅猪）。")
         return BattleRequest(
             {"设置": "assign_preview", "强化": "upgrade_preview", "解除保护": "retire_preview"}[head],
             {"selector": tail},
         )
     if head == "轮盘":
-        if tail not in {"宿傩猪", "五条猪", "sukuna", "gojo", ""}:
-            raise BattleError("目前支持宿傩猪和五条猪的战斗盘。")
+        if tail not in {"宿傩猪", "五条猪", "撅撅猪", "sukuna", "gojo", "juejue", ""}:
+            raise BattleError("目前支持宿傩猪、五条猪和撅撅猪的战斗盘。")
         return BattleRequest(
-            "wheels", {"fighter_id": {"宿傩猪": "sukuna", "五条猪": "gojo"}.get(tail, tail or "sukuna")}
+            "wheels",
+            {
+                "fighter_id": {
+                    "宿傩猪": "sukuna",
+                    "五条猪": "gojo",
+                    "撅撅猪": "juejue",
+                }.get(tail, tail or "sukuna")
+            },
         )
     if head == "器具":
         return (

@@ -38,6 +38,9 @@ class FighterCard:
     pending: str
     tool: str
     ready: str = ""
+    form: str = ""
+    form_track: str = ""
+    mechanic_summary: str = ""
     weight_breakdown: str = ""
     next_weight: str = ""
     count_wheel: BattleWheelCard | None = None
@@ -91,6 +94,9 @@ class BattleView(DispatchView):
                     )
                 },
                 ready=item.get("ready", ""),
+                form=item.get("form", ""),
+                form_track=item.get("form_track", ""),
+                mechanic_summary=item.get("mechanic_summary", ""),
                 weight_breakdown=item.get("weight_breakdown", ""),
                 next_weight=item.get("next_weight", ""),
                 count_wheel=parse_wheel(item.get("count_wheel")),
@@ -126,6 +132,12 @@ class BattleView(DispatchView):
                 lines.append(f"  权重构成：{fighter.weight_breakdown}")
             if fighter.next_weight:
                 lines.append(f"  {fighter.next_weight}")
+            if fighter.form:
+                lines.append(f"  当前形态：{fighter.form}")
+            if fighter.form_track:
+                lines.append(f"  形态轨迹：{fighter.form_track}")
+            if fighter.mechanic_summary:
+                lines.append(f"  机制状态：{fighter.mechanic_summary}")
             lines.extend(
                 f"  {item.label}：{item.value} {item.note}".strip() for item in fighter.action_lines
             )

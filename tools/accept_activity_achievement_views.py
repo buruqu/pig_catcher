@@ -23,7 +23,7 @@ from pig_catcher.assets import AssetCatalogStorage  # noqa: E402
 from pig_catcher.commands.tour import TourRequest  # noqa: E402
 from pig_catcher.domain.achievements import ACHIEVEMENT_DEFINITIONS, AchievementUnlock  # noqa: E402
 from pig_catcher.domain.activity_achievements import ACTIVITY_IDS, ACTIVITY_REWARDS  # noqa: E402
-from pig_catcher.domain.battle_catalog import FIGHTERS  # noqa: E402
+from pig_catcher.domain.battle_catalog import FIGHTERS_BY_ID  # noqa: E402
 from pig_catcher.domain.models import CommandIdentity, ScopeKey  # noqa: E402
 from pig_catcher.infrastructure.database import PigCatcherDatabase  # noqa: E402
 from pig_catcher.infrastructure.repositories.achievements import AchievementRepository  # noqa: E402
@@ -60,7 +60,8 @@ async def scenarios(output: Path):
     source = PROJECT_ROOT / "asset_library/current"
     catalog = json.loads((source / "assets.json").read_text(encoding="utf-8"))
     ids = {character(c).template_id for c in ("kasumi", "tomoe", "layer")}
-    ids.update(f.template_id for f in FIGHTERS)
+    original_fighters = (FIGHTERS_BY_ID["sukuna"], FIGHTERS_BY_ID["gojo"])
+    ids.update(f.template_id for f in original_fighters)
     ids.update(("pig-r2-tiny", "pig-r2-elephant"))
     entries = [e for e in catalog["entries"] if e["kind"] == "pig" and e["template_id"] in ids]
     if {e["template_id"] for e in entries} != ids:
@@ -166,7 +167,7 @@ async def scenarios(output: Path):
         a = replace(actor, user_id="battle-a", display_name="训练手账翻到第五页")
         b = replace(actor, user_id="battle-b", display_name="今天也要认真比划的群友")
         battle = BattleWorld(db, clock, BattleService(db, clock=clock, seed_factory=lambda: "r4-battle-visual"), a, b)
-        for person, fighter in zip((a, b), FIGHTERS, strict=True):
+        for person, fighter in zip((a, b), original_fighters, strict=True):
             await seed_pigs(db, person, template_id=fighter.template_id, count=1)
             await battle.assign(person, fighter.name)
             await battle.fund(person)

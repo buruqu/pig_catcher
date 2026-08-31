@@ -560,8 +560,10 @@ class PigCatcherRenderer:
         return await self._render_template("tour.html", view=view, previews=previews)
 
     async def render_battle(self, view: BattleView, media_paths: Mapping[str, Path]) -> RenderedImage:
+        # 对战卡本身是静态结算图；战斗猪素材可能是伪装成 .jpg 的 GIF。
+        # 统一允许取中间帧作为静态预览，静态图片仍只有一帧且行为不变。
         previews = await self._list_media_data_urls(
-            ((pig.short_code, bool(pig.image_relpath), False) for pig in view.pigs),
+            ((pig.short_code, bool(pig.image_relpath), True) for pig in view.pigs),
             media_paths,
         )
         return await self._render_template("battle.html", view=view, previews=previews)

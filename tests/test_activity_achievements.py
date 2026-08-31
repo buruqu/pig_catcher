@@ -104,7 +104,11 @@ def test_runtime_pack_matches_reviewed_design_and_freezes_old_denominators():
             (r["reward_id"], r["quantity"]) for r in entry["rewards"]
         ]
     assert len([r for r in ACTIVITY_REWARDS.values() if r["kind"] in {"frame", "badge", "title"}]) == 38
-    for fighter in FIGHTERS_BY_ID.values():
+    # 旧版“集齐全部招式”成就冻结在宿傩/五条两张首发盘，新增战斗猪
+    # 不得追溯扩大既有分母；撅撅猪后续若需要成就应使用新的快照 ID。
+    assert "juejue" not in MOVE_ALIASES
+    for fighter_id in ("sukuna", "gojo"):
+        fighter = FIGHTERS_BY_ID[fighter_id]
         assert set(MOVE_ALIASES[fighter.fighter_id]) == {m.move_id for m in fighter.moves}
         current = set(MOVE_ALIASES[fighter.fighter_id].values())
         if fighter.fighter_id == "sukuna":

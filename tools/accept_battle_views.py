@@ -19,15 +19,28 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from pig_catcher.assets import AssetCatalogStorage  # noqa: E402
 from pig_catcher.config.model import CatchingSection  # noqa: E402
-from pig_catcher.domain.battle import apply_move, loads, move_weight_units, resolve_round  # noqa: E402
-from pig_catcher.domain.battle_catalog import FIGHTERS, FIGHTERS_BY_ID, MOVE_WEIGHT_SCALE  # noqa: E402
+from pig_catcher.domain.battle import (  # noqa: E402
+    apply_move,
+    fresh_turn,
+    loads,
+    move_weight_units,
+    new_state,
+    resolve_round,
+)
+from pig_catcher.domain.battle_catalog import (  # noqa: E402
+    FIGHTERS_BY_ID,
+    JUEJUE_FORM_TIME,
+    JUEJUE_PIG_TEMPLATE_IDS,
+    MOVE_WEIGHT_SCALE,
+    fighter_form_moves,
+)
 from pig_catcher.domain.models import CommandIdentity, ScopeKey  # noqa: E402
 from pig_catcher.infrastructure.database import PigCatcherDatabase  # noqa: E402
 from pig_catcher.infrastructure.repositories.dispatch import timestamp_ms  # noqa: E402
 from pig_catcher.rendering import PigCatcherRenderer, media_path  # noqa: E402
 from pig_catcher.services import AssetCatalogService  # noqa: E402
 from pig_catcher.services.battle import BattleService  # noqa: E402
-from pig_catcher.services.battle_views import matchup, view  # noqa: E402
+from pig_catcher.services.battle_views import matchup, view, wheels  # noqa: E402
 from tests.test_battle import BattleWorld  # noqa: E402
 from tests.test_dispatch import NOW, seed_pigs  # noqa: E402
 from tests.test_gameplay import MutableClock  # noqa: E402
@@ -52,6 +65,7 @@ def _fresh_mechanic_state(initial_state: dict) -> dict:
             risk=0,
             core=0,
             next_debt=0,
+            next_action_bonus=0,
             double=False,
             tool_used=False,
             black_flash_stacks=0,
@@ -59,18 +73,7 @@ def _fresh_mechanic_state(initial_state: dict) -> dict:
             round_start_weight=5,
             round_gains=[],
         )
-        side["turn"] = {
-            "raw": None,
-            "debt": 0,
-            "effective": None,
-            "pending": 0,
-            "draws": 0,
-            "done": False,
-            "ready": False,
-            "trait_used": False,
-            "events": [],
-            "infinity_used": False,
-        }
+        side["turn"] = fresh_turn()
     return state
 
 
@@ -82,10 +85,22 @@ def _record_move(state: dict, side: int, move_id: str) -> dict:
     """Apply one explicit move and save a valid deterministic wheel snapshot for its card."""
 
     player = state["sides"][side]
-    moves = FIGHTERS_BY_ID[player["snapshot"]["fighter_id"]].moves
+    fighter_id = player["snapshot"]["fighter_id"]
+    moves = (
+        fighter_form_moves(fighter_id, player["juejue_form"])
+        if fighter_id == "juejue"
+        else FIGHTERS_BY_ID[fighter_id].moves
+    )
     move_index = next(index for index, move in enumerate(moves) if move.move_id == move_id)
     wheel_units = [move_weight_units(player, move) for move in moves]
-    event = apply_move(player, moves[move_index])
+    event = apply_move(
+        player,
+        moves[move_index],
+        seed="battle-visual-explicit-move",
+        round_number=state["round"],
+        side=side,
+        version=state["version"],
+    )
     event.update(
         roll=sum(wheel_units[:move_index]),
         round=state["round"],
@@ -123,6 +138,7 @@ def deterministic_mechanic_cases(
     initial_match: dict,
     identity: CommandIdentity,
     now_ms: int,
+    juejue_entry: dict,
 ) -> tuple[list[tuple[str, object]], dict]:
     """Build explicit rule cards so visual acceptance never depends on a lucky ordinary fight."""
 
@@ -149,7 +165,8 @@ def deterministic_mechanic_cases(
             _record_move(prepared, side, move_id)
         state, result, seed = _resolve_fixed(prepared, "domain-" + suffix, domain_outcome=expected)
         domain = result["interactions"]["domain"]
-        assert domain and tuple(domain["wheel"]) == (("side-0", 4), ("side-1", 3), ("tie", 3))
+        assert domain and tuple(domain["wheel"]) == (("side-0", 8), ("side-1", 6), ("tie", 6))
+        assert domain["weight_scale"] == 2
         match = {**initial_match, "status": state["status"]}
         name = "13c-domain-clash-sukuna-win" if expected == "side-0" else "13d-domain-clash-tie"
         cases.append(
@@ -314,6 +331,55 @@ def deterministic_mechanic_cases(
         "carryover": result["carryover"],
         "next_weights": [side["weight"] for side in state["sides"]],
     }
+
+    juejue_snapshot = deepcopy(initial_state["sides"][0]["snapshot"])
+    juejue_snapshot.update(
+        fighter_id="juejue",
+        template_id=juejue_entry["template_id"],
+        name=juejue_entry["display_name"],
+        short_code="JJFORM",
+        rarity=int(juejue_entry["rarity"]),
+        image_relpath=juejue_entry["image"],
+        display_tags=tuple(juejue_entry.get("display_tags", ())),
+        level=5,
+    )
+    switch_state = new_state(
+        [juejue_snapshot, deepcopy(initial_state["sides"][1]["snapshot"])],
+        seed="battle-visual-juejue-entry",
+    )
+    switch_state["sides"][0]["juejue_form"] = JUEJUE_FORM_TIME
+    _ready(switch_state["sides"][0])
+    switch_virtual = _record_move(switch_state, 0, "switch-virtual")
+    mimic = _record_move(switch_state, 0, "virtual-mimic")
+    switch_sand = _record_move(switch_state, 0, "switch-sand")
+    acceleration = _record_move(switch_state, 0, "sand-accelerate")
+    name = "13i-juejue-form-switch"
+    switch_view = matchup(
+        identity,
+        {**initial_match, "status": "active"},
+        switch_state,
+        now_ms,
+        title="撅撅猪 · 双形态即时切换",
+        banner="固定招式序列：时之沙切入虚拟声完成模仿，再即时切回时之沙继续抽取。",
+        events=_events(switch_state),
+    )
+    cases.append(
+        (
+            name,
+            replace(switch_view, wheels=wheels(identity, "juejue", level=5).wheels),
+        )
+    )
+    evidence[name] = {
+        "form_track": [
+            switch_virtual["form_before"],
+            switch_virtual["form_after"],
+            switch_sand["form_after"],
+        ],
+        "mimic_available": bool(mimic["mimic"]["available"]),
+        "mimic_source_name": mimic["mimic"]["source_name"],
+        "acceleration_tier": acceleration["subwheel"]["tier"],
+        "acceleration_success": acceleration["subwheel"]["success"],
+    }
     return cases, evidence
 
 
@@ -321,11 +387,23 @@ async def scenarios(output: Path):
     catalog_root = PROJECT_ROOT / "asset_library/current"
     catalog = json.loads((catalog_root / "assets.json").read_text(encoding="utf-8"))
     public = [entry for entry in catalog["entries"] if entry["kind"] == "pig" and entry["scope"] == "common"]
-    ids = {fighter.template_id for fighter in FIGHTERS}
+    public_fighters = (FIGHTERS_BY_ID["sukuna"], FIGHTERS_BY_ID["gojo"])
+    juejue_entry = next(
+        entry
+        for entry in catalog["entries"]
+        if entry.get("template_id") == JUEJUE_PIG_TEMPLATE_IDS[0]
+    )
+    juejue_food_entry = next(
+        entry
+        for entry in catalog["entries"]
+        if entry.get("template_id") == juejue_entry["paired_food_template_id"]
+    )
+    ids = {fighter.template_id for fighter in public_fighters}
     for star in range(1, 6):
         ids.add(next(entry["template_id"] for entry in public if entry["rarity"] == star))
     entries = [entry for entry in public if entry["template_id"] in ids]
-    if not all(fighter.template_id in {entry["template_id"] for entry in entries} for fighter in FIGHTERS):
+    entries.extend((juejue_entry, juejue_food_entry))
+    if not all(fighter.template_id in {entry["template_id"] for entry in entries} for fighter in public_fighters):
         raise ValueError("缺少两只已确认的公共战斗猪立绘。")
     source = output / "inputs"
     source.mkdir()
@@ -345,6 +423,13 @@ async def scenarios(output: Path):
         await AssetCatalogService(
             db, AssetCatalogStorage(data_root), min_image_side=32, max_image_bytes=32 * 1024 * 1024
         ).import_manifest(manifest)
+        stored_juejue = await db.fetch_one(
+            "SELECT image_relpath FROM pig_templates WHERE template_id=?",
+            (juejue_entry["template_id"],),
+        )
+        if stored_juejue is None:
+            raise ValueError("离线验收库缺少撅撅猪正式立绘。")
+        juejue_render_entry = {**juejue_entry, "image": stored_juejue[0]}
         a = CommandIdentity(
             ScopeKey("qq-official", "battle-fixture"),
             "fixture-stream",
@@ -360,7 +445,7 @@ async def scenarios(output: Path):
         )
         w = BattleWorld(db, clock, service, a, b)
         cases = [("01-empty", (await w.send()).view)]
-        for actor, fighter in zip((a, b), FIGHTERS, strict=True):
+        for actor, fighter in zip((a, b), public_fighters, strict=True):
             await seed_pigs(db, actor, template_id=fighter.template_id, count=1)
             preview = await w.send("设置 " + fighter.name, actor=actor)
             if actor == a:
@@ -375,6 +460,7 @@ async def scenarios(output: Path):
         await w.send("器具 入场彩纸")
         cases.append(("08-sukuna-wheel", (await w.send("轮盘 宿傩猪")).view))
         cases.append(("09-gojo-wheel", (await w.send("轮盘 五条猪")).view))
+        cases.append(("09b-juejue-dual-form-wheel", wheels(a, "juejue")))
         cases.append(("10-invitation", (await w.invite()).view))
         cases.append(("11-entry", (await w.send("接受", "challenge", actor=b)).view))
         initial_match = await w.match()
@@ -404,6 +490,7 @@ async def scenarios(output: Path):
             initial_match,
             a,
             timestamp_ms(NOW),
+            juejue_render_entry,
         )
         cases.extend(mechanic_cases)
         finished = await w.fight(already_started=True)

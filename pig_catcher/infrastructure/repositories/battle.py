@@ -145,7 +145,7 @@ class BattleRepository:
         member = await DispatchRepository().member(session, player_id, pig_id)
         definition = FIGHTERS_BY_TEMPLATE.get(member["template_id"])
         if definition is None:
-            raise BattleError("目前只有宿傩猪和五条猪拥有战斗盘。")
+            raise BattleError("目前只有宿傩猪、五条猪和撅撅猪拥有战斗盘。")
         if available:
             if member["locked_trade_id"] or member["busy_purpose"]:
                 raise BattleError("战斗猪正被派遣、巡演、对战或交易占用，请先结束对应活动。")
@@ -161,7 +161,7 @@ class BattleRepository:
         if not selector_text:
             profile = await self.profile(session, identity.player_id)
             if not profile["pig_instance_id"]:
-                raise BattleError("请先 /战斗猪 设置 宿傩猪（或五条猪）；+0即可参战。")
+                raise BattleError("请先 /战斗猪 设置 宿傩猪、五条猪或撅撅猪；+0即可参战。")
             return await self.member(session, identity.player_id, profile["pig_instance_id"], available=True)
         selector = parse_asset_selector(selector_text)
         clause = "AND p.short_code=? COLLATE NOCASE" if selector.short_code else "AND p.is_favorite=0"

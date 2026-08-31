@@ -13,7 +13,7 @@ from PIL import Image
 from pig_catcher.commands.battle import parse_battle_request
 from pig_catcher.commands.context import extract_mention_target
 from pig_catcher.domain.battle import loads
-from pig_catcher.domain.battle_catalog import BattleError
+from pig_catcher.domain.battle_catalog import JUEJUE_PIG_TEMPLATE_IDS, BattleError
 from pig_catcher.domain.models import CommandIdentity, ScopeKey
 from pig_catcher.domain.special_content import GOJO_PIG_TEMPLATE_ID, SUKUNA_PIG_TEMPLATE_ID
 
@@ -84,6 +84,13 @@ def test_malformed_commands_rejected(text, section):
         parse_battle_request(text, section=section)
 
 
+def test_juejue_name_and_ascii_alias_select_the_same_wheel():
+    named = parse_battle_request("轮盘 撅撅猪")
+    aliased = parse_battle_request("轮盘 juejue")
+    assert named == aliased
+    assert named.action == "wheels" and named.args == {"fighter_id": "juejue"}
+
+
 async def install_fighters(plugin, root, a, b):
     source = root / "battle-inputs"
     source.mkdir()
@@ -91,6 +98,12 @@ async def install_fighters(plugin, root, a, b):
     entries += [
         _pig_entry(SUKUNA_PIG_TEMPLATE_ID, rarity=5, display_name="宿傩猪"),
         _pig_entry(GOJO_PIG_TEMPLATE_ID, rarity=5, display_name="五条猪"),
+        _pig_entry(
+            JUEJUE_PIG_TEMPLATE_IDS[0],
+            rarity=6,
+            group_id="10001",
+            display_name="撅撅猪",
+        ),
     ]
     for entry in entries:
         Image.new("RGB", (256, 256), "#f9c9de").save(source / entry["image"])
@@ -149,8 +162,42 @@ async def test_queries_help_and_errors_are_images_except_copyable_help(tmp_path)
         assert (await invoke(plugin, "handle_battle_pig", "帮助"))[0]
         assert "/战利品抓猪" in ctx.send.texts[-1][1]
         assert "普通 /抓猪 会自动结算战利品" in ctx.send.texts[-1][1]
+        assert "/战斗猪 轮盘 撅撅猪" in ctx.send.texts[-1][1]
+        assert "即时换盘" in ctx.send.texts[-1][1]
         assert not (await invoke(plugin, "handle_battle_count"))[0]
         assert "对战提示" in ctx.render.calls[-1][0]
+    finally:
+        await plugin.on_unload()
+
+
+async def test_juejue_can_be_assigned_and_its_four_wheels_render(tmp_path):
+    plugin, ctx = await create_test_plugin(tmp_path)
+    try:
+        actor = CommandIdentity(ScopeKey("qq", "10001"), "stream-10001", "20001", "双形态测试员")
+        peer = replace(actor, user_id="20002", display_name="同群占位玩家")
+        await install_fighters(plugin, tmp_path, actor, peer)
+        await seed_pigs(plugin.database, actor, template_id=JUEJUE_PIG_TEMPLATE_IDS[0], count=1)
+
+        assert (await invoke(plugin, "handle_battle_pig", "设置 撅撅猪", actor=actor))[0]
+        assert (await invoke(plugin, "handle_battle_pig", "确认", actor=actor))[0]
+        profile = await plugin.database.fetch_one(
+            "SELECT * FROM battle_profiles WHERE player_id=?",
+            (actor.player_id,),
+        )
+        member = await plugin.database.fetch_one(
+            "SELECT template_id FROM pig_instances WHERE pig_instance_id=?",
+            (profile["pig_instance_id"],),
+        )
+        assert member["template_id"] == JUEJUE_PIG_TEMPLATE_IDS[0]
+
+        assert (await invoke(plugin, "handle_battle_pig", "轮盘 撅撅猪", actor=actor))[0]
+        html = ctx.render.calls[-1][0]
+        assert all(
+            title in html
+            for title in ("撅撅猪 · 时之沙", "撅撅猪 · 虚拟声", "时之沙 · 加速盘", "时之沙 · 时延盘")
+        )
+        assert "切换招式即时换盘" in html
+        assert "相对静止时间·零" in html and "虚拟模仿" in html
     finally:
         await plugin.on_unload()
 

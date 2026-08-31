@@ -20,19 +20,34 @@ from pig_catcher.domain.battle import (
     weight_label,
 )
 from pig_catcher.domain.battle_catalog import (
+    BATTLE_RULE_VERSION,
     COUNT_WHEEL,
     FIGHTERS,
+    FIGHTERS_BY_ID,
+    FIGHTERS_BY_TEMPLATE,
     HEAVY_COUNT_WHEEL,
     INJURY_WHEELS,
+    JUEJUE_ACCELERATION_TIERS,
+    JUEJUE_DELAY_TIERS,
+    JUEJUE_FORM_TIME,
+    JUEJUE_FORM_VIRTUAL,
+    JUEJUE_PIG_TEMPLATE_IDS,
+    JUEJUE_TIME_MOVES,
+    JUEJUE_VIRTUAL_MOVES,
     UPGRADE_COSTS,
     Move,
+    fighter_moves,
 )
 from pig_catcher.services.battle_views import effective_total_after, move_line
 
 
-def state(level=0, trait=0, tool=""):
+def state(level=0, trait=0, tool="", left="sukuna", right="gojo", seed=""):
     return new_state(
-        [{"fighter_id": item.fighter_id, "level": level, "trait_bonus": trait, "tool_id": tool} for item in FIGHTERS]
+        [
+            {"fighter_id": fighter_id, "level": level, "trait_bonus": trait, "tool_id": tool}
+            for fighter_id in (left, right)
+        ],
+        seed=seed,
     )
 
 
@@ -41,7 +56,7 @@ def ready(player, pending=1):
 
 
 def test_exact_catalog_and_growth_costs():
-    assert [len(f.moves) for f in FIGHTERS] == [10, 10]
+    assert [len(f.moves) for f in FIGHTERS] == [10, 10, 16]
     assert all(move.draw_weight == 1 for fighter in FIGHTERS for move in fighter.moves)
     assert [m.gain for m in FIGHTERS[0].moves] == [10, 10, 15, 21, 35, 0, 14, 7, 12, 28]
     assert [m.gain for m in FIGHTERS[1].moves] == [13, 20, 14, 10, 10, 14, 24, 30, 14, 35]
@@ -57,7 +72,7 @@ def test_exact_catalog_and_growth_costs():
     }
 
 
-@pytest.mark.parametrize("move", [move for fighter in FIGHTERS for move in fighter.moves])
+@pytest.mark.parametrize("move", [move for fighter in FIGHTERS[:2] for move in fighter.moves])
 def test_upgrade_only_positive_numeric_part(move):
     a, b = state()["sides"][0], state(5)["sides"][0]
     ready(a)
@@ -238,7 +253,7 @@ def test_cancelled_domain_updates_every_following_displayed_cumulative_total():
     follow_up = _record(s["sides"][0], FIGHTERS[0].moves[1], 0)
     ready(s["sides"][1])
     _record(s["sides"][1], FIGHTERS[1].moves[7], 1)
-    wheel = (("side-0", 4), ("side-1", 3), ("tie", 3))
+    wheel = (("side-0", 8), ("side-1", 6), ("tie", 6))
     summary = resolve_round(s, _seed_for("1:domain:clash", wheel, "side-1"))
     adjustments = {item["ordinal"]: item for item in summary["interactions"]["adjustments"][0]}
     assert adjustments[domain["ordinal"]]["gain"] == domain["gain"]
@@ -291,7 +306,7 @@ def test_domain_clash_is_once_and_zeroes_every_losing_domain_gain(outcome):
         ready(s["sides"][side], 2)
         _record(s["sides"][side], move, side)
         _record(s["sides"][side], move, side)
-    wheel = (("side-0", 4), ("side-1", 3), ("tie", 3))
+    wheel = (("side-0", 8), ("side-1", 6), ("tie", 6))
     summary = resolve_round(s, _seed_for("1:domain:clash", wheel, outcome))
     domain = summary["interactions"]["domain"]
     assert domain["outcome"] == outcome and domain["domain_counts"] == [2, 2]
@@ -391,7 +406,7 @@ def test_domain_bonus_enters_net_round_gain_and_displayed_cumulative_total():
         event = _record(s["sides"][side], move, side)
         if side == 0:
             boosted_event = event
-    wheel = (("side-0", 4), ("side-1", 3), ("tie", 3))
+    wheel = (("side-0", 8), ("side-1", 6), ("tie", 6))
     summary = resolve_round(s, _seed_for("1:domain:clash", wheel, "side-0"))
     domain = summary["interactions"]["domain"]
     bonus = {"ordinal": domain["boosted_ordinal"], "gain": domain["bonus_gain"]}
@@ -414,3 +429,279 @@ def test_huge_odd_round_gain_uses_integer_ceiling_without_float_conversion():
     assert result["carryover"][0]["retained_gain"] == (huge + 1) // 2
     assert next_state["sides"][0]["weight"] == 5 + (huge + 1) // 2
     assert loads(dumps(next_state)) == next_state
+
+
+def test_juejue_catalog_aliases_forms_and_legacy_query_boundary():
+    assert BATTLE_RULE_VERSION == 4
+    assert all(FIGHTERS_BY_TEMPLATE[template_id].fighter_id == "juejue" for template_id in JUEJUE_PIG_TEMPLATE_IDS)
+    assert {move.move_id for move in JUEJUE_TIME_MOVES}.isdisjoint(
+        {move.move_id for move in JUEJUE_VIRTUAL_MOVES}
+    )
+    assert len(JUEJUE_TIME_MOVES) == len(JUEJUE_VIRTUAL_MOVES) == 8
+    assert fighter_moves("juejue", 3) == ()
+    assert fighter_moves("juejue", 4) == JUEJUE_TIME_MOVES + JUEJUE_VIRTUAL_MOVES
+
+
+def test_juejue_entry_form_is_seeded_fifty_fifty_and_persists_exactly():
+    observed = set()
+    for index in range(100):
+        seed = f"entry-form-{index}"
+        first = state(left="juejue", right="gojo", seed=seed)
+        second = state(left="juejue", right="gojo", seed=seed)
+        observed.add(first["sides"][0]["juejue_form"])
+        assert first["sides"][0]["juejue_form"] == second["sides"][0]["juejue_form"]
+        assert first["sides"][0]["juejue_form_roll"] == second["sides"][0]["juejue_form_roll"]
+        assert loads(dumps(first))["sides"][0]["juejue_form"] == first["sides"][0]["juejue_form"]
+    assert observed == {JUEJUE_FORM_TIME, JUEJUE_FORM_VIRTUAL}
+
+
+@pytest.mark.parametrize(
+    "start_form,switch_id,target_form,target_ids",
+    [
+        (JUEJUE_FORM_TIME, "switch-virtual", JUEJUE_FORM_VIRTUAL, {m.move_id for m in JUEJUE_VIRTUAL_MOVES}),
+        (JUEJUE_FORM_VIRTUAL, "switch-sand", JUEJUE_FORM_TIME, {m.move_id for m in JUEJUE_TIME_MOVES}),
+    ],
+)
+def test_juejue_switch_reloads_the_new_form_before_the_next_draw_in_same_chunk(
+    start_form, switch_id, target_form, target_ids
+):
+    for index in range(10_000):
+        seed = f"switch-form-{start_form}-{index}"
+        candidate = state(left="juejue", right="gojo", seed=seed)
+        player = candidate["sides"][0]
+        if player["juejue_form"] != start_form:
+            continue
+        ready(player)
+        events = play_chunk(candidate, 0, seed, chunk_size=2)
+        if events[0]["move_id"] != switch_id:
+            continue
+        assert events[0]["form_before"] == start_form
+        assert events[0]["form_after"] == target_form
+        assert events[1]["form_before"] == target_form
+        assert events[1]["move_id"] in target_ids
+        assert events[1]["draw_wheel_move_ids"] == [move.move_id for move in (
+            JUEJUE_TIME_MOVES if target_form == JUEJUE_FORM_TIME else JUEJUE_VIRTUAL_MOVES
+        )]
+        return
+    raise AssertionError("没有找到固定种子触发形态切换")
+
+
+def test_juejue_dynamic_domain_draw_weights_consume_their_own_bonuses():
+    s = state(left="juejue", right="gojo", seed="draw-weights")
+    player = s["sides"][0]
+    sand_domain = JUEJUE_TIME_MOVES[-1]
+    chaos_domain = JUEJUE_VIRTUAL_MOVES[-1]
+    assert move_weight_units(player, sand_domain) == move_weight_units(player, chaos_domain) == 5
+    player["juejue_sand_domain_steps"] = 3
+    player["juejue_sand_domain_switch_units"] = 5
+    player["turn"]["juejue_realtime"] = True
+    assert move_weight_units(player, sand_domain) == 23
+    assert move_weight_units(player, chaos_domain) == 15
+    ready(player)
+    event = apply_move(player, sand_domain)
+    assert event["sand_domain_steps_before"] == 3
+    assert event["sand_domain_steps_after"] == 0
+    assert event["sand_domain_switch_units_after"] == 0
+    assert move_weight_units(player, sand_domain) == 15
+
+
+def _zero_sequence(expected: bool) -> tuple[dict, dict, dict]:
+    for index in range(20_000):
+        seed = f"relative-zero-{expected}-{index}"
+        s = state(left="juejue", right="gojo", seed=seed)
+        player = s["sides"][0]
+        ready(player, 2)
+        player["juejue_guaranteed"] = True
+        acceleration = apply_move(
+            player, JUEJUE_TIME_MOVES[2], seed=seed, round_number=1, side=0, version=4
+        )
+        player["juejue_guaranteed"] = True
+        delay = apply_move(player, JUEJUE_TIME_MOVES[3], seed=seed, round_number=1, side=0, version=4)
+        if (
+            acceleration["subwheel"]["tier"] + delay["subwheel"]["tier"] >= 5
+            and delay["relative_zero"] is not None
+            and delay["relative_zero"]["success"] is expected
+        ):
+            return s, acceleration, delay
+    raise AssertionError("没有找到相对静止·零固定种子")
+
+
+@pytest.mark.parametrize("expected", [True, False])
+def test_juejue_acceleration_delay_and_relative_zero_are_exact_and_once_per_round(expected):
+    s, acceleration, delay = _zero_sequence(expected)
+    player = s["sides"][0]
+    assert acceleration["subwheel"]["tier_wheel"] == tuple((tier.tier, 1) for tier in JUEJUE_ACCELERATION_TIERS)
+    assert delay["subwheel"]["tier_wheel"] == tuple((tier.tier, 1) for tier in JUEJUE_DELAY_TIERS)
+    assert acceleration["subwheel"]["success"] and delay["subwheel"]["success"]
+    assert acceleration["subwheel"]["guaranteed"] and delay["subwheel"]["guaranteed"]
+    assert delay["relative_zero"]["wheel"] == ((True, 1), (False, 1))
+    assert delay["zero_gain"] == (40 if expected else 0)
+    assert player["turn"]["juejue_zero_checked"]
+    player["juejue_guaranteed"] = True
+    follow = apply_move(
+        player,
+        JUEJUE_TIME_MOVES[2],
+        seed="zero-does-not-recheck",
+        round_number=1,
+        side=0,
+        version=4,
+    )
+    assert follow["relative_zero"] is None
+
+
+def _juejue_delay_event(*, success: bool) -> tuple[dict, dict]:
+    for index in range(20_000):
+        seed = f"juejue-delay-{success}-{index}"
+        s = state(left="juejue", right="juejue", seed=seed)
+        player = s["sides"][0]
+        ready(player)
+        event = apply_move(
+            player, JUEJUE_TIME_MOVES[3], seed=seed, round_number=1, side=0, version=4
+        )
+        if event["subwheel"]["success"] is success and (
+            (success and event["opponent_next_debt"] > 0)
+            or (not success and event["opponent_next_bonus"] > 0)
+        ):
+            event.update(round=1, side=0, fighter_id="juejue")
+            player["turn"]["events"].append(deepcopy(event))
+            player["turn"].update(pending=0, done=True)
+            return s, event
+    raise AssertionError("没有找到撅撅猪时延固定种子")
+
+
+def test_relative_zero_suppresses_juejue_on_juejue_round_reduction_and_cross_round_debt():
+    s, delay = _juejue_delay_event(success=True)
+    defender = s["sides"][1]
+    defender["turn"].update(done=True, juejue_zero_active=True)
+    summary = resolve_round(s, "juejue-zero-defense")
+    before = summary["before"]
+    assert before[0]["weight"] == 5
+    assert before[1]["weight"] == 5
+    assert before[1]["next_debt"] == 0
+    cross = summary["interactions"]["cross_effects"][0]
+    assert cross["round_reduction_suppressed"] and cross["debt_suppressed"]
+    assert cross["round_reduction"] == cross["next_debt"] == 0
+    assert delay["ordinal"] in summary["interactions"]["zeroes"][1]["cancelled_ordinals"]
+
+
+def test_relative_zero_keeps_failed_delay_bonus_for_the_defender():
+    s, delay = _juejue_delay_event(success=False)
+    defender = s["sides"][1]
+    defender["turn"].update(done=True, juejue_zero_active=True)
+    summary = resolve_round(s, "juejue-zero-delay-failure")
+    assert summary["before"][1]["next_action_bonus"] == delay["opponent_next_bonus"]
+
+
+def test_juejue_mimic_uses_frozen_non_juejue_numeric_pool_and_growth_once():
+    s = state(level=5, left="juejue", right="gojo", seed="mimic")
+    player = s["sides"][0]
+    player.update(core=2, heavy=True)
+    ready(player)
+    event = apply_move(
+        player, JUEJUE_VIRTUAL_MOVES[3], seed="mimic", round_number=1, side=0, version=4
+    )
+    mimic = event["mimic"]
+    assert mimic["available"] and mimic["source_fighter_id"] in {"sukuna", "gojo"}
+    assert mimic["source_fighter_id"] != "juejue"
+    assert event["special_base"] == abs(mimic["base"])
+    assert event["gain"] == abs(mimic["base"]) + 5 + 2 - 1
+    assert event["tags"] == ["juejue-mimic"]
+    assert event["extra_draws"] == 0 and not event["loan"]
+
+
+def test_make_real_grows_only_its_direct_numeric_value_for_the_whole_match():
+    player = state(left="juejue", right="gojo", seed="make-real")["sides"][0]
+    ready(player, 3)
+    events = [apply_move(player, JUEJUE_VIRTUAL_MOVES[4]) for _ in range(3)]
+    assert [event["special_base"] for event in events] == [12, 17, 22]
+    assert [event["gain"] for event in events] == [12, 17, 22]
+    assert player["juejue_realization_stacks"] == 3
+
+
+@pytest.mark.parametrize(
+    "left,right,expected",
+    [
+        ("gojo", "gojo", (("side-0", 6), ("side-1", 6), ("tie", 6))),
+        ("sukuna", "sukuna", (("side-0", 8), ("side-1", 8), ("tie", 6))),
+        ("juejue", "gojo", (("side-0", 5), ("side-1", 6), ("tie", 6))),
+    ],
+)
+def test_domain_clash_uses_scaled_integer_strengths(left, right, expected):
+    s = state(left=left, right=right, seed=f"domain-{left}-{right}")
+    moves = {
+        "gojo": FIGHTERS_BY_ID["gojo"].moves[7],
+        "sukuna": FIGHTERS_BY_ID["sukuna"].moves[4],
+        "juejue": JUEJUE_TIME_MOVES[-1],
+    }
+    for side, fighter_id in enumerate((left, right)):
+        ready(s["sides"][side])
+        _record(s["sides"][side], moves[fighter_id], side)
+    summary = resolve_round(s, f"domain-{left}-{right}")
+    assert summary["interactions"]["domain"]["wheel"] == expected
+    assert summary["interactions"]["domain"]["weight_scale"] == 2
+
+
+def test_juejue_distinct_dual_domain_has_nine_strength_and_only_winning_clash_special():
+    s = state(left="juejue", right="sukuna", seed="dual-domain")
+    ready(s["sides"][0], 2)
+    sand = _record(s["sides"][0], JUEJUE_TIME_MOVES[-1], 0)
+    chaos = _record(s["sides"][0], JUEJUE_VIRTUAL_MOVES[-1], 0)
+    ready(s["sides"][1])
+    shrine = _record(s["sides"][1], FIGHTERS_BY_ID["sukuna"].moves[4], 1)
+    wheel = (("side-0", 9), ("side-1", 8), ("tie", 6))
+    seed = _seed_for("1:domain:clash", wheel, "side-0")
+    summary = resolve_round(s, seed)
+    domain = summary["interactions"]["domain"]
+    assert domain["wheel"] == wheel and domain["dual_juejue"] == [True, False]
+    assert domain["boosted_ordinals"] == [sand["ordinal"], chaos["ordinal"]]
+    assert domain["bonus_gain"] == sand["gain"] + chaos["gain"] == 40
+    assert domain["nullified_side"] == 1
+    assert domain["auto_mimic"] and domain["auto_mimic"]["available"]
+    assert summary["before"][0]["weight"] == 5 + 25 + 15 + 40 + domain["auto_mimic"]["gain"]
+    assert summary["before"][0]["next_action_bonus"] == 2
+    assert summary["before"][0]["juejue_guaranteed"]
+    assert summary["before"][1]["weight"] == 5
+    assert shrine["ordinal"] in summary["interactions"]["zeroes"][0]["cancelled_ordinals"] or any(
+        shrine["ordinal"] == item["ordinal"] for item in summary["interactions"]["adjustments"][1]
+    )
+
+
+def test_juejue_rewind_removes_only_the_new_light_or_heavy_injury():
+    source = state(left="juejue", right="sukuna", seed="rewind")
+    source["sides"][0]["turn"].update(done=True, juejue_rewind=True)
+    source["sides"][1].update(weight=100)
+    source["sides"][1]["turn"]["done"] = True
+    for index in range(20_000):
+        candidate = deepcopy(source)
+        summary = resolve_round(candidate, f"rewind-{index}")
+        if summary["loser"] == 0 and summary["injury"] in {"light", "heavy"}:
+            assert summary["injury_rewound"] and summary["injury_effective"] == "none"
+            assert not summary["after"][0]["heavy"] and summary["after"][0]["risk"] == 0
+            return
+    raise AssertionError("没有找到回溯伤势固定种子")
+
+
+def test_juejue_command_order_chunking_and_serialization_are_deterministic():
+    seed = "juejue-order-and-chunk"
+    a = state(level=3, left="juejue", right="gojo", seed=seed)
+    b = state(level=3, left="juejue", right="gojo", seed=seed)
+    for current, order, size in ((a, (0, 1), 32), (b, (1, 0), 1)):
+        for side in order:
+            roll_count(current, side, seed)
+            guard = 0
+            while not current["sides"][side]["turn"]["done"]:
+                play_chunk(current, side, seed, chunk_size=size)
+                current.update(loads(dumps(current)))
+                guard += 1
+                assert guard < 10_000
+        resolve_round(current, seed)
+    assert a == b
+
+
+def test_v3_payload_remains_lossless_but_is_not_silently_resumed_by_v4_engine():
+    legacy = state()
+    legacy["version"] = 3
+    restored = loads(dumps(legacy))
+    assert restored == legacy
+    with pytest.raises(Exception, match="另一版本规则"):
+        roll_count(restored, 0, "must-not-recalculate")

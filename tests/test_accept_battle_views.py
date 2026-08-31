@@ -1,8 +1,9 @@
 """The offline battle art gate includes deterministic cards for every new interaction family."""
 
 from pig_catcher.domain.battle import new_state
-from pig_catcher.domain.battle_catalog import BATTLE_VERSION, FIGHTERS
+from pig_catcher.domain.battle_catalog import BATTLE_VERSION, FIGHTERS_BY_ID, JUEJUE_PIG_TEMPLATE_IDS
 from pig_catcher.domain.models import CommandIdentity, ScopeKey
+from pig_catcher.services.battle_views import wheels
 from tools.accept_battle_views import deterministic_mechanic_cases
 
 
@@ -29,7 +30,8 @@ def _snapshot(fighter, index: int) -> dict:
 
 def test_deterministic_mechanic_cards_cover_new_battle_rules() -> None:
     identity = CommandIdentity(ScopeKey("qq-official", "fixture"), "stream", "player-0", "玩家0")
-    state = new_state([_snapshot(fighter, index) for index, fighter in enumerate(FIGHTERS)])
+    public_fighters = (FIGHTERS_BY_ID["sukuna"], FIGHTERS_BY_ID["gojo"])
+    state = new_state([_snapshot(fighter, index) for index, fighter in enumerate(public_fighters)])
     match = {
         "battle_id": "BVISUALFIXTURE",
         "status": "active",
@@ -37,7 +39,19 @@ def test_deterministic_mechanic_cards_cover_new_battle_rules() -> None:
         "expires_ms": 60_000,
     }
 
-    cases, evidence = deterministic_mechanic_cases(state, match, identity, 0)
+    cases, evidence = deterministic_mechanic_cases(
+        state,
+        match,
+        identity,
+        0,
+        {
+            "template_id": JUEJUE_PIG_TEMPLATE_IDS[0],
+            "display_name": "撅撅猪",
+            "rarity": 6,
+            "image": "media/fixture/juejue.jpg",
+            "display_tags": ["群友定制", "叠叠猪", "动态"],
+        },
+    )
     names = [name for name, _view in cases]
     assert names == [
         "13c-domain-clash-sukuna-win",
@@ -46,8 +60,9 @@ def test_deterministic_mechanic_cards_cover_new_battle_rules() -> None:
         "13f-black-flash-loan-infinity-space",
         "13g-purple-reset-cycle",
         "13h-round-carry",
+        "13i-juejue-form-switch",
     ]
-    assert evidence[names[0]]["wheel"] == (("side-0", 4), ("side-1", 3), ("tie", 3))
+    assert evidence[names[0]]["wheel"] == (("side-0", 8), ("side-1", 6), ("tie", 6))
     assert evidence[names[0]]["outcome"] == "side-0"
     assert evidence[names[0]]["boost_side"] == 0
     assert evidence[names[0]]["bonus_gain"] > 0
@@ -67,4 +82,24 @@ def test_deterministic_mechanic_cards_cover_new_battle_rules() -> None:
     carry = evidence["13h-round-carry"]
     assert carry["round"] == 3
     assert [item["round_start_weight"] for item in carry["carryover"]] == [8, 8]
-    assert "历史折半继承3" in cases[-1][1].text()
+    assert "历史折半继承3" in dict(cases)["13h-round-carry"].text()
+    switch = evidence["13i-juejue-form-switch"]
+    assert switch["form_track"] == ["time-sand", "virtual-sound", "time-sand"]
+    switch_text = dict(cases)["13i-juejue-form-switch"].text()
+    assert "时之沙 → 虚拟声 → 时之沙" in switch_text
+    assert "虚拟模仿" in switch_text
+    assert "加速盘抽中" in switch_text and "最终成功率" in switch_text
+
+
+def test_juejue_dual_form_and_subwheels_have_a_deterministic_art_view() -> None:
+    identity = CommandIdentity(ScopeKey("qq-official", "fixture"), "stream", "player-0", "玩家0")
+    result = wheels(identity, "juejue", level=5)
+    titles = [card.title for card in result.wheels]
+    assert titles[:4] == [
+        "撅撅猪 · 时之沙",
+        "撅撅猪 · 虚拟声",
+        "时之沙 · 加速盘",
+        "时之沙 · 时延盘",
+    ]
+    text = result.text()
+    assert all(value in text for value in ("即时换盘", "相对静止时间·零", "虚拟模仿", "领域战使用权重抽取"))

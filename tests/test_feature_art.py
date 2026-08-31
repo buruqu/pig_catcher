@@ -14,7 +14,7 @@ import pytest
 from PIL import Image
 
 from pig_catcher.domain.battle import new_state
-from pig_catcher.domain.battle_catalog import FIGHTERS, INJURY_WHEELS
+from pig_catcher.domain.battle_catalog import FIGHTERS_BY_ID, INJURY_WHEELS
 from pig_catcher.domain.battle_views import BattleView
 from pig_catcher.domain.dispatch import MATERIALS, REGIONS, TOOLS
 from pig_catcher.domain.dispatch_views import DispatchView
@@ -217,7 +217,7 @@ def test_count_wheel_uses_pre_injury_state_after_core_heals():
             "weight_value": 60.0,
             "template_id": f.template_id,
         }
-        for i, f in enumerate(FIGHTERS)
+        for i, f in enumerate((FIGHTERS_BY_ID["sukuna"], FIGHTERS_BY_ID["gojo"]))
     ]
     state = new_state(snapshots)
     state["sides"][0].update(heavy=True, risk=2)

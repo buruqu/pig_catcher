@@ -9,7 +9,7 @@ from .special_content import GOJO_PIG_TEMPLATE_ID, SUKUNA_PIG_TEMPLATE_ID
 
 # 对战规则版本与活动成就事实版本分离：新版对战会改变随机命名空间，
 # 但新增字段仍是 activity_progress v1 可以向后兼容读取的事实载荷。
-BATTLE_RULE_VERSION = 3
+BATTLE_RULE_VERSION = 4
 BATTLE_FACT_VERSION = 1
 BATTLE_VERSION = BATTLE_RULE_VERSION
 INVITE_TTL_MS = 5 * 60 * 1000
@@ -55,6 +55,15 @@ class Move:
     loan: bool = False
     draw_weight: int = 1
     tags: tuple[str, ...] = ()
+    direction: str = "self"
+    description: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class FighterForm:
+    form_id: str
+    name: str
+    moves: tuple[Move, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,6 +72,156 @@ class FighterDefinition:
     template_id: str
     name: str
     moves: tuple[Move, ...]
+    template_aliases: tuple[str, ...] = ()
+    forms: tuple[FighterForm, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class JuejueAccelerationTier:
+    tier: int
+    success_chance: int
+    gain: int
+    extra_draws: int
+    failure_debt: int
+
+
+@dataclass(frozen=True, slots=True)
+class JuejueDelayTier:
+    tier: int
+    success_chance: int
+    gain: int
+    opponent_reduction: int
+    opponent_debt: int
+    failure_opponent_bonus: int
+
+
+JUEJUE_PIG_TEMPLATE_IDS = (
+    "pig-g1092931381-juejue",
+    "pig-g237716658-juejue",
+    "pig-qo5e5854406d0297d6feae696a13e3a339-juejue",
+    "pig-qo9ea2810f378fbd7dc3219c56ceab3520-juejue",
+)
+JUEJUE_FORM_TIME = "time-sand"
+JUEJUE_FORM_VIRTUAL = "virtual-sound"
+JUEJUE_ACCELERATION_TIERS = (
+    JuejueAccelerationTier(1, 100, 15, 1, 0),
+    JuejueAccelerationTier(2, 75, 20, 2, 2),
+    JuejueAccelerationTier(3, 50, 25, 3, 3),
+)
+JUEJUE_DELAY_TIERS = (
+    JuejueDelayTier(1, 100, 15, 5, 0, 0),
+    JuejueDelayTier(2, 75, 15, 10, 1, 1),
+    JuejueDelayTier(3, 50, 15, 15, 2, 2),
+)
+JUEJUE_TIME_MOVES = (
+    Move(
+        "sand-sculpt",
+        "时之沙·塑型",
+        5,
+        tags=("juejue-sculpt",),
+        description="荒时之沙出现权重+0.1；下一次加速或时延成功率+5个百分点，累计最多20。",
+    ),
+    Move(
+        "sand-rewind",
+        "时之沙·回溯",
+        10,
+        tags=("juejue-rewind",),
+        description="挂起本回合一次回溯；若本回合失败并抽到轻伤或重伤，撤销本轮新伤势与风险变化。",
+    ),
+    Move(
+        "sand-accelerate",
+        "时之沙·加速",
+        tags=("juejue-accelerate",),
+        description="进入等权三档加速盘；成功增加胜利权重并在本回合追加1/2/3次抽取，失败产生下回合欠招。",
+    ),
+    Move(
+        "sand-delay",
+        "时之沙·时延",
+        tags=("juejue-delay",),
+        description="进入等权三档时延盘；成功削减对方本轮数值并可能扣对方下回合招数，失败可能令对方加招。",
+    ),
+    Move(
+        "sand-body",
+        "时之沙·沙之形体",
+        16,
+        tags=("juejue-sand-body",),
+        description="本回合首次生效：对方第一招仍有效的数值贡献减半并向下取整。",
+    ),
+    Move("sand-seal", "时之沙·时空间封印术", 30, description="胜利权重+30。"),
+    Move(
+        "switch-virtual",
+        "切换·虚拟声",
+        draws=2,
+        tags=("juejue-switch-virtual",),
+        description="立即切换为虚拟声轮盘，并从新轮盘再抽两次。",
+    ),
+    Move(
+        "sand-domain",
+        "领域展开·荒时之沙",
+        25,
+        tags=("domain", "juejue-sand-domain"),
+        description="胜利权重+25；领域命中后对方下回合-1招、自己下回合+1招；领域战基础权重-0.5。",
+    ),
+)
+JUEJUE_VIRTUAL_MOVES = (
+    Move(
+        "virtual-realm",
+        "虚拟声·虚拟之境",
+        draws=1,
+        tags=("juejue-virtual-realm",),
+        description="再抽一次；保证下一次加速或时延成功。",
+    ),
+    Move(
+        "future-simulation",
+        "虚拟声·未来模拟",
+        tags=("juejue-future-simulation",),
+        description="本回合首次生效：随机令对方一招仍有效的数值贡献归零，功能部分保留。",
+    ),
+    Move(
+        "realtime-compute",
+        "虚拟声·实时演算",
+        draws=1,
+        tags=("juejue-realtime",),
+        description="再抽一次；本回合首次令两种领域的出现权重各+1。",
+    ),
+    Move(
+        "virtual-mimic",
+        "虚拟声·虚拟模仿",
+        tags=("juejue-mimic",),
+        description="大小盘各50%，仅复制其他战斗猪的直接有符号数值与方向，不复制功能。",
+    ),
+    Move(
+        "make-real",
+        "虚拟声·化虚为实",
+        12,
+        tags=("juejue-make-real",),
+        description="第n次基础胜利权重为12+5×(n-1)，层数持续整场。",
+    ),
+    Move(
+        "louder",
+        "虚拟声·把音乐开大声点！",
+        tags=("juejue-music",),
+        description="本回合进入音乐状态；不叠加，仅令随后每招胜利权重+5。",
+    ),
+    Move(
+        "switch-sand",
+        "切换·时之沙",
+        draws=1,
+        tags=("juejue-switch-sand",),
+        description="立即切换为时之沙并再抽一次；荒时之沙下次出现权重+0.5，下一次加速和时延各+5个百分点。",
+    ),
+    Move(
+        "chaos-domain",
+        "领域展开·乱序数虚时空",
+        15,
+        tags=("domain", "juejue-chaos-domain"),
+        description="胜利权重+15；领域命中后自动模仿、自己下回合+1招并保证下一次加速或时延成功；领域战基础权重-0.5。",
+    ),
+)
+JUEJUE_FORMS = (
+    FighterForm(JUEJUE_FORM_TIME, "时之沙", JUEJUE_TIME_MOVES),
+    FighterForm(JUEJUE_FORM_VIRTUAL, "虚拟声", JUEJUE_VIRTUAL_MOVES),
+)
 
 
 FIGHTERS = (
@@ -100,9 +259,26 @@ FIGHTERS = (
             Move("unlimited-purple", "无限制·茈！", 35, tags=("purple",)),
         ),
     ),
+    FighterDefinition(
+        "juejue",
+        JUEJUE_PIG_TEMPLATE_IDS[0],
+        "撅撅猪",
+        JUEJUE_TIME_MOVES + JUEJUE_VIRTUAL_MOVES,
+        template_aliases=JUEJUE_PIG_TEMPLATE_IDS[1:],
+        forms=JUEJUE_FORMS,
+    ),
 )
 FIGHTERS_BY_ID = {item.fighter_id: item for item in FIGHTERS}
-FIGHTERS_BY_TEMPLATE = {item.template_id: item for item in FIGHTERS}
+FIGHTERS_BY_TEMPLATE = {
+    template_id: item
+    for item in FIGHTERS
+    for template_id in (item.template_id, *item.template_aliases)
+}
+FIGHTER_FORMS_BY_ID = {
+    (fighter.fighter_id, form.form_id): form
+    for fighter in FIGHTERS
+    for form in fighter.forms
+}
 LEGACY_MOVE_IDS = {
     "sukuna": frozenset(
         ("black-flash", "dismantle", "cleave", "furnace", "shrine", "loan", "reverse", "elbow", "net")
@@ -113,9 +289,18 @@ LEGACY_MOVE_IDS = {
 
 def fighter_moves(fighter_id: str, rule_version: int = BATTLE_RULE_VERSION) -> tuple[Move, ...]:
     moves = FIGHTERS_BY_ID[fighter_id].moves
+    if fighter_id == "juejue" and rule_version < 4:
+        return ()
     if rule_version == 1:
         return tuple(move for move in moves if move.move_id in LEGACY_MOVE_IDS[fighter_id])
     return moves
+
+
+def fighter_form_moves(fighter_id: str, form_id: str) -> tuple[Move, ...]:
+    try:
+        return FIGHTER_FORMS_BY_ID[(fighter_id, form_id)].moves
+    except KeyError as exc:
+        raise BattleError("未知战斗猪形态。") from exc
 
 
 @dataclass(frozen=True, slots=True)

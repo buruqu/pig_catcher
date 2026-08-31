@@ -268,7 +268,11 @@ class BattleService:
             return (
                 matchup(identity, match, loads(match["state_json"]), now_ms)
                 if match
-                else view(identity, "本群尚无对战", banner="先 /战斗猪 设置 宿傩猪 或五条猪，再 /比划比划 @群友。")
+                else view(
+                    identity,
+                    "本群尚无对战",
+                    banner="先 /战斗猪 设置 宿傩猪、五条猪或撅撅猪，再 /比划比划 @群友。",
+                )
             )
         if action == "invite":
             if match:
@@ -286,7 +290,8 @@ class BattleService:
             if profile["last_invite_ms"] and now_ms - profile["last_invite_ms"] < INVITE_COOLDOWN_MS:
                 raise BattleError("两次成功发出邀请至少间隔60秒，避免反复打扰。")
             snapshots = [await self.repo.snapshot(session, pid, identity.scope.value, now_ms) for pid in ids]
-            state = new_state(snapshots)
+            battle_seed = self.seed_factory()
+            state = new_state(snapshots, seed=battle_seed)
             state["status"] = "pending"
             for side_state in state["sides"]:
                 side_state["tool_used"] = False
@@ -301,7 +306,7 @@ class BattleService:
                     *ids,
                     "pending",
                     BATTLE_VERSION,
-                    self.seed_factory(),
+                    battle_seed,
                     dumps(state),
                     dumps([self.repo.fingerprint(snap) for snap in snapshots]),
                     now_ms + INVITE_TTL_MS,
@@ -353,7 +358,7 @@ class BattleService:
                 snap["achievement_entry"] = await AchievementCouponRepository().consume(
                     session, snap["player_id"], "battle-visual", match["battle_id"], iso_ms(now_ms)
                 )
-            state = new_state(snapshots)
+            state = new_state(snapshots, seed=match["random_seed"])
             day = beijing_day(now_ms)
             await session.execute(
                 "UPDATE battle_matches SET status='active',state_json=?,accepted_day=?,expires_ms=? WHERE battle_id=?",
