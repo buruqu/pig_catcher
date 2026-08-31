@@ -1,6 +1,6 @@
 # 技术架构设计
 
-> 当前内部测试版为2.0.3 / Schema49 / Ruleset44 / Manifest4，SDK锁定2.7.1、
+> 当前内部测试版为2.0.9 / Schema52 / Ruleset49 / Manifest4，战斗规则为 Battle v4，SDK锁定2.7.1、
 > 本地Python3.13.12。dev12全量结果见[验收报告](34-v2-final-acceptance.md)；dev13已完成
 > 十层升级、主商城重平衡和三套独立器具商城的离线统一验收。下文1.x兼容基线和迁移历史保留原记录，
 > 不表示本次启动、升级或修改了正式MaiBot。
@@ -15,7 +15,7 @@
 
 第五轮沿用已验证的 SDK 2.7.x 公共接口和宿主加载器；若后续版本变化，先更新兼容设计再写代码。
 
-当前正式插件为 `1.29.1`，标识为 `schema_version=34`、`asset_manifest_version=4` 和
+当前正式插件为 `1.29.2`，标识为 `schema_version=34`、`asset_manifest_version=4` 和
 `ruleset_version=29`。三者独立递增，不能用插件版本代替数据、素材和数值规则版本。
 Schema 18 为抓猪收据增加普通额度成本，Ruleset 16 增加六星菜专属抓猪、滚动七天到期、
 多次六星效果与普通六星做菜平衡；Schema 19 修复存量“一猪六吃”效果类型与新参数不匹配；
@@ -647,7 +647,7 @@ Schema47只迁移永久升级等级：每行旧等级原子变为 `min(10, old_l
 
 ## Battle v4 发布边界（2026-08-31）
 
-- 插件版本 `2.0.6`，Schema52，Ruleset47，Battle definition version4；Schema52只扩展战利品总次数
+- 插件版本 `2.0.9`，Schema52，Ruleset49，Battle definition version4；Schema52只扩展战利品总次数
   触发器，使v4沿用三次，同时保留v1五次、v2/v3三次。
 - 初始形态、每招主盘、子盘、领域及胜负均使用版本化确定性命名空间；分片、重试、命令先后和重启不改结果。
 - 部署前必须确认内部库没有 `invited/active/resolving/awaiting_confirmation` 的v3场次；否则暂停更新，

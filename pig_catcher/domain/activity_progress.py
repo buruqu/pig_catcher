@@ -294,11 +294,16 @@ def battle(state: dict, event: str, source: str, at: int, data: dict, player_id:
             collect(state, "battle.finished_opponents", [other["snapshot"]["player_id"]])
             collect(state, "battle.finished_roles", ["initiator" if index == 0 else "opponent"])
             recorded_moves = match["moves"]
-            collect(
-                state,
-                f"battle.{archetype}_moves",
-                (MOVE_ALIASES[archetype][move] for move in recorded_moves if move in MOVE_ALIASES[archetype]),
-            )
+            aliases = MOVE_ALIASES.get(archetype)
+            if aliases is not None:
+                # The v1 movebook achievements are frozen to the two launch
+                # fighters.  New fighters still settle every generic battle
+                # fact, but must not create or expand a legacy movebook.
+                collect(
+                    state,
+                    f"battle.{archetype}_moves",
+                    (aliases[move] for move in recorded_moves if move in aliases),
+                )
             for metric in set(match["flags"]):
                 flag(state, metric)
             if own["core"] >= 3:

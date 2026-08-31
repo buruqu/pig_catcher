@@ -160,7 +160,7 @@ JUEJUE_TIME_MOVES = (
         "领域展开·荒时之沙",
         25,
         tags=("domain", "juejue-sand-domain"),
-        description="胜利权重+25；领域命中后对方下回合-1招、自己下回合+1招；领域战基础权重-0.5。",
+        description="胜利权重+25；领域命中后对方下回合-1招、自己下回合+1招；主招式盘基础权重1，领域战单领域权重2.5。",
     ),
 )
 JUEJUE_VIRTUAL_MOVES = (
@@ -215,7 +215,7 @@ JUEJUE_VIRTUAL_MOVES = (
         "领域展开·乱序数虚时空",
         15,
         tags=("domain", "juejue-chaos-domain"),
-        description="胜利权重+15；领域命中后自动模仿、自己下回合+1招并保证下一次加速或时延成功；领域战基础权重-0.5。",
+        description="胜利权重+15；领域命中后自动模仿、自己下回合+1招并保证下一次加速或时延成功；主招式盘基础权重1，领域战单领域权重2.5。",
     ),
 )
 JUEJUE_FORMS = (

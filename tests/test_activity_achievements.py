@@ -10,8 +10,14 @@ import pytest
 
 from pig_catcher.domain.achievements import ACHIEVEMENT_BY_ID, ACHIEVEMENT_DEFINITIONS, LEGACY_ACHIEVEMENT_DEFINITIONS
 from pig_catcher.domain.activity_achievements import ACTIVITY_IDS, ACTIVITY_REWARDS, FIXED_SETS, LEGACY_REGULAR_IDS
-from pig_catcher.domain.activity_progress import MOVE_ALIASES, THEME_ALIASES, VENUE_ALIASES, progress, reduce_fact
-from pig_catcher.domain.battle import new_state
+from pig_catcher.domain.activity_progress import (
+    MOVE_ALIASES,
+    THEME_ALIASES,
+    VENUE_ALIASES,
+    progress,
+    reduce_fact,
+)
+from pig_catcher.domain.battle import dumps, loads, new_state
 from pig_catcher.domain.battle_catalog import FIGHTERS_BY_ID
 from pig_catcher.domain.dispatch import MATERIAL_SCALE
 from pig_catcher.domain.tour import score_stage
@@ -130,6 +136,89 @@ def test_space_slash_is_retained_for_future_achievements_but_not_old_nine_move_d
     definition = ACHIEVEMENT_BY_ID["battle-sukuna-movebook"]
     completed, details = progress(state, definition, set())
     assert completed == 0 and details["items"] == []
+
+
+def test_juejue_natural_finish_skips_frozen_movebooks_but_retains_generic_battle_facts():
+    state = {}
+    recorded = ("sand-sculpt", "switch-virtual", "virtual-mimic", "chaos-domain")
+    for ordinal, move_id in enumerate(recorded, start=1):
+        fact(
+            state,
+            "battle",
+            f"move:1:{ordinal}",
+            {"move_id": move_id, "gain": 0, "multiplier": 1},
+            source="juejue-match",
+        )
+
+    fact(state, "battle", "finished", match_data("juejue"), source="juejue-match")
+
+    assert "battle.juejue_moves" not in state["sets"]
+    assert "battle.sukuna_moves" not in state["sets"]
+    assert "battle.gojo_moves" not in state["sets"]
+    assert state["values"]["battle.natural_finishes"] == 1
+    assert state["sets"]["journey.three_systems"] == ["battle"]
+    assert "juejue" not in MOVE_ALIASES
+    for achievement_id in ("battle-sukuna-movebook", "battle-gojo-movebook"):
+        completed, details = progress(state, ACHIEVEMENT_BY_ID[achievement_id], set())
+        assert completed == 0 and details["items"] == []
+
+
+async def test_juejue_natural_finish_drains_queue_without_blocking_later_facts(battle_world):
+    w = battle_world
+
+    def natural_finish(fighter_id: str, source_id: str) -> tuple[str, str]:
+        payload = match_data(fighter_id)
+        for side, actor in zip(payload["state"]["sides"], (w.a, w.b), strict=True):
+            side["snapshot"]["player_id"] = actor.player_id
+        payload["winner_id"] = w.a.player_id
+        return source_id, dumps(payload)
+
+    facts = (
+        ("juejue-natural-finish", *natural_finish("juejue", "juejue-natural")),
+        ("later-launch-finish", *natural_finish("sukuna", "later-launch")),
+    )
+    async with w.db.transaction() as session:
+        for fact_key, source_id, payload_json in facts:
+            await session.execute(
+                "INSERT INTO activity_facts VALUES(?,?,?,?,?,?,?,?,?)",
+                (
+                    fact_key,
+                    w.a.player_id,
+                    w.a.scope.value,
+                    "battle",
+                    source_id,
+                    "finished",
+                    1,
+                    1,
+                    payload_json,
+                ),
+            )
+
+    service = AchievementService(w.db, clock=w.clock)
+    first = await service.process_activity_facts(scope_id=w.a.scope.value, receipt_id="juejue-queue")
+    unlock_count = (await w.db.fetch_one("SELECT COUNT(*) FROM achievement_unlocks"))[0]
+    queue = await w.db.fetch_all(
+        "SELECT fact_key,processed_at FROM achievement_activity_queue "
+        "WHERE fact_key IN (?,?) ORDER BY sequence",
+        tuple(fact[0] for fact in facts),
+    )
+    projection = await w.db.fetch_one(
+        "SELECT state_json FROM achievement_activity_state WHERE player_id=?", (w.a.player_id,)
+    )
+
+    assert first
+    assert [row["fact_key"] for row in queue] == [fact[0] for fact in facts]
+    assert all(row["processed_at"] is not None for row in queue)
+    assert loads(projection["state_json"])["values"]["battle.natural_finishes"] == 2
+    assert await service.process_activity_facts(scope_id=w.a.scope.value, receipt_id="juejue-queue-retry") == ()
+    assert (await w.db.fetch_one("SELECT COUNT(*) FROM achievement_unlocks"))[0] == unlock_count
+    assert loads(
+        (
+            await w.db.fetch_one(
+                "SELECT state_json FROM achievement_activity_state WHERE player_id=?", (w.a.player_id,)
+            )
+        )["state_json"]
+    )["values"]["battle.natural_finishes"] == 2
 
 
 def complete_state(code):

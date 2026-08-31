@@ -486,23 +486,24 @@ def test_juejue_switch_reloads_the_new_form_before_the_next_draw_in_same_chunk(
     raise AssertionError("没有找到固定种子触发形态切换")
 
 
-def test_juejue_dynamic_domain_draw_weights_consume_their_own_bonuses():
+def test_juejue_domain_main_wheel_base_and_dynamic_draw_weights_are_exact():
     s = state(left="juejue", right="gojo", seed="draw-weights")
     player = s["sides"][0]
     sand_domain = JUEJUE_TIME_MOVES[-1]
     chaos_domain = JUEJUE_VIRTUAL_MOVES[-1]
-    assert move_weight_units(player, sand_domain) == move_weight_units(player, chaos_domain) == 5
+    assert sand_domain.draw_weight == chaos_domain.draw_weight == 1
+    assert move_weight_units(player, sand_domain) == move_weight_units(player, chaos_domain) == 10
     player["juejue_sand_domain_steps"] = 3
     player["juejue_sand_domain_switch_units"] = 5
     player["turn"]["juejue_realtime"] = True
-    assert move_weight_units(player, sand_domain) == 23
-    assert move_weight_units(player, chaos_domain) == 15
+    assert move_weight_units(player, sand_domain) == 28
+    assert move_weight_units(player, chaos_domain) == 20
     ready(player)
     event = apply_move(player, sand_domain)
     assert event["sand_domain_steps_before"] == 3
     assert event["sand_domain_steps_after"] == 0
     assert event["sand_domain_switch_units_after"] == 0
-    assert move_weight_units(player, sand_domain) == 15
+    assert move_weight_units(player, sand_domain) == move_weight_units(player, chaos_domain) == 20
 
 
 def _zero_sequence(expected: bool) -> tuple[dict, dict, dict]:
@@ -592,6 +593,58 @@ def test_relative_zero_keeps_failed_delay_bonus_for_the_defender():
     assert summary["before"][1]["next_action_bonus"] == delay["opponent_next_bonus"]
 
 
+def _chaos_domain_hits_relative_zero(*, direction: str = "self") -> dict:
+    s = state(left="juejue", right="juejue", seed=f"zero-auto-mimic-{direction}")
+    attacker, defender = s["sides"]
+    if direction == "opponent":
+        attacker["juejue_mimic_pool"] = {
+            "large": [],
+            "small": [
+                {
+                    "fighter_id": "future",
+                    "move_id": "future-opponent-reduction",
+                    "name": "未来减权招式",
+                    "base": 13,
+                    "direction": "opponent",
+                }
+            ],
+        }
+    ready(attacker)
+    _record(attacker, JUEJUE_VIRTUAL_MOVES[-1], 0)
+    defender["turn"].update(raw=0, effective=0, pending=0, done=True, juejue_zero_active=True)
+    seed = _seed_for("1:domain:solo:0", (("hit", 8), ("simple-domain", 2)), "hit")
+    return resolve_round(s, seed)
+
+
+@pytest.mark.parametrize("direction", ["self", "opponent"])
+def test_relative_zero_suppresses_late_domain_auto_mimic_numeric_but_keeps_functions(direction):
+    summary = _chaos_domain_hits_relative_zero(direction=direction)
+    domain = summary["interactions"]["domain"]
+    mimic = domain["auto_mimic"]
+    assert domain["outcome"] == "hit" and mimic["available"]
+    assert mimic["direction"] == direction
+    assert mimic["numeric_suppressed"] and mimic["suppressed_reason"] == "相对静止·零"
+    assert mimic["gain"] == mimic["opponent_reduction"] == 0
+    assert mimic["raw_gain"] > 0 if direction == "self" else mimic["raw_opponent_reduction"] > 0
+    assert summary["before"][0]["weight"] == summary["before"][1]["weight"] == 5
+    assert summary["before"][0]["next_action_bonus"] == 1
+    assert summary["before"][0]["juejue_guaranteed"]
+    assert "领域功能仍生效" in domain["effect"]
+
+
+def test_domain_auto_mimic_numeric_still_applies_without_relative_zero():
+    s = state(left="juejue", right="juejue", seed="auto-mimic-control")
+    ready(s["sides"][0])
+    chaos = _record(s["sides"][0], JUEJUE_VIRTUAL_MOVES[-1], 0)
+    s["sides"][1]["turn"].update(raw=0, effective=0, pending=0, done=True)
+    seed = _seed_for("1:domain:solo:0", (("hit", 8), ("simple-domain", 2)), "hit")
+    summary = resolve_round(s, seed)
+    mimic = summary["interactions"]["domain"]["auto_mimic"]
+    assert mimic["available"] and not mimic["numeric_suppressed"]
+    assert mimic["gain"] == mimic["raw_gain"] > 0
+    assert summary["before"][0]["weight"] == 5 + chaos["gain"] + mimic["gain"]
+
+
 def test_juejue_mimic_uses_frozen_non_juejue_numeric_pool_and_growth_once():
     s = state(level=5, left="juejue", right="gojo", seed="mimic")
     player = s["sides"][0]
@@ -641,14 +694,14 @@ def test_domain_clash_uses_scaled_integer_strengths(left, right, expected):
     assert summary["interactions"]["domain"]["weight_scale"] == 2
 
 
-def test_juejue_distinct_dual_domain_has_nine_strength_and_only_winning_clash_special():
+def test_juejue_distinct_dual_domain_has_eleven_strength_and_only_winning_clash_special():
     s = state(left="juejue", right="sukuna", seed="dual-domain")
     ready(s["sides"][0], 2)
     sand = _record(s["sides"][0], JUEJUE_TIME_MOVES[-1], 0)
     chaos = _record(s["sides"][0], JUEJUE_VIRTUAL_MOVES[-1], 0)
     ready(s["sides"][1])
     shrine = _record(s["sides"][1], FIGHTERS_BY_ID["sukuna"].moves[4], 1)
-    wheel = (("side-0", 9), ("side-1", 8), ("tie", 6))
+    wheel = (("side-0", 11), ("side-1", 8), ("tie", 6))
     seed = _seed_for("1:domain:clash", wheel, "side-0")
     summary = resolve_round(s, seed)
     domain = summary["interactions"]["domain"]

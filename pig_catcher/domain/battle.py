@@ -518,8 +518,7 @@ def move_weight_units(player: dict, move: Move) -> int:
     if "purple" in move.tags:
         units += int(player.get("purple_weight_steps", 0))
     if player.get("snapshot", {}).get("fighter_id") == "juejue" and "domain" in move.tags:
-        # 撅撅猪两个领域的基础出现权重各少0.5；实时演算对两者各+1。
-        units -= 5
+        # 两个领域在主招式盘的基础出现权重均为1；塑型、切盘和实时演算只叠加动态权重。
         if player.get("turn", {}).get("juejue_realtime"):
             units += 10
         if "juejue-sand-domain" in move.tags:
@@ -625,7 +624,7 @@ def _domain_strength(state: dict, side: int, events: list[dict]) -> tuple[int, b
     }
     dual_juejue = fighter_id == "juejue" and len(distinct_juejue) == 2
     if dual_juejue:
-        return 9, True
+        return 11, True
     if fighter_id == "juejue":
         return 5, False
     if fighter_id == "sukuna":
@@ -648,7 +647,7 @@ def _domain_resolution(state: dict, seed: str, cancelled: list[dict[int, dict]])
         strengths[side], dual_juejue[side] = _domain_strength(state, side, domains[side])
     if len(active) == 2:
         # 领域战以二倍整数保存半点：普通6、宿傩8、平手6；撅撅猪
-        # 单领域5，两个不同领域同回合齐出时9。宿傩镜像因此为8:8:6。
+        # 单领域5，两个不同领域同回合齐出时11。宿傩镜像因此为8:8:6。
         wheel = (("side-0", strengths[0]), ("side-1", strengths[1]), ("tie", 6))
         outcome, roll = choose(seed, f"{state['round']}:domain:clash", wheel, version=version)
         if outcome == "tie":
@@ -898,23 +897,43 @@ def _settle_interactions(state: dict, seed: str) -> dict:
             )
             music_gain = 5 if player["turn"].get("juejue_music") else 0
             direction = mimic.get("direction", "self")
-            applied_gain = numeric + music_gain if mimic["available"] and direction == "self" else 0
+            raw_gain = numeric + music_gain if mimic["available"] and direction == "self" else 0
+            raw_reduction = numeric + music_gain if mimic["available"] and direction == "opponent" else 0
+            numeric_suppressed = bool(mimic["available"] and target in protected_juejue_sides)
+            suppressed_reason = ""
+            if numeric_suppressed:
+                target_guard = zeroes[target]
+                suppressed_reason = (
+                    "相对静止·零"
+                    if target_guard["relative_zero"] and not target_guard["dual_domain"]
+                    else (
+                        "双领域·时空静止"
+                        if target_guard["dual_domain"] and not target_guard["relative_zero"]
+                        else "相对静止·零与双领域"
+                    )
+                )
+            applied_gain = 0 if numeric_suppressed else raw_gain
+            applied_reduction = 0 if numeric_suppressed else raw_reduction
             if applied_gain:
                 player["weight"] += applied_gain
-            if mimic["available"] and direction == "opponent":
-                extra_round_reduction[target] += numeric + music_gain
+            if applied_reduction:
+                extra_round_reduction[target] += applied_reduction
             auto_mimic = {
                 **mimic,
                 "training": int(player["snapshot"].get("level", 0)) if mimic["available"] else 0,
                 "core": int(player.get("core", 0)) if mimic["available"] else 0,
                 "heavy_penalty": int(bool(player.get("heavy"))) if mimic["available"] else 0,
                 "music_gain": music_gain if mimic["available"] else 0,
+                "raw_gain": raw_gain,
+                "raw_opponent_reduction": raw_reduction,
                 "gain": applied_gain,
-                "opponent_reduction": numeric + music_gain
-                if mimic["available"] and direction == "opponent"
-                else 0,
+                "opponent_reduction": applied_reduction,
+                "numeric_suppressed": numeric_suppressed,
+                "suppressed_reason": suppressed_reason,
             }
             domain_effects.append("乱序数虚时空命中：自动模仿、自己下回合+1招并保证下一次加速或时延成功")
+            if numeric_suppressed:
+                domain_effects.append(f"自动模仿数值被{suppressed_reason}清零，领域功能仍生效")
 
     if domain is not None:
         domain["effects"] = domain_effects

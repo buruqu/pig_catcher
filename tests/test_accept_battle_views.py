@@ -102,4 +102,14 @@ def test_juejue_dual_form_and_subwheels_have_a_deterministic_art_view() -> None:
         "时之沙 · 时延盘",
     ]
     text = result.text()
-    assert all(value in text for value in ("即时换盘", "相对静止时间·零", "虚拟模仿", "领域战使用权重抽取"))
+    assert all(value in text for value in ("即时换盘", "相对静止时间·零", "虚拟模仿", "主盘基础抽取权重为1"))
+    assert all(
+        value in text
+        for value in (
+            "单领域战权重2.5",
+            "双领域5.5",
+            "撤销本轮新伤势",
+            "之后每个招式固定+5",
+            "下一次加速与下一次时延成功率各+5个百分点",
+        )
+    )
