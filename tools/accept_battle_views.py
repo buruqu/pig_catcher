@@ -28,6 +28,9 @@ from pig_catcher.domain.battle import (  # noqa: E402
     resolve_round,
 )
 from pig_catcher.domain.battle_catalog import (  # noqa: E402
+    ASAMU_PIG_TEMPLATE_IDS,
+    DANIYA_FORM_DISILLUSION,
+    DANIYA_PIG_TEMPLATE_IDS,
     FIGHTERS_BY_ID,
     JUEJUE_FORM_TIME,
     JUEJUE_PIG_TEMPLATE_IDS,
@@ -86,11 +89,12 @@ def _record_move(state: dict, side: int, move_id: str) -> dict:
 
     player = state["sides"][side]
     fighter_id = player["snapshot"]["fighter_id"]
-    moves = (
-        fighter_form_moves(fighter_id, player["juejue_form"])
-        if fighter_id == "juejue"
-        else FIGHTERS_BY_ID[fighter_id].moves
-    )
+    if fighter_id == "juejue":
+        moves = fighter_form_moves(fighter_id, player["juejue_form"])
+    elif fighter_id == "daniya":
+        moves = fighter_form_moves(fighter_id, player["daniya_form"])
+    else:
+        moves = FIGHTERS_BY_ID[fighter_id].moves
     move_index = next(index for index, move in enumerate(moves) if move.move_id == move_id)
     wheel_units = [move_weight_units(player, move) for move in moves]
     event = apply_move(
@@ -113,6 +117,29 @@ def _record_move(state: dict, side: int, move_id: str) -> dict:
     return event
 
 
+def _fighter_snapshot(entry: dict, fighter_id: str, short_code: str) -> dict:
+    """Build a public battle snapshot from one imported, formally catalogued pig."""
+
+    return {
+        "player_id": f"fixture-{fighter_id}",
+        "player_name": "泡泡舞台的群友" if fighter_id == "daniya" else "红茶耐压的群友",
+        "pig_instance_id": f"fixture-pig-{fighter_id}",
+        "fighter_id": fighter_id,
+        "template_id": entry["template_id"],
+        "name": entry["display_name"],
+        "short_code": short_code,
+        "rarity": int(entry["rarity"]),
+        "image_relpath": entry["image"],
+        "display_tags": tuple(entry.get("display_tags", ())),
+        "size_value": 66.6 if fighter_id == "daniya" else 88.8,
+        "weight_value": 166.6 if fighter_id == "daniya" else 288.8,
+        "favorite": True,
+        "level": 5,
+        "tool_id": "",
+        "trait_bonus": 0,
+    }
+
+
 def _events(state: dict) -> list[dict]:
     return [deepcopy(event) for side in state["sides"] for event in side["turn"]["events"]]
 
@@ -133,12 +160,27 @@ def _resolve_fixed(prepared: dict, slug: str, *, domain_outcome: str | None = No
     raise AssertionError(f"无法为离线对战样张找到固定结果：{slug}/{domain_outcome}")
 
 
+def _resolve_matching(prepared: dict, slug: str, predicate) -> tuple[dict, dict, str]:
+    """Find a reproducible non-terminal result satisfying one mechanic predicate."""
+
+    for index in range(20_000):
+        seed = f"battle-visual-{slug}-{index}"
+        state = deepcopy(prepared)
+        result = resolve_round(state, seed)
+        if result is None or result["natural_end"] or not predicate(result):
+            continue
+        return state, result, seed
+    raise AssertionError(f"无法为离线对战样张找到指定机制结果：{slug}")
+
+
 def deterministic_mechanic_cases(
     initial_state: dict,
     initial_match: dict,
     identity: CommandIdentity,
     now_ms: int,
     juejue_entry: dict,
+    daniya_entry: dict,
+    asamu_entry: dict,
 ) -> tuple[list[tuple[str, object]], dict]:
     """Build explicit rule cards so visual acceptance never depends on a lucky ordinary fight."""
 
@@ -380,6 +422,266 @@ def deterministic_mechanic_cases(
         "acceleration_tier": acceleration["subwheel"]["tier"],
         "acceleration_success": acceleration["subwheel"]["success"],
     }
+
+    daniya_snapshot = _fighter_snapshot(daniya_entry, "daniya", "DANIYA")
+    asamu_snapshot = _fighter_snapshot(asamu_entry, "asamu", "ASAMU")
+    v5_state = new_state(
+        [deepcopy(daniya_snapshot), deepcopy(asamu_snapshot)],
+        seed="battle-visual-daniya-asamu-entry",
+    )
+    v5_match = {**initial_match, "battle_id": "BTV5DANIYAASAMU", "definition_version": 5}
+    name = "13j-daniya-asamu-formal-art"
+    cases.append(
+        (
+            name,
+            matchup(
+                identity,
+                {**v5_match, "status": "active"},
+                v5_state,
+                now_ms,
+                title="Battle v5 · 达妮娅猪与阿萨姆猪",
+                banner="正式素材离线验收：达妮娅猪以布景形态入场，阿萨姆猪携动态招式盘入场。",
+            ),
+        )
+    )
+    evidence[name] = {
+        "fighters": [
+            {
+                "fighter_id": side["snapshot"]["fighter_id"],
+                "template_id": side["snapshot"]["template_id"],
+                "image_relpath": side["snapshot"]["image_relpath"],
+            }
+            for side in v5_state["sides"]
+        ],
+        "daniya_initial_form": v5_state["sides"][0]["daniya_form"],
+    }
+
+    prepared = deepcopy(v5_state)
+    _ready(prepared["sides"][0], 3)
+    staging_a = _record_move(prepared, 0, "daniya-staging-dream-feast")
+    staging_b = _record_move(prepared, 0, "daniya-staging-mimic-bubble")
+    daniya_domain = _record_move(prepared, 0, "daniya-domain")
+    _ready(prepared["sides"][1])
+    _record_move(prepared, 1, "asamu-domain")
+    state, result, seed = _resolve_fixed(prepared, "daniya-domain-transition", domain_outcome="side-0")
+    transition = result["interactions"]["daniya_transition"]
+    assert transition and transition["after"] == DANIYA_FORM_DISILLUSION
+    name = "13k-daniya-domain-transition"
+    cases.append(
+        (
+            name,
+            matchup(
+                identity,
+                {**v5_match, "status": state["status"]},
+                state,
+                now_ms,
+                title="达妮娅猪 · 布景蓄势与蚀域转幕",
+                banner="两次布景令蚀域主盘从1提升至1.2；蚀域抽中后清零，真实领域战获胜即切换幻灭并使下回合+1招。",
+                events=_events(prepared),
+                round_result=result,
+            ),
+        )
+    )
+    evidence[name] = {
+        "seed": seed,
+        "staging_steps": [
+            staging_a["daniya_domain_steps_after"],
+            staging_b["daniya_domain_steps_after"],
+        ],
+        "domain_draw_weight_units": daniya_domain["draw_wheel_units"][-1],
+        "domain_steps_after_draw": daniya_domain["daniya_domain_steps_after"],
+        "domain_wheel": result["interactions"]["domain"]["wheel"],
+        "transition": transition,
+        "next_round_form": state["sides"][0]["daniya_form"],
+        "next_action_bonus": state["sides"][0]["next_action_bonus"],
+    }
+
+    prepared = deepcopy(v5_state)
+    prepared["sides"][0]["daniya_form"] = DANIYA_FORM_DISILLUSION
+    _ready(prepared["sides"][0])
+    loan = _record_move(prepared, 0, "daniya-unfinished-lie")
+    disillusion = _record_move(prepared, 0, "daniya-disillusion-final-curtain")
+    _ready(prepared["sides"][1])
+    pressure = _record_move(prepared, 1, "asamu-pressure-king")
+
+    def pressure_invalidates_disillusion(result: dict) -> bool:
+        return any(
+            check["hit"]
+            and check["source_ordinal"] == pressure["ordinal"]
+            and check["target_ordinal"] == disillusion["ordinal"]
+            for check in result["interactions"]["pressure_checks"]
+        )
+
+    state, result, seed = _resolve_matching(
+        prepared,
+        "unified-numeric-invalidation",
+        pressure_invalidates_disillusion,
+    )
+    adjustment = next(
+        row
+        for row in result["interactions"]["adjustments"][0]
+        if row["ordinal"] == disillusion["ordinal"]
+    )
+    cross_effect = next(
+        row
+        for row in result["interactions"]["cross_effects"]
+        if row["source_side"] == 0 and row["source_ordinal"] == disillusion["ordinal"]
+    )
+    assert adjustment["gain"] == disillusion["gain"]
+    assert cross_effect["round_reduction"] == disillusion["opponent_reduction"]
+    name = "13l-unified-numeric-invalidation"
+    cases.append(
+        (
+            name,
+            matchup(
+                identity,
+                {**v5_match, "status": state["status"]},
+                state,
+                now_ms,
+                title="统一失效 · 数值归零而功能保留",
+                banner="未竟的谎言令下一招双倍；传奇耐压王命中后只把该招自身胜率归零，对方减权、幻灭力竭加成与贷款跨回合效果照常结算。",
+                events=_events(prepared),
+                round_result=result,
+            ),
+        )
+    )
+    evidence[name] = {
+        "seed": seed,
+        "loan_gain": loan["gain"],
+        "loan_next_debt": loan["next_debt"],
+        "doubled_own_gain_before_invalidation": disillusion["gain"],
+        "doubled_opponent_reduction_preserved": disillusion["opponent_reduction"],
+        "cancelled_own_gain": adjustment["gain"],
+        "invalidation_reasons": adjustment["reasons"],
+        "permanent_opponent_exhaust_bonus_units": cross_effect["exhaust_bonus_units"],
+    }
+
+    prepared = deepcopy(v5_state)
+    prepared["sides"][0].update(weight=100, round_start_weight=100)
+    _ready(prepared["sides"][0])
+    collapse = _record_move(prepared, 0, "daniya-timed-collapse")
+    _ready(prepared["sides"][1])
+    _record_move(prepared, 1, "asamu-charge-up")
+    state, result, seed = _resolve_matching(
+        prepared,
+        "daniya-collapse-rebound",
+        lambda current: current["loser"] == 1,
+    )
+    assert result["injury_modifiers"]["current_collapse_multiplier"] == 5
+    name = "13m-daniya-collapse-rebound"
+    cases.append(
+        (
+            name,
+            matchup(
+                identity,
+                {**v5_match, "status": state["status"]},
+                state,
+                now_ms,
+                title="达妮娅猪 · 计时的溃灭",
+                banner="自身先承受-52.1；本回合把对方力竭盘乘5。若对方仍未倒下，反噬会在达妮娅下一回合仅生效一次。",
+                events=_events(prepared),
+                round_result=result,
+            ),
+        )
+    )
+    evidence[name] = {
+        "seed": seed,
+        "move_gain": collapse["gain"],
+        "injury_wheel": result["injury_wheel"],
+        "injury_modifiers": result["injury_modifiers"],
+        "injury": result["injury"],
+        "collapse_rebounds": result["collapse_rebounds"],
+        "daniya_rebound_round": state["sides"][0]["next_exhaust_multiplier_round"],
+        "daniya_rebound_multiplier": state["sides"][0]["next_exhaust_multiplier"],
+    }
+
+    prepared = deepcopy(v5_state)
+    _ready(prepared["sides"][0])
+    _record_move(prepared, 0, "daniya-staging-final-curtain")
+    _ready(prepared["sides"][1], 4)
+    bathe = _record_move(prepared, 1, "asamu-bathe")
+    tea = _record_move(prepared, 1, "asamu-milk-tea")
+    sleep = _record_move(prepared, 1, "asamu-sleep")
+    prime = _record_move(prepared, 1, "asamu-prime")
+    pressure = _record_move(prepared, 1, "asamu-pressure-king")
+
+    def pressure_hits_staging(result: dict) -> bool:
+        return any(
+            check["hit"] and check["target_side"] == 0 and check["target_ordinal"] == 1
+            for check in result["interactions"]["pressure_checks"]
+        )
+
+    state, result, seed = _resolve_matching(prepared, "asamu-dynamic-chain", pressure_hits_staging)
+    name = "13n-asamu-dynamic-chain"
+    cases.append(
+        (
+            name,
+            matchup(
+                identity,
+                {**v5_match, "status": state["status"]},
+                state,
+                now_ms,
+                title="阿萨姆猪 · 动态招式盘与耐压王",
+                banner="洗澡→喝奶茶→睡觉逐段改变下一招抽取权重；全盛姿态再抽一次，耐压王则对对方数值招式独立做33%失效判定。",
+                events=_events(prepared),
+                round_result=result,
+            ),
+        )
+    )
+    evidence[name] = {
+        "seed": seed,
+        "tea_weight_after_bathe": tea["draw_wheel_units"][1],
+        "sleep_weight_after_tea": sleep["draw_wheel_units"][2],
+        "prime_weight_after_sleep": prime["draw_wheel_units"][3],
+        "prime_extra_draws": prime["extra_draws"],
+        "bathe_bonus_after": bathe["asamu_tea_bonus_after"],
+        "tea_resets_own_weight": tea["asamu_tea_bonus_after"],
+        "sleep_resets_own_weight": sleep["asamu_sleep_bonus_after"],
+        "pressure_source_ordinal": pressure["ordinal"],
+        "pressure_checks": result["interactions"]["pressure_checks"],
+    }
+
+    prepared = deepcopy(v5_state)
+    _ready(prepared["sides"][0])
+    _record_move(prepared, 0, "daniya-domain")
+    _ready(prepared["sides"][1])
+    _record_move(prepared, 1, "asamu-domain")
+    state, result, seed = _resolve_fixed(prepared, "asamu-domain-copies", domain_outcome="side-1")
+    copies = result["interactions"]["asamu_domain_copies"]
+    assert len(copies) == 4
+    name = "13o-asamu-domain-copies"
+    cases.append(
+        (
+            name,
+            matchup(
+                identity,
+                {**v5_match, "status": state["status"]},
+                state,
+                now_ms,
+                title="阿萨姆猪 · 奶茶领域夺取四招",
+                banner="领域战获胜后严格复制对方四个随机招式；复制到领域只保留招式本身，不递归开启第二场领域战。",
+                events=_events(prepared) + [deepcopy(event) for event in copies],
+                round_result=result,
+            ),
+        )
+    )
+    evidence[name] = {
+        "seed": seed,
+        "domain_wheel": result["interactions"]["domain"]["wheel"],
+        "domain_outcome": result["interactions"]["domain"]["outcome"],
+        "copy_count": len(copies),
+        "copies": [
+            {
+                "slot": event["copy_slot"],
+                "source_move_id": event["source_move_id"],
+                "source_move_name": event["source_move_name"],
+                "domain_reentry_suppressed": event["domain_reentry_suppressed"],
+                "gain": event["gain"],
+                "opponent_reduction": event["opponent_reduction"],
+            }
+            for event in copies
+        ],
+    }
     return cases, evidence
 
 
@@ -398,11 +700,40 @@ async def scenarios(output: Path):
         for entry in catalog["entries"]
         if entry.get("template_id") == juejue_entry["paired_food_template_id"]
     )
+    daniya_entry = next(
+        entry
+        for entry in catalog["entries"]
+        if entry.get("template_id") == DANIYA_PIG_TEMPLATE_IDS[0]
+    )
+    daniya_food_entry = next(
+        entry
+        for entry in catalog["entries"]
+        if entry.get("template_id") == daniya_entry["paired_food_template_id"]
+    )
+    asamu_entry = next(
+        entry
+        for entry in catalog["entries"]
+        if entry.get("template_id") == ASAMU_PIG_TEMPLATE_IDS[0]
+    )
+    asamu_food_entry = next(
+        entry
+        for entry in catalog["entries"]
+        if entry.get("template_id") == asamu_entry["paired_food_template_id"]
+    )
     ids = {fighter.template_id for fighter in public_fighters}
     for star in range(1, 6):
         ids.add(next(entry["template_id"] for entry in public if entry["rarity"] == star))
     entries = [entry for entry in public if entry["template_id"] in ids]
-    entries.extend((juejue_entry, juejue_food_entry))
+    entries.extend(
+        (
+            juejue_entry,
+            juejue_food_entry,
+            daniya_entry,
+            daniya_food_entry,
+            asamu_entry,
+            asamu_food_entry,
+        )
+    )
     if not all(fighter.template_id in {entry["template_id"] for entry in entries} for fighter in public_fighters):
         raise ValueError("缺少两只已确认的公共战斗猪立绘。")
     source = output / "inputs"
@@ -430,6 +761,15 @@ async def scenarios(output: Path):
         if stored_juejue is None:
             raise ValueError("离线验收库缺少撅撅猪正式立绘。")
         juejue_render_entry = {**juejue_entry, "image": stored_juejue[0]}
+        stored_v5 = {}
+        for fighter_id, entry in (("daniya", daniya_entry), ("asamu", asamu_entry)):
+            stored = await db.fetch_one(
+                "SELECT image_relpath FROM pig_templates WHERE template_id=?",
+                (entry["template_id"],),
+            )
+            if stored is None:
+                raise ValueError(f"离线验收库缺少{entry['display_name']}正式立绘。")
+            stored_v5[fighter_id] = {**entry, "image": stored[0]}
         a = CommandIdentity(
             ScopeKey("qq-official", "battle-fixture"),
             "fixture-stream",
@@ -461,6 +801,8 @@ async def scenarios(output: Path):
         cases.append(("08-sukuna-wheel", (await w.send("轮盘 宿傩猪")).view))
         cases.append(("09-gojo-wheel", (await w.send("轮盘 五条猪")).view))
         cases.append(("09b-juejue-dual-form-wheel", wheels(a, "juejue")))
+        cases.append(("09c-daniya-dual-form-wheel", wheels(a, "daniya", level=5)))
+        cases.append(("09d-asamu-dynamic-wheel", wheels(a, "asamu", level=5)))
         cases.append(("10-invitation", (await w.invite()).view))
         cases.append(("11-entry", (await w.send("接受", "challenge", actor=b)).view))
         initial_match = await w.match()
@@ -491,6 +833,8 @@ async def scenarios(output: Path):
             a,
             timestamp_ms(NOW),
             juejue_render_entry,
+            stored_v5["daniya"],
+            stored_v5["asamu"],
         )
         cases.extend(mechanic_cases)
         finished = await w.fight(already_started=True)
@@ -529,7 +873,7 @@ async def scenarios(output: Path):
                 ),
             )
         )
-        long_view = cases[10][1]
+        long_view = next(result for case_name, result in cases if case_name == "10-invitation")
         cases.append(
             (
                 "23-long-names",
@@ -591,16 +935,34 @@ async def run(args):
         finally:
             await capability.close()
             await browser.close()
-    failures = [row for row in capability.diagnostics if row["clippedText"] or row["outside"] or row["brokenImages"]]
+    failures = [
+        row
+        for row in capability.diagnostics
+        if row["clippedText"] or row["outside"] or row["brokenImages"] or row.get("clippedMedia")
+    ]
     report = {
         "status": "failed" if failures else "passed",
         "count": len(outputs),
         "diagnostics": capability.diagnostics,
         "failures": failures,
         "deterministic_mechanics": mechanic_evidence,
+        "battle_v5_visual_coverage": (
+            "达妮娅猪与阿萨姆猪正式立绘",
+            "达妮娅布景/幻灭双形态轮盘",
+            "阿萨姆动态抽取权重轮盘",
+            "蚀域蓄势、领域切形态与下回合加招",
+            "未竟的谎言与统一数值失效",
+            "计时的溃灭与力竭反噬",
+            "洗澡/喝奶茶/睡觉/全盛姿态连锁",
+            "传奇耐压王独立失效判定",
+            "阿萨姆领域胜利复制四招",
+        ),
         "scope": "isolated offline data and public art; no production or QQ connection",
     }
-    (output / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    (output / "report.json").write_text(
+        json.dumps(report, ensure_ascii=False, indent=2, default=str),
+        encoding="utf-8",
+    )
     contact_sheet(outputs, output / "contact-sheet.jpg")
     if failures:
         raise RuntimeError(json.dumps(failures, ensure_ascii=False, indent=2))

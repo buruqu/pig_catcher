@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import asyncio
 import sqlite3
+from copy import deepcopy
 from dataclasses import dataclass, replace
 from datetime import timedelta
+from fractions import Fraction
 from pathlib import Path
 from uuid import uuid4
 
@@ -13,8 +15,15 @@ import pytest
 
 from pig_catcher.commands.battle import BattleRequest, parse_battle_request
 from pig_catcher.config.model import CatchingSection
-from pig_catcher.domain.battle import dumps, loads
-from pig_catcher.domain.battle_catalog import ACTION_TTL_MS, BattleError
+from pig_catcher.domain.battle import apply_move, dumps, loads
+from pig_catcher.domain.battle_catalog import (
+    ACTION_TTL_MS,
+    ASAMU_MOVES,
+    ASAMU_PIG_TEMPLATE_IDS,
+    DANIYA_PIG_TEMPLATE_IDS,
+    FIGHTERS_BY_ID,
+    BattleError,
+)
 from pig_catcher.domain.dispatch import MATERIAL_SCALE
 from pig_catcher.domain.errors import (
     AssetStateConflictError,
@@ -129,6 +138,8 @@ async def world(tmp_path: Path):
         [
             _pig_entry(SUKUNA_PIG_TEMPLATE_ID, rarity=5, display_name="宿傩猪"),
             _pig_entry(GOJO_PIG_TEMPLATE_ID, rarity=5, display_name="五条猪"),
+            _pig_entry(ASAMU_PIG_TEMPLATE_IDS[0], rarity=5, display_name="阿萨姆猪"),
+            _pig_entry(DANIYA_PIG_TEMPLATE_IDS[0], rarity=5, display_name="达妮娅猪"),
         ]
     )
     db = await _database_with_catalog(tmp_path, [*entries, _food_entry(5)])
@@ -136,6 +147,8 @@ async def world(tmp_path: Path):
     b = replace(a, user_id="201", display_name="应战者")
     for person, template in ((a, SUKUNA_PIG_TEMPLATE_ID), (b, GOJO_PIG_TEMPLATE_ID)):
         await seed_pigs(db, person, template_id=template, count=2)
+    await seed_pigs(db, a, template_id=ASAMU_PIG_TEMPLATE_IDS[0], count=1)
+    await seed_pigs(db, b, template_id=DANIYA_PIG_TEMPLATE_IDS[0], count=1)
     clock = MutableClock(NOW)
     w = BattleWorld(
         db,
@@ -240,6 +253,71 @@ async def test_round_settles_after_both_moves_and_shows_every_action_for_both_fi
     assert [len(fighter.action_lines) for fighter in settled.view.fighters] == [row[1] for row in stored_moves]
     assert len(await world.db.fetch_all("SELECT * FROM battle_rounds")) == 1
     assert (await world.db.fetch_one("SELECT COUNT(*) FROM activity_facts WHERE subevent_id LIKE 'ready:%'"))[0] == 0
+
+
+async def test_asamu_domain_copies_persist_four_moves_and_facts_with_exact_fraction(world):
+    await world.assign(world.a, "阿萨姆猪")
+    await world.assign(world.b, "达妮娅猪")
+    await world.start()
+    match = await world.match()
+    state = loads(match["state_json"])
+    assert [side["snapshot"]["fighter_id"] for side in state["sides"]] == ["asamu", "daniya"]
+
+    # 该种子使阿萨姆在真实领域对抗中胜出，且四个复制位包含达妮娅的 -52.1 招式。
+    seed = "service-asamu-copy-3"
+    for side, move in ((0, ASAMU_MOVES[-1]), (1, FIGHTERS_BY_ID["daniya"].moves[-1])):
+        player = state["sides"][side]
+        player["turn"].update(raw=1, effective=1, pending=1, done=False)
+        event = apply_move(
+            player,
+            move,
+            seed=seed,
+            round_number=state["round"],
+            side=side,
+            version=state["version"],
+        )
+        event.update(round=state["round"], side=side, fighter_id=player["snapshot"]["fighter_id"])
+        player["turn"]["events"].append(deepcopy(event))
+        player["turn"]["done"] = True
+
+    async with world.db.transaction() as session:
+        await session.execute(
+            "UPDATE battle_matches SET random_seed=?,state_json=? WHERE battle_id=?",
+            (seed, dumps(state), match["battle_id"]),
+        )
+
+    result = await world.send(section="move", actor=world.a, mid="asamu-domain-copy-persistence")
+    assert result.view.title == "双方出招 · 回合结算"
+
+    move_rows = await world.db.fetch_all(
+        "SELECT event_json FROM battle_moves WHERE battle_id=? AND round_number=1 ORDER BY ordinal",
+        (match["battle_id"],),
+    )
+    stored_moves = [loads(row["event_json"]) for row in move_rows]
+    assert len(stored_moves) == 4
+    assert [event["copy_slot"] for event in stored_moves] == [1, 2, 3, 4]
+    assert all(event["generated_by"] == "asamu-domain-copy" for event in stored_moves)
+
+    fact_rows = await world.db.fetch_all(
+        """SELECT player_id,payload_json FROM activity_facts
+        WHERE source_type='battle' AND source_id=? AND subevent_id LIKE 'move:1:%'
+        ORDER BY subevent_id""",
+        (match["battle_id"],),
+    )
+    stored_facts = [loads(row["payload_json"]) for row in fact_rows]
+    assert len(stored_facts) == 4
+    assert all(row["player_id"] == world.a.player_id for row in fact_rows)
+    assert stored_facts == stored_moves
+
+    collapse = next(event for event in stored_moves if event["source_move_id"] == "daniya-timed-collapse")
+    assert collapse["gain"] == Fraction(-521, 10)
+    assert type(collapse["gain"]) is Fraction
+    raw_collapse = next(
+        row["event_json"]
+        for row, event in zip(move_rows, stored_moves, strict=True)
+        if event["source_move_id"] == "daniya-timed-collapse"
+    )
+    assert '"$battle-fraction":["-0x209","0xa"]' in raw_collapse
 
 
 async def test_legacy_both_done_state_settles_on_next_move_without_reroll(world):

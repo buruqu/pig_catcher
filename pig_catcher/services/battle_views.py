@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+from fractions import Fraction
+
 from ..domain.battle import weight_label
 from ..domain.battle_catalog import (
     COUNT_WHEEL,
+    DANIYA_FORM_DISILLUSION,
+    DANIYA_FORM_STAGING,
     FIGHTERS_BY_ID,
     HEAVY_COUNT_WHEEL,
     INJURY_NAMES,
@@ -19,6 +23,7 @@ from ..domain.battle_catalog import (
     MATERIAL_IDS,
     MOVE_WEIGHT_SCALE,
     TOOLS_BY_ID,
+    VICTORY_WEIGHT_SCALE,
     fighter_form_moves,
     fighter_moves,
 )
@@ -44,6 +49,15 @@ JUEJUE_FORM_NAMES = {
     JUEJUE_FORM_TIME: "时之沙",
     JUEJUE_FORM_VIRTUAL: "虚拟声",
 }
+
+DANIYA_FORM_NAMES = {
+    DANIYA_FORM_STAGING: "布景",
+    DANIYA_FORM_DISILLUSION: "幻灭",
+}
+
+# 塑型、苍赫和布景招式在状态里按“十分之一抽取权重”保存；
+# 它们不是 MOVE_WEIGHT_SCALE=1000 的原始轮盘单位，展示时必须单独换算。
+DYNAMIC_DRAW_STEP_SCALE = 10
 
 
 def _required(record: dict, keys: tuple[str, ...], label: str) -> None:
@@ -93,7 +107,7 @@ def _mimic_fact(mimic: dict, *, label: str = "虚拟模仿") -> str:
     direction = "自身增加" if mimic["direction"] == "self" else "对手减少"
     return (
         f"{label}：{band}抽中“{mimic['source_name']}”，"
-        f"{direction}{weight_label(abs(int(mimic['base'])))}"
+        f"{direction}{weight_label(abs(Fraction(mimic['base'])))}"
     )
 
 
@@ -121,17 +135,43 @@ def view(identity: CommandIdentity, title: str, **kwargs) -> BattleView:
     return BattleView(title=title, player_name=safe_display_name(identity.display_name, identity.user_id), **kwargs)
 
 
-def _scaled_weight(value: int, scale: int) -> int | float:
-    return value // scale if value % scale == 0 else value / scale
+def _scaled_weight(value, scale: int) -> int | float:
+    """将精确权重转为轮盘组件可序列化的数值；文字仍使用weight_label保真。"""
+    exact = Fraction(value, scale)
+    return int(exact) if exact.denominator == 1 else float(exact)
 
 
-def effective_total_after(event: dict, adjustments: dict[int, dict], domain_bonus: dict | None = None) -> int:
+def _signed_weight(value) -> str:
+    exact = Fraction(value)
+    return ("+" if exact > 0 else "") + weight_label(exact)
+
+
+def _percent(value, total) -> str:
+    denominator = Fraction(total)
+    if denominator <= 0:
+        return "0.00%"
+    return f"{float(Fraction(value) * 100 / denominator):.2f}%"
+
+
+def _fighter_form_name(fighter_id: str, form_id: str) -> str:
+    if fighter_id == "juejue":
+        return _form_name(form_id)
+    if fighter_id == "daniya":
+        try:
+            return DANIYA_FORM_NAMES[form_id]
+        except KeyError as exc:
+            raise ValueError(f"未知达妮娅猪形态：{form_id}") from exc
+    return form_id
+
+
+def effective_total_after(event: dict, adjustments: dict[int, dict], domain_bonus: dict | None = None):
     ordinal = int(event["ordinal"])
-    total = int(event["total"]) - sum(
-        int(item["gain"]) for cancelled_ordinal, item in adjustments.items() if cancelled_ordinal <= ordinal
+    total = Fraction(event["total"]) - sum(
+        (Fraction(item["gain"]) for cancelled_ordinal, item in adjustments.items() if cancelled_ordinal <= ordinal),
+        Fraction(0),
     )
     if domain_bonus and int(domain_bonus.get("ordinal") or 0) <= ordinal:
-        total += int(domain_bonus.get("gain") or 0)
+        total += Fraction(domain_bonus.get("gain") or 0)
     return total
 
 
@@ -174,21 +214,21 @@ def _juejue_event_line(
     )
     form_before = _form_name(str(event["form_before"]))
     form_after = _form_name(str(event["form_after"]))
-    gain = int(event["gain"])
+    gain = Fraction(event["gain"])
     value = (
         f"+{weight_label(gain)} → 累计{weight_label(shown_total)}"
         if gain > 0
         else f"功能结算 → 累计{weight_label(shown_total)}"
     )
     note_parts = [f"来源盘：{form_before}"]
-    special_base = int(event["special_base"])
+    special_base = Fraction(event["special_base"])
     if special_base:
         note_parts.append(
             f"本次数值基底{special_base}，强化+{event['training']}，核心+{weight_label(event['core'])}，"
             f"伤势-{event['penalty']}，倍率×{event['multiplier']}"
         )
-    if int(event["music_gain"]):
-        note_parts.append(f"虚拟声音乐状态额外+{weight_label(int(event['music_gain']))}")
+    if Fraction(event["music_gain"]):
+        note_parts.append(f"虚拟声音乐状态额外+{weight_label(event['music_gain'])}")
     subwheel = event["subwheel"]
     if subwheel is not None:
         _required(
@@ -229,7 +269,7 @@ def _juejue_event_line(
         if relative_zero["checked"]:
             note_parts.append(
                 "相对静止时间·零判定成功：自身额外+"
-                + weight_label(int(relative_zero["gain"]))
+                + weight_label(relative_zero["gain"])
                 + "，对方本回合招式无效"
                 if relative_zero["success"]
                 else "相对静止时间·零判定失败"
@@ -240,7 +280,8 @@ def _juejue_event_line(
         note_parts.append(f"下一次加速/时延成功率加成累计至+{event['sculpt_bonus_after']}%")
     if int(event["sand_domain_steps_after"]) > int(event["sand_domain_steps_before"]):
         note_parts.append(
-            f"领域·荒时之沙出现权重累计+{int(event['sand_domain_steps_after']) / 10:.1f}"
+            f"领域·荒时之沙出现权重累计+"
+            f"{_scaled_weight(event['sand_domain_steps_after'], DYNAMIC_DRAW_STEP_SCALE)}"
         )
     if int(event["realization_stacks_after"]) > int(event["realization_stacks_before"]):
         note_parts.append(f"化虚为实累计至{event['realization_stacks_after']}层")
@@ -254,8 +295,8 @@ def _juejue_event_line(
         note_parts.append("沙之形体已展开：回合末将对方第一招有效数值减半")
     if event["rewind_active"]:
         note_parts.append("回溯已挂起：本回合失败时可撤销新抽到的轻伤或重伤")
-    if int(event["opponent_reduction"]):
-        note_parts.append(f"请求削减对方本回合权重{weight_label(int(event['opponent_reduction']))}")
+    if Fraction(event["opponent_reduction"]):
+        note_parts.append(f"请求削减对方本回合权重{weight_label(event['opponent_reduction'])}")
     if int(event["opponent_next_debt"]):
         note_parts.append(f"请求令对方下回合出招数-{event['opponent_next_debt']}")
     if int(event["opponent_next_bonus"]):
@@ -263,8 +304,8 @@ def _juejue_event_line(
     if event.get("extra_draws"):
         note_parts.append(f"本回合再抽{event['extra_draws']}次")
     if adjustment:
-        deducted = int(adjustment["gain"])
-        original = int(event["gain"])
+        deducted = Fraction(adjustment["gain"])
+        original = Fraction(event["gain"])
         value = (
             f"原+{weight_label(original)} · 结算归零 → 累计{weight_label(shown_total)}"
             if deducted >= original
@@ -280,7 +321,7 @@ def _juejue_event_line(
             else "本招"
         )
         note_parts.append(
-            f"领域判定胜出，{target}额外+{weight_label(int(domain_bonus['gain']))}（已提交结算事实）"
+            f"领域判定胜出，{target}额外+{weight_label(domain_bonus['gain'])}（已提交结算事实）"
         )
     if event["tool_used"]:
         note_parts.append(f"{TOOLS_BY_ID[event['tool_used']].name}已消耗")
@@ -291,10 +332,10 @@ def move_line(
     event: dict,
     adjustment: dict | None = None,
     *,
-    effective_total: int | None = None,
+    effective_total=None,
     domain_bonus: dict | None = None,
 ) -> Line:
-    shown_total = int(event["total"]) if effective_total is None else effective_total
+    shown_total = Fraction(event["total"]) if effective_total is None else Fraction(effective_total)
     if event.get("fighter_id") == "juejue":
         return _juejue_event_line(
             event,
@@ -302,16 +343,20 @@ def move_line(
             shown_total=shown_total,
             domain_bonus=domain_bonus,
         )
-    if event["base"] > 0:
+    numeric_base = bool(event.get("numeric_base", event.get("base", 0)))
+    special_base = Fraction(event.get("special_base", event.get("base", 0)))
+    gain = Fraction(event.get("gain", 0))
+    opponent_reduction = Fraction(event.get("opponent_reduction", 0))
+    if numeric_base:
         note = (
-            f"({event['base']} + 强化{event['training']} + 核心{weight_label(event['core'])} "
+            f"({_signed_weight(special_base)} + 强化{event['training']} + 核心{weight_label(event['core'])} "
             f"- 伤势{event['penalty']}) ×{event['multiplier']}"
         )
         if event.get("black_flash_bonus", 0):
             note += f"，黑闪领悟+{event['black_flash_bonus']}（不翻倍）"
         if event["trait_gain"] or event["tool_gain"]:
             note += f"，个体+{event['trait_gain']} / 器具+{event['tool_gain']}（不翻倍）"
-        value = f"+{weight_label(event['gain'])} → 累计{weight_label(shown_total)}"
+        value = f"{_signed_weight(gain)} → 累计{weight_label(shown_total)}"
     else:
         value = (
             f"黑闪领悟+{weight_label(event['black_flash_bonus'])} → 累计{weight_label(shown_total)}"
@@ -319,6 +364,51 @@ def move_line(
             else f"再抽{event['extra_draws']}次"
         )
         note = "功能招式不加战斗强化；待用×2保留" if event["double_pending"] else "功能招式不加战斗强化"
+    fighter_id = event.get("fighter_id")
+    if fighter_id == "daniya":
+        form = _fighter_form_name("daniya", str(event.get("form_before", DANIYA_FORM_STAGING)))
+        note += f"；来源形态：{form}"
+        if opponent_reduction:
+            note += f"；同时令对方本回合-{weight_label(opponent_reduction)}"
+        if "daniya-staging" in event.get("tags", ()):
+            note += (
+                f"；蚀域抽取加权 "
+                f"{_scaled_weight(event.get('daniya_domain_steps_before', 0), DYNAMIC_DRAW_STEP_SCALE)}"
+                f" → {_scaled_weight(event.get('daniya_domain_steps_after', 0), DYNAMIC_DRAW_STEP_SCALE)}"
+            )
+        if "daniya-disillusion" in event.get("tags", ()):
+            exhaust_bonus = _scaled_weight(event.get("opponent_exhaust_bonus_units", 0), INJURY_WEIGHT_SCALE)
+            note += f"；对方力竭盘永久+{exhaust_bonus}"
+        if "daniya-timed-collapse" in event.get("tags", ()):
+            note += "；对方本回合力竭权重×5；若未力竭，自己下回合力竭权重×5"
+        if "daniya-domain" in event.get("tags", ()):
+            note += "；领域胜利后切换幻灭形态，自己下回合出招数+1"
+    elif fighter_id == "asamu":
+        if event.get("forced"):
+            note += f"；奶龙覆盖：原本将抽中“{event.get('original_move_name') or '未知招式'}”"
+        if event.get("asamu_big_stacks_after") != event.get("asamu_big_stacks_before"):
+            note += f"；憋大层数 {event.get('asamu_big_stacks_before', 0)} → {event.get('asamu_big_stacks_after', 0)}"
+        dynamic = (
+            ("喝奶茶", "asamu_tea_bonus_before", "asamu_tea_bonus_after"),
+            ("睡觉", "asamu_sleep_bonus_before", "asamu_sleep_bonus_after"),
+            ("全盛姿态", "asamu_prime_bonus_before", "asamu_prime_bonus_after"),
+        )
+        for label, before_key, after_key in dynamic:
+            before, after = event.get(before_key), event.get(after_key)
+            if before is not None and after is not None and before != after:
+                before_weight = _scaled_weight(before, MOVE_WEIGHT_SCALE)
+                after_weight = _scaled_weight(after, MOVE_WEIGHT_SCALE)
+                note += f"；{label}附加抽取权重 {before_weight} → {after_weight}"
+        if "asamu-pressure-king" in event.get("tags", ()):
+            note += "；本层独立判定对方每个数值招式33%失效；只归零胜率数值，功能保留"
+        if "asamu-misfortune-transfer" in event.get("tags", ()):
+            note += "；双方本回合力竭倒下权重各×5"
+        if event.get("opponent_next_milk_dragons"):
+            note += f"；对方下回合前{event['opponent_next_milk_dragons']}招将被依次覆盖为发奶龙"
+        if "asamu-tit-for-tat" in event.get("tags", ()):
+            note += "；回合末若落后则交换双方权重并再+4，否则自身+40"
+        if "asamu-domain" in event.get("tags", ()):
+            note += "；领域胜利后复制对方4个随机招式"
     if event["loan"]:
         note += f"；下回合扣招累计{weight_label(event['next_debt'])}，仅保留一份×2"
     if event.get("extra_draws"):
@@ -326,24 +416,30 @@ def move_line(
     if "black-flash" in event.get("tags", ()):
         note += f"；黑闪领悟现为+{event.get('black_flash_stacks', 0)}"
     if "blue-red" in event.get("tags", ()):
-        note += f"；两种茈的抽取权重累计+{event.get('purple_weight_steps', 0) / 10:.1f}"
+        note += (
+            f"；两种茈的抽取权重累计+"
+            f"{_scaled_weight(event.get('purple_weight_steps', 0), DYNAMIC_DRAW_STEP_SCALE)}"
+        )
     if "purple" in event.get("tags", ()):
         used = int(event.get("purple_weight_steps_used", event.get("purple_weight_steps_before", 0)))
-        note += f"；本次茈盘加权+{used / 10:.1f}已消耗，使用后归零重新累计"
+        note += (
+            f"；本次茈盘加权+{_scaled_weight(used, DYNAMIC_DRAW_STEP_SCALE)}"
+            "已消耗，使用后归零重新累计"
+        )
     if "infinity" in event.get("tags", ()):
         note += "；本回合无下限防御已展开（多次不叠加）"
     if adjustment:
-        deducted = int(adjustment["gain"])
-        original = int(event["gain"])
+        deducted = Fraction(adjustment["gain"])
+        original = Fraction(event["gain"])
         value = (
-            f"原+{weight_label(original)} · 结算归零 → 累计{weight_label(shown_total)}"
-            if deducted >= original
-            else f"原+{weight_label(original)} · 扣除{weight_label(deducted)}"
+            f"原{_signed_weight(original)} · 结算归零 → 累计{weight_label(shown_total)}"
+            if deducted == original
+            else f"原{_signed_weight(original)} · 调整{_signed_weight(-deducted)}"
             f" → 累计{weight_label(shown_total)}"
         )
-        note += "；" + "、".join(adjustment["reasons"])
+        note += "；" + "、".join(adjustment["reasons"]) + "；本招全部胜率数值归零，功能保留"
     if domain_bonus:
-        note += f"；领域战获胜，本招额外+{weight_label(int(domain_bonus['gain']))}（本回合仅一次）"
+        note += f"；领域战获胜，本招额外+{weight_label(domain_bonus['gain'])}（本回合仅一次）"
     if event["tool_used"]:
         note += f"；{TOOLS_BY_ID[event['tool_used']].name}已消耗"
     return Line(f"{event['ordinal']}. {event['name']}", value, note)
@@ -356,6 +452,76 @@ def wheel_card(kind: str, title: str, options: tuple, selected=None, note: str =
         title,
         tuple(BattleWheelSegment(str(label), weight) for label, weight in options),
         next((i for i, (label, _weight) in enumerate(options) if label == selected), None),
+        note,
+    )
+
+
+def _event_move_wheel(event: dict, definition_version: int) -> BattleWheelCard:
+    """Project the wheel which actually produced an event.
+
+    Forced milk-dragon events keep the opponent's original wheel/roll, while
+    Assam-domain copies keep the source fighter's wheel.  Neither case can be
+    reconstructed from ``fighter_id`` plus the final move name alone.
+    """
+
+    generated_copy = event.get("generated_by") == "asamu-domain-copy"
+    source_fighter_id = str(event.get("source_fighter_id") or event.get("fighter_id") or "")
+    if source_fighter_id not in FIGHTERS_BY_ID:
+        raise ValueError(f"未知招式盘来源：{source_fighter_id}")
+
+    definition = FIGHTERS_BY_ID[source_fighter_id]
+    moves_by_id = {move.move_id: move for move in fighter_moves(source_fighter_id, definition_version)}
+    wheel_move_ids = tuple(str(move_id) for move_id in event.get("draw_wheel_move_ids") or ())
+    exact_moves = tuple(moves_by_id.get(move_id) for move_id in wheel_move_ids)
+    if wheel_move_ids and all(move is not None for move in exact_moves):
+        moves = exact_moves
+    elif source_fighter_id in {"juejue", "daniya"} and not generated_copy:
+        moves = fighter_form_moves(source_fighter_id, str(event.get("form_before") or ""))
+    else:
+        moves = fighter_moves(source_fighter_id, definition_version)
+
+    units = event.get("draw_wheel_units")
+    scale = int(event.get("draw_weight_scale") or MOVE_WEIGHT_SCALE)
+    options = (
+        tuple((move.name, _scaled_weight(units[index], scale)) for index, move in enumerate(moves))
+        if units and len(units) == len(moves)
+        else tuple((move.name, move.draw_weight) for move in moves)
+    )
+
+    selected_move_id = str(
+        event.get("original_move_id")
+        if event.get("forced")
+        else event.get("source_move_id")
+        if generated_copy
+        else event.get("move_id")
+        or ""
+    )
+    selected = moves_by_id[selected_move_id].name if selected_move_id in moves_by_id else str(event["name"])
+
+    form_id = ""
+    if definition.forms:
+        for form in definition.forms:
+            if tuple(move.move_id for move in form.moves) == wheel_move_ids:
+                form_id = form.form_id
+                break
+        if not form_id and not generated_copy:
+            form_id = str(event.get("form_before") or "")
+    form_suffix = f" · {_fighter_form_name(source_fighter_id, form_id)}" if form_id else ""
+
+    if event.get("forced"):
+        title_suffix = f"{form_suffix} · 奶龙覆盖"
+        note = f"高亮原始抽取落点“{selected}”；随后被覆盖为“{event['name']}”。"
+    elif generated_copy:
+        title_suffix = f" · 复制自{definition.name}{form_suffix}"
+        note = f"高亮阿萨姆领域复制时的真实来源落点；实际施放“{event['name']}”。"
+    else:
+        title_suffix = form_suffix
+        note = "本卡展示最后一招的真实落点；逐招数值均为已提交事实。"
+    return wheel_card(
+        "move",
+        f"第{event['ordinal']}招落点{title_suffix}",
+        options,
+        selected,
         note,
     )
 
@@ -417,7 +583,7 @@ def _juejue_state_projection(side: dict) -> tuple[str, str, str]:
         facts.append("下一次加速/时延必定成功")
     domain_units = int(side["juejue_sand_domain_steps"]) + int(side["juejue_sand_domain_switch_units"])
     if domain_units:
-        facts.append(f"荒时之沙抽取权重+{domain_units / 10:.1f}")
+        facts.append(f"荒时之沙抽取权重+{_scaled_weight(domain_units, DYNAMIC_DRAW_STEP_SCALE)}")
     if side["juejue_realization_stacks"]:
         facts.append(f"化虚为实累计{side['juejue_realization_stacks']}层")
     if turn["juejue_music"]:
@@ -437,6 +603,61 @@ def _juejue_state_projection(side: dict) -> tuple[str, str, str]:
     if turn["juejue_delay_tier"]:
         facts.append(f"本回合时延最高{turn['juejue_delay_tier']}档")
     return f"当前形态 · {current}", " → ".join(track), " · ".join(facts) or "暂无待结算机制"
+
+
+def _daniya_state_projection(side: dict) -> tuple[str, str, str]:
+    current = _fighter_form_name("daniya", str(side.get("daniya_form", DANIYA_FORM_STAGING)))
+    turn = side.get("turn", {})
+    track: list[str] = []
+    for event in turn.get("events", ()):
+        before = _fighter_form_name("daniya", str(event.get("form_before", side.get("daniya_form"))))
+        after = _fighter_form_name("daniya", str(event.get("form_after", before)))
+        if not track:
+            track.append(before)
+        if after != track[-1]:
+            track.append(after)
+    if not track:
+        track.append(current)
+    elif current != track[-1]:
+        track.append(current)
+    facts = [
+        f"蚀域抽取加权+{_scaled_weight(side.get('daniya_domain_steps', 0), DYNAMIC_DRAW_STEP_SCALE)}",
+        f"自身力竭盘被永久加权+"
+        f"{_scaled_weight(side.get('injury_exhaust_bonus_units', 0), INJURY_WEIGHT_SCALE)}",
+    ]
+    if turn.get("daniya_collapse_count"):
+        facts.append(f"本回合计时溃灭×{turn['daniya_collapse_count']}")
+    if side.get("next_exhaust_multiplier_round") is not None:
+        facts.append(
+            f"第{side['next_exhaust_multiplier_round']}回合自身力竭权重×{side.get('next_exhaust_multiplier', 1)}"
+        )
+    return f"当前形态 · {current}", " → ".join(track), " · ".join(facts)
+
+
+def _asamu_state_projection(side: dict) -> tuple[str, str, str]:
+    turn = side.get("turn", {})
+    injury = {"none": "无伤", "light": "轻伤", "heavy": "重伤"}.get(
+        str(side.get("injury_state", "none")), str(side.get("injury_state", "none"))
+    )
+    tea = 1000 + int(side.get("asamu_tea_bonus_units", 0))
+    sleep = 1000 + int(side.get("asamu_sleep_bonus_units", 0))
+    prime = 200 + int(side.get("asamu_prime_bonus_units", 0))
+    facts = [
+        f"憋大永久层数{side.get('asamu_big_stacks', 0)}（后续每个招式的胜率数值每层+3）",
+        f"喝奶茶/睡觉/全盛姿态权重 {tea / 1000:g}/{sleep / 1000:g}/{prime / 1000:g}",
+    ]
+    milk = int(side.get("asamu_milk_dragon_next_count", 0))
+    if milk:
+        facts.append(f"自己下回合前{milk}招将变为发奶龙")
+    if turn.get("asamu_pressure_ordinals"):
+        facts.append(f"耐压王{len(turn['asamu_pressure_ordinals'])}层独立判定")
+    if turn.get("asamu_misfortune_count"):
+        facts.append(f"厄运传递×{turn['asamu_misfortune_count']}")
+    if turn.get("asamu_retaliation_ordinals"):
+        facts.append(f"以牙还牙×{len(turn['asamu_retaliation_ordinals'])}待结算")
+    if turn.get("forced_milk_dragon_used"):
+        facts.append(f"本回合奶龙覆盖{turn['forced_milk_dragon_used']}招")
+    return f"当前伤势 · {injury}", "动态抽取盘", " · ".join(facts)
 
 
 def _v4_interaction_panels(interactions: dict, names: list[str]) -> tuple[Panel, ...]:
@@ -476,7 +697,7 @@ def _v4_interaction_panels(interactions: dict, names: list[str]) -> tuple[Panel,
             value, note = "没有有效目标", f"{target}本回合没有仍有效的数值招式"
         else:
             value = f"取消{target}第{fact['selected_ordinal']}招"
-            note = f"已扣除胜利权重{weight_label(int(fact['cancelled_gain']))}"
+            note = f"已扣除胜利权重{weight_label(fact['cancelled_gain'])}；招式功能保留"
         mechanism_lines.append(Line(names[int(fact["side"])] + " · 未来模拟", value, note))
     for fact in interactions["sand_bodies"]:
         _required(
@@ -500,8 +721,8 @@ def _v4_interaction_panels(interactions: dict, names: list[str]) -> tuple[Panel,
         else:
             value = f"{target}第{fact['selected_ordinal']}招减半"
             note = (
-                f"有效数值{weight_label(int(fact['original_gain']))} → "
-                f"{weight_label(int(fact['remaining_gain']))}，向下取整"
+                f"有效数值{weight_label(fact['original_gain'])} → "
+                f"{weight_label(fact['remaining_gain'])}，向下取整"
             )
         mechanism_lines.append(Line(names[int(fact["side"])] + " · 沙之形体", value, note))
     for fact in interactions["zeroes"]:
@@ -532,7 +753,7 @@ def _v4_interaction_panels(interactions: dict, names: list[str]) -> tuple[Panel,
             Line(
                 names[int(fact["side"])] + " · " + " + ".join(source),
                 f"令{target}本回合数值招式失效",
-                f"受影响招式：{ordinals}；共扣除{weight_label(int(fact['cancelled_gain']))}；"
+                f"受影响招式：{ordinals}；共扣除{weight_label(fact['cancelled_gain'])}；功能保留；"
                 + ("同时免疫本轮跨回合负面效果" if fact["cross_debuff_suppressed"] else ""),
             )
         )
@@ -548,14 +769,14 @@ def _v4_interaction_panels(interactions: dict, names: list[str]) -> tuple[Panel,
     effect_lines: list[Line] = []
     for fact in interactions["round_reductions"]:
         _required(fact, ("side", "requested", "applied", "floor", "source_ordinals"), "本轮减权结算")
-        if not int(fact["requested"]):
+        if not Fraction(fact["requested"]):
             continue
         source = "、".join(str(item) for item in fact["source_ordinals"]) or "领域自动模仿"
         effect_lines.append(
             Line(
                 names[int(fact["side"])] + " · 本轮权重削减",
-                f"请求{weight_label(int(fact['requested']))} / 实扣{weight_label(int(fact['applied']))}",
-                f"来源招式：{source}；结算不会低于本回合起始权重{weight_label(int(fact['floor']))}",
+                f"请求{weight_label(fact['requested'])} / 实扣{weight_label(fact['applied'])}",
+                f"来源招式：{source}；结算不会低于本回合起始权重{weight_label(fact['floor'])}",
             )
         )
     for fact in interactions["cross_effects"]:
@@ -576,8 +797,8 @@ def _v4_interaction_panels(interactions: dict, names: list[str]) -> tuple[Panel,
         source = names[int(fact["source_side"])]
         target = names[int(fact["target_side"])]
         facts = []
-        if int(fact["round_reduction"]):
-            facts.append(f"本轮减权{weight_label(int(fact['round_reduction']))}")
+        if Fraction(fact["round_reduction"]):
+            facts.append(f"本轮减权{weight_label(fact['round_reduction'])}")
         elif fact["round_reduction_suppressed"]:
             facts.append("本轮减权被时空保护免疫")
         if int(fact["next_debt"]):
@@ -586,6 +807,12 @@ def _v4_interaction_panels(interactions: dict, names: list[str]) -> tuple[Panel,
             facts.append("跨回合欠招被时空保护免疫")
         if int(fact["next_bonus"]):
             facts.append(f"下回合+{fact['next_bonus']}招")
+        if int(fact.get("next_milk_dragons", 0)):
+            facts.append(f"下回合前{fact['next_milk_dragons']}招覆盖为发奶龙")
+        if int(fact.get("exhaust_bonus_units", 0)):
+            facts.append(f"力竭盘永久+{_scaled_weight(fact['exhaust_bonus_units'], INJURY_WEIGHT_SCALE)}")
+        if fact.get("directed_effect_suppressed"):
+            facts.append("定向负面效果被时空保护免疫")
         if facts:
             effect_lines.append(
                 Line(
@@ -596,6 +823,49 @@ def _v4_interaction_panels(interactions: dict, names: list[str]) -> tuple[Panel,
             )
     if effect_lines:
         panels.append(Panel("本回合跨方效果", tuple(effect_lines), "所有减权与下回合招数均来自已提交事实。"))
+
+    v5_lines: list[Line] = []
+    transition = interactions.get("daniya_transition")
+    if transition:
+        v5_lines.append(
+            Line(
+                names[int(transition["side"])] + " · 蚀域",
+                f"{_fighter_form_name('daniya', transition['before'])} → "
+                f"{_fighter_form_name('daniya', transition['after'])}",
+                f"领域胜利完成形态切换；下回合出招数+{transition.get('next_action_bonus', 0)}。",
+            )
+        )
+    for fact in interactions.get("pressure_checks", ()):
+        target = names[int(fact["target_side"])]
+        value = f"{target}第{fact['target_ordinal']}招数值失效" if fact["hit"] else "本层判定未命中"
+        note = (
+            f"来源第{fact['source_ordinal']}招；扣除{weight_label(fact['cancelled_gain'])}；"
+            "该招全部胜率数值归零，功能照常结算。"
+        )
+        v5_lines.append(Line(names[int(fact["side"])] + " · 传奇耐压王", value, note))
+    for event in interactions.get("asamu_domain_copies", ()):
+        value = f"复制{names[int(event['source_side'])]}的“{event['source_move_name']}”"
+        note = f"第{event['copy_slot']}份复制；数值{_signed_weight(event.get('gain', 0))}"
+        if event.get("domain_reentry_suppressed"):
+            note += "；复制到领域招式时不再次触发领域判定"
+        v5_lines.append(Line("领域·呃呃阿萨姆奶茶", value, note))
+    for fact in interactions.get("retaliations", ()):
+        before, after = fact.get("before", ()), fact.get("after", ())
+        value = "交换双方权重后再加成" if fact.get("swapped") else "优势状态直接加成"
+        note = (
+            f"连续结算{fact.get('count', 1)}次；"
+            f"{weight_label(before[0])}/{weight_label(before[1])} → "
+            f"{weight_label(after[0])}/{weight_label(after[1])}"
+        )
+        v5_lines.append(Line(names[int(fact["side"])] + " · 以牙还牙", value, note))
+    if v5_lines:
+        panels.append(
+            Panel(
+                "达妮娅猪 / 阿萨姆猪 · 回合机制",
+                tuple(v5_lines),
+                "失效统一只将一招的全部胜率数值归零；抽数、状态、领域及其他功能事实全部保留。",
+            )
+        )
     return tuple(panels)
 
 
@@ -633,7 +903,7 @@ def matchup(
             domain_bonus_maps[int(boost_side)] = {
                 "ordinal": int(domain["boosted_ordinal"]),
                 "ordinals": tuple(int(item) for item in domain.get("boosted_ordinals", ())),
-                "gain": int(domain.get("bonus_gain") or 0),
+                "gain": Fraction(domain.get("bonus_gain") or 0),
             }
     for index, count_side in enumerate(count_sides):
         turn = count_side["turn"]
@@ -659,28 +929,7 @@ def matchup(
             if not side_events:
                 continue
             last = side_events[-1]
-            moves = (
-                fighter_form_moves("juejue", str(last["form_before"]))
-                if last["fighter_id"] == "juejue"
-                else fighter_moves(last["fighter_id"], int(match.get("definition_version") or 1))
-            )
-            units = last.get("draw_wheel_units")
-            scale = int(last.get("draw_weight_scale") or MOVE_WEIGHT_SCALE)
-            options = (
-                tuple((move.name, _scaled_weight(int(units[index]), scale)) for index, move in enumerate(moves))
-                if units and len(units) == len(moves)
-                else tuple((move.name, move.draw_weight) for move in moves)
-            )
-            move_cards[event_side] = wheel_card(
-                "move",
-                "第"
-                + str(last["ordinal"])
-                + "招落点"
-                + (f" · {_form_name(str(last['form_before']))}" if last["fighter_id"] == "juejue" else ""),
-                options,
-                last["name"],
-                "本卡展示最后一招的真实落点；逐招数值均为已提交事实。",
-            )
+            move_cards[event_side] = _event_move_wheel(last, definition_version)
             visible_events = side_events
             action_lines[event_side] = tuple(
                 move_line(
@@ -752,7 +1001,9 @@ def matchup(
         if side.get("black_flash_stacks"):
             mechanic_notes.append(f"黑闪领悟+{weight_label(side['black_flash_stacks'])}")
         if side.get("purple_weight_steps"):
-            mechanic_notes.append(f"茈盘+{side['purple_weight_steps'] / 10:.1f}")
+                mechanic_notes.append(
+                    f"茈盘+{_scaled_weight(side['purple_weight_steps'], DYNAMIC_DRAW_STEP_SCALE)}"
+                )
         if mechanic_notes:
             tool_note += " · " + " · ".join(mechanic_notes)
         if turn["done"]:
@@ -762,23 +1013,23 @@ def matchup(
         if definition_version >= 3:
             if round_result and round_result.get("carryover"):
                 carry = round_result["carryover"][index]
-                inherited = int(carry["round_start_weight"]) - 5
+                inherited = Fraction(carry["round_start_weight"]) - 5
                 weight_breakdown = (
                     f"基础5 + 历史折半继承{weight_label(inherited)} + "
-                    f"本回合净增{weight_label(int(carry['round_gain']))}"
+                    f"本回合净增{weight_label(carry['round_gain'])}"
                 )
                 next_weight = (
                     "整场已结束，本回合权重不再迁移"
                     if carry.get("next_round_weight") is None
                     else (
-                        f"本回合净增按50%向上取整保留{weight_label(int(carry['retained_gain']))}；"
-                        f"下回合起始{weight_label(int(carry['next_round_weight']))}"
+                        f"本回合净增按50%向上取整保留{weight_label(carry['retained_gain'])}；"
+                        f"下回合起始{weight_label(carry['next_round_weight'])}"
                     )
                 )
             else:
-                start = int(side.get("round_start_weight", side["weight"]))
+                start = Fraction(side.get("round_start_weight", side["weight"]))
                 inherited = start - 5
-                current = int(side["weight"]) - start
+                current = Fraction(side["weight"]) - start
                 weight_breakdown = (
                     f"基础5 + 历史折半继承{weight_label(inherited)} + 本回合净增{weight_label(current)}"
                 )
@@ -789,6 +1040,10 @@ def matchup(
         form = form_track = mechanic_summary = ""
         if snap.get("fighter_id") == "juejue":
             form, form_track, mechanic_summary = _juejue_state_projection(side)
+        elif snap.get("fighter_id") == "daniya":
+            form, form_track, mechanic_summary = _daniya_state_projection(side)
+        elif snap.get("fighter_id") == "asamu":
+            form, form_track, mechanic_summary = _asamu_state_projection(side)
         cards.append(
             FighterCard(
                 player_name=snap["player_name"],
@@ -796,7 +1051,7 @@ def matchup(
                 short_code=snap["short_code"],
                 level=snap["level"],
                 weight=weight_label(side["weight"]),
-                chance=f"{side['weight'] * 10000 // total / 100:.2f}%",
+                chance=_percent(side["weight"], total),
                 count=count,
                 injury="重伤 · 数值招式-1" if side["heavy"] else "正常出招盘",
                 risk=("初始风险", "轻伤风险", "重伤风险")[side["risk"]],
@@ -882,9 +1137,7 @@ def matchup(
                 "simple-domain": "简易领域免疫",
             }
             scale = int(domain.get("weight_scale") or 1)
-            domain_options = tuple(
-                (labels[key], _scaled_weight(int(weight), scale)) for key, weight in domain["wheel"]
-            )
+            domain_options = tuple((labels[key], _scaled_weight(weight, scale)) for key, weight in domain["wheel"])
             wheel_cards.insert(
                 0,
                 wheel_card(
@@ -904,12 +1157,12 @@ def matchup(
                 ),
             ]
             if domain["mode"] == "clash" and definition_version >= 4:
-                tie_weight = next(int(weight) for key, weight in domain["wheel"] if key == "tie")
+                tie_weight = next(weight for key, weight in domain["wheel"] if key == "tie")
                 domain_lines.append(
                     Line(
                         "领域战权重",
-                        f"{names[0]} {_scaled_weight(int(domain['strengths'][0]), scale)} / "
-                        f"{names[1]} {_scaled_weight(int(domain['strengths'][1]), scale)} / "
+                        f"{names[0]} {_scaled_weight(domain['strengths'][0], scale)} / "
+                        f"{names[1]} {_scaled_weight(domain['strengths'][1], scale)} / "
                         f"平手 {_scaled_weight(tie_weight, scale)}",
                         "宿傩、普通领域、撅撅猪单领域与双领域均按各自已发布权重进入同一轮盘。",
                     )
@@ -925,7 +1178,7 @@ def matchup(
                     Line(
                         "领域胜方加倍",
                         f"{names[int(domain['boost_side'])]} {target}合计额外 "
-                        f"+{weight_label(int(domain['bonus_gain']))}",
+                        f"+{weight_label(domain['bonus_gain'])}",
                         "普通领域只翻倍一份；撅撅猪两个不同领域同回合齐出且胜出时，两份相加后一起翻倍。",
                     )
                 )
@@ -953,8 +1206,8 @@ def matchup(
                         "乱序数虚时空 · 自动模仿",
                         _mimic_fact(auto, label="领域自动模仿"),
                         (
-                            f"本次自身增加{weight_label(int(auto.get('gain', 0)))}；"
-                            f"对手减权请求{weight_label(int(auto.get('opponent_reduction', 0)))}"
+                            f"本次自身增加{weight_label(auto.get('gain', 0))}；"
+                            f"对手减权请求{weight_label(auto.get('opponent_reduction', 0))}"
                         ),
                     )
                 )
@@ -972,6 +1225,31 @@ def matchup(
         if definition_version >= 4:
             names = [side["snapshot"]["player_name"] for side in display_sides]
             panels.extend(_v4_interaction_panels(interactions, names))
+        modifiers = round_result.get("injury_modifiers")
+        if modifiers:
+            lines = [
+                Line(
+                    "力竭权重倍率",
+                    f"×{modifiers.get('total_exhaust_multiplier', 1)}",
+                    f"厄运传递×{modifiers.get('misfortune_count', 0)}；"
+                    f"计时溃灭×{modifiers.get('current_collapse_multiplier', 1)}；"
+                    f"反噬×{modifiers.get('rebound_multiplier', 1)}",
+                ),
+                Line(
+                    "永久力竭加权",
+                    f"+{_scaled_weight(modifiers.get('permanent_exhaust_bonus_units', 0), INJURY_WEIGHT_SCALE)}",
+                    "达妮娅幻灭招式累积，直接加入本次伤势盘。",
+                ),
+            ]
+            for rebound in round_result.get("collapse_rebounds", ()):
+                lines.append(
+                    Line(
+                        names[int(rebound["caster_side"])] + " · 计时反噬",
+                        "目标本回合力竭" if rebound["target_exhausted"] else "反噬登记至下回合",
+                        f"反噬回合：{rebound.get('rebound_round') or '无'}",
+                    )
+                )
+            panels.append(Panel("本回合伤势修正", tuple(lines), "轮盘扇区已经包含以上精确修正。"))
         panel_note = (
             f"整场结束，败者获得{loot_attempts}次额外战利品抓猪，全部归胜者。"
             if round_result["natural_end"]
@@ -1044,7 +1322,7 @@ def matchup(
         round_label=(
             f"第{round_result['round'] if round_result else state['round']}回合 · {STATUS_NAMES[state['status']]}"
         ),
-        win_percent=f"{display_sides[0]['weight'] * 10000 // total / 100:.2f}",
+        win_percent=_percent(display_sides[0]["weight"], total),
         panels=tuple(panels),
         hints=hints,
         wheels=tuple(wheel_cards),
@@ -1101,7 +1379,8 @@ def _juejue_wheels(identity: CommandIdentity, level: int) -> BattleView:
         Line(
             f"{_form_name(form_id)} · {move.name}",
             _juejue_move_effect(move, level),
-            f"基础抽取权重{move.draw_weight}；切换后，尚未执行的追加抽取立即改用新形态盘。",
+            f"基础抽取权重{_scaled_weight(move.resolved_draw_weight_units, MOVE_WEIGHT_SCALE)}；"
+            "切换后，尚未执行的追加抽取立即改用新形态盘。",
         )
         for form_id, form_moves in ((JUEJUE_FORM_TIME, time_moves), (JUEJUE_FORM_VIRTUAL, virtual_moves))
         for move in form_moves
@@ -1141,14 +1420,20 @@ def _juejue_wheels(identity: CommandIdentity, level: int) -> BattleView:
             wheel_card(
                 "move",
                 "撅撅猪 · 时之沙",
-                tuple((move.name, move.draw_weight) for move in time_moves),
-                note="八格基础等权；塑型、实时演算与切回时之沙会按规则改变领域招式的真实抽取权重。",
+                tuple(
+                    (move.name, _scaled_weight(move.resolved_draw_weight_units, MOVE_WEIGHT_SCALE))
+                    for move in time_moves
+                ),
+                note="八格基础等权且领域主盘权重也是1；塑型、实时演算与切回会改变领域的真实抽取权重。",
             ),
             wheel_card(
                 "move",
                 "撅撅猪 · 虚拟声",
-                tuple((move.name, move.draw_weight) for move in virtual_moves),
-                note="八格基础等权；虚拟模仿的大盘/小盘各占50%，候选池随规则版本冻结。",
+                tuple(
+                    (move.name, _scaled_weight(move.resolved_draw_weight_units, MOVE_WEIGHT_SCALE))
+                    for move in virtual_moves
+                ),
+                note="八格基础等权且领域主盘权重也是1；虚拟模仿的大盘/小盘各占50%。",
             ),
             wheel_card(
                 "subwheel",
@@ -1210,9 +1495,163 @@ def _juejue_wheels(identity: CommandIdentity, level: int) -> BattleView:
     )
 
 
+def _common_battle_wheels() -> tuple[BattleWheelCard, ...]:
+    return (
+        wheel_card("count", "正常出招数", tuple((f"{number}招", weight) for number, weight in COUNT_WHEEL)),
+        wheel_card("count", "重伤出招数", tuple((f"{number}招", weight) for number, weight in HEAVY_COUNT_WHEEL)),
+        *(
+            wheel_card(
+                "injury",
+                ("初始风险", "轻伤风险", "重伤风险")[i],
+                tuple((INJURY_NAMES[key], _scaled_weight(weight, INJURY_WEIGHT_SCALE)) for key, weight in options),
+                note="扇区面积为抽取权重占比；不是胜利概率。",
+            )
+            for i, options in enumerate(INJURY_WHEELS)
+        ),
+    )
+
+
+def _move_weight(move) -> int | float:
+    return _scaled_weight(move.resolved_draw_weight_units, MOVE_WEIGHT_SCALE)
+
+
+def _daniya_effect(move, level: int) -> str:
+    gain = Fraction(move.resolved_gain_tenths, VICTORY_WEIGHT_SCALE)
+    enhanced = gain + level if gain > 0 else gain
+    numeric = f"自身胜率{_signed_weight(enhanced)}" if gain else ""
+    if move.resolved_opponent_reduction_tenths:
+        numeric += f"、对方-{weight_label(Fraction(move.resolved_opponent_reduction_tenths, VICTORY_WEIGHT_SCALE))}"
+    mechanics = {
+        "daniya-staging-dream-feast": "下一次蚀域主盘权重+0.1",
+        "daniya-staging-mimic-bubble": "下一次蚀域主盘权重+0.1",
+        "daniya-staging-final-curtain": "下一次蚀域主盘权重+0.1",
+        "daniya-staging-greeting": "下一次蚀域主盘权重+0.1",
+        "daniya-disillusion-dream-feast": "对方力竭盘永久+0.1",
+        "daniya-disillusion-banish": "对方力竭盘永久+0.1",
+        "daniya-disillusion-final-curtain": "对方力竭盘永久+0.1",
+        "daniya-disillusion-knock": "对方力竭盘永久+0.1",
+        "daniya-flawless": "再抽2次",
+        "daniya-unfinished-lie": "再抽1次；下一次数值招式自身加权及对方减权同步×2；下回合-1招",
+        "daniya-timed-collapse": "对方本回合力竭权重×5；若对方未力竭，自己下回合力竭权重×5",
+        "daniya-domain": "领域胜利后切换幻灭形态，自己下回合+1招",
+    }[move.move_id]
+    return "；".join(part for part in (numeric, mechanics) if part)
+
+
+def _daniya_wheels(identity: CommandIdentity, level: int) -> BattleView:
+    definition = FIGHTERS_BY_ID["daniya"]
+    forms = {form.form_id: form for form in definition.forms}
+    form_wheels = tuple(
+        wheel_card(
+            "move",
+            f"达妮娅猪 · {DANIYA_FORM_NAMES[form_id]}",
+            tuple((move.name, _move_weight(move)) for move in forms[form_id].moves),
+            note="形态专属4招与公共4招同盘；计时的溃灭基础权重0.5，其余基础权重1。",
+        )
+        for form_id in (DANIYA_FORM_STAGING, DANIYA_FORM_DISILLUSION)
+    )
+    lines = tuple(
+        Line(
+            f"{DANIYA_FORM_NAMES[form_id]} · {move.name}",
+            _daniya_effect(move, level),
+            f"抽取权重 {_move_weight(move)}；正数胜率受强化，-52.1与功能数值不受强化。",
+        )
+        for form_id in (DANIYA_FORM_STAGING, DANIYA_FORM_DISILLUSION)
+        for move in forms[form_id].moves
+    )
+    return view(
+        identity,
+        "达妮娅猪 · 双形态战斗轮盘",
+        banner=f"展示强化+{level}的数值。默认布景；蚀域在领域战胜利后即时切换为幻灭。",
+        wheels=(*form_wheels, *_common_battle_wheels()),
+        panels=(
+            Panel("双形态招式", lines, "重复出现的公共招式是同一规则，只因当前形态不同而进入不同轮盘。"),
+            Panel(
+                "形态与伤势机制",
+                (
+                    Line("布景", "每次布景数值招式令下次蚀域抽取权重+0.1", "蚀域实际使用后清除累计。"),
+                    Line("幻灭", "每次幻灭数值招式令对方力竭盘永久+0.1", "精确累积，不提前取整。"),
+                    Line("计时的溃灭", "自身-52.1", "若对手未在本回合力竭，×5反噬登记到自己下回合。"),
+                ),
+            ),
+        ),
+        hints=(
+            "招式抽取权重按千分之一保存；胜利权重按十分之一保存，图中文字展示精确小数。",
+            "数值失效只归零胜率数值，贷款、形态与伤势功能仍保留。",
+        ),
+    )
+
+
+def _asamu_effect(move, level: int) -> str:
+    gain = Fraction(move.resolved_gain_tenths, VICTORY_WEIGHT_SCALE)
+    numeric = f"胜率+{weight_label(gain + level)}" if gain > 0 else ""
+    mechanics = {
+        "asamu-bathe": "喝奶茶抽取权重+0.5",
+        "asamu-milk-tea": "睡觉抽取权重+0.25，并重置喝奶茶当前加权",
+        "asamu-sleep": "全盛姿态抽取权重永久+0.1，并重置睡觉当前加权",
+        "asamu-prime": "再抽1次",
+        "asamu-charge-up": "本场后续每个招式的胜率数值额外+3，可无限累积",
+        "asamu-pressure-king": "本层对方每个数值招式独立33%失效；功能保留",
+        "asamu-misfortune-transfer": "双方本回合力竭倒下权重各×5",
+        "asamu-milk-dragon": "依次覆盖对方下回合第一、第二……招为发奶龙",
+        "asamu-tit-for-tat": "回合末落后则交换双方权重并再+4；未落后则自身+40",
+        "asamu-domain": "领域胜利后随机使用对方4个招式；复制领域不再次发起领域判定",
+    }[move.move_id]
+    return "；".join(part for part in (numeric, mechanics) if part)
+
+
+def _asamu_wheels(identity: CommandIdentity, level: int) -> BattleView:
+    definition = FIGHTERS_BY_ID["asamu"]
+    moves = definition.moves
+    total_units = sum(move.resolved_draw_weight_units for move in moves)
+    lines = tuple(
+        Line(
+            move.name,
+            _asamu_effect(move, level),
+            f"基础抽取权重 {_move_weight(move)}；基础出现概率 "
+            f"{100 * move.resolved_draw_weight_units / total_units:.2f}%（动态加权前）。",
+        )
+        for move in moves
+    )
+    return view(
+        identity,
+        "阿萨姆猪 · 动态战斗轮盘",
+        banner=f"展示强化+{level}的数值。喝奶茶、睡觉、全盛姿态会在战斗中动态改变抽取权重。",
+        wheels=(
+            wheel_card("move", "阿萨姆猪 · 基础招式盘", tuple((move.name, _move_weight(move)) for move in moves)),
+            *_common_battle_wheels(),
+        ),
+        panels=(
+            Panel("动态招式盘", lines, "展示基础盘；实战落点卡会显示当时的精确动态轮盘。"),
+            Panel(
+                "特殊结算",
+                (
+                    Line("传奇耐压王", "每层独立33%", "命中后该招全部胜率数值归零，抽数与技能功能照常。"),
+                    Line(
+                        "发奶龙",
+                        "覆盖对方下回合前序招式",
+                        "原抽取落点会保存在事实中；被覆盖的发奶龙不反向施加覆盖。",
+                    ),
+                    Line(
+                        "以牙还牙",
+                        "无伤0.4 / 轻伤0.749 / 重伤0.947",
+                        "回合末共用同一结算快照；每次抽中各给后置奖励，双方权重交换至多一次。",
+                    ),
+                    Line("领域·呃呃阿萨姆奶茶", "领域胜利复制对方4招", "逐份展示来源、数值与领域再入抑制。"),
+                ),
+            ),
+        ),
+        hints=("憋个大的永久+3只增加招式胜率数值，不改变抽中权重。", "厄运传递和计时的溃灭按独立倍率乘入伤势盘。"),
+    )
+
+
 def wheels(identity: CommandIdentity, fighter_id: str, level: int = 0) -> BattleView:
     if fighter_id == "juejue":
         return _juejue_wheels(identity, level)
+    if fighter_id == "daniya":
+        return _daniya_wheels(identity, level)
+    if fighter_id == "asamu":
+        return _asamu_wheels(identity, level)
     definition = FIGHTERS_BY_ID[fighter_id]
     moves = []
     for move in definition.moves:
@@ -1221,8 +1660,14 @@ def wheels(identity: CommandIdentity, fighter_id: str, level: int = 0) -> Battle
             effect += f" 再抽{move.draws}次"
         if move.loan:
             effect += "；下个数值招式×2，下回合扣1招"
+        total_units = sum(item.resolved_draw_weight_units for item in definition.moves)
         moves.append(
-            Line(move.name, effect.strip(), f"抽取权重 {move.draw_weight}；出现概率 {100 / len(definition.moves):.2f}%")
+            Line(
+                move.name,
+                effect.strip(),
+                f"抽取权重 {_move_weight(move)}；出现概率 "
+                f"{100 * move.resolved_draw_weight_units / total_units:.2f}%",
+            )
         )
     return view(
         identity,
@@ -1232,7 +1677,7 @@ def wheels(identity: CommandIdentity, fighter_id: str, level: int = 0) -> Battle
             wheel_card(
                 "move",
                 definition.name + " · 等权招式盘",
-                tuple((move.name, move.draw_weight) for move in definition.moves),
+                tuple((move.name, _move_weight(move)) for move in definition.moves),
                 note="规则预览；没有抽取，强化只增加数值招式的胜利权重。",
             ),
             wheel_card("count", "正常出招数", tuple((f"{number}招", weight) for number, weight in COUNT_WHEEL)),

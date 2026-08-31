@@ -271,7 +271,7 @@ class BattleService:
                 else view(
                     identity,
                     "本群尚无对战",
-                    banner="先 /战斗猪 设置 宿傩猪、五条猪或撅撅猪，再 /比划比划 @群友。",
+                    banner="先 /战斗猪 设置 宿傩猪、五条猪、撅撅猪、达妮娅猪或阿萨姆猪，再 /比划比划 @群友。",
                 )
             )
         if action == "invite":
@@ -488,6 +488,29 @@ class BattleService:
         else:
             raise BattleError("未知对战操作。")
         if summary:
+            generated = tuple(summary.get("interactions", {}).get("asamu_domain_copies", ()))
+            for event in generated:
+                generated_side = int(event["side"])
+                await session.execute(
+                    "INSERT INTO battle_moves VALUES(?,?,?,?,?,?)",
+                    (
+                        match["battle_id"],
+                        round_number,
+                        generated_side,
+                        event["ordinal"],
+                        dumps(event),
+                        now_ms,
+                    ),
+                )
+                await self.repo.fact(
+                    session,
+                    ids[generated_side],
+                    identity.scope.value,
+                    match["battle_id"],
+                    f"move:{round_number}:{event['ordinal']}",
+                    now_ms,
+                    event,
+                )
             await session.execute(
                 "INSERT INTO battle_rounds VALUES(?,?,?,?)", (match["battle_id"], round_number, dumps(summary), now_ms)
             )

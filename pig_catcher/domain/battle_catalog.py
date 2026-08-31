@@ -9,7 +9,7 @@ from .special_content import GOJO_PIG_TEMPLATE_ID, SUKUNA_PIG_TEMPLATE_ID
 
 # 对战规则版本与活动成就事实版本分离：新版对战会改变随机命名空间，
 # 但新增字段仍是 activity_progress v1 可以向后兼容读取的事实载荷。
-BATTLE_RULE_VERSION = 4
+BATTLE_RULE_VERSION = 5
 BATTLE_FACT_VERSION = 1
 BATTLE_VERSION = BATTLE_RULE_VERSION
 INVITE_TTL_MS = 5 * 60 * 1000
@@ -20,15 +20,17 @@ INVITE_COOLDOWN_MS = 60 * 1000
 MOVE_CHUNK_SIZE = 32
 COUNT_WHEEL = ((1, 5), (2, 4), (3, 3), (4, 2), (5, 1))
 HEAVY_COUNT_WHEEL = COUNT_WHEEL[:-1]
-INJURY_WEIGHT_SCALE = 2
-# 以二倍整数保存半点权重，抽签全程不使用浮点数。
+INJURY_WEIGHT_SCALE = 10
+# 以十倍整数保存伤势盘的0.1权重，抽签全程不使用浮点数。
+# v4的 6.5/2.5/0.5/0.5、2.5/6/1/0.5、1/2.5/6/0.5 保持完全等价。
 INJURY_WHEELS = (
-    (("light", 13), ("heavy", 5), ("exhausted", 1), ("core", 1)),
-    (("light", 5), ("heavy", 12), ("exhausted", 2), ("core", 1)),
-    (("light", 2), ("heavy", 5), ("exhausted", 12), ("core", 1)),
+    (("light", 65), ("heavy", 25), ("exhausted", 5), ("core", 5)),
+    (("light", 25), ("heavy", 60), ("exhausted", 10), ("core", 5)),
+    (("light", 10), ("heavy", 25), ("exhausted", 60), ("core", 5)),
 )
 INJURY_NAMES = {"light": "轻伤", "heavy": "重伤", "exhausted": "力竭倒下", "core": "我掌握了抓猪的核心！"}
-MOVE_WEIGHT_SCALE = 10
+MOVE_WEIGHT_SCALE = 1000
+VICTORY_WEIGHT_SCALE = 10
 LEGACY_LOOT_WEIGHTS = (5, 10, 10, 25, 30, 20)
 LOOT_WEIGHTS = (5, 10, 10, 30, 30, 15)
 LEGACY_LOOT_ATTEMPTS = 5
@@ -57,6 +59,24 @@ class Move:
     tags: tuple[str, ...] = ()
     direction: str = "self"
     description: str = ""
+    # v5的精确字段均只存整数：gain_tenths以0.1自身胜利权重为一单位，
+    # opponent_reduction保留对方整数减权语义，draw_weight_units以1/1000抽取权重为一单位。
+    # None 保留旧三猪的整数定义，不迫使旧数据改写或使用浮点数。
+    gain_tenths: int | None = None
+    opponent_reduction: int = 0
+    draw_weight_units: int | None = None
+
+    @property
+    def resolved_gain_tenths(self) -> int:
+        return self.gain * VICTORY_WEIGHT_SCALE if self.gain_tenths is None else self.gain_tenths
+
+    @property
+    def resolved_opponent_reduction_tenths(self) -> int:
+        return self.opponent_reduction * VICTORY_WEIGHT_SCALE
+
+    @property
+    def resolved_draw_weight_units(self) -> int:
+        return self.draw_weight * MOVE_WEIGHT_SCALE if self.draw_weight_units is None else self.draw_weight_units
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,6 +94,7 @@ class FighterDefinition:
     moves: tuple[Move, ...]
     template_aliases: tuple[str, ...] = ()
     forms: tuple[FighterForm, ...] = ()
+    initial_form_id: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,8 +122,22 @@ JUEJUE_PIG_TEMPLATE_IDS = (
     "pig-qo5e5854406d0297d6feae696a13e3a339-juejue",
     "pig-qo9ea2810f378fbd7dc3219c56ceab3520-juejue",
 )
+DANIYA_PIG_TEMPLATE_IDS = (
+    "pig-g1092931381-daniya",
+    "pig-g237716658-daniya",
+    "pig-qo5e5854406d0297d6feae696a13e3a339-daniya",
+    "pig-qo9ea2810f378fbd7dc3219c56ceab3520-daniya",
+)
+ASAMU_PIG_TEMPLATE_IDS = (
+    "pig-g1092931381-asamu",
+    "pig-g237716658-asamu",
+    "pig-qo5e5854406d0297d6feae696a13e3a339-asamu",
+    "pig-qo9ea2810f378fbd7dc3219c56ceab3520-asamu",
+)
 JUEJUE_FORM_TIME = "time-sand"
 JUEJUE_FORM_VIRTUAL = "virtual-sound"
+DANIYA_FORM_STAGING = "staging"
+DANIYA_FORM_DISILLUSION = "disillusion"
 JUEJUE_ACCELERATION_TIERS = (
     JuejueAccelerationTier(1, 100, 15, 1, 0),
     JuejueAccelerationTier(2, 75, 20, 2, 2),
@@ -223,6 +258,202 @@ JUEJUE_FORMS = (
     FighterForm(JUEJUE_FORM_VIRTUAL, "虚拟声", JUEJUE_VIRTUAL_MOVES),
 )
 
+DANIYA_STAGING_MOVES = (
+    Move(
+        "daniya-staging-dream-feast",
+        "达妮娅-布景·织梦的飨宴",
+        14,
+        tags=("daniya", "daniya-staging"),
+        description="胜利权重+14；下一次蚀域主盘抽取权重+0.1。",
+        draw_weight_units=1000,
+    ),
+    Move(
+        "daniya-staging-mimic-bubble",
+        "达妮娅-布景·拟态泡泡",
+        20,
+        tags=("daniya", "daniya-staging"),
+        description="胜利权重+20；下一次蚀域主盘抽取权重+0.1。",
+        draw_weight_units=1000,
+    ),
+    Move(
+        "daniya-staging-final-curtain",
+        "达妮娅-布景·帷幕终景",
+        42,
+        tags=("daniya", "daniya-staging"),
+        description="胜利权重+42；下一次蚀域主盘抽取权重+0.1。",
+        draw_weight_units=1000,
+    ),
+    Move(
+        "daniya-staging-greeting",
+        "达妮娅-布景·久疏问候！",
+        26,
+        tags=("daniya", "daniya-staging"),
+        description="胜利权重+26；下一次蚀域主盘抽取权重+0.1。",
+        draw_weight_units=1000,
+    ),
+)
+DANIYA_DISILLUSION_MOVES = (
+    Move(
+        "daniya-disillusion-dream-feast",
+        "达妮娅-幻灭·织梦的飨宴",
+        8,
+        tags=("daniya", "daniya-disillusion"),
+        description="自身胜利权重+8、对方胜利权重-8；对方本场后续伤势盘的力竭权重永久+0.1。",
+        opponent_reduction=8,
+        draw_weight_units=1000,
+    ),
+    Move(
+        "daniya-disillusion-banish",
+        "达妮娅-幻灭·放逐",
+        11,
+        tags=("daniya", "daniya-disillusion"),
+        description="自身胜利权重+11、对方胜利权重-11；对方本场后续伤势盘的力竭权重永久+0.1。",
+        opponent_reduction=11,
+        draw_weight_units=1000,
+    ),
+    Move(
+        "daniya-disillusion-final-curtain",
+        "达妮娅-幻灭·帷幕终景",
+        22,
+        tags=("daniya", "daniya-disillusion"),
+        description="自身胜利权重+22、对方胜利权重-22；对方本场后续伤势盘的力竭权重永久+0.1。",
+        opponent_reduction=22,
+        draw_weight_units=1000,
+    ),
+    Move(
+        "daniya-disillusion-knock",
+        "达妮娅-幻灭·轻叩门扉",
+        14,
+        tags=("daniya", "daniya-disillusion"),
+        description="自身胜利权重+14、对方胜利权重-14；对方本场后续伤势盘的力竭权重永久+0.1。",
+        opponent_reduction=14,
+        draw_weight_units=1000,
+    ),
+)
+DANIYA_COMMON_MOVES = (
+    Move(
+        "daniya-flawless",
+        "达妮娅·天衣无缝",
+        draws=2,
+        tags=("daniya", "daniya-flawless"),
+        description="再抽两次。",
+        draw_weight_units=1000,
+    ),
+    Move(
+        "daniya-unfinished-lie",
+        "达妮娅·未竟的谎言",
+        draws=1,
+        loan=True,
+        tags=("daniya", "daniya-loan"),
+        description="本回合再抽一次；下一个数值招式的自身加权与对方减权同步翻倍，下回合出招数-1。",
+        draw_weight_units=1000,
+    ),
+    Move(
+        "daniya-timed-collapse",
+        "达妮娅·计时的溃灭",
+        tags=("daniya", "daniya-timed-collapse"),
+        description="自身胜利权重-52.1；对方本回合力竭权重×5，若未力竭，自身下回合力竭权重×5。",
+        gain_tenths=-521,
+        draw_weight_units=500,
+    ),
+    Move(
+        "daniya-domain",
+        "达妮娅·蚀域",
+        30,
+        tags=("domain", "daniya", "daniya-domain"),
+        description="领域对抗胜利后立即切换为幻灭形态，并使自身下回合出招数+1。",
+        draw_weight_units=1000,
+    ),
+)
+DANIYA_FORMS = (
+    FighterForm(DANIYA_FORM_STAGING, "布景", DANIYA_STAGING_MOVES + DANIYA_COMMON_MOVES),
+    FighterForm(DANIYA_FORM_DISILLUSION, "幻灭", DANIYA_DISILLUSION_MOVES + DANIYA_COMMON_MOVES),
+)
+
+ASAMU_MOVES = (
+    Move(
+        "asamu-bathe",
+        "洗澡",
+        10,
+        tags=("asamu", "asamu-bathe"),
+        description="喝奶茶的抽取权重+0.5。",
+        draw_weight_units=1000,
+    ),
+    Move(
+        "asamu-milk-tea",
+        "喝奶茶",
+        13,
+        tags=("asamu", "asamu-milk-tea"),
+        description="睡觉的抽取权重+0.25，并重置喝奶茶当前抽取权重。",
+        draw_weight_units=1000,
+    ),
+    Move(
+        "asamu-sleep",
+        "睡觉",
+        20,
+        tags=("asamu", "asamu-sleep"),
+        description="本场永久使全盛姿态抽取权重+0.1，并重置睡觉当前抽取权重。",
+        draw_weight_units=1000,
+    ),
+    Move(
+        "asamu-prime",
+        "全盛姿态",
+        44,
+        draws=1,
+        tags=("asamu", "asamu-prime"),
+        description="胜利权重+44，再抽一次。",
+        draw_weight_units=200,
+    ),
+    Move(
+        "asamu-charge-up",
+        "憋个大的",
+        1,
+        tags=("asamu", "asamu-charge-up"),
+        description="本场后续所有招式的胜利权重额外+3，可累加。",
+        draw_weight_units=1000,
+    ),
+    Move(
+        "asamu-pressure-king",
+        "传奇耐压王",
+        7,
+        tags=("asamu", "asamu-pressure-king"),
+        description="对方本回合每个数值招式独立33%失效；每层独立判定，只归零数值而保留功能。",
+        draw_weight_units=500,
+    ),
+    Move(
+        "asamu-misfortune-transfer",
+        "厄运传递",
+        13,
+        tags=("asamu", "asamu-misfortune-transfer"),
+        description="双方本回合力竭倒下权重均×5。",
+        draw_weight_units=500,
+    ),
+    Move(
+        "asamu-milk-dragon",
+        "发奶龙",
+        9,
+        tags=("asamu", "asamu-milk-dragon"),
+        description="依次将对方下回合第一、第二…招替换为发奶龙；被替换的发奶龙不反向影响来源玩家。",
+        draw_weight_units=1000,
+    ),
+    Move(
+        "asamu-tit-for-tat",
+        "以牙还牙",
+        4,
+        tags=("asamu", "asamu-tit-for-tat"),
+        description="回合末若自身权重较低，交换双方权重并再+4；否则自身+40。抽取权重随无伤/轻伤/重伤为0.4/0.749/0.947。",
+        draw_weight_units=400,
+    ),
+    Move(
+        "asamu-domain",
+        "领域·呃呃阿萨姆奶茶",
+        22,
+        tags=("domain", "asamu", "asamu-domain"),
+        description="领域对抗胜利后，使用对方4个随机招式。",
+        draw_weight_units=1000,
+    ),
+)
+
 
 FIGHTERS = (
     FighterDefinition(
@@ -267,6 +498,22 @@ FIGHTERS = (
         template_aliases=JUEJUE_PIG_TEMPLATE_IDS[1:],
         forms=JUEJUE_FORMS,
     ),
+    FighterDefinition(
+        "daniya",
+        DANIYA_PIG_TEMPLATE_IDS[0],
+        "达妮娅猪",
+        DANIYA_STAGING_MOVES + DANIYA_DISILLUSION_MOVES + DANIYA_COMMON_MOVES,
+        template_aliases=DANIYA_PIG_TEMPLATE_IDS[1:],
+        forms=DANIYA_FORMS,
+        initial_form_id=DANIYA_FORM_STAGING,
+    ),
+    FighterDefinition(
+        "asamu",
+        ASAMU_PIG_TEMPLATE_IDS[0],
+        "阿萨姆猪",
+        ASAMU_MOVES,
+        template_aliases=ASAMU_PIG_TEMPLATE_IDS[1:],
+    ),
 )
 FIGHTERS_BY_ID = {item.fighter_id: item for item in FIGHTERS}
 FIGHTERS_BY_TEMPLATE = {
@@ -289,6 +536,8 @@ LEGACY_MOVE_IDS = {
 
 def fighter_moves(fighter_id: str, rule_version: int = BATTLE_RULE_VERSION) -> tuple[Move, ...]:
     moves = FIGHTERS_BY_ID[fighter_id].moves
+    if fighter_id in {"daniya", "asamu"} and rule_version < 5:
+        return ()
     if fighter_id == "juejue" and rule_version < 4:
         return ()
     if rule_version == 1:

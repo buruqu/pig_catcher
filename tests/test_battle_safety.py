@@ -470,7 +470,7 @@ async def test_schema49_migration_preserves_existing_loot_as_five_uses(tmp_path)
         row = await db.fetch_one(
             "SELECT used,total_uses FROM battle_loot WHERE battle_id='BLEGACY49LOOT'"
         )
-        assert await db.schema_version() == 52
+        assert await db.schema_version() == 53
         assert tuple(row) == (2, 5)
         assert await db.fetch_all("PRAGMA foreign_key_check") == []
     finally:
