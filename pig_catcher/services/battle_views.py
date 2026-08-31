@@ -104,11 +104,76 @@ def _mimic_fact(mimic: dict, *, label: str = "虚拟模仿") -> str:
     band = {"large": "大轮盘", "small": "小轮盘"}.get(str(mimic["band"]))
     if band is None:
         raise ValueError(f"未知虚拟模仿轮盘：{mimic['band']}")
-    direction = "自身增加" if mimic["direction"] == "self" else "对手减少"
-    return (
-        f"{label}：{band}抽中“{mimic['source_name']}”，"
-        f"{direction}{weight_label(abs(Fraction(mimic['base'])))}"
-    )
+    base = Fraction(mimic["base"])
+    if mimic["direction"] == "self":
+        direction = "自身增加" if base >= 0 else "自身减少"
+    else:
+        direction = "对手减少" if base >= 0 else "对手增加"
+    source_numbers = []
+    if base:
+        source_numbers.append(f"{direction}{weight_label(abs(base))}")
+    if Fraction(mimic.get("opponent_reduction", 0)):
+        source_numbers.append(f"另带对手减权{weight_label(mimic['opponent_reduction'])}")
+    result = f"{label}：{band}抽中“{mimic['source_name']}”，" + "、".join(source_numbers)
+    effect_summary = mimic.get("effect_summary")
+    if isinstance(effect_summary, dict):
+        effect_parts = []
+        if Fraction(effect_summary.get("opponent_reduction", 0)):
+            effect_parts.append(f"对方本回合-{weight_label(effect_summary['opponent_reduction'])}")
+        if int(effect_summary.get("opponent_next_debt", 0)):
+            effect_parts.append(f"对方下回合-{effect_summary['opponent_next_debt']}招")
+        if int(effect_summary.get("opponent_next_bonus", 0)):
+            effect_parts.append(f"对方下回合+{effect_summary['opponent_next_bonus']}招")
+        if int(effect_summary.get("opponent_next_milk_dragons", 0)):
+            effect_parts.append(f"对方下回合前{effect_summary['opponent_next_milk_dragons']}招变为发奶龙")
+        if int(effect_summary.get("opponent_exhaust_bonus_units", 0)):
+            effect_parts.append(
+                "对方力竭盘+"
+                + str(_scaled_weight(effect_summary["opponent_exhaust_bonus_units"], INJURY_WEIGHT_SCALE))
+            )
+        if effect_summary.get("loan"):
+            effect_parts.append("贷款状态与自身下回合欠招")
+        if effect_summary.get("black_flash"):
+            effect_parts.append("黑闪成长")
+        if effect_summary.get("infinity"):
+            effect_parts.append("无下限防御")
+        effect_summary = "、".join(effect_parts)
+    elif isinstance(effect_summary, (tuple, list)):
+        effect_summary = "、".join(str(item) for item in effect_summary if item)
+    if mimic.get("copied_domain_effect"):
+        effect_summary = "、".join(item for item in (str(effect_summary or ""), mimic["copied_domain_effect"]) if item)
+    if effect_summary:
+        result += f"；同时复制效果：{effect_summary}"
+    elif mimic.get("functional_tags"):
+        result += "；同时复制该招的一般功能与定向效果"
+    boundaries = []
+    if mimic.get("extra_draws_suppressed"):
+        boundaries.append("复制招式的追加抽数已抑制")
+    if mimic.get("domain_reentry_suppressed"):
+        boundaries.append("复制领域不会再次开启领域战")
+    if mimic.get("copied_domain_effect_suppressed"):
+        boundaries.append(str(mimic["copied_domain_effect_suppressed"]))
+    if boundaries:
+        result += "；" + "、".join(boundaries)
+    return result
+
+
+def _relative_zero_first_fact(record: object, label: str) -> str:
+    """把 Battle v6 的首次子盘事实投影成人话；旧战报没有该字段时不猜。"""
+
+    if not isinstance(record, dict):
+        return f"首次{label}未出现"
+    tier = record.get("tier")
+    if tier is None:
+        return f"首次{label}未出现"
+    result = f"首次{label}{tier}档"
+    if record.get("success") is True:
+        result += "成功"
+    elif record.get("success") is False:
+        result += "失败"
+    if record.get("ordinal") is not None:
+        result += f"（第{record['ordinal']}招）"
+    return result
 
 
 def cost_text(costs: dict) -> str:
@@ -266,14 +331,29 @@ def _juejue_event_line(
     relative_zero = event["relative_zero"]
     if relative_zero is not None:
         _required(relative_zero, ("checked", "roll", "wheel", "success", "gain"), "相对静止时间·零")
-        if relative_zero["checked"]:
+        first_acceleration = relative_zero.get("first_acceleration")
+        first_delay = relative_zero.get("first_delay")
+        if first_acceleration is not None or first_delay is not None:
             note_parts.append(
-                "相对静止时间·零判定成功：自身额外+"
-                + weight_label(relative_zero["gain"])
-                + "，对方本回合招式无效"
-                if relative_zero["success"]
-                else "相对静止时间·零判定失败"
+                "零只读取本回合第一次子盘："
+                + _relative_zero_first_fact(first_acceleration, "加速")
+                + "、"
+                + _relative_zero_first_fact(first_delay, "时延")
             )
+        if relative_zero["checked"]:
+            if relative_zero.get("eligible", True):
+                note_parts.append(
+                    "相对静止时间·零判定成功：自身额外+"
+                    + weight_label(relative_zero["gain"])
+                    + "，对方本回合招式无效"
+                    if relative_zero["success"]
+                    else "相对静止时间·零判定失败"
+                )
+            else:
+                note_parts.append(
+                    "相对静止时间·零不满足发动条件"
+                    + (f"：{relative_zero['reason']}" if relative_zero.get("reason") else "")
+                )
     if form_before != form_after:
         note_parts.append(f"即时切换为{form_after}；本招追加抽取从新形态轮盘继续")
     if int(event["sculpt_bonus_after"]) > int(event["sculpt_bonus_before"]):
@@ -290,18 +370,31 @@ def _juejue_event_line(
     if event["realtime_activated"]:
         note_parts.append("实时演算首次生效：本回合两种领域出现权重各+1")
     if event["future_simulation_activated"]:
-        note_parts.append("未来模拟已挂起：回合末随机取消对方一个有效数值招式")
+        note_parts.append("未来模拟独立挂起1次：回合末随机取消对方一个有效数值招式")
     if event["sand_body_activated"]:
         note_parts.append("沙之形体已展开：回合末将对方第一招有效数值减半")
     if event["rewind_active"]:
         note_parts.append("回溯已挂起：本回合失败时可撤销新抽到的轻伤或重伤")
+    if int(event.get("rewind_debt_cleared", 0)):
+        source = (
+            f"第{event['rewind_failure_ordinal']}招"
+            if event.get("rewind_failure_ordinal") is not None
+            else "一笔"
+        )
+        note_parts.append(
+            f"回溯已撤销{source}加速失败产生的下回合-{event['rewind_debt_cleared']}招"
+        )
+    if int(event.get("rewind_pending_count", 0)):
+        note_parts.append(f"尚有{event['rewind_pending_count']}次回溯等待本回合后续加速失败")
+    if event.get("music_repeated"):
+        note_parts.append("音乐状态不叠层；本次重复抽中改为再抽2次")
     if Fraction(event["opponent_reduction"]):
         note_parts.append(f"请求削减对方本回合权重{weight_label(event['opponent_reduction'])}")
     if int(event["opponent_next_debt"]):
         note_parts.append(f"请求令对方下回合出招数-{event['opponent_next_debt']}")
     if int(event["opponent_next_bonus"]):
         note_parts.append(f"本次失败令对方下回合出招数+{event['opponent_next_bonus']}")
-    if event.get("extra_draws"):
+    if event.get("extra_draws") and not event.get("music_repeated"):
         note_parts.append(f"本回合再抽{event['extra_draws']}次")
     if adjustment:
         deducted = Fraction(adjustment["gain"])
@@ -465,7 +558,12 @@ def _event_move_wheel(event: dict, definition_version: int) -> BattleWheelCard:
     """
 
     generated_copy = event.get("generated_by") == "asamu-domain-copy"
-    source_fighter_id = str(event.get("source_fighter_id") or event.get("fighter_id") or "")
+    generated_mimic = event.get("generated_by") == "chaos-domain-auto-mimic"
+    source_fighter_id = str(
+        event.get("fighter_id")
+        if generated_mimic
+        else event.get("source_fighter_id") or event.get("fighter_id") or ""
+    )
     if source_fighter_id not in FIGHTERS_BY_ID:
         raise ValueError(f"未知招式盘来源：{source_fighter_id}")
 
@@ -475,7 +573,7 @@ def _event_move_wheel(event: dict, definition_version: int) -> BattleWheelCard:
     exact_moves = tuple(moves_by_id.get(move_id) for move_id in wheel_move_ids)
     if wheel_move_ids and all(move is not None for move in exact_moves):
         moves = exact_moves
-    elif source_fighter_id in {"juejue", "daniya"} and not generated_copy:
+    elif source_fighter_id in {"juejue", "daniya"} and not generated_copy and not generated_mimic:
         moves = fighter_form_moves(source_fighter_id, str(event.get("form_before") or ""))
     else:
         moves = fighter_moves(source_fighter_id, definition_version)
@@ -514,6 +612,13 @@ def _event_move_wheel(event: dict, definition_version: int) -> BattleWheelCard:
     elif generated_copy:
         title_suffix = f" · 复制自{definition.name}{form_suffix}"
         note = f"高亮阿萨姆领域复制时的真实来源落点；实际施放“{event['name']}”。"
+    elif generated_mimic:
+        mimic = event.get("mimic") or {}
+        copied_fighter_id = str(mimic.get("source_fighter_id") or event.get("source_fighter_id") or "")
+        copied_fighter = FIGHTERS_BY_ID.get(copied_fighter_id)
+        copied_from = copied_fighter.name if copied_fighter else str(mimic.get("source_name") or "其他战斗猪")
+        title_suffix = " · 乱序数虚时空自动发动"
+        note = f"高亮领域命中后自动生成的虚拟模仿；本次复制来源：{copied_from}。"
     else:
         title_suffix = form_suffix
         note = "本卡展示最后一招的真实落点；逐招数值均为已提交事实。"
@@ -590,18 +695,44 @@ def _juejue_state_projection(side: dict) -> tuple[str, str, str]:
         facts.append("音乐状态：后续数值招式+5")
     if turn["juejue_realtime"]:
         facts.append("实时演算：本回合领域盘加权")
-    if turn["juejue_future_simulation"]:
-        facts.append("未来模拟待结算")
+    future_count = int(
+        turn.get("juejue_future_simulation_count", 0)
+        or len(turn.get("juejue_future_simulation_ordinals", ()))
+        or len(turn.get("juejue_future_simulations", ()))
+        or bool(turn["juejue_future_simulation"])
+    )
+    if future_count:
+        facts.append(f"未来模拟待结算×{future_count}")
     if turn["juejue_sand_body"]:
         facts.append("沙之形体已展开")
-    if turn["juejue_rewind"]:
+    rewind_pending = int(
+        turn.get("juejue_rewind_pending_count", 0)
+        or len(turn.get("juejue_rewind_pending_ordinals", ()))
+    )
+    if rewind_pending:
+        facts.append(f"回溯待消除加速失败×{rewind_pending}")
+    elif turn["juejue_rewind"]:
         facts.append("回溯已挂起")
     if turn["juejue_zero_checked"]:
         facts.append("相对静止时间·零已成功" if turn["juejue_zero_active"] else "相对静止时间·零未触发")
-    if turn["juejue_acceleration_tier"]:
-        facts.append(f"本回合加速最高{turn['juejue_acceleration_tier']}档")
-    if turn["juejue_delay_tier"]:
-        facts.append(f"本回合时延最高{turn['juejue_delay_tier']}档")
+    music_repeats = len(turn.get("juejue_music_repeat_ordinals", ()))
+    if music_repeats:
+        facts.append(f"音乐重复再抽×{music_repeats}")
+    first_acceleration = turn.get("juejue_first_acceleration") or turn.get("juejue_zero_first_acceleration")
+    first_delay = turn.get("juejue_first_delay") or turn.get("juejue_zero_first_delay")
+    if first_acceleration is not None or first_delay is not None:
+        facts.append(
+            "零判定首档："
+            + _relative_zero_first_fact(first_acceleration, "加速")
+            + "、"
+            + _relative_zero_first_fact(first_delay, "时延")
+        )
+    else:
+        # Battle v4/v5 历史战报只保存最高成功档，继续按旧字段准确展示。
+        if turn["juejue_acceleration_tier"]:
+            facts.append(f"旧规则本回合加速最高{turn['juejue_acceleration_tier']}档")
+        if turn["juejue_delay_tier"]:
+            facts.append(f"旧规则本回合时延最高{turn['juejue_delay_tier']}档")
     return f"当前形态 · {current}", " → ".join(track), " · ".join(facts) or "暂无待结算机制"
 
 
@@ -698,7 +829,13 @@ def _v4_interaction_panels(interactions: dict, names: list[str]) -> tuple[Panel,
         else:
             value = f"取消{target}第{fact['selected_ordinal']}招"
             note = f"已扣除胜利权重{weight_label(fact['cancelled_gain'])}；招式功能保留"
-        mechanism_lines.append(Line(names[int(fact["side"])] + " · 未来模拟", value, note))
+        source_ordinal = fact.get("source_ordinal")
+        source = (
+            names[int(fact["side"])] + f" · 未来模拟（第{source_ordinal}招）"
+            if source_ordinal is not None
+            else names[int(fact["side"])] + " · 未来模拟"
+        )
+        mechanism_lines.append(Line(source, value, note))
     for fact in interactions["sand_bodies"]:
         _required(
             fact,
@@ -1259,20 +1396,30 @@ def matchup(
                 else "旧规则累计胜利权重完整保留，双方继续下一回合。"
             )
         )
+        injury_lines = [
+            Line(
+                loser + "的伤势盘",
+                INJURY_NAMES[round_result["injury"]]
+                + ("（本轮已回溯）" if round_result.get("injury_rewound") else ""),
+                "抽取权重："
+                + " / ".join(
+                    f"{INJURY_NAMES[k]} {_scaled_weight(v, INJURY_WEIGHT_SCALE)}"
+                    for k, v in round_result["injury_wheel"]
+                ),
+            )
+        ]
+        if round_result.get("injury_rewound"):
+            injury_lines.append(
+                Line(
+                    loser + " · 时之沙·回溯",
+                    "撤销本轮新伤势",
+                    "只撤销本轮新抽到的轻伤或重伤；没有清除历史风险，也不能挽救力竭。",
+                )
+            )
         panels.append(
             Panel(
                 f"第{round_result['round']}回合 · {winner}胜",
-                (
-                    Line(
-                        loser + "的伤势盘",
-                        INJURY_NAMES[round_result["injury"]],
-                        "抽取权重："
-                        + " / ".join(
-                            f"{INJURY_NAMES[k]} {_scaled_weight(v, INJURY_WEIGHT_SCALE)}"
-                            for k, v in round_result["injury_wheel"]
-                        ),
-                    ),
-                ),
+                tuple(injury_lines),
                 panel_note,
             )
         )
@@ -1340,7 +1487,10 @@ def _juejue_move_effect(move, level: int) -> str:
     numeric = f"胜利权重+{move.gain + level}；" if move.gain else ""
     effects = {
         "sand-sculpt": "荒时之沙抽取权重+0.1（领域后清除）；下一次加速/时延成功率+5个百分点",
-        "sand-rewind": "挂起一次回溯：本回合若落败且新抽中轻伤或重伤，撤销本轮新伤势；不能挽救力竭或回溯旧风险",
+        "sand-rewind": (
+            "消除本回合一次加速失败产生的整笔下回合欠招；当前没有待消除失败时可先挂起；"
+            "本回合若落败且新抽中轻伤或重伤，仍撤销本轮新伤势；不能挽救力竭或回溯旧风险"
+        ),
         "sand-accelerate": "进入加速盘；成功后增加胜利权重并按档位追加抽取",
         "sand-delay": "进入时延盘；成功后压低对方本回合权重并影响对方下回合出招数",
         "sand-body": "对方本回合第一个仍有效的数值招式胜利权重减半（向下取整；同回合不叠）",
@@ -1348,11 +1498,14 @@ def _juejue_move_effect(move, level: int) -> str:
         "switch-virtual": "即时切换至虚拟声，并从虚拟声轮盘再抽2次",
         "sand-domain": "主盘抽取权重1、单领域战权重2.5；单方领域命中或领域战获胜后，对方下回合-1招、自己下回合+1招",
         "virtual-realm": "再抽1次；下一次加速或时延判定必定成功",
-        "future-simulation": "随机令对方本回合一个带胜利权重的招式无效",
+        "future-simulation": "每次抽中都独立随机令对方本回合一个带胜利权重的招式无效",
         "realtime-compute": "再抽1次；本回合荒时之沙与乱序数虚时空的抽取权重各+1（不叠）",
-        "virtual-mimic": "大/小轮盘各50%；只模仿其他战斗猪可模仿招式的直接胜利权重",
+        "virtual-mimic": (
+            "大/小轮盘各50%；复制其他战斗猪可模仿招式的数值、一般功能与定向效果；"
+            "复制领域不重开领域战，复制招式的追加抽数不递归"
+        ),
         "make-real": "下次再次使用时额外+5，逐次累加",
-        "louder": "进入本回合音乐状态；之后每个招式固定+5（重复抽中不叠）",
+        "louder": "首次进入本回合音乐状态，之后每招固定+5；重复抽中不叠层，改为再抽2次",
         "switch-sand": (
             "即时切换至时之沙并再抽1次；下一次荒时之沙+0.5抽取权重；"
             "下一次加速与下一次时延成功率各+5个百分点"
@@ -1473,23 +1626,28 @@ def _juejue_wheels(identity: CommandIdentity, level: int) -> BattleView:
                 (
                     Line(
                         "相对静止时间·零",
-                        "成功的加速档位+时延档位≥5时判定50%",
-                        "成功后自身固定+40，对方本回合全部数值贡献无效；招式功能事实保留。",
+                        "本回合第一次加速+第一次时延均成功且档位和≥5时判定50%",
+                        "后续重复加速/时延不参与凑档；成功后自身固定+40，对方本回合全部数值贡献无效。",
                     ),
                     Line(
                         "双领域",
                         "荒时之沙 + 乱序数虚时空",
                         "仅在双方都开领域且撅撅猪获胜时，两份仍有效领域数值相加再翻倍；模仿不参与翻倍。",
                     ),
-                    Line("虚拟模仿", "大盘≥20 / 小盘<20", "按数值绝对值分盘；只复制直接数值，不复制功能链。"),
+                    Line(
+                        "虚拟模仿",
+                        "大盘≥20 / 小盘<20",
+                        "按数值绝对值分盘；复制数值与一般效果，但抑制领域再入和复制招式的追加抽数。",
+                    ),
                 ),
                 "组合技只结算一次；图中展示已提交的领域权重、模仿来源和最终落点。",
             ),
         ),
         hints=(
             "当前形态与完整切换轨迹会显示在参战猪猪下方；长连锁不省略事实。",
-            "实时演算与音乐状态本回合不重复叠层；荒时之沙使用后清除塑型的领域加权。",
-            "回溯不能取消力竭，也不降低历史风险；虚拟模仿候选池随对战规则版本冻结。",
+            "实时演算本回合不重复叠层；音乐重复抽中改为再抽2次，不增加音乐层数。",
+            "回溯还能消除一笔加速失败产生的整笔欠招；不能取消力竭，也不降低历史风险。",
+            "未来模拟每次抽中独立结算；虚拟模仿候选池随对战规则版本冻结。",
             "领域招式主盘基础抽取权重为1；领域战另算：普通3、宿傩4、撅撅猪单领域2.5、双领域5.5、平手3。",
         ),
     )

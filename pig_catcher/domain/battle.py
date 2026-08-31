@@ -138,14 +138,21 @@ def fresh_turn() -> dict:
         "events": [],
         "infinity_used": False,
         "juejue_music": False,
+        "juejue_music_repeat_ordinals": [],
         "juejue_realtime": False,
         "juejue_future_simulation": False,
+        "juejue_future_simulation_ordinals": [],
         "juejue_sand_body": False,
         "juejue_zero_checked": False,
         "juejue_zero_active": False,
         "juejue_acceleration_tier": 0,
         "juejue_delay_tier": 0,
+        "juejue_zero_first_acceleration": None,
+        "juejue_zero_first_delay": None,
         "juejue_rewind": False,
+        "juejue_rewind_count": 0,
+        "juejue_rewind_pending_ordinals": [],
+        "juejue_acceleration_failures": [],
         "daniya_collapse_count": 0,
         "asamu_pressure_ordinals": [],
         "asamu_misfortune_count": 0,
@@ -162,8 +169,11 @@ def _frozen_mimic_pool() -> dict[str, list[dict]]:
             continue
         for move in fighter.moves:
             base = _move_base(move)
-            # 虚拟模仿只复制正向直接胜利数值；自损、对方减权和所有功能均不复制。
-            if base <= 0:
+            opponent_reduction = _opponent_reduction_base(move)
+            # v6只允许有胜率数值或对手减益数值的招式进入池；抽中后才连同
+            # 其普通功能复制。纯贷款、纯再抽等零数值招不进入池。
+            magnitude = max(abs(base), abs(opponent_reduction))
+            if magnitude == 0:
                 continue
             entry = {
                 "fighter_id": fighter.fighter_id,
@@ -171,8 +181,12 @@ def _frozen_mimic_pool() -> dict[str, list[dict]]:
                 "name": move.name,
                 "base": base,
                 "direction": move.direction,
+                "opponent_reduction": opponent_reduction,
+                "draws": int(move.draws),
+                "loan": bool(move.loan),
+                "tags": list(move.tags),
             }
-            pool["large" if base >= 20 else "small"].append(entry)
+            pool["large" if magnitude >= 20 else "small"].append(entry)
     return pool
 
 
@@ -343,6 +357,12 @@ def _juejue_subwheel(
 
 def _juejue_mimic(player: dict, seed: str, key: str, version: int) -> dict:
     pool = player.get("juejue_mimic_pool") or {"large": [], "small": []}
+    if version < 6:
+        # 已开局的v5及更早现场必须保留原有“仅正向直接数值”池及其索引顺序。
+        pool = {
+            band: [entry for entry in pool.get(band, ()) if Fraction(entry.get("base", 0)) > 0]
+            for band in ("large", "small")
+        }
     bands = tuple((name, 1) for name in ("large", "small") if pool.get(name))
     if not bands:
         return {
@@ -357,6 +377,10 @@ def _juejue_mimic(player: dict, seed: str, key: str, version: int) -> dict:
             "source_name": "",
             "base": 0,
             "direction": "self",
+            "opponent_reduction": 0,
+            "source_draws": 0,
+            "source_loan": False,
+            "source_tags": [],
         }
     band, band_roll = choose(seed, f"{key}:band", bands, version=version)
     source_wheel = tuple((index, 1) for index, _entry in enumerate(pool[band]))
@@ -372,9 +396,20 @@ def _juejue_mimic(player: dict, seed: str, key: str, version: int) -> dict:
         "source_fighter_id": source["fighter_id"],
         "source_move_id": source["move_id"],
         "source_name": source["name"],
-        "base": int(source["base"]),
+        "base": Fraction(source["base"]),
         "direction": source.get("direction", "self"),
+        "opponent_reduction": Fraction(source.get("opponent_reduction", 0)),
+        "source_draws": int(source.get("draws", 0)),
+        "source_loan": bool(source.get("loan", False)),
+        "source_tags": list(source.get("tags", ())),
     }
+
+
+def _move_by_id(fighter_id: str, move_id: str) -> Move | None:
+    fighter = FIGHTERS_BY_ID.get(fighter_id)
+    if fighter is None:
+        return None
+    return next((move for move in fighter.moves if move.move_id == move_id), None)
 
 
 def apply_move(
@@ -389,6 +424,8 @@ def apply_move(
     allow_extra_draws: bool = True,
     functional_fighter_id: str | None = None,
     forced: bool = False,
+    mimic_override: dict | None = None,
+    copy_context: bool = False,
 ) -> dict:
     """应用一个确定招式。
 
@@ -406,6 +443,11 @@ def apply_move(
     key = f"{round_number}:{side}:move:{ordinal}:nested"
     snapshot = player["snapshot"]
     fighter_id = functional_fighter_id or snapshot.get("fighter_id", "")
+    effect_fighter_id = fighter_id
+    effect_tags = set(move.tags)
+    effect_move_id = move.move_id
+    effect_draws = int(move.draws)
+    effect_loan = bool(move.loan)
     is_juejue = fighter_id == "juejue"
     is_daniya = fighter_id == "daniya"
     if is_juejue:
@@ -417,6 +459,13 @@ def apply_move(
     music_was_active = bool(turn.get("juejue_music"))
     music_gain = Fraction(5 if music_was_active else 0)
     special_base = _move_base(move)
+    if version < 6 and move.move_id in {
+        "virtual-realm",
+        "future-simulation",
+        "realtime-compute",
+    }:
+        # v5这三招仅有功能，不追改已开局战斗的胜率账。
+        special_base = Fraction(0)
     numeric_direction = move.direction
     special_extra_draws = 0
     opponent_reduction = _opponent_reduction_base(move)
@@ -441,17 +490,57 @@ def apply_move(
     realtime_activated = False
     future_activated = False
     sand_body_activated = False
+    music_activated = False
+    music_repeated = False
+    rewind_debt_cleared = 0
+    rewind_failure_ordinal = None
+    rewind_pending_count = len(turn.get("juejue_rewind_pending_ordinals", ()))
+    acceleration_failure_debt = 0
+    acceleration_failure_rewound = False
+    acceleration_rewind_source_ordinal = None
+    copied_domain_effect = ""
+    copied_domain_effect_suppressed = ""
+    suppressed_source_local_effects: list[str] = []
 
     if is_juejue and "juejue-accelerate" in move.tags:
         tier, subwheel = _juejue_subwheel(player, "acceleration", seed, key, version)
+        if version >= 6 and turn.get("juejue_zero_first_acceleration") is None:
+            turn["juejue_zero_first_acceleration"] = {
+                "ordinal": ordinal,
+                "tier": int(tier.tier),
+                "success": bool(subwheel["success"]),
+            }
         if subwheel["success"]:
             special_base = Fraction(tier.gain)
             special_extra_draws = tier.extra_draws
             turn["juejue_acceleration_tier"] = max(turn["juejue_acceleration_tier"], tier.tier)
         else:
-            player["next_debt"] += tier.failure_debt
+            acceleration_failure_debt = int(tier.failure_debt)
+            if version < 6:
+                player["next_debt"] += acceleration_failure_debt
+            else:
+                pending_rewinds = turn.setdefault("juejue_rewind_pending_ordinals", [])
+                acceleration_rewind_source_ordinal = pending_rewinds.pop(0) if pending_rewinds else None
+                acceleration_failure_rewound = acceleration_rewind_source_ordinal is not None
+                if not acceleration_failure_rewound:
+                    player["next_debt"] += acceleration_failure_debt
+                turn.setdefault("juejue_acceleration_failures", []).append(
+                    {
+                        "ordinal": ordinal,
+                        "debt": acceleration_failure_debt,
+                        "debt_applied": not acceleration_failure_rewound,
+                        "rewound_by_ordinal": acceleration_rewind_source_ordinal,
+                    }
+                )
+                rewind_pending_count = len(pending_rewinds)
     elif is_juejue and "juejue-delay" in move.tags:
         tier, subwheel = _juejue_subwheel(player, "delay", seed, key, version)
+        if version >= 6 and turn.get("juejue_zero_first_delay") is None:
+            turn["juejue_zero_first_delay"] = {
+                "ordinal": ordinal,
+                "tier": int(tier.tier),
+                "success": bool(subwheel["success"]),
+            }
         if subwheel["success"]:
             special_base = Fraction(tier.gain)
             opponent_reduction += Fraction(tier.opponent_reduction)
@@ -460,31 +549,77 @@ def apply_move(
         else:
             opponent_next_bonus = tier.failure_opponent_bonus
     elif is_juejue and "juejue-mimic" in move.tags:
-        mimic = _juejue_mimic(player, seed, key, version)
-        special_base = abs(Fraction(mimic["base"]))
-        numeric_direction = mimic["direction"]
+        mimic = (
+            deepcopy(mimic_override)
+            if mimic_override is not None
+            else _juejue_mimic(player, seed, key, version)
+        )
+        # 冻结entry是本场唯一事实源；目录热修后也不能回查覆盖数值或功能。
+        special_base = Fraction(mimic.get("base", 0))
+        numeric_direction = mimic.get("direction", "self")
+        opponent_reduction = Fraction(mimic.get("opponent_reduction", 0))
+        effect_tags = set(mimic.get("source_tags", ()))
+        effect_fighter_id = str(mimic.get("source_fighter_id", ""))
+        effect_move_id = str(mimic.get("source_move_id", ""))
+        effect_draws = int(mimic.get("source_draws", 0))
+        effect_loan = bool(mimic.get("source_loan", False))
+        if version < 6:
+            # v5及更早现场保持旧语义：只取正向数值，不复制任何功能或定向减权。
+            special_base = abs(special_base)
+            opponent_reduction = Fraction(0)
+            effect_tags = set()
+            effect_fighter_id = fighter_id
+            effect_move_id = move.move_id
+            effect_draws = int(move.draws)
+            effect_loan = bool(move.loan)
     elif is_juejue and "juejue-make-real" in move.tags:
         special_base = Fraction(12 + 5 * realization_before)
         player["juejue_realization_stacks"] += 1
+
+    is_copy = mimic is not None or copy_context
 
     if is_juejue and "juejue-sculpt" in move.tags:
         player["juejue_sculpt_bonus"] = min(20, player["juejue_sculpt_bonus"] + 5)
         player["juejue_sand_domain_steps"] += 1
     if is_juejue and "juejue-rewind" in move.tags:
         turn["juejue_rewind"] = True
+        if version >= 6:
+            turn["juejue_rewind_count"] = int(turn.get("juejue_rewind_count", 0)) + 1
+            for failure in reversed(turn.setdefault("juejue_acceleration_failures", [])):
+                if not failure.get("debt_applied") or failure.get("rewound_by_ordinal") is not None:
+                    continue
+                rewind_debt_cleared = int(failure.get("debt", 0))
+                rewind_failure_ordinal = int(failure["ordinal"])
+                player["next_debt"] = max(
+                    0, int(player.get("next_debt", 0)) - rewind_debt_cleared
+                )
+                failure["debt_applied"] = False
+                failure["rewound_by_ordinal"] = ordinal
+                break
+            else:
+                turn.setdefault("juejue_rewind_pending_ordinals", []).append(ordinal)
+            rewind_pending_count = len(turn.get("juejue_rewind_pending_ordinals", ()))
     if is_juejue and "juejue-sand-body" in move.tags and not turn["juejue_sand_body"]:
         turn["juejue_sand_body"] = True
         sand_body_activated = True
-    if is_juejue and "juejue-future-simulation" in move.tags and not turn["juejue_future_simulation"]:
-        turn["juejue_future_simulation"] = True
-        future_activated = True
+    if is_juejue and "juejue-future-simulation" in move.tags:
+        if version >= 6 or not turn["juejue_future_simulation"]:
+            turn["juejue_future_simulation"] = True
+            turn.setdefault("juejue_future_simulation_ordinals", []).append(ordinal)
+            future_activated = True
     if is_juejue and "juejue-realtime" in move.tags and not turn["juejue_realtime"]:
         turn["juejue_realtime"] = True
         realtime_activated = True
     if is_juejue and "juejue-virtual-realm" in move.tags:
         player["juejue_guaranteed"] = True
     if is_juejue and "juejue-music" in move.tags:
-        turn["juejue_music"] = True
+        if turn["juejue_music"] and version >= 6:
+            music_repeated = True
+            turn.setdefault("juejue_music_repeat_ordinals", []).append(ordinal)
+            special_extra_draws += 2
+        elif not turn["juejue_music"]:
+            turn["juejue_music"] = True
+            music_activated = True
     if is_juejue and "juejue-switch-virtual" in move.tags:
         player["juejue_form"] = JUEJUE_FORM_VIRTUAL
     if is_juejue and "juejue-switch-sand" in move.tags:
@@ -497,46 +632,74 @@ def apply_move(
         player["juejue_sand_domain_switch_units"] = 0
 
     # 达妮娅：布景四招只提高下一次蚀域的主盘出现权重；领域被抽到即清空。
-    if "daniya-staging" in move.tags:
+    if "daniya-staging" in effect_tags and not is_copy:
         player["daniya_domain_steps"] = int(player.get("daniya_domain_steps", 0)) + 1
-    if "daniya-disillusion" in move.tags:
+    elif "daniya-staging" in effect_tags:
+        suppressed_source_local_effects.append("daniya-domain-draw-weight")
+    if "daniya-disillusion" in effect_tags:
         opponent_exhaust_bonus_units += 1
-    if "daniya-timed-collapse" in move.tags:
+    if "daniya-timed-collapse" in effect_tags:
         turn["daniya_collapse_count"] = max(1, int(turn.get("daniya_collapse_count", 0)))
-    if "daniya-domain" in move.tags:
+    if "daniya-domain" in effect_tags and not is_copy:
         player["daniya_domain_steps"] = 0
 
     # 阿萨姆：所有动态抽取权重都保存为千分整数；睡觉对全盛的加成整场保留。
-    if "asamu-bathe" in move.tags:
+    if "asamu-bathe" in effect_tags and not is_copy:
         player["asamu_tea_bonus_units"] = int(player.get("asamu_tea_bonus_units", 0)) + 500
-    if "asamu-milk-tea" in move.tags:
+    elif "asamu-bathe" in effect_tags:
+        suppressed_source_local_effects.append("asamu-milk-tea-draw-weight")
+    if "asamu-milk-tea" in effect_tags and not is_copy:
         player["asamu_tea_bonus_units"] = 0
         player["asamu_sleep_bonus_units"] = int(player.get("asamu_sleep_bonus_units", 0)) + 250
-    if "asamu-sleep" in move.tags:
+    elif "asamu-milk-tea" in effect_tags:
+        suppressed_source_local_effects.append("asamu-sleep-draw-weight")
+    if "asamu-sleep" in effect_tags and not is_copy:
         player["asamu_sleep_bonus_units"] = 0
         player["asamu_prime_bonus_units"] = int(player.get("asamu_prime_bonus_units", 0)) + 100
-    if "asamu-charge-up" in move.tags:
+    elif "asamu-sleep" in effect_tags:
+        suppressed_source_local_effects.append("asamu-prime-draw-weight")
+    if "asamu-charge-up" in effect_tags:
         player["asamu_big_stacks"] = asamu_big_before + 1
-    if "asamu-pressure-king" in move.tags:
+    if "asamu-pressure-king" in effect_tags:
         turn.setdefault("asamu_pressure_ordinals", []).append(ordinal)
-    if "asamu-misfortune-transfer" in move.tags:
+    if "asamu-misfortune-transfer" in effect_tags:
         turn["asamu_misfortune_count"] = int(turn.get("asamu_misfortune_count", 0)) + 1
-    if "asamu-milk-dragon" in move.tags and not forced:
+    if "asamu-milk-dragon" in effect_tags and not forced:
         opponent_next_milk_dragons = 1
-    if "asamu-tit-for-tat" in move.tags:
+    if "asamu-tit-for-tat" in effect_tags:
         turn.setdefault("asamu_retaliation_ordinals", []).append(ordinal)
 
+    # 虚拟模仿复制领域的数值和一般命中效果，但绝不重新进入领域战。
+    # 阿萨姆领域的“再复制四招”属于可扩张递归，明确抑制；其他普通定向
+    # 效果继续走本回合统一的跨方结算与保护规则。
+    copied_domain = is_copy and "domain" in effect_tags
+    if copied_domain:
+        if effect_fighter_id == "gojo":
+            opponent_next_debt += 1
+            copied_domain_effect = "无量空处命中：对方下回合出招数-1"
+        elif effect_fighter_id == "daniya":
+            player["next_action_bonus"] += 1
+            copied_domain_effect = "蚀域命中：自己下回合出招数+1"
+        elif effect_fighter_id == "asamu":
+            copied_domain_effect_suppressed = "阿萨姆领域追加四次复制被抑制"
+        else:
+            copied_domain_effect = "仅复制领域数值；不重新进入领域战"
+
+    first_acceleration = turn.get("juejue_zero_first_acceleration")
+    first_delay = turn.get("juejue_zero_first_delay")
     if (
-        is_juejue
+        version < 6
+        and is_juejue
         and subwheel is not None
         and subwheel["success"]
         and not turn["juejue_zero_checked"]
         and turn["juejue_acceleration_tier"] + turn["juejue_delay_tier"] >= 5
     ):
+        wheel = ((True, 1), (False, 1))
         zero_success, zero_roll = choose(
             seed,
             f"{key}:relative-zero",
-            ((True, 1), (False, 1)),
+            wheel,
             version=version,
         )
         turn["juejue_zero_checked"] = True
@@ -546,7 +709,51 @@ def apply_move(
             "checked": True,
             "acceleration_tier": turn["juejue_acceleration_tier"],
             "delay_tier": turn["juejue_delay_tier"],
-            "wheel": ((True, 1), (False, 1)),
+            "wheel": wheel,
+            "roll": zero_roll,
+            "success": bool(zero_success),
+            "gain": zero_bonus,
+        }
+    elif (
+        version >= 6
+        and is_juejue
+        and not turn["juejue_zero_checked"]
+        and first_acceleration
+        and first_delay
+    ):
+        turn["juejue_zero_checked"] = True
+        tier_sum = int(first_acceleration["tier"]) + int(first_delay["tier"])
+        both_success = bool(first_acceleration["success"] and first_delay["success"])
+        eligible = both_success and tier_sum >= 5
+        if not both_success:
+            reason = "首次加速或首次时延失败"
+        elif tier_sum < 5:
+            reason = "首次加速与首次时延档数和不足5"
+        else:
+            reason = "满足判定条件"
+        zero_roll = None
+        zero_success = False
+        wheel: tuple = ()
+        if eligible:
+            wheel = ((True, 1), (False, 1))
+            zero_success, zero_roll = choose(
+                seed,
+                f"{key}:relative-zero",
+                wheel,
+                version=version,
+            )
+        turn["juejue_zero_active"] = bool(zero_success)
+        zero_bonus = Fraction(40 if zero_success else 0)
+        relative_zero = {
+            "checked": True,
+            "eligible": eligible,
+            "reason": reason,
+            "first_acceleration": deepcopy(first_acceleration),
+            "first_delay": deepcopy(first_delay),
+            "acceleration_tier": int(first_acceleration["tier"]),
+            "delay_tier": int(first_delay["tier"]),
+            "tier_sum": tier_sum,
+            "wheel": wheel,
             "roll": zero_roll,
             "success": bool(zero_success),
             "gain": zero_bonus,
@@ -576,11 +783,8 @@ def apply_move(
     own_numeric = directed_numeric if numeric_direction == "self" else Fraction(0)
     if numeric_direction == "opponent":
         opponent_reduction += directed_numeric
-    asamu_big_gain = (
-        Fraction(3 * asamu_big_before)
-        if snapshot.get("fighter_id") == "asamu"
-        else Fraction(0)
-    )
+    # 憋个大的属于“后续所有招式”效果；由虚拟模仿获得层数后同样生效。
+    asamu_big_gain = Fraction(3 * asamu_big_before)
     gain = own_numeric + music_gain + black_flash_bonus + zero_bonus + asamu_big_gain
     if multiplier_contract:
         player["double"] = False
@@ -589,24 +793,56 @@ def apply_move(
     if used_tool:
         player["tool_used"] = True
     player["weight"] += gain
-    requested_extra_draws = move.draws + special_extra_draws
+    requested_extra_draws = effect_draws + special_extra_draws
+    # 主动虚拟模仿复制来源追加抽数；领域结算型自动模仿与固定复制通过
+    # allow_extra_draws=False 抑制追加抽数，避免结算后重新打开pending。
+    copy_draws_suppressed = mimic is not None and requested_extra_draws > 0 and not allow_extra_draws
     extra_draws = requested_extra_draws if allow_extra_draws else 0
     turn["pending"] += extra_draws
-    if move.loan:
+    if effect_loan:
         player["double"] = True
         player["next_debt"] += 1
-    if "black-flash" in move.tags:
+    if "black-flash" in effect_tags:
         player["black_flash_stacks"] += 1
     purple_weight_steps_before = player["purple_weight_steps"]
-    purple_weight_steps_used = purple_weight_steps_before if "purple" in move.tags else 0
-    if "purple" in move.tags:
+    purple_weight_steps_used = (
+        purple_weight_steps_before if "purple" in effect_tags and not is_copy else 0
+    )
+    if "purple" in effect_tags and not is_copy:
         player["purple_weight_steps"] = 0
-    if "blue-red" in move.tags:
+    elif "purple" in effect_tags:
+        suppressed_source_local_effects.append("gojo-purple-draw-weight-reset")
+    if "blue-red" in effect_tags and not is_copy:
         player["purple_weight_steps"] += 1
-    if "infinity" in move.tags:
+    elif "blue-red" in effect_tags:
+        suppressed_source_local_effects.append("gojo-purple-draw-weight")
+    if "infinity" in effect_tags:
         turn["infinity_used"] = True
     turn["done"] = turn["pending"] == 0
     has_numeric_contribution = gain != 0
+    if mimic is not None:
+        mimic.update(
+            functional_fighter_id=effect_fighter_id,
+            functional_move_id=effect_move_id,
+            functional_tags=sorted(effect_tags),
+            requested_extra_draws=requested_extra_draws,
+            extra_draws_suppressed=requested_extra_draws if copy_draws_suppressed else 0,
+            domain_reentry_suppressed=copied_domain,
+            copied_domain_effect=copied_domain_effect,
+            copied_domain_effect_suppressed=copied_domain_effect_suppressed,
+            suppressed_source_local_effects=list(suppressed_source_local_effects),
+            effect_summary={
+                "own_gain": gain,
+                "opponent_reduction": opponent_reduction,
+                "opponent_next_debt": opponent_next_debt,
+                "opponent_next_bonus": opponent_next_bonus,
+                "opponent_next_milk_dragons": opponent_next_milk_dragons,
+                "opponent_exhaust_bonus_units": opponent_exhaust_bonus_units,
+                "loan": effect_loan,
+                "black_flash": "black-flash" in effect_tags,
+                "infinity": "infinity" in effect_tags,
+            },
+        )
     return {
         "ordinal": ordinal,
         "move_id": move.move_id,
@@ -666,15 +902,25 @@ def apply_move(
         "guaranteed_after": bool(player.get("juejue_guaranteed", False)),
         "realtime_activated": realtime_activated,
         "future_simulation_activated": future_activated,
+        "future_simulation_source_ordinal": ordinal if future_activated else None,
         "sand_body_activated": sand_body_activated,
         "rewind_active": bool(turn.get("juejue_rewind")),
+        "rewind_count": int(turn.get("juejue_rewind_count", 0)),
+        "rewind_debt_cleared": rewind_debt_cleared,
+        "rewind_failure_ordinal": rewind_failure_ordinal,
+        "rewind_pending_count": rewind_pending_count,
+        "acceleration_failure_debt": acceleration_failure_debt,
+        "acceleration_failure_rewound": acceleration_failure_rewound,
+        "acceleration_rewind_source_ordinal": acceleration_rewind_source_ordinal,
+        "music_activated": music_activated,
+        "music_repeated": music_repeated,
         "tool_used": snapshot.get("tool_id", "") if used_tool else "",
         "gain": gain,
         "total": player["weight"],
         "extra_draws": extra_draws,
         "requested_extra_draws": requested_extra_draws,
         "extra_draws_suppressed": requested_extra_draws - extra_draws,
-        "loan": move.loan,
+        "loan": effect_loan,
         "double_pending": player["double"],
         "next_debt": player["next_debt"],
         "next_action_bonus": player.get("next_action_bonus", 0),
@@ -683,8 +929,16 @@ def apply_move(
         "purple_weight_steps_used": purple_weight_steps_used,
         "purple_weight_steps": player["purple_weight_steps"],
         "tags": list(move.tags),
+        "functional_tags": sorted(effect_tags),
         "forced": forced,
-        "functional_fighter_id": fighter_id,
+        "copy_context": is_copy,
+        "functional_fighter_id": effect_fighter_id,
+        "functional_move_id": effect_move_id,
+        "domain_reentry_suppressed": copied_domain,
+        "domain_eligible": not copied_domain,
+        "copied_domain_effect": copied_domain_effect,
+        "copied_domain_effect_suppressed": copied_domain_effect_suppressed,
+        "suppressed_source_local_effects": list(suppressed_source_local_effects),
     }
 
 
@@ -849,7 +1103,13 @@ def _domain_strength(state: dict, side: int, events: list[dict]) -> tuple[int, b
 
 def _domain_resolution(state: dict, seed: str, cancelled: list[dict[int, dict]]) -> dict | None:
     domains = [
-        [event for event in side["turn"].get("events", ()) if "domain" in event.get("tags", ())]
+        [
+            event
+            for event in side["turn"].get("events", ())
+            if "domain" in event.get("tags", ())
+            and not event.get("domain_reentry_suppressed")
+            and event.get("domain_eligible", True)
+        ]
         for side in state["sides"]
     ]
     active = [index for index, events in enumerate(domains) if events]
@@ -956,6 +1216,7 @@ def _asamu_domain_copies(state: dict, seed: str, domain: dict | None) -> tuple[d
             consume_pending=False,
             allow_extra_draws=False,
             functional_fighter_id=opponent["snapshot"]["fighter_id"],
+            copy_context=True,
         )
         event.update(
             roll=roll,
@@ -972,10 +1233,60 @@ def _asamu_domain_copies(state: dict, seed: str, domain: dict | None) -> tuple[d
             source_move_id=source_move.move_id,
             source_move_name=source_move.name,
             domain_reentry_suppressed="domain" in source_move.tags,
+            domain_eligible=False,
         )
         player["turn"]["events"].append(deepcopy(event))
         copies.append(event)
     return tuple(copies)
+
+
+def _juejue_domain_auto_mimic(state: dict, seed: str, domain: dict | None) -> dict | None:
+    """乱序数虚时空固定模仿一次；与主动模仿共用完整功能及安全边界。"""
+
+    if state.get("version", 0) < 6 or not domain or domain.get("hit_side") not in (0, 1):
+        return None
+    side = int(domain["hit_side"])
+    player = state["sides"][side]
+    if player["snapshot"].get("fighter_id") != "juejue" or "chaos-domain" not in set(
+        domain["domain_ids"][side]
+    ):
+        return None
+    mimic_move = _move_by_id("juejue", "virtual-mimic")
+    if mimic_move is None:  # pragma: no cover - 目录定义与引擎同时发布
+        raise BattleError("乱序数虚时空缺少虚拟模仿定义。")
+    mimic = _juejue_mimic(
+        player,
+        seed,
+        f"{state['round']}:{side}:domain:auto-mimic",
+        state["version"],
+    )
+    event = apply_move(
+        player,
+        mimic_move,
+        seed=seed,
+        round_number=state["round"],
+        side=side,
+        version=state["version"],
+        consume_pending=False,
+        allow_extra_draws=False,
+        mimic_override=mimic,
+    )
+    event.update(
+        roll=mimic.get("source_roll"),
+        round=state["round"],
+        side=side,
+        fighter_id="juejue",
+        draw_weight_scale=MOVE_WEIGHT_SCALE,
+        draw_wheel_move_ids=["virtual-mimic"],
+        draw_wheel_units=[MOVE_WEIGHT_SCALE],
+        generated_by="chaos-domain-auto-mimic",
+        source_side=side,
+        source_fighter_id=mimic.get("source_fighter_id", ""),
+        source_move_id=mimic.get("source_move_id", ""),
+        source_move_name=mimic.get("source_name", ""),
+    )
+    player["turn"]["events"].append(deepcopy(event))
+    return event
 
 
 def _settle_interactions(state: dict, seed: str) -> dict:
@@ -1003,6 +1314,7 @@ def _settle_interactions(state: dict, seed: str) -> dict:
             }
 
     asamu_domain_copies = _asamu_domain_copies(state, seed, domain)
+    chaos_auto_mimic_event = _juejue_domain_auto_mimic(state, seed, domain)
 
     # 无下限先抵消对方第一招仍有效、具有基础数值的招式；不会回滚功能。
     for defender in (0, 1):
@@ -1015,42 +1327,69 @@ def _settle_interactions(state: dict, seed: str) -> dict:
             _cancel_event(cancelled, attacker, event, "无下限·防御")
             break
 
-    # 未来模拟与沙之形体均每方每轮最多结算一次；只改变数值贡献，保留再抽、
-    # 贷款、切换形态等功能事实。
+    # 每次未来模拟都独立随机一招归零；沙之形体仍每方每轮最多结算一次。
+    # 两者都只改变数值贡献，保留再抽、贷款、切换形态等功能事实。
     future_simulations = []
     sand_bodies = []
     for defender in (0, 1):
         attacker = 1 - defender
-        future = {
-            "side": defender,
-            "active": bool(state["sides"][defender]["turn"].get("juejue_future_simulation")),
-            "target_side": attacker,
-            "candidate_ordinals": [],
-            "selected_ordinal": None,
-            "roll": None,
-            "cancelled_gain": 0,
-        }
-        if future["active"]:
+        future_turn = state["sides"][defender]["turn"]
+        source_ordinals = list(future_turn.get("juejue_future_simulation_ordinals", ()))
+        if not source_ordinals and future_turn.get("juejue_future_simulation"):
+            # 兼容已在进行、只有旧布尔字段的现场。
+            source_ordinals = [None]
+        if version < 6:
+            source_ordinals = source_ordinals[:1]
+        if not source_ordinals:
+            future_simulations.append(
+                {
+                    "side": defender,
+                    "active": False,
+                    "source_ordinal": None,
+                    "chance_ordinal": None,
+                    "target_side": attacker,
+                    "candidate_ordinals": [],
+                    "selected_ordinal": None,
+                    "roll": None,
+                    "cancelled_gain": 0,
+                }
+            )
+        for chance_ordinal, source_ordinal in enumerate(source_ordinals, start=1):
+            future = {
+                "side": defender,
+                "active": True,
+                "source_ordinal": source_ordinal,
+                "chance_ordinal": chance_ordinal,
+                "target_side": attacker,
+                "candidate_ordinals": [],
+                "selected_ordinal": None,
+                "roll": None,
+                "cancelled_gain": 0,
+            }
             candidates = [
                 event
                 for event in state["sides"][attacker]["turn"].get("events", ())
-                if event.get("numeric_base") and _remaining_event_gain(cancelled, attacker, event) != 0
+                if event.get("numeric_base")
+                and _remaining_event_gain(cancelled, attacker, event) != 0
             ]
             future["candidate_ordinals"] = [int(event["ordinal"]) for event in candidates]
             if candidates:
                 wheel = tuple((int(event["ordinal"]), 1) for event in candidates)
-                selected, roll = choose(
-                    seed,
-                    f"{round_number}:juejue:future:{defender}:target",
-                    wheel,
-                    version=version,
+                namespace = (
+                    f"{round_number}:juejue:future:{defender}:target"
+                    if source_ordinal is None
+                    else f"{round_number}:juejue:future:{defender}:{source_ordinal}:target"
                 )
+                selected, roll = choose(seed, namespace, wheel, version=version)
                 event = next(item for item in candidates if int(item["ordinal"]) == selected)
                 future.update(selected_ordinal=selected, roll=roll)
                 future["cancelled_gain"] = _cancel_event(
-                    cancelled, attacker, event, "虚拟声·未来模拟"
+                    cancelled,
+                    attacker,
+                    event,
+                    f"虚拟声·未来模拟#{chance_ordinal}",
                 )
-        future_simulations.append(future)
+            future_simulations.append(future)
 
         sand = {
             "side": defender,
@@ -1166,6 +1505,8 @@ def _settle_interactions(state: dict, seed: str) -> dict:
                 event
                 for event in state["sides"][winner]["turn"].get("events", ())
                 if "domain" in event.get("tags", ())
+                and not event.get("domain_reentry_suppressed")
+                and event.get("domain_eligible", True)
                 and _remaining_event_gain(cancelled, winner, event) > 0
             ]
             if domain["dual_juejue"][winner]:
@@ -1213,25 +1554,49 @@ def _settle_interactions(state: dict, seed: str) -> dict:
             player = state["sides"][hit_side]
             player["next_action_bonus"] += 1
             player["juejue_guaranteed"] = True
-            mimic = _juejue_mimic(
-                player,
-                seed,
-                f"{round_number}:{hit_side}:domain:auto-mimic",
-                version,
-            )
-            base = abs(int(mimic["base"]))
-            numeric = max(
-                0,
-                base
-                + int(player["snapshot"].get("level", 0))
-                + int(player.get("core", 0))
-                - int(bool(player.get("heavy"))),
-            )
-            music_gain = 5 if player["turn"].get("juejue_music") else 0
-            direction = mimic.get("direction", "self")
-            raw_gain = numeric + music_gain if mimic["available"] and direction == "self" else 0
-            raw_reduction = numeric + music_gain if mimic["available"] and direction == "opponent" else 0
-            numeric_suppressed = bool(mimic["available"] and target in protected_juejue_sides)
+            if version < 6:
+                mimic = _juejue_mimic(
+                    player,
+                    seed,
+                    f"{round_number}:{hit_side}:domain:auto-mimic",
+                    version,
+                )
+                base = abs(int(mimic["base"]))
+                numeric = max(
+                    0,
+                    base
+                    + int(player["snapshot"].get("level", 0))
+                    + int(player.get("core", 0))
+                    - int(bool(player.get("heavy"))),
+                )
+                legacy_music_gain = 5 if player["turn"].get("juejue_music") else 0
+                direction = mimic.get("direction", "self")
+                raw_gain = (
+                    numeric + legacy_music_gain
+                    if mimic["available"] and direction == "self"
+                    else 0
+                )
+                raw_reduction = (
+                    numeric + legacy_music_gain
+                    if mimic["available"] and direction == "opponent"
+                    else 0
+                )
+                generated = None
+            else:
+                generated = chaos_auto_mimic_event
+                mimic = (
+                    deepcopy(generated.get("mimic") or {})
+                    if generated
+                    else {"available": False}
+                )
+                raw_gain = Fraction(generated.get("gain", 0)) if generated else Fraction(0)
+                raw_reduction = (
+                    Fraction(generated.get("opponent_reduction", 0))
+                    if generated
+                    else Fraction(0)
+                )
+                legacy_music_gain = 0
+            numeric_suppressed = bool(mimic.get("available") and target in protected_juejue_sides)
             suppressed_reason = ""
             if numeric_suppressed:
                 target_guard = zeroes[target]
@@ -1244,24 +1609,48 @@ def _settle_interactions(state: dict, seed: str) -> dict:
                         else "相对静止·零与双领域"
                     )
                 )
-            applied_gain = 0 if numeric_suppressed else raw_gain
-            applied_reduction = 0 if numeric_suppressed else raw_reduction
-            if applied_gain:
-                player["weight"] += applied_gain
-            if applied_reduction:
+            if version < 6:
+                applied_gain = Fraction(0) if numeric_suppressed else Fraction(raw_gain)
+                if applied_gain:
+                    player["weight"] += applied_gain
+            else:
+                applied_gain = (
+                    _remaining_event_gain(cancelled, hit_side, generated)
+                    if generated is not None
+                    else Fraction(0)
+                )
+            applied_reduction = Fraction(0) if numeric_suppressed else raw_reduction
+            if version < 6 and applied_reduction:
                 extra_round_reduction[target] += applied_reduction
             auto_mimic = {
                 **mimic,
-                "training": int(player["snapshot"].get("level", 0)) if mimic["available"] else 0,
-                "core": int(player.get("core", 0)) if mimic["available"] else 0,
-                "heavy_penalty": int(bool(player.get("heavy"))) if mimic["available"] else 0,
-                "music_gain": music_gain if mimic["available"] else 0,
+                "event_ordinal": generated.get("ordinal") if generated else None,
+                "generated_by": "chaos-domain-auto-mimic" if generated else "",
+                "training": (
+                    generated.get("training", 0)
+                    if generated
+                    else int(player["snapshot"].get("level", 0)) if mimic.get("available") else 0
+                ),
+                "core": (
+                    generated.get("core", 0)
+                    if generated
+                    else int(player.get("core", 0)) if mimic.get("available") else 0
+                ),
+                "heavy_penalty": (
+                    generated.get("penalty", 0)
+                    if generated
+                    else int(bool(player.get("heavy"))) if mimic.get("available") else 0
+                ),
+                "music_gain": (
+                    generated.get("music_gain", 0) if generated else legacy_music_gain
+                ),
                 "raw_gain": raw_gain,
                 "raw_opponent_reduction": raw_reduction,
                 "gain": applied_gain,
                 "opponent_reduction": applied_reduction,
                 "numeric_suppressed": numeric_suppressed,
                 "suppressed_reason": suppressed_reason,
+                "effect_summary": mimic.get("effect_summary", {}),
             }
             domain_effects.append("乱序数虚时空命中：自动模仿、自己下回合+1招并保证下一次加速或时延成功")
             if numeric_suppressed:
@@ -1379,6 +1768,8 @@ def _settle_interactions(state: dict, seed: str) -> dict:
         "domain": domain,
         "daniya_transition": daniya_transition,
         "asamu_domain_copies": asamu_domain_copies,
+        "generated_events": tuple(asamu_domain_copies)
+        + ((chaos_auto_mimic_event,) if chaos_auto_mimic_event is not None else ()),
         "adjustments": tuple(adjustments),
         "future_simulations": tuple(future_simulations),
         "sand_bodies": tuple(sand_bodies),

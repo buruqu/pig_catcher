@@ -488,16 +488,25 @@ class BattleService:
         else:
             raise BattleError("未知对战操作。")
         if summary:
-            generated = tuple(summary.get("interactions", {}).get("asamu_domain_copies", ()))
+            # 领域结算可能生成并立即应用额外招式（例如阿萨姆领域复制、
+            # 乱序数虚时空自动模仿）。领域层统一分配 side/ordinal；这里不
+            # 重算随机事实，也不忽略主键冲突，保证事务回滚后可以安全重试。
+            generated = tuple(summary["interactions"].get("generated_events", ()))
+            generated_keys: set[tuple[int, int]] = set()
             for event in generated:
                 generated_side = int(event["side"])
+                generated_ordinal = int(event["ordinal"])
+                generated_key = (generated_side, generated_ordinal)
+                if generated_side not in (0, 1) or generated_ordinal < 1 or generated_key in generated_keys:
+                    raise BattleError("对战领域生成招式的顺序事实无效。")
+                generated_keys.add(generated_key)
                 await session.execute(
                     "INSERT INTO battle_moves VALUES(?,?,?,?,?,?)",
                     (
                         match["battle_id"],
                         round_number,
                         generated_side,
-                        event["ordinal"],
+                        generated_ordinal,
                         dumps(event),
                         now_ms,
                     ),
@@ -507,7 +516,7 @@ class BattleService:
                     ids[generated_side],
                     identity.scope.value,
                     match["battle_id"],
-                    f"move:{round_number}:{event['ordinal']}",
+                    f"move:{round_number}:{generated_ordinal}",
                     now_ms,
                     event,
                 )

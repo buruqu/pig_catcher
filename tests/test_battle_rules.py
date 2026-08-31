@@ -1,6 +1,7 @@
 """用户定稿轮盘、核心无上限、分块精确重放和永久概率的纯规则验收。"""
 
 from copy import deepcopy
+from fractions import Fraction
 
 import pytest
 
@@ -436,7 +437,7 @@ def test_huge_odd_round_gain_uses_integer_ceiling_without_float_conversion():
 
 
 def test_juejue_catalog_aliases_forms_and_legacy_query_boundary():
-    assert BATTLE_RULE_VERSION == 5
+    assert BATTLE_RULE_VERSION == 6
     assert all(FIGHTERS_BY_TEMPLATE[template_id].fighter_id == "juejue" for template_id in JUEJUE_PIG_TEMPLATE_IDS)
     assert {move.move_id for move in JUEJUE_TIME_MOVES}.isdisjoint(
         {move.move_id for move in JUEJUE_VIRTUAL_MOVES}
@@ -629,7 +630,7 @@ def test_relative_zero_suppresses_late_domain_auto_mimic_numeric_but_keeps_funct
     assert mimic["direction"] == direction
     assert mimic["numeric_suppressed"] and mimic["suppressed_reason"] == "相对静止·零"
     assert mimic["gain"] == mimic["opponent_reduction"] == 0
-    assert mimic["raw_gain"] > 0 if direction == "self" else mimic["raw_opponent_reduction"] > 0
+    assert mimic["raw_gain"] != 0 if direction == "self" else mimic["raw_opponent_reduction"] != 0
     assert summary["before"][0]["weight"] == summary["before"][1]["weight"] == 5
     assert summary["before"][0]["next_action_bonus"] == 1
     assert summary["before"][0]["juejue_guaranteed"]
@@ -645,8 +646,10 @@ def test_domain_auto_mimic_numeric_still_applies_without_relative_zero():
     summary = resolve_round(s, seed)
     mimic = summary["interactions"]["domain"]["auto_mimic"]
     assert mimic["available"] and not mimic["numeric_suppressed"]
-    assert mimic["gain"] == mimic["raw_gain"] > 0
-    assert summary["before"][0]["weight"] == 5 + chaos["gain"] + mimic["gain"]
+    assert mimic["gain"] == mimic["raw_gain"] != 0
+    assert summary["before"][0]["weight"] == max(
+        Fraction(1, 10), 5 + chaos["gain"] + mimic["gain"]
+    )
 
 
 def test_juejue_mimic_uses_frozen_non_juejue_numeric_pool_and_growth_once():

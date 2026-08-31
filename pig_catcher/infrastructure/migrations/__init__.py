@@ -54,6 +54,7 @@ from .v0050_battle_loot_total import MIGRATION_0050
 from .v0051_battle_rule_v3 import MIGRATION_0051
 from .v0052_battle_rule_v4 import MIGRATION_0052
 from .v0053_battle_rule_v5 import MIGRATION_0053
+from .v0054_battle_rule_v6 import MIGRATION_0054
 
 MIGRATIONS: tuple[Migration, ...] = (
     MIGRATION_0001,
@@ -109,6 +110,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     MIGRATION_0051,
     MIGRATION_0052,
     MIGRATION_0053,
+    MIGRATION_0054,
 )
 
 __all__ = ["MIGRATIONS", "Migration"]

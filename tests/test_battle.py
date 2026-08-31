@@ -15,13 +15,16 @@ import pytest
 
 from pig_catcher.commands.battle import BattleRequest, parse_battle_request
 from pig_catcher.config.model import CatchingSection
-from pig_catcher.domain.battle import apply_move, dumps, loads
+from pig_catcher.domain.battle import apply_move, dumps, loads, resolve_round
 from pig_catcher.domain.battle_catalog import (
     ACTION_TTL_MS,
     ASAMU_MOVES,
     ASAMU_PIG_TEMPLATE_IDS,
     DANIYA_PIG_TEMPLATE_IDS,
     FIGHTERS_BY_ID,
+    JUEJUE_FORM_VIRTUAL,
+    JUEJUE_PIG_TEMPLATE_IDS,
+    JUEJUE_VIRTUAL_MOVES,
     BattleError,
 )
 from pig_catcher.domain.dispatch import MATERIAL_SCALE
@@ -140,6 +143,7 @@ async def world(tmp_path: Path):
             _pig_entry(GOJO_PIG_TEMPLATE_ID, rarity=5, display_name="五条猪"),
             _pig_entry(ASAMU_PIG_TEMPLATE_IDS[0], rarity=5, display_name="阿萨姆猪"),
             _pig_entry(DANIYA_PIG_TEMPLATE_IDS[0], rarity=5, display_name="达妮娅猪"),
+            _pig_entry(JUEJUE_PIG_TEMPLATE_IDS[0], rarity=5, display_name="撅撅猪"),
         ]
     )
     db = await _database_with_catalog(tmp_path, [*entries, _food_entry(5)])
@@ -149,6 +153,7 @@ async def world(tmp_path: Path):
         await seed_pigs(db, person, template_id=template, count=2)
     await seed_pigs(db, a, template_id=ASAMU_PIG_TEMPLATE_IDS[0], count=1)
     await seed_pigs(db, b, template_id=DANIYA_PIG_TEMPLATE_IDS[0], count=1)
+    await seed_pigs(db, a, template_id=JUEJUE_PIG_TEMPLATE_IDS[0], count=1)
     clock = MutableClock(NOW)
     w = BattleWorld(
         db,
@@ -263,15 +268,14 @@ async def test_asamu_domain_copies_persist_four_moves_and_facts_with_exact_fract
     state = loads(match["state_json"])
     assert [side["snapshot"]["fighter_id"] for side in state["sides"]] == ["asamu", "daniya"]
 
-    # 该种子使阿萨姆在真实领域对抗中胜出，且四个复制位包含达妮娅的 -52.1 招式。
-    seed = "service-asamu-copy-3"
+    setup_seed = "service-asamu-domain-setup"
     for side, move in ((0, ASAMU_MOVES[-1]), (1, FIGHTERS_BY_ID["daniya"].moves[-1])):
         player = state["sides"][side]
         player["turn"].update(raw=1, effective=1, pending=1, done=False)
         event = apply_move(
             player,
             move,
-            seed=seed,
+            seed=setup_seed,
             round_number=state["round"],
             side=side,
             version=state["version"],
@@ -279,6 +283,18 @@ async def test_asamu_domain_copies_persist_four_moves_and_facts_with_exact_fract
         event.update(round=state["round"], side=side, fighter_id=player["snapshot"]["fighter_id"])
         player["turn"]["events"].append(deepcopy(event))
         player["turn"]["done"] = True
+
+    # 找出一份固定可重现的v6事实：阿萨姆赢得真实领域战，且四个复制位
+    # 至少一次命中达妮娅的 -52.1 分数招式，顺带验收分数序列化。
+    seed = None
+    for index in range(1000):
+        candidate = f"service-asamu-domain-copy-{index}"
+        probe = resolve_round(deepcopy(state), candidate)
+        copies = probe["interactions"]["generated_events"]
+        if len(copies) == 4 and any(event["source_move_id"] == "daniya-timed-collapse" for event in copies):
+            seed = candidate
+            break
+    assert seed is not None
 
     async with world.db.transaction() as session:
         await session.execute(
@@ -318,6 +334,103 @@ async def test_asamu_domain_copies_persist_four_moves_and_facts_with_exact_fract
         if event["source_move_id"] == "daniya-timed-collapse"
     )
     assert '"$battle-fraction":["-0x209","0xa"]' in raw_collapse
+
+    replay = await world.send(section="move", actor=world.a, mid="asamu-domain-copy-persistence")
+    assert replay.receipt.receipt_id == result.receipt.receipt_id
+    assert (
+        await world.db.fetch_one(
+            "SELECT COUNT(*) FROM battle_moves WHERE battle_id=? AND round_number=1",
+            (match["battle_id"],),
+        )
+    )[0] == 4
+    assert (
+        await world.db.fetch_one(
+            """SELECT COUNT(*) FROM activity_facts
+            WHERE source_type='battle' AND source_id=? AND subevent_id LIKE 'move:1:%'""",
+            (match["battle_id"],),
+        )
+    )[0] == 4
+
+
+async def test_chaos_domain_auto_mimic_persists_one_move_and_fact_and_replays_idempotently(world):
+    await world.assign(world.a, "撅撅猪")
+    await world.start()
+    match = await world.match()
+    state = loads(match["state_json"])
+    assert state["sides"][0]["snapshot"]["fighter_id"] == "juejue"
+
+    caster, target = state["sides"]
+    caster["juejue_form"] = JUEJUE_FORM_VIRTUAL
+    caster["turn"].update(raw=1, effective=1, pending=1, done=False)
+    chaos_move = next(move for move in JUEJUE_VIRTUAL_MOVES if move.move_id == "chaos-domain")
+    chaos = apply_move(
+        caster,
+        chaos_move,
+        seed="service-chaos-domain",
+        round_number=state["round"],
+        side=0,
+        version=state["version"],
+    )
+    chaos.update(round=state["round"], side=0, fighter_id="juejue")
+    caster["turn"]["events"].append(deepcopy(chaos))
+    caster["turn"]["done"] = True
+    target["turn"].update(raw=0, effective=0, pending=0, done=True)
+
+    seed = None
+    for index in range(100):
+        candidate = f"service-chaos-auto-mimic-{index}"
+        probe = resolve_round(deepcopy(state), candidate)
+        domain = probe["interactions"]["domain"]
+        if domain and domain["hit_side"] == 0:
+            seed = candidate
+            break
+    assert seed is not None
+    async with world.db.transaction() as session:
+        await session.execute(
+            "UPDATE battle_matches SET random_seed=?,state_json=? WHERE battle_id=?",
+            (seed, dumps(state), match["battle_id"]),
+        )
+
+    message_id = "chaos-domain-auto-mimic-persistence"
+    result = await world.send(section="move", actor=world.a, mid=message_id)
+    assert result.view.title == "双方出招 · 回合结算"
+    move_rows = await world.db.fetch_all(
+        """SELECT side,ordinal,event_json FROM battle_moves
+        WHERE battle_id=? AND round_number=1 ORDER BY side,ordinal""",
+        (match["battle_id"],),
+    )
+    assert len(move_rows) == 1
+    event = loads(move_rows[0]["event_json"])
+    assert (move_rows[0]["side"], move_rows[0]["ordinal"]) == (0, event["ordinal"])
+    assert event["ordinal"] > chaos["ordinal"]
+    assert event["generated_by"] == "chaos-domain-auto-mimic"
+    assert event["move_id"] == "virtual-mimic"
+
+    fact_rows = await world.db.fetch_all(
+        """SELECT player_id,subevent_id,payload_json FROM activity_facts
+        WHERE source_type='battle' AND source_id=? AND subevent_id LIKE 'move:1:%'""",
+        (match["battle_id"],),
+    )
+    assert len(fact_rows) == 1
+    assert fact_rows[0]["player_id"] == world.a.player_id
+    assert fact_rows[0]["subevent_id"] == f"move:1:{event['ordinal']}"
+    assert loads(fact_rows[0]["payload_json"]) == event
+
+    replay = await world.send(section="move", actor=world.a, mid=message_id)
+    assert replay.receipt.receipt_id == result.receipt.receipt_id
+    assert (
+        await world.db.fetch_one(
+            "SELECT COUNT(*) FROM battle_moves WHERE battle_id=? AND round_number=1",
+            (match["battle_id"],),
+        )
+    )[0] == 1
+    assert (
+        await world.db.fetch_one(
+            """SELECT COUNT(*) FROM activity_facts
+            WHERE source_type='battle' AND source_id=? AND subevent_id LIKE 'move:1:%'""",
+            (match["battle_id"],),
+        )
+    )[0] == 1
 
 
 async def test_legacy_both_done_state_settles_on_next_move_without_reroll(world):

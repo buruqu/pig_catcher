@@ -11,7 +11,13 @@ from pig_catcher.domain.battle_catalog import (
     JUEJUE_PIG_TEMPLATE_IDS,
 )
 from pig_catcher.domain.models import CommandIdentity, ScopeKey
-from pig_catcher.services.battle_views import wheels
+from pig_catcher.services.battle_views import (
+    _event_move_wheel,
+    _mimic_fact,
+    _v4_interaction_panels,
+    move_line,
+    wheels,
+)
 from tools.accept_battle_views import deterministic_mechanic_cases
 
 
@@ -158,7 +164,163 @@ def test_juejue_dual_form_and_subwheels_have_a_deterministic_art_view() -> None:
             "单领域战权重2.5",
             "双领域5.5",
             "撤销本轮新伤势",
-            "之后每个招式固定+5",
+            "之后每招固定+5",
             "下一次加速与下一次时延成功率各+5个百分点",
         )
     )
+
+
+def test_juejue_v6_wheel_explains_first_only_zero_repeat_music_and_effect_mimic() -> None:
+    identity = CommandIdentity(ScopeKey("qq-official", "fixture"), "stream", "player-0", "玩家0")
+    text = wheels(identity, "juejue", level=5).text()
+
+    assert text.count("胜利权重+10") >= 3
+    assert "本回合第一次加速+第一次时延均成功且档位和≥5" in text
+    assert "重复抽中不叠层，改为再抽2次" in text
+    assert "每次抽中都独立随机" in text
+    assert "复制数值与一般效果" in text
+    assert "抑制领域再入" in text
+    assert "消除本回合一次加速失败产生的整笔下回合欠招" in text
+
+
+def test_juejue_v6_mimic_and_event_facts_are_visible_without_exposing_internal_ids() -> None:
+    mimic = {
+        "available": True,
+        "band": "large",
+        "band_wheel": (("large", 1), ("small", 1)),
+        "band_roll": 0,
+        "source_wheel": ((0, 1),),
+        "source_roll": 0,
+        "source_fighter_id": "asamu",
+        "source_move_id": "pressure-king",
+        "source_name": "传奇耐压王",
+        "base": 7,
+        "direction": "self",
+        "functional_fighter_id": "asamu",
+        "functional_move_id": "pressure-king",
+        "functional_tags": ("asamu-pressure-king",),
+        "effect_summary": "对方每个数值招式独立进行失效判定",
+        "extra_draws_suppressed": True,
+        "domain_reentry_suppressed": True,
+    }
+    mimic_text = _mimic_fact(mimic)
+    assert "同时复制效果" in mimic_text
+    assert "追加抽数已抑制" in mimic_text
+    assert "不会再次开启领域战" in mimic_text
+    assert "pressure-king" not in mimic_text and "asamu" not in mimic_text
+
+    event = {
+        "ordinal": 4,
+        "name": "虚拟声·把音乐开大声点！",
+        "fighter_id": "juejue",
+        "form_before": "virtual-sound",
+        "form_after": "virtual-sound",
+        "special_base": 0,
+        "music_gain": 5,
+        "subwheel": None,
+        "relative_zero": {
+            "checked": True,
+            "roll": None,
+            "wheel": (),
+            "success": False,
+            "gain": 0,
+            "eligible": False,
+            "reason": "首次加速判定失败",
+            "first_acceleration": {"tier": 3, "success": False, "ordinal": 1},
+            "first_delay": {"tier": 2, "success": True, "ordinal": 3},
+        },
+        "mimic": mimic,
+        "sculpt_bonus_before": 0,
+        "sculpt_bonus_after": 0,
+        "sand_domain_steps_before": 0,
+        "sand_domain_steps_after": 0,
+        "sand_domain_switch_units_before": 0,
+        "sand_domain_switch_units_after": 0,
+        "realization_stacks_before": 0,
+        "realization_stacks_after": 0,
+        "guaranteed_before": False,
+        "guaranteed_after": False,
+        "realtime_activated": False,
+        "future_simulation_activated": True,
+        "sand_body_activated": False,
+        "rewind_active": True,
+        "rewind_debt_cleared": 3,
+        "rewind_failure_ordinal": 2,
+        "rewind_pending_count": 1,
+        "music_repeated": True,
+        "opponent_reduction": 0,
+        "opponent_next_debt": 0,
+        "opponent_next_bonus": 0,
+        "training": 0,
+        "core": 0,
+        "penalty": 0,
+        "multiplier": 1,
+        "gain": 5,
+        "total": 25,
+        "extra_draws": 2,
+        "tool_used": "",
+    }
+    line = move_line(event)
+    assert "第一次子盘" in line.note
+    assert "首次加速3档失败" in line.note
+    assert "不满足发动条件" in line.note
+    assert "未来模拟独立挂起1次" in line.note
+    assert "撤销第2招加速失败产生的下回合-3招" in line.note
+    assert "音乐状态不叠层" in line.note
+
+
+def test_juejue_v6_each_future_simulation_has_its_own_source_in_settlement_view() -> None:
+    interactions = {
+        "domain": None,
+        "adjustments": ((), ()),
+        "future_simulations": (
+            {
+                "side": 0,
+                "active": True,
+                "source_ordinal": 2,
+                "target_side": 1,
+                "candidate_ordinals": (1, 3),
+                "selected_ordinal": 1,
+                "roll": 0,
+                "cancelled_gain": 12,
+            },
+            {
+                "side": 0,
+                "active": True,
+                "source_ordinal": 5,
+                "target_side": 1,
+                "candidate_ordinals": (3,),
+                "selected_ordinal": 3,
+                "roll": 0,
+                "cancelled_gain": 8,
+            },
+        ),
+        "sand_bodies": (),
+        "zeroes": (),
+        "round_reductions": (),
+        "cross_effects": (),
+    }
+    panels = _v4_interaction_panels(interactions, ["玩家甲", "玩家乙"])
+    text = "\n".join(panel.title + "\n" + "\n".join(line.label for line in panel.rows) for panel in panels)
+    assert "未来模拟（第2招）" in text
+    assert "未来模拟（第5招）" in text
+
+
+def test_juejue_v6_domain_auto_mimic_has_a_real_selected_wheel_segment() -> None:
+    event = {
+        "ordinal": 9,
+        "name": "虚拟声·虚拟模仿",
+        "move_id": "virtual-mimic",
+        "fighter_id": "juejue",
+        "source_fighter_id": "asamu",
+        "generated_by": "chaos-domain-auto-mimic",
+        "draw_weight_scale": 1000,
+        "draw_wheel_move_ids": ("virtual-mimic",),
+        "draw_wheel_units": (1000,),
+        "mimic": {"source_fighter_id": "asamu", "source_name": "传奇耐压王"},
+    }
+    card = _event_move_wheel(event, BATTLE_VERSION)
+    assert card.selected_index == 0
+    assert card.segments[0].label == "虚拟声·虚拟模仿"
+    assert "乱序数虚时空自动发动" in card.title
+    assert "阿萨姆猪" in card.note

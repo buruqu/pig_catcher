@@ -9,7 +9,7 @@ from .special_content import GOJO_PIG_TEMPLATE_ID, SUKUNA_PIG_TEMPLATE_ID
 
 # 对战规则版本与活动成就事实版本分离：新版对战会改变随机命名空间，
 # 但新增字段仍是 activity_progress v1 可以向后兼容读取的事实载荷。
-BATTLE_RULE_VERSION = 5
+BATTLE_RULE_VERSION = 6
 BATTLE_FACT_VERSION = 1
 BATTLE_VERSION = BATTLE_RULE_VERSION
 INVITE_TTL_MS = 5 * 60 * 1000
@@ -161,7 +161,7 @@ JUEJUE_TIME_MOVES = (
         "时之沙·回溯",
         10,
         tags=("juejue-rewind",),
-        description="挂起本回合一次回溯；若本回合失败并抽到轻伤或重伤，撤销本轮新伤势与风险变化。",
+        description="撤销本回合一次加速失败产生的整笔欠招；可先挂起等待。落败时仍撤销本轮新轻伤或重伤。",
     ),
     Move(
         "sand-accelerate",
@@ -202,28 +202,31 @@ JUEJUE_VIRTUAL_MOVES = (
     Move(
         "virtual-realm",
         "虚拟声·虚拟之境",
+        5,
         draws=1,
         tags=("juejue-virtual-realm",),
-        description="再抽一次；保证下一次加速或时延成功。",
+        description="胜利权重+5；再抽一次；保证下一次加速或时延成功。",
     ),
     Move(
         "future-simulation",
         "虚拟声·未来模拟",
+        5,
         tags=("juejue-future-simulation",),
-        description="本回合首次生效：随机令对方一招仍有效的数值贡献归零，功能部分保留。",
+        description="胜利权重+5；每次抽中都独立随机令对方一招仍有效的数值贡献归零，功能部分保留。",
     ),
     Move(
         "realtime-compute",
         "虚拟声·实时演算",
+        5,
         draws=1,
         tags=("juejue-realtime",),
-        description="再抽一次；本回合首次令两种领域的出现权重各+1。",
+        description="胜利权重+5；再抽一次；本回合首次令两种领域的出现权重各+1。",
     ),
     Move(
         "virtual-mimic",
         "虚拟声·虚拟模仿",
         tags=("juejue-mimic",),
-        description="大小盘各50%，仅复制其他战斗猪的直接有符号数值与方向，不复制功能。",
+        description="大小盘各50%，复制其他战斗猪的数值、可移植普通功能与定向效果；领域再入被抑制，领域自动模仿不追加抽数。",
     ),
     Move(
         "make-real",
@@ -236,7 +239,7 @@ JUEJUE_VIRTUAL_MOVES = (
         "louder",
         "虚拟声·把音乐开大声点！",
         tags=("juejue-music",),
-        description="本回合进入音乐状态；不叠加，仅令随后每招胜利权重+5。",
+        description="首次令本回合随后每招胜利权重+5；重复抽中不叠层，本招额外再抽两次。",
     ),
     Move(
         "switch-sand",

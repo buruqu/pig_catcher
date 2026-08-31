@@ -217,7 +217,7 @@ class PigCatcherDatabase:
         from .migrations.v0048_feature_tool_store_ledger import TABLES as FEATURE_STORE_TABLES
         from .migrations.v0049_battle_quota_reset import GUARDS as BATTLE_QUOTA_GUARDS
         from .migrations.v0049_battle_quota_reset import TABLES as BATTLE_QUOTA_TABLES
-        from .migrations.v0052_battle_rule_v4 import GUARDS as BATTLE_LOOT_TOTAL_GUARDS
+        from .migrations.v0054_battle_rule_v6 import GUARDS as BATTLE_LOOT_TOTAL_GUARDS
 
         required_tables = {
             "player_food_effects",

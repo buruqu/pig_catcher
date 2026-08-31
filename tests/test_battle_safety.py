@@ -359,7 +359,10 @@ async def test_legacy_v1_loot_keeps_five_draw_random_sequence_and_distribution(w
         assert snapshot["total_uses"] == 5 and snapshot["remaining"] == 5 - ordinal
 
 
-@pytest.mark.parametrize("definition_version,total_uses", ((1, 3), (2, 5), (3, 5), (4, 5)))
+@pytest.mark.parametrize(
+    "definition_version,total_uses",
+    ((1, 3), (2, 5), (3, 5), (4, 5), (5, 5), (6, 5)),
+)
 async def test_loot_total_must_match_battle_rule_version(world, definition_version, total_uses):
     original = dict(await world.fight())
     match = original
@@ -470,8 +473,99 @@ async def test_schema49_migration_preserves_existing_loot_as_five_uses(tmp_path)
         row = await db.fetch_one(
             "SELECT used,total_uses FROM battle_loot WHERE battle_id='BLEGACY49LOOT'"
         )
-        assert await db.schema_version() == 53
+        assert await db.schema_version() == 54
         assert tuple(row) == (2, 5)
+        assert await db.fetch_all("PRAGMA foreign_key_check") == []
+    finally:
+        await db.close()
+
+
+async def test_schema53_to_54_preserves_v5_loot_and_allows_v6_three_uses(tmp_path):
+    path = tmp_path / "battle-v6-migration.sqlite3"
+    conn = sqlite3.connect(path)
+    conn.execute("CREATE TABLE schema_migrations(version INTEGER PRIMARY KEY,name TEXT UNIQUE,applied_at TEXT)")
+    for migration in MIGRATIONS:
+        if migration.version > 53:
+            break
+        for sql in migration.statements:
+            conn.execute(sql)
+        conn.execute(
+            "INSERT INTO schema_migrations VALUES(?,?,?)",
+            (migration.version, migration.name, "test"),
+        )
+    conn.execute(
+        """INSERT INTO scopes(
+            scope_id,platform,group_id,group_name,stream_id,enabled,created_at,updated_at
+        ) VALUES(?,?,?,?,?,?,?,?)""",
+        ("qq:v6", "qq", "v6", "规则迁移群", "stream-v6", 1, "test", "test"),
+    )
+    conn.executemany(
+        """INSERT INTO players(
+            player_id,scope_id,platform_user_id,display_name,coin_balance,experience,
+            created_at,updated_at,batch_keep_highest
+        ) VALUES(?,?,?,?,?,?,?,?,?)""",
+        (
+            ("qq:v6:a", "qq:v6", "a", "甲", 0, 0, "test", "test", 0),
+            ("qq:v6:b", "qq:v6", "b", "乙", 0, 0, "test", "test", 0),
+        ),
+    )
+    match_values = (
+        "BV5PRESERVED",
+        "qq:v6",
+        "qq:v6:a",
+        "qq:v6:b",
+        "completed",
+        5,
+        "v5-seed",
+        "{}",
+        "{}",
+        "",
+        0,
+        1,
+        2,
+        "qq:v6:b",
+    )
+    conn.execute(
+        """INSERT INTO battle_matches(
+            battle_id,scope_id,initiator_id,opponent_id,status,definition_version,
+            random_seed,state_json,invitation_json,accepted_day,expires_ms,
+            created_ms,finished_ms,winner_id
+        ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        match_values,
+    )
+    conn.execute(
+        """INSERT INTO battle_loot(
+            battle_id,actor_id,recipient_id,scope_id,used,created_ms,total_uses
+        ) VALUES(?,?,?,?,?,?,?)""",
+        ("BV5PRESERVED", "qq:v6:a", "qq:v6:b", "qq:v6", 1, 2, 3),
+    )
+    conn.execute("PRAGMA user_version=53")
+    conn.commit()
+    conn.close()
+
+    db = PigCatcherDatabase(path)
+    await db.open()
+    try:
+        assert await db.schema_version() == 54
+        preserved = await db.fetch_one(
+            "SELECT used,total_uses FROM battle_loot WHERE battle_id='BV5PRESERVED'"
+        )
+        assert tuple(preserved) == (1, 3)
+        async with db.transaction() as session:
+            await session.execute(
+                """INSERT INTO battle_matches(
+                    battle_id,scope_id,initiator_id,opponent_id,status,definition_version,
+                    random_seed,state_json,invitation_json,accepted_day,expires_ms,
+                    created_ms,finished_ms,winner_id
+                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                ("BV6ALLOWED", *match_values[1:5], 6, "v6-seed", *match_values[7:]),
+            )
+            await session.execute(
+                """INSERT INTO battle_loot(
+                    battle_id,actor_id,recipient_id,scope_id,used,created_ms,total_uses
+                ) VALUES(?,?,?,?,?,?,?)""",
+                ("BV6ALLOWED", "qq:v6:a", "qq:v6:b", "qq:v6", 0, 3, 3),
+            )
         assert await db.fetch_all("PRAGMA foreign_key_check") == []
     finally:
         await db.close()
