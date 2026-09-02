@@ -74,10 +74,13 @@ class FakeSend:
     def __init__(self) -> None:
         self.texts: list[tuple[str, str]] = []
         self.images: list[tuple[str, str]] = []
+        self.hybrids: list[tuple[str, list[dict[str, str]]]] = []
         self.text_success = True
         self.image_success = True
+        self.hybrid_success = True
         self.text_error: Exception | None = None
         self.image_error: Exception | None = None
+        self.hybrid_error: Exception | None = None
 
     async def text(self, text: str, stream_id: str) -> bool:
         self.texts.append((stream_id, text))
@@ -90,6 +93,12 @@ class FakeSend:
         if self.image_error is not None:
             raise self.image_error
         return self.image_success
+
+    async def hybrid(self, segments: list[dict[str, str]], stream_id: str) -> bool:
+        self.hybrids.append((stream_id, segments))
+        if self.hybrid_error is not None:
+            raise self.hybrid_error
+        return self.hybrid_success
 
 
 class FakeContext:

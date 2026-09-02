@@ -155,23 +155,23 @@ def test_beijing_week_window_uses_monday_boundary() -> None:
 async def test_backfill_ranking_scope_isolation_ties_and_disposed_assets(tmp_path: Path) -> None:
     database = PigCatcherDatabase(tmp_path / "weekly.sqlite3")
     await database.open()
-    clock = MutableClock(datetime(2026, 8, 26, 4, 0, tzinfo=UTC))
+    clock = MutableClock(datetime(2026, 9, 1, 4, 0, tzinfo=UTC))
     alice = _identity("alice", "爱丽丝")
     bob = _identity("bob", "波布")
     carol = _identity("carol", "卡萝")
     other_scope = _identity("alice", "另一个爱丽丝", group_id="other-group")
-    await _seed_catch(database, alice, serial=1, value=60, occurred_at="2026-08-24T01:00:00.000Z")
+    await _seed_catch(database, alice, serial=1, value=60, occurred_at="2026-09-01T01:00:00.000Z")
     await _seed_catch(
         database,
         alice,
         serial=2,
         value=40,
-        occurred_at="2026-08-24T02:00:00.000Z",
+        occurred_at="2026-09-01T02:00:00.000Z",
         state="sold",
     )
-    await _seed_catch(database, bob, serial=3, value=100, occurred_at="2026-08-24T03:00:00.000Z")
-    await _seed_catch(database, carol, serial=4, value=100, occurred_at="2026-08-24T04:00:00.000Z")
-    await _seed_catch(database, other_scope, serial=5, value=999, occurred_at="2026-08-24T05:00:00.000Z")
+    await _seed_catch(database, bob, serial=3, value=100, occurred_at="2026-09-01T03:00:00.000Z")
+    await _seed_catch(database, carol, serial=4, value=100, occurred_at="2026-09-01T04:00:00.000Z")
+    await _seed_catch(database, other_scope, serial=5, value=999, occurred_at="2026-09-01T05:00:00.000Z")
 
     service = WeeklyCompetitionService(database, clock=clock)
     await service.initialize()
@@ -197,7 +197,7 @@ async def test_backfill_ranking_scope_isolation_ties_and_disposed_assets(tmp_pat
 async def test_settlement_rewards_top_ten_once_and_event_cosmetics_can_be_equipped(tmp_path: Path) -> None:
     database = PigCatcherDatabase(tmp_path / "settlement.sqlite3")
     await database.open()
-    clock = MutableClock(datetime(2026, 8, 26, 4, 0, tzinfo=UTC))
+    clock = MutableClock(datetime(2026, 9, 1, 4, 0, tzinfo=UTC))
     players = [_identity(f"player-{rank}", f"玩家{rank}") for rank in range(1, 12)]
     for rank, identity in enumerate(players, start=1):
         await _seed_catch(
@@ -205,12 +205,12 @@ async def test_settlement_rewards_top_ten_once_and_event_cosmetics_can_be_equipp
             identity,
             serial=100 + rank,
             value=1200 - rank * 10,
-            occurred_at=f"2026-08-25T{rank:02d}:00:00.000Z",
+            occurred_at=f"2026-09-01T{rank:02d}:00:00.000Z",
         )
     service = WeeklyCompetitionService(database, clock=clock)
     await service.initialize()
 
-    clock.value = datetime(2026, 8, 30, 16, 1, tzinfo=UTC)
+    clock.value = datetime(2026, 9, 7, 16, 1, tzinfo=UTC)
     settled = await service.leaderboard(players[0])
     assert settled.status == "settled"
     awards = await database.fetch_all(
@@ -283,6 +283,9 @@ async def test_plugin_scores_catch_and_renders_weekly_command_alias(tmp_path: Pa
         },
     )
     await _install_test_pig(plugin, tmp_path)
+    launch_clock = MutableClock(datetime(2026, 9, 1, 4, 0, tzinfo=UTC))
+    plugin._weekly_competition_service.clock = launch_clock
+    plugin._gameplay_service.clock = launch_clock
     message = build_message(message_id="weekly-plugin-catch")
     caught = await plugin.handle_catch(stream_id="stream-10001", **_command_kwargs(message))
     assert caught[0] is True

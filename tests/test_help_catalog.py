@@ -490,6 +490,7 @@ def test_advertised_upgrades_have_real_parser_support(product: str) -> None:
 @pytest.mark.parametrize(
     "topic,command,parser,arguments,kwargs,action",
     [
+        ("派遣", "/猪猪派遣", parse_dispatch_request, "自动 回声矿洞", {}, "auto"),
         ("派遣", "/猪猪派遣", parse_dispatch_request, "出发 1 回声矿洞 8小时", {}, "start"),
         ("派遣", "/猪猪派遣", parse_dispatch_request, "确认", {}, "confirm"),
         ("派遣", "/派遣背包", parse_dispatch_request, "制作 区域地图 2", {"section": "bag"}, "craft"),
@@ -503,6 +504,8 @@ def test_advertised_upgrades_have_real_parser_support(product: str) -> None:
             "roster",
         ),
         ("巡演", "/猪猪巡演", parse_tour_request, "确认", {}, "confirm"),
+        ("巡演", "/猪猪巡演", parse_tour_request, "自动 Pastel＊Palettes", {}, "auto_tour"),
+        ("巡演", "/猪猪巡演", parse_tour_request, "自动配队 Pastel＊Palettes", {}, "auto_roster"),
         ("对战", "/战斗猪", parse_battle_request, "设置 宿傩猪", {}, "assign_preview"),
         ("对战", "/战斗猪", parse_battle_request, "确认", {}, "confirm"),
         ("对战", "/比划比划", parse_battle_request, "接受", {"section": "challenge"}, "accept"),

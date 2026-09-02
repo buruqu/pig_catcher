@@ -1,6 +1,6 @@
 [plugin]
 enabled = true
-config_version = "2.0.11"
+config_version = "2.0.19"
 framework_phase = "6"
 
 [features]
@@ -93,6 +93,24 @@ trade_enabled = true
 max_trade_price = 1000000
 offer_expiry_minutes = 5
 trade_page_size = 8
+daily_gift_send_limit = 5
+daily_gift_receive_limit = 5
+trade_tax_percent = 5
+
+[launch_campaign]
+enabled = true
+campaign_id = "pig-dream-2.0-launch"
+starts_at = "2026-09-01T00:00:00+08:00"
+first_day_ends_at = "2026-09-02T00:00:00+08:00"
+first_day_window_limit = 20
+first_day_high_star_multiplier = 2.0
+starter_coin_amount = 50000
+starter_pig_choice_tickets = 2
+starter_food_choice_tickets = 1
+starter_battle_pig_choice_tickets = 1
+starter_five_star_collab_random_tickets = 5
+starter_code_change_tickets = 3
+starter_six_ways_foods = 6
 
 [regulation]
 mode = "自动执行"
@@ -164,6 +182,7 @@ execute_blacklist_update = false
 group_id = ""
 platform = ""
 content = ""
+image_path = ""
 execute_send = false
 
 [maintenance]

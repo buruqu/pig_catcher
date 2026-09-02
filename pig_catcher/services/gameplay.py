@@ -10,7 +10,7 @@ from datetime import UTC, datetime, time, timedelta, timezone
 from typing import Any
 from uuid import uuid4
 
-from ..config.model import CatchingSection, RankingSection
+from ..config.model import CatchingSection, LaunchCampaignSection, RankingSection
 from ..domain.display import display_tags_from_json, format_length, format_measurement, format_weight
 from ..domain.economy import (
     generate_food_attributes,
@@ -59,6 +59,13 @@ from ..domain.gameplay import (
     size_label,
     veteran_benefits,
     weight_label,
+)
+from ..domain.launch_campaign import (
+    apply_first_day_high_star_weights,
+    first_day_active,
+)
+from ..domain.launch_campaign import (
+    effective_window_limit as campaign_window_limit,
 )
 from ..domain.models import CommandIdentity, CommandReceipt
 from ..domain.ports import Clock, MessageKeyFactory, RandomSource, SystemClock, SystemRandomSource
@@ -961,6 +968,7 @@ class GameplayService:
         clock: Clock | None = None,
         id_factory: Callable[[], str] | None = None,
         short_code_factory: Callable[[], str] | None = None,
+        launch_campaign: LaunchCampaignSection | None = None,
     ) -> None:
         self.database = database
         self.catching = catching
@@ -979,6 +987,7 @@ class GameplayService:
         self.clock = clock or SystemClock()
         self.id_factory = id_factory or (lambda: uuid4().hex)
         self.short_code_factory = short_code_factory or new_short_code
+        self.launch_campaign = launch_campaign or LaunchCampaignSection()
 
     async def catch(self, identity: CommandIdentity) -> CatchResult:
         """Commit exactly one catch for one source message."""
@@ -1074,8 +1083,13 @@ class GameplayService:
                 )
                 catch_restriction = None
             else:
+                configured_base_limit = campaign_window_limit(
+                    self.launch_campaign,
+                    now_datetime,
+                    normal_limit=self.catching.daily_limit,
+                )
                 quota_layers = stack_catch_quota_layers(
-                    configured_base=self.catching.daily_limit,
+                    configured_base=configured_base_limit,
                     permanent_bonus=permanent_bonus,
                     weekly_bonus=weekly_bonus,
                     current_window_bonus=current_window_bonus,
@@ -1314,6 +1328,21 @@ class GameplayService:
                     )
             elif six_star_progress_stacks:
                 excluded_summaries += ("达妮娅泡泡云冻永久概率加成本次受六星菜独占规则影响，未参与结算。",)
+            campaign_probability_active = bool(
+                first_day_active(self.launch_campaign, now_datetime)
+                and not exclusive_effect_active
+                and not effect_application.collaboration_only
+                and not effect_application.shuffle_permutation
+            )
+            if campaign_probability_active:
+                weights = apply_first_day_high_star_weights(weights, self.launch_campaign, now_datetime)
+                effect_summaries += (
+                    f"2.0 开服首日：4/5/6 星权重 ×{self.launch_campaign.first_day_high_star_multiplier:g}。",
+                )
+            elif first_day_active(self.launch_campaign, now_datetime):
+                excluded_summaries += (
+                    "2.0 开服首日高星加成本次遇到六星独占、联动固定分布或概率换位规则，未参与结算。",
+                )
             rarity_roll = self.random_source.random()
             rarity = choose_rarity(weights, rarity_roll)
             candidates = candidate_buckets[rarity]
@@ -1467,6 +1496,9 @@ class GameplayService:
                     str(catch_restriction.get("expires_at") or "") if catch_restriction is not None else ""
                 ),
                 "quota_window_boost_limit": (int(window_boost["limit_value"]) if window_boost is not None else 0),
+                "launch_campaign_id": self.launch_campaign.campaign_id if self.launch_campaign.enabled else "",
+                "launch_first_day_active": first_day_active(self.launch_campaign, now_datetime),
+                "launch_high_star_multiplier_applied": campaign_probability_active,
                 "group_technique_id": (
                     str(active_group_technique["technique_id"]) if active_group_technique is not None else ""
                 ),
@@ -2718,8 +2750,13 @@ class GameplayService:
                 )
                 catch_restriction = None
             else:
+                configured_base_limit = campaign_window_limit(
+                    self.launch_campaign,
+                    now_datetime,
+                    normal_limit=self.catching.daily_limit,
+                )
                 quota_layers = stack_catch_quota_layers(
-                    configured_base=self.catching.daily_limit,
+                    configured_base=configured_base_limit,
                     permanent_bonus=permanent_bonus,
                     weekly_bonus=weekly_bonus,
                     current_window_bonus=current_window_bonus,

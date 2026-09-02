@@ -19,12 +19,13 @@ from pig_catcher.infrastructure.migrations import MIGRATIONS
 from pig_catcher.infrastructure.migrations.v0039_battles import GUARDS as BATTLE_GUARDS
 from pig_catcher.infrastructure.migrations.v0039_battles import TABLES
 from pig_catcher.infrastructure.migrations.v0049_battle_quota_reset import GUARDS as BATTLE_QUOTA_GUARDS
-from pig_catcher.infrastructure.migrations.v0052_battle_rule_v4 import GUARDS as BATTLE_LOOT_TOTAL_GUARDS
+from pig_catcher.infrastructure.migrations.v0060_battle_rule_v11 import GUARDS as BATTLE_LOOT_TOTAL_GUARDS
 from pig_catcher.infrastructure.repositories.dispatch import iso_ms, timestamp_ms
 from pig_catcher.infrastructure.repositories.economy import EconomyRepository
 from pig_catcher.infrastructure.repositories.gameplay import GameplayRepository
 from pig_catcher.services.battle import BattleService
 from pig_catcher.services.weekly_competitions import WeeklyCompetitionService
+from pig_catcher.version import SCHEMA_VERSION
 
 from .test_battle import BattleWorld
 from .test_battle import world as world
@@ -361,7 +362,7 @@ async def test_legacy_v1_loot_keeps_five_draw_random_sequence_and_distribution(w
 
 @pytest.mark.parametrize(
     "definition_version,total_uses",
-    ((1, 3), (2, 5), (3, 5), (4, 5), (5, 5), (6, 5)),
+    ((1, 3), (2, 5), (3, 5), (4, 5), (5, 5), (6, 5), (7, 5), (8, 5), (9, 5), (10, 5), (11, 5)),
 )
 async def test_loot_total_must_match_battle_rule_version(world, definition_version, total_uses):
     original = dict(await world.fight())
@@ -473,14 +474,14 @@ async def test_schema49_migration_preserves_existing_loot_as_five_uses(tmp_path)
         row = await db.fetch_one(
             "SELECT used,total_uses FROM battle_loot WHERE battle_id='BLEGACY49LOOT'"
         )
-        assert await db.schema_version() == 54
+        assert await db.schema_version() == SCHEMA_VERSION
         assert tuple(row) == (2, 5)
         assert await db.fetch_all("PRAGMA foreign_key_check") == []
     finally:
         await db.close()
 
 
-async def test_schema53_to_54_preserves_v5_loot_and_allows_v6_three_uses(tmp_path):
+async def test_schema53_to_55_preserves_v5_loot_and_allows_v7_three_uses(tmp_path):
     path = tmp_path / "battle-v6-migration.sqlite3"
     conn = sqlite3.connect(path)
     conn.execute("CREATE TABLE schema_migrations(version INTEGER PRIMARY KEY,name TEXT UNIQUE,applied_at TEXT)")
@@ -546,7 +547,7 @@ async def test_schema53_to_54_preserves_v5_loot_and_allows_v6_three_uses(tmp_pat
     db = PigCatcherDatabase(path)
     await db.open()
     try:
-        assert await db.schema_version() == 54
+        assert await db.schema_version() == SCHEMA_VERSION
         preserved = await db.fetch_one(
             "SELECT used,total_uses FROM battle_loot WHERE battle_id='BV5PRESERVED'"
         )
@@ -558,13 +559,13 @@ async def test_schema53_to_54_preserves_v5_loot_and_allows_v6_three_uses(tmp_pat
                     random_seed,state_json,invitation_json,accepted_day,expires_ms,
                     created_ms,finished_ms,winner_id
                 ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                ("BV6ALLOWED", *match_values[1:5], 6, "v6-seed", *match_values[7:]),
+                ("BV7ALLOWED", *match_values[1:5], 7, "v7-seed", *match_values[7:]),
             )
             await session.execute(
                 """INSERT INTO battle_loot(
                     battle_id,actor_id,recipient_id,scope_id,used,created_ms,total_uses
                 ) VALUES(?,?,?,?,?,?,?)""",
-                ("BV6ALLOWED", "qq:v6:a", "qq:v6:b", "qq:v6", 0, 3, 3),
+                ("BV7ALLOWED", "qq:v6:a", "qq:v6:b", "qq:v6", 0, 3, 3),
             )
         assert await db.fetch_all("PRAGMA foreign_key_check") == []
     finally:

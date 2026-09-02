@@ -83,6 +83,8 @@ _MUTATIONS = (
             "joint_accept",
             "joint_decline",
             "joint_cancel",
+            "auto_roster",
+            "auto_tour",
         )
     )
 )
@@ -192,6 +194,31 @@ class TourService:
             return await self.queries.overview(session, identity, now_ms)
         if action in {"equipment", "tools"}:
             return await self.queries.equipment(session, identity, now_ms, tools=action == "tools")
+        if action in {"auto_roster", "auto_tour"}:
+            theme_id = args.get("theme", "")
+            profile = await self.repository.profile(session, identity.player_id, now_ms, required=False)
+            if not profile or profile["archived"]:
+                from ..domain.tour_catalog import THEMES_BY_ID
+
+                theme = THEMES_BY_ID.get(theme_id)
+                if theme is None:
+                    raise TourError("未知乐队；可先用 /猪猪巡演 主题 查看。")
+                await self.repository.create(
+                    session,
+                    identity.player_id,
+                    identity.scope.value,
+                    f"{theme.band_name}猪猪乐队",
+                    now_ms,
+                )
+                profile = await self.repository.profile(session, identity.player_id, now_ms)
+            return await self.setup.auto_preview(
+                session,
+                identity,
+                profile,
+                theme_id,
+                now_ms,
+                full_tour=action == "auto_tour",
+            )
         profile = await self.repository.profile(session, identity.player_id, now_ms)
         if action in _SETTINGS:
             return await self.setup.settings(session, identity, profile, action, args, now_ms)
@@ -300,6 +327,75 @@ class TourService:
             view = self.queries.view(
                 identity, "巡演已提前落幕", profile, banner="没有整趟奖励，不退档期；已完成站点和成长仍可在游记查看。"
             )
+        elif action == "auto_start":
+            if payload["base_revision"] != profile["revision"]:
+                raise TourError("自动预览后乐队配置已变化，请重新选择喜欢的乐队。")
+            expected = payload["ready"]
+            current_roster = await session.fetch_one(
+                "SELECT revision FROM tour_rosters WHERE player_id=? AND slot=?",
+                (identity.player_id, payload["slot"]),
+            )
+            if (int(current_roster[0]) if current_roster else 0) != payload["base_roster_revision"]:
+                raise TourError("自动预览后阵容已变化，本次没有消耗档期。")
+            members = []
+            for before in expected["members"]:
+                member = await self.repository.member(
+                    session, identity.player_id, before["pig_instance_id"], available=True
+                )
+                from .tour_setup import member_fingerprint
+
+                if member_fingerprint(member) != member_fingerprint(before):
+                    raise TourError("自动配队成员状态已变化，请重新预览；没有消耗档期。")
+                members.append(member)
+            roster = expected["roster"]
+            await session.execute(
+                """INSERT INTO tour_rosters VALUES(?,?,?,?,?,1) ON CONFLICT(player_id,slot)
+                DO UPDATE SET member_ids_json=excluded.member_ids_json,captain_id=excluded.captain_id,
+                center_id=excluded.center_id,revision=tour_rosters.revision+1""",
+                (
+                    identity.player_id,
+                    payload["slot"],
+                    roster["member_ids_json"],
+                    roster["captain_id"],
+                    roster["center_id"],
+                ),
+            )
+            await session.execute(
+                "UPDATE tour_profiles SET active_slot=?,plans_json=? WHERE player_id=?",
+                (payload["slot"], encode(expected["plans"]), identity.player_id),
+            )
+            for member in members:
+                await self.repository.protect(
+                    session, identity.player_id, identity.scope.value, member["pig_instance_id"]
+                )
+            await self.setup.revision(session, identity.player_id, now_ms)
+            fresh_profile = await self.repository.profile(session, identity.player_id, now_ms)
+            snapshot = await self.setup.ready(session, fresh_profile)
+            if not self.setup.same_ready(expected, snapshot):
+                raise TourError("自动巡演所用阵容、档期、编排或成就券已变化；本次没有消耗。")
+            await self.repository.fact(
+                session,
+                identity.player_id,
+                identity.scope.value,
+                key,
+                "auto-configured",
+                now_ms,
+                {
+                    "theme": payload["theme"],
+                    "slot": payload["slot"],
+                    "members": [member["pig_instance_id"] for member in members],
+                    "plans": expected["plans"],
+                },
+            )
+            await self.repository.start(
+                session,
+                fresh_profile,
+                snapshot["roster"],
+                snapshot["members"],
+                seed=self.seed_factory(),
+                now_ms=now_ms,
+            )
+            view = await self._play(session, identity, fresh_profile, now_ms, all_remaining=True)
         else:
             view = await self.setup.confirm(session, identity, profile, action, payload, now_ms, key)
         await session.execute("DELETE FROM tour_pending WHERE player_id=?", (identity.player_id,))

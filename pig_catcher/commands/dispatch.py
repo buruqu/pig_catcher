@@ -11,6 +11,8 @@ from ..domain.dispatch import DURATIONS, DispatchError, material_id, region_defi
 DISPATCH_HELP = """【猪猪远行社】
 /猪猪派遣 — 队伍、到期结算和未读返程
 /猪猪派遣 路线 — 五条路线、产物、费用、特长
+/猪猪派遣 自动 回声矿洞 — 自动挑选最佳空闲队伍，默认8小时
+/猪猪派遣 自动 回声矿洞 12小时 — 可选4/8/12/24小时；预览后只确认一次
 /猪猪派遣 编队 1 猪名、猪名、猪名 — 1至3只，至少一只1～3星，最多一只高星
 /猪猪派遣 编队 1 清空 — 清空空闲队伍
 /猪猪派遣 出发 1 回声矿洞 8小时 — 时长可选4/8/12/24小时
@@ -109,6 +111,20 @@ def parse_dispatch_request(arguments: str, *, section: str = "dispatch") -> Disp
         }
         if text in simple:
             return DispatchRequest(simple[text])
+        if words and words[0] in {"自动", "智能"} and len(words) in (2, 3):
+            hours_text = re.sub(r"(?:小时|h)$", "", words[2], flags=re.IGNORECASE) if len(words) == 3 else "8"
+            hours = positive_number(hours_text, maximum=24, label="旅行小时")
+            if hours not in DURATIONS:
+                raise DispatchError("旅行时长只能为4、8、12或24小时。")
+            return DispatchRequest(
+                "auto",
+                {
+                    "region_id": region_definition(words[1]).region_id,
+                    "hours": hours,
+                    "tool_id": "",
+                    "tool_options": {},
+                },
+            )
         if len(words) >= 3 and words[0] == "编队":
             slot = positive_number(words[1], maximum=3, label="队伍编号")
             selectors = re.split(r"[、，,]", text.split(None, 2)[2])

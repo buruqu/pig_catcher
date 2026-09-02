@@ -55,6 +55,12 @@ from .v0051_battle_rule_v3 import MIGRATION_0051
 from .v0052_battle_rule_v4 import MIGRATION_0052
 from .v0053_battle_rule_v5 import MIGRATION_0053
 from .v0054_battle_rule_v6 import MIGRATION_0054
+from .v0055_battle_rule_v7 import MIGRATION_0055
+from .v0056_launch_campaign_and_social_limits import MIGRATION_0056
+from .v0057_battle_rule_v8 import MIGRATION_0057
+from .v0058_battle_rule_v9 import MIGRATION_0058
+from .v0059_battle_rule_v10 import MIGRATION_0059
+from .v0060_battle_rule_v11 import MIGRATION_0060
 
 MIGRATIONS: tuple[Migration, ...] = (
     MIGRATION_0001,
@@ -111,6 +117,12 @@ MIGRATIONS: tuple[Migration, ...] = (
     MIGRATION_0052,
     MIGRATION_0053,
     MIGRATION_0054,
+    MIGRATION_0055,
+    MIGRATION_0056,
+    MIGRATION_0057,
+    MIGRATION_0058,
+    MIGRATION_0059,
+    MIGRATION_0060,
 )
 
 __all__ = ["MIGRATIONS", "Migration"]

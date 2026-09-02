@@ -207,8 +207,8 @@ def deterministic_mechanic_cases(
             _record_move(prepared, side, move_id)
         state, result, seed = _resolve_fixed(prepared, "domain-" + suffix, domain_outcome=expected)
         domain = result["interactions"]["domain"]
-        assert domain and tuple(domain["wheel"]) == (("side-0", 8), ("side-1", 6), ("tie", 6))
-        assert domain["weight_scale"] == 2
+        assert domain and tuple(domain["wheel"]) == (("side-0", 40), ("side-1", 30), ("tie", 30))
+        assert domain["weight_scale"] == 10
         match = {**initial_match, "status": state["status"]}
         name = "13c-domain-clash-sukuna-win" if expected == "side-0" else "13d-domain-clash-tie"
         cases.append(
@@ -268,6 +268,45 @@ def deterministic_mechanic_cases(
         "wheel": domain["wheel"],
         "outcome": domain["outcome"],
         "gojo_next_round_debt_applied": False,
+    }
+
+    prepared = _fresh_mechanic_state(initial_state)
+    _ready(prepared["sides"][0])
+    _record_move(prepared, 0, "dismantle")
+    _ready(prepared["sides"][1])
+    _record_move(prepared, 1, "void")
+    state, result, seed = _resolve_fixed(prepared, "solo-gojo-hit", domain_outcome="hit")
+    domain = result["interactions"]["domain"]
+    assert domain and tuple(domain["wheel"]) == (("hit", 8), ("simple-domain", 2))
+    assert domain["boost_side"] == 1 and domain["bonus_gain"] == 30
+    assert domain["boost_reason"] == "领域命中"
+    assert state["sides"][0]["next_debt"] == 1
+    name = "13e2-solo-gojo-hit"
+    cases.append(
+        (
+            name,
+            matchup(
+                identity,
+                {**initial_match, "status": state["status"]},
+                state,
+                now_ms,
+                title="单方领域 · 无量空处命中加倍",
+                banner="固定种子验收：无量空处通过8:2命中判定，一份仍有效领域胜率翻倍，并使对方下回合少1招。",
+                events=_events(prepared),
+                round_result=result,
+            ),
+        )
+    )
+    evidence[name] = {
+        "seed": seed,
+        "mode": domain["mode"],
+        "wheel": domain["wheel"],
+        "outcome": domain["outcome"],
+        "boost_side": domain["boost_side"],
+        "boosted_ordinal": domain["boosted_ordinal"],
+        "bonus_gain": domain["bonus_gain"],
+        "boost_reason": domain["boost_reason"],
+        "gojo_next_round_debt_applied": state["sides"][0]["next_debt"] == 1,
     }
 
     prepared = _fresh_mechanic_state(initial_state)
@@ -561,7 +600,8 @@ def deterministic_mechanic_cases(
     _ready(prepared["sides"][0])
     collapse = _record_move(prepared, 0, "daniya-timed-collapse")
     _ready(prepared["sides"][1])
-    _record_move(prepared, 1, "asamu-charge-up")
+    # 憋个大会追加抽数，不能作为单招结算样张；洗澡没有未完成抽数。
+    _record_move(prepared, 1, "asamu-bathe")
     state, result, seed = _resolve_matching(
         prepared,
         "daniya-collapse-rebound",
@@ -586,7 +626,7 @@ def deterministic_mechanic_cases(
     )
     evidence[name] = {
         "seed": seed,
-        "move_gain": collapse["gain"],
+        "move_opponent_reduction": collapse["opponent_reduction"],
         "injury_wheel": result["injury_wheel"],
         "injury_modifiers": result["injury_modifiers"],
         "injury": result["injury"],
@@ -604,6 +644,7 @@ def deterministic_mechanic_cases(
     sleep = _record_move(prepared, 1, "asamu-sleep")
     prime = _record_move(prepared, 1, "asamu-prime")
     pressure = _record_move(prepared, 1, "asamu-pressure-king")
+    _record_move(prepared, 1, "asamu-bathe")
 
     def pressure_hits_staging(result: dict) -> bool:
         return any(
@@ -622,7 +663,7 @@ def deterministic_mechanic_cases(
                 state,
                 now_ms,
                 title="阿萨姆猪 · 动态招式盘与耐压王",
-                banner="洗澡→喝奶茶→睡觉逐段改变下一招抽取权重；全盛姿态再抽一次，耐压王则对对方数值招式独立做33%失效判定。",
+                banner="洗澡提高喝奶茶权重；喝奶茶永久培养全盛姿态，睡觉强化后续招式；全盛姿态再抽两次，耐压王独立判定数值失效。",
                 events=_events(prepared),
                 round_result=result,
             ),
@@ -648,7 +689,7 @@ def deterministic_mechanic_cases(
     _record_move(prepared, 1, "asamu-domain")
     state, result, seed = _resolve_fixed(prepared, "asamu-domain-copies", domain_outcome="side-1")
     copies = result["interactions"]["asamu_domain_copies"]
-    assert len(copies) == 4
+    assert len(copies) == 2
     name = "13o-asamu-domain-copies"
     cases.append(
         (
@@ -658,8 +699,8 @@ def deterministic_mechanic_cases(
                 {**v5_match, "status": state["status"]},
                 state,
                 now_ms,
-                title="阿萨姆猪 · 奶茶领域夺取四招",
-                banner="领域战获胜后严格复制对方四个随机招式；复制到领域只保留招式本身，不递归开启第二场领域战。",
+                title="阿萨姆猪 · 奶茶领域夺取两招",
+                banner="领域战获胜后严格复制对方两个随机招式；复制到领域只保留招式本身，不递归开启第二场领域战。",
                 events=_events(prepared) + [deepcopy(event) for event in copies],
                 round_result=result,
             ),
@@ -803,6 +844,7 @@ async def scenarios(output: Path):
         cases.append(("09b-juejue-dual-form-wheel", wheels(a, "juejue")))
         cases.append(("09c-daniya-dual-form-wheel", wheels(a, "daniya", level=5)))
         cases.append(("09d-asamu-dynamic-wheel", wheels(a, "asamu", level=5)))
+        cases.append(("09e-yilu-operator-wheel", wheels(a, "yilu", level=5)))
         cases.append(("10-invitation", (await w.invite()).view))
         cases.append(("11-entry", (await w.send("接受", "challenge", actor=b)).view))
         initial_match = await w.match()
@@ -941,7 +983,7 @@ async def run(args):
         if row["clippedText"] or row["outside"] or row["brokenImages"] or row.get("clippedMedia")
     ]
     report = {
-        "title": "Battle v6 · 战斗图片离线验收",
+        "title": "Battle v11 · 战斗图片离线验收",
         "status": "failed" if failures else "passed",
         "count": len(outputs),
         "diagnostics": capability.diagnostics,
@@ -951,12 +993,13 @@ async def run(args):
             "达妮娅猪与阿萨姆猪正式立绘",
             "达妮娅布景/幻灭双形态轮盘",
             "阿萨姆动态抽取权重轮盘",
+            "熠～噜猪九招干员盘及医疗/特种新权重",
             "蚀域蓄势、领域切形态与下回合加招",
             "未竟的谎言与统一数值失效",
             "计时的溃灭与力竭反噬",
             "洗澡/喝奶茶/睡觉/全盛姿态连锁",
             "传奇耐压王独立失效判定",
-            "阿萨姆领域胜利复制四招",
+            "阿萨姆领域胜利复制两招",
         ),
         "scope": "isolated offline data and public art; no production or QQ connection",
     }
@@ -976,7 +1019,7 @@ async def run(args):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Battle v6 战斗图片离线验收")
+    parser = argparse.ArgumentParser(description="Battle v11 战斗图片离线验收")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument(
         "--browser-executable", type=Path, default=Path("C:/Program Files/Google/Chrome/Application/chrome.exe")

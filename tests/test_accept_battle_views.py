@@ -85,6 +85,7 @@ def test_deterministic_mechanic_cards_cover_new_battle_rules() -> None:
         "13c-domain-clash-sukuna-win",
         "13d-domain-clash-tie",
         "13e-solo-simple-domain",
+        "13e2-solo-gojo-hit",
         "13f-black-flash-loan-infinity-space",
         "13g-purple-reset-cycle",
         "13h-round-carry",
@@ -96,17 +97,22 @@ def test_deterministic_mechanic_cards_cover_new_battle_rules() -> None:
         "13n-asamu-dynamic-chain",
         "13o-asamu-domain-copies",
     ]
-    assert evidence[names[0]]["wheel"] == (("side-0", 8), ("side-1", 6), ("tie", 6))
+    assert evidence[names[0]]["wheel"] == (("side-0", 40), ("side-1", 30), ("tie", 30))
     assert evidence[names[0]]["outcome"] == "side-0"
     assert evidence[names[0]]["boost_side"] == 0
     assert evidence[names[0]]["bonus_gain"] > 0
     assert evidence[names[1]]["outcome"] == "tie"
     assert evidence[names[2]]["wheel"] == (("hit", 8), ("simple-domain", 2))
     assert evidence[names[2]]["outcome"] == "simple-domain"
-    assert evidence[names[3]]["black_flash_stacks"] == 1
-    assert evidence[names[3]]["loan_gain"] == 1
-    assert evidence[names[3]]["space_slash_gain"] >= 29
-    assert "无下限·防御" in str(evidence[names[3]]["infinity_adjustments"])
+    assert evidence[names[3]]["outcome"] == "hit"
+    assert evidence[names[3]]["boost_reason"] == "领域命中"
+    assert evidence[names[3]]["bonus_gain"] == 30
+    assert evidence[names[3]]["gojo_next_round_debt_applied"]
+    assert "任意战斗猪单方领域命中" in dict(cases)[names[3]].text()
+    assert evidence[names[4]]["black_flash_stacks"] == 1
+    assert evidence[names[4]]["loan_gain"] == 1
+    assert evidence[names[4]]["space_slash_gain"] >= 29
+    assert "无下限·防御" in str(evidence[names[4]]["infinity_adjustments"])
     assert all(view.fighters for _name, view in cases)
     assert all(view.wheels for name, view in cases if name != "13j-daniya-asamu-formal-art")
     assert "空间斩" in dict(cases)["13f-black-flash-loan-infinity-space"].text()
@@ -131,15 +137,15 @@ def test_deterministic_mechanic_cards_cover_new_battle_rules() -> None:
     assert transition["domain_steps_after_draw"] == 0
     invalidation = evidence["13l-unified-numeric-invalidation"]
     assert invalidation["cancelled_own_gain"] == invalidation["doubled_own_gain_before_invalidation"]
-    assert invalidation["doubled_opponent_reduction_preserved"] == 44
+    assert invalidation["doubled_opponent_reduction_preserved"] == 42
     assert invalidation["permanent_opponent_exhaust_bonus_units"] == 1
-    assert evidence["13m-daniya-collapse-rebound"]["move_gain"] == Fraction(-521, 10)
+    assert evidence["13m-daniya-collapse-rebound"]["move_opponent_reduction"] == Fraction(521, 10)
     dynamic = evidence["13n-asamu-dynamic-chain"]
     assert dynamic["tea_weight_after_bathe"] == 1500
-    assert dynamic["sleep_weight_after_tea"] == 1250
+    assert dynamic["sleep_weight_after_tea"] == 1000
     assert dynamic["prime_weight_after_sleep"] == 300
     copies = evidence["13o-asamu-domain-copies"]
-    assert copies["copy_count"] == 4
+    assert copies["copy_count"] == 2
     copy_card = dict(cases)["13o-asamu-domain-copies"].fighters[1].move_wheel
     assert copy_card is not None and copy_card.selected_index is not None
     assert copy_card.segments[copy_card.selected_index].label == copies["copies"][-1]["source_move_name"]
@@ -158,6 +164,8 @@ def test_juejue_dual_form_and_subwheels_have_a_deterministic_art_view() -> None:
     ]
     text = result.text()
     assert all(value in text for value in ("即时换盘", "相对静止时间·零", "虚拟模仿", "主盘基础抽取权重为1"))
+    assert "时之沙·加速" in text and "时之沙·时延" in text
+    assert text.count("基础抽取权重1.5") >= 2
     assert all(
         value in text
         for value in (
@@ -304,6 +312,35 @@ def test_juejue_v6_each_future_simulation_has_its_own_source_in_settlement_view(
     text = "\n".join(panel.title + "\n" + "\n".join(line.label for line in panel.rows) for panel in panels)
     assert "未来模拟（第2招）" in text
     assert "未来模拟（第5招）" in text
+
+
+def test_retaliation_panel_renders_fraction_snapshots_without_indexing_scalar_facts() -> None:
+    interactions = {
+        "domain": None,
+        "adjustments": ((), ()),
+        "future_simulations": (),
+        "sand_bodies": (),
+        "zeroes": (),
+        "round_reductions": (),
+        "cross_effects": (),
+        "retaliation_snapshot": (9, 20),
+        "retaliation_after_snapshot": (24, 9),
+        "retaliations": (
+            {
+                "side": 0,
+                "count": 1,
+                "swapped": True,
+                "before": 9,
+                "after": 24,
+            },
+        ),
+    }
+    panels = _v4_interaction_panels(interactions, ["阿萨姆", "对手"])
+    text = "\n".join(
+        panel.title + "\n" + "\n".join(line.note for line in panel.rows)
+        for panel in panels
+    )
+    assert "9/20 → 24/9" in text
 
 
 def test_juejue_v6_domain_auto_mimic_has_a_real_selected_wheel_segment() -> None:

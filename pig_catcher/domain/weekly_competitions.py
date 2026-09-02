@@ -75,6 +75,8 @@ class WeeklyCompetitionDefinition:
     metric_label: str
     metric_unit: str
     reward_tiers: tuple[WeeklyRewardTier, ...]
+    fixed_starts_at: str = ""
+    fixed_ends_at: str = ""
 
     def __post_init__(self) -> None:
         if not self.definition_key.strip() or not self.name.strip():
@@ -91,6 +93,8 @@ class WeeklyCompetitionDefinition:
             if overlap:
                 raise ValueError(f"Weekly reward ranks repeat across tiers: {sorted(overlap)}")
             seen.update(tier.ranks)
+        if bool(self.fixed_starts_at) != bool(self.fixed_ends_at):
+            raise ValueError("Fixed weekly window needs both start and end")
 
     def rewards_for_rank(self, rank: int) -> tuple[WeeklyReward, ...]:
         """Resolve one deterministic final-rank reward bundle."""
@@ -144,6 +148,8 @@ WEEKLY_COMPETITION_DEFINITIONS: tuple[WeeklyCompetitionDefinition, ...] = (
                 _sprint_rewards(10, coins=3_000, catch_tickets=2, fireworks=1),
             ),
         ),
+        fixed_starts_at="2026-09-01T00:00:00+08:00",
+        fixed_ends_at="2026-09-08T00:00:00+08:00",
     ),
 )
 

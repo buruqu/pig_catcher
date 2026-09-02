@@ -271,7 +271,7 @@ class BattleService:
                 else view(
                     identity,
                     "本群尚无对战",
-                    banner="先 /战斗猪 设置 宿傩猪、五条猪、撅撅猪、达妮娅猪或阿萨姆猪，再 /比划比划 @群友。",
+                    banner="先 /战斗猪 设置 宿傩猪、五条猪、撅撅猪、达妮娅猪、阿萨姆猪或熠～噜猪，再 /比划比划 @群友。",
                 )
             )
         if action == "invite":

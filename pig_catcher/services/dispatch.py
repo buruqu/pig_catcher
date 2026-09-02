@@ -6,6 +6,7 @@ import json
 import secrets
 from collections.abc import Callable
 from dataclasses import dataclass, replace
+from itertools import combinations
 from typing import Any
 from uuid import uuid4
 
@@ -18,6 +19,7 @@ from ..domain.dispatch import (
     REGIONS_BY_ID,
     TOOLS_BY_ID,
     DispatchError,
+    block_yield,
     material_id,
     team_bonus,
     team_slots,
@@ -38,7 +40,9 @@ from .command_state import validate_existing_receipt
 from .dispatch_queries import DispatchQueries, local_time, option_text, reward_lines
 from .receipts import request_fingerprint
 
-_MUTATIONS = frozenset(("team", "start", "recall", "confirm", "cancel", "craft", "convert", "choose", "returns"))
+_MUTATIONS = frozenset(
+    ("team", "start", "auto", "recall", "confirm", "cancel", "craft", "convert", "choose", "returns")
+)
 _QUERIES = frozenset(("overview", "routes", "bag", "recipes", "journal", "detail", "souvenirs", "choices"))
 
 
@@ -146,6 +150,8 @@ class DispatchService:
             return await self._team_preview(session, identity, args, now_ms)
         if action == "start":
             return await self._start_preview(session, identity, args, now_ms)
+        if action == "auto":
+            return await self._auto_preview(session, identity, args, now_ms)
         if action == "recall":
             return await self._recall_preview(session, identity, args["slot"], now_ms)
         if action == "confirm":
@@ -298,6 +304,25 @@ class DispatchService:
         members = [await self.repository.member(session, identity.player_id, pig_id) for pig_id in ids]
         for member in members:
             self.repository.require_available(member)
+        snapshot = await self._departure_snapshot(
+            session,
+            identity,
+            args,
+            members,
+            team_revision=team["revision"],
+        )
+        await self._pending(session, identity, "start", snapshot, now_ms)
+        return self.queries.start_preview(identity, snapshot, now_ms)
+
+    async def _departure_snapshot(
+        self,
+        session: DatabaseSession,
+        identity: CommandIdentity,
+        args: dict[str, Any],
+        members: list[dict[str, Any]],
+        *,
+        team_revision: int,
+    ) -> dict[str, Any]:
         if args["region_id"] not in REGIONS_BY_ID or args["hours"] not in DURATIONS:
             raise DispatchError("路线或时长不合法。")
         region = REGIONS_BY_ID[args["region_id"]]
@@ -307,7 +332,7 @@ class DispatchService:
             "members": members,
             "bonus": team_bonus(members, region),
             "fee": region.fee * (args["hours"] // 4),
-            "team_revision": team["revision"],
+            "team_revision": team_revision,
         }
         coupons = await AchievementCouponRepository().selected(
             session, identity.player_id, ("dispatch-numeric", "dispatch-visual")
@@ -317,8 +342,104 @@ class DispatchService:
         if coupons.get("dispatch-numeric", {}).get("ticket_id") == "dispatch-bill":
             snapshot["fee"] = max(0, snapshot["fee"] - 120)
         await self._check_resources(session, identity, snapshot)
+        return snapshot
+
+    async def _auto_members(
+        self, session: DatabaseSession, identity: CommandIdentity, region_id: str
+    ) -> list[dict[str, Any]]:
+        region = REGIONS_BY_ID[region_id]
+        rows = await session.fetch_all(
+            """SELECT p.pig_instance_id FROM pig_instances p
+            WHERE p.owner_player_id=? AND p.scope_id=? AND p.state='active'
+            AND p.locked_trade_id IS NULL AND p.is_favorite=0
+            AND NOT EXISTS(SELECT 1 FROM asset_occupancies o WHERE o.pig_instance_id=p.pig_instance_id)
+            ORDER BY p.official_value,p.acquired_at,p.pig_instance_id""",
+            (identity.player_id, identity.scope.value),
+        )
+        members = [await self.repository.member(session, identity.player_id, row[0]) for row in rows]
+        if not members:
+            raise DispatchError("没有可自动派遣的空闲非收藏猪；收藏猪请继续使用手动编队并输入完整编号。")
+
+        # 路线只有两个特长标签。按“高/低星 + 标签掩码”各保留前三名，仍能精确覆盖
+        # 最多三人队的最优解，同时避免大背包做三次方枚举。
+        buckets: dict[tuple[bool, int], list[tuple[float, dict[str, Any]]]] = {}
+        for member in members:
+            quality = float(member[f"{region.attribute}_q"])
+            if not region.prefer_large:
+                quality = 1 - quality
+            mask = sum(1 << index for index, tag in enumerate(region.tags) if tag in member["tags"])
+            score = quality * 50_000 + int(member["proficiency"]) * 10_000
+            buckets.setdefault((int(member["rarity"]) >= 4, mask), []).append((score, member))
+        candidates: dict[str, dict[str, Any]] = {}
+        for bucket in buckets.values():
+            bucket.sort(key=lambda item: (-item[0], int(item[1]["official_value"]), item[1]["pig_instance_id"]))
+            for _, member in bucket[:3]:
+                candidates[member["pig_instance_id"]] = member
+
+        ordered = sorted(candidates.values(), key=lambda member: member["pig_instance_id"])
+        best_members: list[dict[str, Any]] | None = None
+        best_key: tuple[int, int, int, int] | None = None
+        for size in range(1, min(3, len(ordered)) + 1):
+            for chosen in combinations(ordered, size):
+                try:
+                    bonus = team_bonus(list(chosen), region)
+                except DispatchError:
+                    continue
+                primary_units, _ = block_yield(size, sum(bonus.values()))
+                key = (
+                    primary_units,
+                    sum(bonus.values()),
+                    size,
+                    -sum(int(member["official_value"]) for member in chosen),
+                )
+                if best_key is None or key > best_key:
+                    best_key, best_members = key, list(chosen)
+        if best_members is None:
+            raise DispatchError("现有空闲非收藏猪无法组成有效队伍：至少需要一只1～3星猪。")
+        return best_members
+
+    async def _auto_preview(
+        self, session: DatabaseSession, identity: CommandIdentity, args: dict[str, Any], now_ms: int
+    ) -> DispatchView:
+        if args["region_id"] not in REGIONS_BY_ID or args["hours"] not in DURATIONS:
+            raise DispatchError("路线或时长不合法。")
+        profile = await self.repository.profile(session, identity.player_id)
+        unlocked = team_slots(profile["effective_seconds"])
+        active = {
+            int(row[0])
+            for row in await session.fetch_all(
+                "SELECT slot FROM dispatch_trips WHERE player_id=? AND status='traveling'",
+                (identity.player_id,),
+            )
+        }
+        slot = next((candidate for candidate in range(1, unlocked + 1) if candidate not in active), None)
+        if slot is None:
+            raise DispatchError(f"目前解锁的{unlocked}支队伍都在旅行；请等待返程或先召回。")
+        members = await self._auto_members(session, identity, args["region_id"])
+        team = await session.fetch_one(
+            "SELECT revision FROM dispatch_teams WHERE player_id=? AND slot=?", (identity.player_id, slot)
+        )
+        previous_revision = int(team[0]) if team else 0
+        snapshot = await self._departure_snapshot(
+            session,
+            identity,
+            {**args, "slot": slot},
+            members,
+            team_revision=previous_revision + 1,
+        )
+        snapshot.update(automatic=True, previous_team_revision=previous_revision)
+        # 复用既有 start 待确认类型，避免为纯交互简化引入数据库迁移。
         await self._pending(session, identity, "start", snapshot, now_ms)
-        return self.queries.start_preview(identity, snapshot, now_ms)
+        view = self.queries.start_preview(identity, snapshot, now_ms)
+        return replace(
+            view,
+            title=f"自动配队 · 第{slot}队出发预览",
+            banner=(
+                f"已按{REGIONS_BY_ID[args['region_id']].name}的特长、体型/重量与熟练度挑选当前最佳空闲队伍。"
+                "确认后会同时保存该队并出发。"
+            ),
+            hints=("2分钟内 /猪猪派遣 确认；只需确认这一次。", "/猪猪派遣 取消 · 不改队、不扣费"),
+        )
 
     async def _check_resources(
         self, session: DatabaseSession, identity: CommandIdentity, snapshot: dict[str, Any]
@@ -393,6 +514,26 @@ class DispatchService:
                 hints=(f"/猪猪派遣 出发 {payload['slot']} 青草近郊 4小时",),
             )
         elif operation == "start":
+            if payload.get("automatic"):
+                await self._check_slot(session, identity, payload["slot"])
+                members = await self._fresh_members(session, identity, payload["members"])
+                team = await session.fetch_one(
+                    "SELECT revision FROM dispatch_teams WHERE player_id=? AND slot=?",
+                    (identity.player_id, payload["slot"]),
+                )
+                if (int(team[0]) if team else 0) != payload["previous_team_revision"]:
+                    raise DispatchError("自动配队预览后队伍已变化，请重新选择路线。")
+                await session.execute(
+                    """INSERT INTO dispatch_teams VALUES(?,?,?,1) ON CONFLICT(player_id,slot)
+                    DO UPDATE SET member_ids_json=excluded.member_ids_json,revision=revision+1""",
+                    (identity.player_id, payload["slot"], encode([m["pig_instance_id"] for m in members])),
+                )
+                fresh_team = await session.fetch_one(
+                    "SELECT revision FROM dispatch_teams WHERE player_id=? AND slot=?",
+                    (identity.player_id, payload["slot"]),
+                )
+                if fresh_team is None or int(fresh_team[0]) != payload["team_revision"]:
+                    raise DispatchError("自动配队版本发生冲突，本次没有改队或扣费。")
             view = await self._depart(session, identity, payload, now_ms, key)
         elif operation == "recall":
             trip = await self._owned_trip(session, identity, payload["trip_id"])

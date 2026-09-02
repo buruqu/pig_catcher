@@ -6,6 +6,7 @@ import hashlib
 import json
 from copy import deepcopy
 from fractions import Fraction
+from math import lcm
 from typing import Any
 
 from .battle_catalog import (
@@ -28,6 +29,7 @@ from .battle_catalog import (
     MOVE_CHUNK_SIZE,
     MOVE_WEIGHT_SCALE,
     VICTORY_WEIGHT_SCALE,
+    YILU_MOVES,
     BattleError,
     Move,
     fighter_form_moves,
@@ -154,11 +156,22 @@ def fresh_turn() -> dict:
         "juejue_rewind_pending_ordinals": [],
         "juejue_acceleration_failures": [],
         "daniya_collapse_count": 0,
+        "domain_clash_bonus_units": 0,
+        "opponent_domain_clash_reduction_units": 0,
         "asamu_pressure_ordinals": [],
         "asamu_misfortune_count": 0,
         "asamu_retaliation_ordinals": [],
         "forced_milk_dragon_count": 0,
         "forced_milk_dragon_used": 0,
+        "yilu_operator_placements": 0,
+        "yilu_double_operator_draws": 0,
+        "yilu_specialist_operator_draws": 0,
+        "yilu_defender_chances": [],
+        "yilu_injury_recovery_layers": 0,
+        "yilu_injury_worsen_layers": 0,
+        "yilu_true_damage_layers": 0,
+        "yilu_force_end": False,
+        "yilu_round_base_bonus": 0,
     }
 
 
@@ -243,7 +256,13 @@ def new_state(fighters: list[dict], *, seed: str = "") -> dict:
                 "asamu_tea_bonus_units": 0,
                 "asamu_sleep_bonus_units": 0,
                 "asamu_prime_bonus_units": 0,
+                "asamu_prime_temp_bonus_units": 0,
+                "asamu_future_gain_bonus": 0,
                 "asamu_milk_dragon_next_count": 0,
+                "yilu_markers": 0,
+                "yilu_markers_total": 0,
+                "yilu_future_base_bonus": 0,
+                "yilu_next_round_base_bonus": 0,
                 "turn": fresh_turn(),
             }
         )
@@ -285,7 +304,13 @@ def _side(state: dict, side: int) -> dict:
     player.setdefault("asamu_tea_bonus_units", 0)
     player.setdefault("asamu_sleep_bonus_units", 0)
     player.setdefault("asamu_prime_bonus_units", 0)
+    player.setdefault("asamu_prime_temp_bonus_units", 0)
+    player.setdefault("asamu_future_gain_bonus", 0)
     player.setdefault("asamu_milk_dragon_next_count", 0)
+    player.setdefault("yilu_markers", 0)
+    player.setdefault("yilu_markers_total", 0)
+    player.setdefault("yilu_future_base_bonus", 0)
+    player.setdefault("yilu_next_round_base_bonus", 0)
     for key, value in fresh_turn().items():
         player["turn"].setdefault(key, deepcopy(value))
     return player
@@ -412,6 +437,27 @@ def _move_by_id(fighter_id: str, move_id: str) -> Move | None:
     return next((move for move in fighter.moves if move.move_id == move_id), None)
 
 
+def _yilu_add_markers(player: dict, amount: int) -> dict:
+    """累计指示物并按终身累计每跨过9点返还招式，不因消费重复刷同一里程碑。"""
+
+    amount = max(0, int(amount))
+    before = int(player.get("yilu_markers", 0))
+    total_before = int(player.get("yilu_markers_total", 0))
+    after = before + amount
+    total_after = total_before + amount
+    threshold_draws = total_after // 9 - total_before // 9
+    player["yilu_markers"] = after
+    player["yilu_markers_total"] = total_after
+    return {
+        "amount": amount,
+        "before": before,
+        "after": after,
+        "total_before": total_before,
+        "total_after": total_after,
+        "threshold_draws": threshold_draws,
+    }
+
+
 def apply_move(
     player: dict,
     move: Move,
@@ -426,6 +472,7 @@ def apply_move(
     forced: bool = False,
     mimic_override: dict | None = None,
     copy_context: bool = False,
+    effect_repeats: int = 1,
 ) -> dict:
     """应用一个确定招式。
 
@@ -501,6 +548,18 @@ def apply_move(
     copied_domain_effect = ""
     copied_domain_effect_suppressed = ""
     suppressed_source_local_effects: list[str] = []
+    effect_repeats = max(1, int(effect_repeats))
+    yilu_marker_events: list[dict] = []
+    yilu_sniper_shots: list[dict] = []
+    yilu_defender_checks: list[dict] = []
+    yilu_consumed_markers = 0
+    yilu_true_damage_added = 0
+    yilu_medic_recoveries: list[dict] = []
+    yilu_specialist_draws_added = 0
+    yilu_future_base_before = int(player.get("yilu_future_base_bonus", 0)) + int(
+        turn.get("yilu_round_base_bonus", 0)
+    )
+    asamu_future_gain_before = int(player.get("asamu_future_gain_bonus", 0))
 
     if is_juejue and "juejue-accelerate" in move.tags:
         tier, subwheel = _juejue_subwheel(player, "acceleration", seed, key, version)
@@ -578,6 +637,169 @@ def apply_move(
 
     is_copy = mimic is not None or copy_context
 
+    # 熠～噜猪的干员效果按确定的子轮盘直接记入事件；巴别塔再部署的
+    # 干员只占一个放置名额，但其完整效果顺序执行两遍。
+    if "yilu-operator" in effect_tags:
+        if snapshot.get("fighter_id") == "yilu":
+            turn["yilu_operator_placements"] = int(turn.get("yilu_operator_placements", 0)) + 1
+        if "yilu-vanguard" in effect_tags:
+            special_base = Fraction(5 * effect_repeats)
+            for _repeat in range(effect_repeats):
+                marker = _yilu_add_markers(player, 2)
+                yilu_marker_events.append(marker)
+                special_extra_draws += 1 + int(marker["threshold_draws"])
+            player["yilu_future_base_bonus"] = int(
+                player.get("yilu_future_base_bonus", 0)
+            ) + 2 * effect_repeats
+        elif "yilu-guard" in effect_tags:
+            special_base = Fraction(0)
+            for _repeat in range(effect_repeats):
+                marker = _yilu_add_markers(player, 1)
+                yilu_marker_events.append(marker)
+                special_extra_draws += int(marker["threshold_draws"])
+                consumed = int(player.get("yilu_markers", 0))
+                player["yilu_markers"] = 0
+                yilu_consumed_markers += consumed
+                special_base += consumed * 5
+                if consumed > 5:
+                    yilu_true_damage_added += 1
+            turn["yilu_true_damage_layers"] = int(
+                turn.get("yilu_true_damage_layers", 0)
+            ) + yilu_true_damage_added
+        elif "yilu-defender" in effect_tags:
+            special_base = Fraction(2 * effect_repeats)
+            for repeat_index in range(1, effect_repeats + 1):
+                marker = _yilu_add_markers(player, 1)
+                yilu_marker_events.append(marker)
+                special_extra_draws += int(marker["threshold_draws"])
+                hit, hit_roll = choose(
+                    seed,
+                    f"{key}:yilu:defender:{repeat_index}:hit",
+                    ((True, 70), (False, 30)),
+                    version=version,
+                )
+                check = {
+                    "source_ordinal": ordinal,
+                    "repeat": repeat_index,
+                    "hit": bool(hit),
+                    "hit_roll": hit_roll,
+                }
+                turn.setdefault("yilu_defender_chances", []).append(check)
+                yilu_defender_checks.append(deepcopy(check))
+        elif "yilu-caster" in effect_tags:
+            special_base = Fraction(0)
+            for _repeat in range(effect_repeats):
+                marker = _yilu_add_markers(player, 3)
+                yilu_marker_events.append(marker)
+                special_extra_draws += int(marker["threshold_draws"])
+                available = int(player.get("yilu_markers", 0))
+                groups = available // 6
+                if groups:
+                    consumed = groups * 6
+                    player["yilu_markers"] = available - consumed
+                    yilu_consumed_markers += consumed
+                    special_base += groups * 40
+                else:
+                    fallback = _yilu_add_markers(player, 1)
+                    yilu_marker_events.append(fallback)
+                    special_extra_draws += int(fallback["threshold_draws"])
+        elif "yilu-sniper" in effect_tags:
+            special_base = Fraction(0)
+            for repeat_index in range(1, effect_repeats + 1):
+                shot_roll = randbelow(
+                    seed,
+                    f"{key}:yilu:sniper:{repeat_index}:count",
+                    10,
+                    version=version,
+                )
+                shots = shot_roll + 1
+                for shot_index in range(1, shots + 1):
+                    shot_gain = 1
+                    add_marker, add_roll = choose(
+                        seed,
+                        f"{key}:yilu:sniper:{repeat_index}:{shot_index}:add",
+                        ((True, 1), (False, 1)),
+                        version=version,
+                    )
+                    marker = None
+                    if add_marker:
+                        marker = _yilu_add_markers(player, 1)
+                        yilu_marker_events.append(marker)
+                        special_extra_draws += int(marker["threshold_draws"])
+                    consume_marker, consume_roll = choose(
+                        seed,
+                        f"{key}:yilu:sniper:{repeat_index}:{shot_index}:consume",
+                        ((True, 1), (False, 1)),
+                        version=version,
+                    )
+                    consumed = bool(consume_marker and int(player.get("yilu_markers", 0)) > 0)
+                    if consumed:
+                        player["yilu_markers"] -= 1
+                        yilu_consumed_markers += 1
+                        shot_gain += 2
+                    special_base += shot_gain
+                    yilu_sniper_shots.append(
+                        {
+                            "repeat": repeat_index,
+                            "shot": shot_index,
+                            "shot_count": shots,
+                            "shot_roll": shot_roll,
+                            "gain": shot_gain,
+                            "add_marker": bool(add_marker),
+                            "add_roll": add_roll,
+                            "consume_requested": bool(consume_marker),
+                            "consume_roll": consume_roll,
+                            "consumed": consumed,
+                        }
+                    )
+        elif "yilu-medic" in effect_tags:
+            special_base = Fraction(0)
+            for repeat_index in range(1, effect_repeats + 1):
+                consumed = int(player.get("yilu_markers", 0))
+                player["yilu_markers"] = 0
+                yilu_consumed_markers += consumed
+                turn["yilu_injury_recovery_layers"] = int(
+                    turn.get("yilu_injury_recovery_layers", 0)
+                ) + 1
+                injury_before = str(player.get("injury_state", "none"))
+                recovered = injury_before == "heavy" or bool(player.get("heavy"))
+                if recovered:
+                    player["heavy"] = False
+                    player["risk"] = 1
+                    player["injury_state"] = "light"
+                yilu_medic_recoveries.append(
+                    {
+                        "repeat": repeat_index,
+                        "before": injury_before,
+                        "after": str(player.get("injury_state", "none")),
+                        "recovered": recovered,
+                    }
+                )
+                marker = _yilu_add_markers(player, 2)
+                yilu_marker_events.append(marker)
+                special_extra_draws += int(marker["threshold_draws"])
+        elif "yilu-specialist" in effect_tags:
+            special_base = Fraction(0)
+            for _repeat in range(effect_repeats):
+                consumed = int(player.get("yilu_markers", 0))
+                player["yilu_markers"] = 0
+                yilu_consumed_markers += consumed
+                marker = _yilu_add_markers(player, 1)
+                yilu_marker_events.append(marker)
+                special_extra_draws += int(marker["threshold_draws"])
+                turn["yilu_specialist_operator_draws"] = int(
+                    turn.get("yilu_specialist_operator_draws", 0)
+                ) + 2
+                yilu_specialist_draws_added += 2
+                special_extra_draws += 2
+
+    if "yilu-babel" in effect_tags:
+        turn["yilu_double_operator_draws"] = int(
+            turn.get("yilu_double_operator_draws", 0)
+        ) + 1
+        special_extra_draws += 1
+        player["next_debt"] += 1
+
     if is_juejue and "juejue-sculpt" in move.tags:
         player["juejue_sculpt_bonus"] = min(20, player["juejue_sculpt_bonus"] + 5)
         player["juejue_sand_domain_steps"] += 1
@@ -642,24 +864,34 @@ def apply_move(
         turn["daniya_collapse_count"] = max(1, int(turn.get("daniya_collapse_count", 0)))
     if "daniya-domain" in effect_tags and not is_copy:
         player["daniya_domain_steps"] = 0
+    if "daniya-flawless" in effect_tags:
+        turn["domain_clash_bonus_units"] = int(turn.get("domain_clash_bonus_units", 0)) + 2
+    if "daniya-loan" in effect_tags:
+        turn["opponent_domain_clash_reduction_units"] = int(
+            turn.get("opponent_domain_clash_reduction_units", 0)
+        ) + 2
 
-    # 阿萨姆：所有动态抽取权重都保存为千分整数；睡觉对全盛的加成整场保留。
+    # 阿萨姆：喝奶茶永久养全盛，憋个大的只给临时权重；睡觉的+5
+    # 从下一招开始叠加到本场所有后续招式。
     if "asamu-bathe" in effect_tags and not is_copy:
         player["asamu_tea_bonus_units"] = int(player.get("asamu_tea_bonus_units", 0)) + 500
     elif "asamu-bathe" in effect_tags:
         suppressed_source_local_effects.append("asamu-milk-tea-draw-weight")
     if "asamu-milk-tea" in effect_tags and not is_copy:
         player["asamu_tea_bonus_units"] = 0
-        player["asamu_sleep_bonus_units"] = int(player.get("asamu_sleep_bonus_units", 0)) + 250
-    elif "asamu-milk-tea" in effect_tags:
-        suppressed_source_local_effects.append("asamu-sleep-draw-weight")
-    if "asamu-sleep" in effect_tags and not is_copy:
-        player["asamu_sleep_bonus_units"] = 0
         player["asamu_prime_bonus_units"] = int(player.get("asamu_prime_bonus_units", 0)) + 100
-    elif "asamu-sleep" in effect_tags:
+    elif "asamu-milk-tea" in effect_tags:
         suppressed_source_local_effects.append("asamu-prime-draw-weight")
-    if "asamu-charge-up" in effect_tags:
-        player["asamu_big_stacks"] = asamu_big_before + 1
+    if "asamu-sleep" in effect_tags:
+        player["asamu_future_gain_bonus"] = asamu_future_gain_before + 5
+    if "asamu-charge-up" in effect_tags and not is_copy:
+        player["asamu_prime_temp_bonus_units"] = int(
+            player.get("asamu_prime_temp_bonus_units", 0)
+        ) + 1000
+    elif "asamu-charge-up" in effect_tags:
+        suppressed_source_local_effects.append("asamu-prime-temporary-draw-weight")
+    if "asamu-prime" in effect_tags and not is_copy:
+        player["asamu_prime_temp_bonus_units"] = 0
     if "asamu-pressure-king" in effect_tags:
         turn.setdefault("asamu_pressure_ordinals", []).append(ordinal)
     if "asamu-misfortune-transfer" in effect_tags:
@@ -681,7 +913,7 @@ def apply_move(
             player["next_action_bonus"] += 1
             copied_domain_effect = "蚀域命中：自己下回合出招数+1"
         elif effect_fighter_id == "asamu":
-            copied_domain_effect_suppressed = "阿萨姆领域追加四次复制被抑制"
+            copied_domain_effect_suppressed = "阿萨姆领域追加两次复制被抑制"
         else:
             copied_domain_effect = "仅复制领域数值；不重新进入领域战"
 
@@ -783,9 +1015,16 @@ def apply_move(
     own_numeric = directed_numeric if numeric_direction == "self" else Fraction(0)
     if numeric_direction == "opponent":
         opponent_reduction += directed_numeric
-    # 憋个大的属于“后续所有招式”效果；由虚拟模仿获得层数后同样生效。
-    asamu_big_gain = Fraction(3 * asamu_big_before)
-    gain = own_numeric + music_gain + black_flash_bonus + zero_bonus + asamu_big_gain
+    asamu_future_gain = Fraction(asamu_future_gain_before)
+    yilu_future_gain = Fraction(yilu_future_base_before * effect_repeats)
+    gain = (
+        own_numeric
+        + music_gain
+        + black_flash_bonus
+        + zero_bonus
+        + asamu_future_gain
+        + yilu_future_gain
+    )
     if multiplier_contract:
         player["double"] = False
     if positive_numeric:
@@ -819,6 +1058,13 @@ def apply_move(
     if "infinity" in effect_tags:
         turn["infinity_used"] = True
     turn["done"] = turn["pending"] == 0
+    if (
+        snapshot.get("fighter_id") == "yilu"
+        and int(turn.get("yilu_operator_placements", 0)) >= 10
+    ):
+        turn["pending"] = 0
+        turn["done"] = True
+        turn["yilu_force_end"] = True
     has_numeric_contribution = gain != 0
     if mimic is not None:
         mimic.update(
@@ -865,15 +1111,35 @@ def apply_move(
         "black_flash_stacks": player["black_flash_stacks"],
         "music_gain": music_gain,
         "zero_gain": zero_bonus,
-        "asamu_big_gain": asamu_big_gain,
+        "asamu_big_gain": 0,
         "asamu_big_stacks_before": asamu_big_before,
         "asamu_big_stacks_after": int(player.get("asamu_big_stacks", 0)),
+        "asamu_future_gain": asamu_future_gain,
+        "asamu_future_gain_before": asamu_future_gain_before,
+        "asamu_future_gain_after": int(player.get("asamu_future_gain_bonus", 0)),
         "asamu_tea_bonus_before": tea_bonus_before,
         "asamu_tea_bonus_after": int(player.get("asamu_tea_bonus_units", 0)),
         "asamu_sleep_bonus_before": sleep_bonus_before,
         "asamu_sleep_bonus_after": int(player.get("asamu_sleep_bonus_units", 0)),
         "asamu_prime_bonus_before": prime_bonus_before,
         "asamu_prime_bonus_after": int(player.get("asamu_prime_bonus_units", 0)),
+        "asamu_prime_temp_bonus_after": int(player.get("asamu_prime_temp_bonus_units", 0)),
+        "yilu_effect_repeats": effect_repeats,
+        "yilu_future_gain": yilu_future_gain,
+        "yilu_future_base_before": yilu_future_base_before,
+        "yilu_future_base_after": int(player.get("yilu_future_base_bonus", 0))
+        + int(turn.get("yilu_round_base_bonus", 0)),
+        "yilu_markers": int(player.get("yilu_markers", 0)),
+        "yilu_markers_total": int(player.get("yilu_markers_total", 0)),
+        "yilu_marker_events": deepcopy(yilu_marker_events),
+        "yilu_consumed_markers": yilu_consumed_markers,
+        "yilu_threshold_draws": sum(int(item["threshold_draws"]) for item in yilu_marker_events),
+        "yilu_sniper_shots": deepcopy(yilu_sniper_shots),
+        "yilu_defender_checks": deepcopy(yilu_defender_checks),
+        "yilu_true_damage_added": yilu_true_damage_added,
+        "yilu_medic_recoveries": deepcopy(yilu_medic_recoveries),
+        "yilu_specialist_draws_added": yilu_specialist_draws_added,
+        "yilu_operator_placements": int(turn.get("yilu_operator_placements", 0)),
         "subwheel": subwheel,
         "relative_zero": relative_zero,
         "mimic": mimic,
@@ -924,6 +1190,10 @@ def apply_move(
         "double_pending": player["double"],
         "next_debt": player["next_debt"],
         "next_action_bonus": player.get("next_action_bonus", 0),
+        "domain_clash_bonus_units": int(turn.get("domain_clash_bonus_units", 0)),
+        "opponent_domain_clash_reduction_units": int(
+            turn.get("opponent_domain_clash_reduction_units", 0)
+        ),
         "pending": turn["pending"],
         "purple_weight_steps_before": purple_weight_steps_before,
         "purple_weight_steps_used": purple_weight_steps_used,
@@ -960,10 +1230,12 @@ def move_weight_units(player: dict, move: Move) -> int:
     if player.get("snapshot", {}).get("fighter_id") == "asamu":
         if "asamu-milk-tea" in move.tags:
             units += int(player.get("asamu_tea_bonus_units", 0))
-        elif "asamu-sleep" in move.tags:
-            units += int(player.get("asamu_sleep_bonus_units", 0))
         elif "asamu-prime" in move.tags:
             units += int(player.get("asamu_prime_bonus_units", 0))
+            units += int(player.get("asamu_prime_temp_bonus_units", 0))
+        elif "asamu-pressure-king" in move.tags:
+            injury = player.get("injury_state", "none")
+            units = 2000 if injury == "heavy" else 1000 if injury == "light" else 500
         elif "asamu-tit-for-tat" in move.tags:
             injury = player.get("injury_state", "none")
             units = 749 if injury == "light" else 947 if injury == "heavy" else 400
@@ -981,9 +1253,30 @@ def play_chunk(state: dict, side: int, seed: str, *, chunk_size: int = MOVE_CHUN
         if player["turn"]["done"]:
             break
         fighter_id = player["snapshot"]["fighter_id"]
+        forced_milk = int(player["turn"].get("forced_milk_dragon_count", 0)) > int(
+            player["turn"].get("forced_milk_dragon_used", 0)
+        )
+        forced_yilu_operator = (
+            not forced_milk and int(player["turn"].get("yilu_double_operator_draws", 0)) > 0
+        )
+        forced_yilu_specialist = (
+            not forced_milk
+            and not forced_yilu_operator
+            and int(player["turn"].get("yilu_specialist_operator_draws", 0)) > 0
+        )
         # 每次抽取都重新读取当前形态。切换招式增加的 pending 会在同一
         # play_chunk 内立刻从新轮盘抽取，不会继续使用分片开始时的旧盘。
-        if fighter_id == "juejue":
+        if forced_yilu_operator:
+            moves = tuple(move for move in YILU_MOVES if "yilu-operator" in move.tags)
+        elif forced_yilu_specialist:
+            moves = tuple(
+                move
+                for move in YILU_MOVES
+                if "yilu-operator" in move.tags
+                and "yilu-medic" not in move.tags
+                and "yilu-specialist" not in move.tags
+            )
+        elif fighter_id == "juejue":
             moves = fighter_form_moves(fighter_id, player["juejue_form"])
         elif fighter_id == "daniya":
             moves = fighter_form_moves(fighter_id, player["daniya_form"])
@@ -998,12 +1291,13 @@ def play_chunk(state: dict, side: int, seed: str, *, chunk_size: int = MOVE_CHUN
             version=state["version"],
         )
         original_move = moves[index]
-        forced_milk = int(player["turn"].get("forced_milk_dragon_count", 0)) > int(
-            player["turn"].get("forced_milk_dragon_used", 0)
-        )
         selected_move = ASAMU_MOVES[7] if forced_milk else original_move
         if forced_milk:
             player["turn"]["forced_milk_dragon_used"] += 1
+        if forced_yilu_operator:
+            player["turn"]["yilu_double_operator_draws"] -= 1
+        if forced_yilu_specialist:
+            player["turn"]["yilu_specialist_operator_draws"] -= 1
         event = apply_move(
             player,
             selected_move,
@@ -1012,6 +1306,7 @@ def play_chunk(state: dict, side: int, seed: str, *, chunk_size: int = MOVE_CHUN
             side=side,
             version=state["version"],
             forced=forced_milk,
+            effect_repeats=2 if forced_yilu_operator else 1,
         )
         event.update(
             roll=roll,
@@ -1023,6 +1318,8 @@ def play_chunk(state: dict, side: int, seed: str, *, chunk_size: int = MOVE_CHUN
             draw_wheel_units=[weight for _index, weight in wheel],
             original_move_id=original_move.move_id if forced_milk else "",
             original_move_name=original_move.name if forced_milk else "",
+            yilu_babel_redeploy=forced_yilu_operator,
+            yilu_specialist_redeploy=forced_yilu_specialist,
         )
         player["turn"]["events"].append(deepcopy(event))
         events.append(event)
@@ -1093,12 +1390,12 @@ def _domain_strength(state: dict, side: int, events: list[dict]) -> tuple[int, b
     }
     dual_juejue = fighter_id == "juejue" and len(distinct_juejue) == 2
     if dual_juejue:
-        return 11, True
+        return 55, True
     if fighter_id == "juejue":
-        return 5, False
+        return 25, False
     if fighter_id == "sukuna":
-        return 8, False
-    return 6, False
+        return 40, False
+    return 30, False
 
 
 def _domain_resolution(state: dict, seed: str, cancelled: list[dict[int, dict]]) -> dict | None:
@@ -1121,9 +1418,18 @@ def _domain_resolution(state: dict, seed: str, cancelled: list[dict[int, dict]])
     for side in active:
         strengths[side], dual_juejue[side] = _domain_strength(state, side, domains[side])
     if len(active) == 2:
-        # 领域战以二倍整数保存半点：普通6、宿傩8、平手6；撅撅猪
-        # 单领域5，两个不同领域同回合齐出时11。宿傩镜像因此为8:8:6。
-        wheel = (("side-0", strengths[0]), ("side-1", strengths[1]), ("tie", 6))
+        # v7改用十分整数：普通30、宿傩40、撅撅单领域25/双领域55、
+        # 平手30。达妮娅的±0.2直接在同一精确刻度叠加。
+        base_strengths = strengths.copy()
+        for side in (0, 1):
+            own_bonus = int(state["sides"][side]["turn"].get("domain_clash_bonus_units", 0))
+            opponent_reduction = int(
+                state["sides"][1 - side]["turn"].get(
+                    "opponent_domain_clash_reduction_units", 0
+                )
+            )
+            strengths[side] = max(1, strengths[side] + own_bonus - opponent_reduction)
+        wheel = (("side-0", strengths[0]), ("side-1", strengths[1]), ("tie", 30))
         outcome, roll = choose(seed, f"{state['round']}:domain:clash", wheel, version=version)
         if outcome == "tie":
             losing = (0, 1)
@@ -1154,7 +1460,8 @@ def _domain_resolution(state: dict, seed: str, cancelled: list[dict[int, dict]])
     return {
         "mode": mode,
         "wheel": wheel,
-        "weight_scale": 2 if mode == "clash" else 1,
+        "weight_scale": 10 if mode == "clash" else 1,
+        "base_strengths": base_strengths if mode == "clash" else strengths.copy(),
         "strengths": strengths,
         "outcome": outcome,
         "roll": roll,
@@ -1167,6 +1474,7 @@ def _domain_resolution(state: dict, seed: str, cancelled: list[dict[int, dict]])
         "boosted_ordinal": None,
         "boosted_ordinals": [],
         "bonus_gain": 0,
+        "boost_reason": "",
         "effects": [],
         "effect": "",
         "auto_mimic": None,
@@ -1185,11 +1493,11 @@ def _available_moves(player: dict) -> tuple[Move, ...]:
 
 
 def _asamu_domain_copies(state: dict, seed: str, domain: dict | None) -> tuple[dict, ...]:
-    """领域对抗胜利后严格复制四个招式；复制领域不会再次开启领域战。"""
+    """领域战胜利或单方命中后复制两个招式；复制领域不会再次开启领域战。"""
 
-    if not domain or domain.get("mode") != "clash" or domain.get("winner") not in (0, 1):
+    if not domain or domain.get("hit_side") not in (0, 1):
         return ()
-    side = int(domain["winner"])
+    side = int(domain["hit_side"])
     player = state["sides"][side]
     if player["snapshot"].get("fighter_id") != "asamu" or "asamu-domain" not in set(domain["domain_ids"][side]):
         return ()
@@ -1198,7 +1506,7 @@ def _asamu_domain_copies(state: dict, seed: str, domain: dict | None) -> tuple[d
     source_moves = _available_moves(opponent)
     wheel = tuple((index, move_weight_units(opponent, move)) for index, move in enumerate(source_moves))
     copies: list[dict] = []
-    for slot in range(1, 5):
+    for slot in range(1, 3):
         index, roll = choose(
             seed,
             f"{state['round']}:domain:asamu:{side}:copy:{slot}:source",
@@ -1295,10 +1603,10 @@ def _settle_interactions(state: dict, seed: str) -> dict:
     version = state["version"]
     round_number = state["round"]
 
-    # 达妮娅只在双方真实领域对抗中获胜才进入幻灭；单方8:2不触发。
+    # 达妮娅在领域战获胜或单方8:2命中时都进入幻灭。
     daniya_transition = None
-    if domain and domain.get("mode") == "clash" and domain.get("winner") in (0, 1):
-        winner = int(domain["winner"])
+    if domain and domain.get("hit_side") in (0, 1):
+        winner = int(domain["hit_side"])
         winner_side = state["sides"][winner]
         if winner_side["snapshot"].get("fighter_id") == "daniya" and "daniya-domain" in set(
             domain["domain_ids"][winner]
@@ -1322,7 +1630,11 @@ def _settle_interactions(state: dict, seed: str) -> dict:
             continue
         attacker = 1 - defender
         for event in state["sides"][attacker]["turn"].get("events", ()):
-            if not event.get("numeric_base") or _remaining_event_gain(cancelled, attacker, event) == 0:
+            # 贷款即使受到黑闪等全局光环而显示少量数值，仍是功能招式；
+            # 无下限按规则等待下一招真正的数值招式。
+            if event.get("loan"):
+                continue
+            if not event.get("has_numeric_contribution") or _remaining_event_gain(cancelled, attacker, event) == 0:
                 continue
             _cancel_event(cancelled, attacker, event, "无下限·防御")
             break
@@ -1369,7 +1681,7 @@ def _settle_interactions(state: dict, seed: str) -> dict:
             candidates = [
                 event
                 for event in state["sides"][attacker]["turn"].get("events", ())
-                if event.get("numeric_base")
+                if event.get("has_numeric_contribution")
                 and _remaining_event_gain(cancelled, attacker, event) != 0
             ]
             future["candidate_ordinals"] = [int(event["ordinal"]) for event in candidates]
@@ -1403,7 +1715,7 @@ def _settle_interactions(state: dict, seed: str) -> dict:
         if sand["active"]:
             for event in state["sides"][attacker]["turn"].get("events", ()):
                 remaining = _remaining_event_gain(cancelled, attacker, event)
-                if not event.get("numeric_base") or remaining <= 0:
+                if not event.get("has_numeric_contribution") or remaining <= 0:
                     continue
                 deduction = remaining - remaining // 2
                 applied = _reduce_event(cancelled, attacker, event, deduction, "时之沙·沙之形体")
@@ -1425,7 +1737,7 @@ def _settle_interactions(state: dict, seed: str) -> dict:
         candidates = [
             event
             for event in state["sides"][attacker]["turn"].get("events", ())
-            if event.get("numeric_base") and Fraction(event.get("gain", 0)) != 0
+            if event.get("has_numeric_contribution") and Fraction(event.get("gain", 0)) != 0
         ]
         for source_ordinal in sources:
             for event in candidates:
@@ -1449,6 +1761,50 @@ def _settle_interactions(state: dict, seed: str) -> dict:
                         "cancelled_gain": cancelled_gain,
                     }
                 )
+
+    # 重装的70%判定在双方招式齐备后再选择目标；成功只清空该招式的
+    # 胜率数值，功能保留，并额外向对方申请-5回合减权。
+    yilu_defender_results = []
+    yilu_defender_reductions = [Fraction(0), Fraction(0)]
+    for defender in (0, 1):
+        attacker = 1 - defender
+        for chance_index, chance in enumerate(
+            state["sides"][defender]["turn"].get("yilu_defender_chances", ()),
+            start=1,
+        ):
+            record = {
+                **deepcopy(chance),
+                "side": defender,
+                "target_side": attacker,
+                "candidate_ordinals": [],
+                "selected_ordinal": None,
+                "target_roll": None,
+                "cancelled_gain": Fraction(0),
+                "opponent_reduction": Fraction(0),
+            }
+            candidates = [
+                event
+                for event in state["sides"][attacker]["turn"].get("events", ())
+                if _remaining_event_gain(cancelled, attacker, event) > 0
+            ]
+            record["candidate_ordinals"] = [int(event["ordinal"]) for event in candidates]
+            if chance.get("hit") and candidates:
+                wheel = tuple((int(event["ordinal"]), 1) for event in candidates)
+                selected, target_roll = choose(
+                    seed,
+                    f"{round_number}:yilu:defender:{defender}:{chance_index}:target",
+                    wheel,
+                    version=version,
+                )
+                event = next(item for item in candidates if int(item["ordinal"]) == selected)
+                record["selected_ordinal"] = selected
+                record["target_roll"] = target_roll
+                record["cancelled_gain"] = _cancel_event(
+                    cancelled, attacker, event, "干员放置·重装"
+                )
+                record["opponent_reduction"] = Fraction(5)
+                yilu_defender_reductions[attacker] += 5
+            yilu_defender_results.append(record)
 
     dual_winner = None
     if domain is not None and domain["mode"] == "clash" and domain.get("winner") in (0, 1):
@@ -1495,21 +1851,45 @@ def _settle_interactions(state: dict, seed: str) -> dict:
         state["sides"][side]["weight"] -= deduction
         adjustments.append(tuple(entries[key] for key in sorted(entries)))
 
-    # 领域战胜方通常只翻倍第一份仍有效领域。撅撅猪两个不同领域在真实
-    # clash 中获胜时，改为两份仍有效领域数值相加后整体翻倍；同领域重复
-    # 不产生双领域特效。
+    # 领域战胜方通常只翻倍第一份仍有效领域。Battle v10先为五条猪补齐
+    # 单方命中翻倍；Battle v11起统一为所有战斗猪在8:2单方领域命中时
+    # 都执行同一份翻倍。简易领域成功时仍归零。撅撅猪两个不同领域仅在
+    # 真实clash中获胜时改为两份相加后整体翻倍；同领域重复不产生双领域特效。
     if domain is not None:
         winner = domain.get("winner")
+        boost_side = None
+        boost_reason = ""
         if domain.get("mode") == "clash" and winner in (0, 1):
+            boost_side = int(winner)
+            boost_reason = "领域战获胜"
+        elif (
+            version >= 10
+            and domain.get("mode") == "solo"
+            and domain.get("hit_side") in (0, 1)
+        ):
+            candidate = int(domain["hit_side"])
+            fighter_id = state["sides"][candidate]["snapshot"].get("fighter_id")
+            is_v10_gojo = fighter_id == "gojo" and "void" in set(
+                domain["domain_ids"][candidate]
+            )
+            if version >= 11 or is_v10_gojo:
+                boost_side = candidate
+                boost_reason = "领域命中"
+        if boost_side is not None:
             effective_domains = [
                 event
-                for event in state["sides"][winner]["turn"].get("events", ())
+                for event in state["sides"][boost_side]["turn"].get("events", ())
                 if "domain" in event.get("tags", ())
                 and not event.get("domain_reentry_suppressed")
                 and event.get("domain_eligible", True)
-                and _remaining_event_gain(cancelled, winner, event) > 0
+                and _remaining_event_gain(cancelled, boost_side, event) > 0
+                and (
+                    domain.get("mode") == "clash"
+                    or version >= 11
+                    or event.get("move_id") == "void"
+                )
             ]
-            if domain["dual_juejue"][winner]:
+            if domain.get("mode") == "clash" and domain["dual_juejue"][boost_side]:
                 by_id = {}
                 for event in effective_domains:
                     if event.get("move_id") in {"sand-domain", "chaos-domain"}:
@@ -1518,19 +1898,22 @@ def _settle_interactions(state: dict, seed: str) -> dict:
             else:
                 boosted = effective_domains[:1]
             if boosted:
-                bonus = sum(_remaining_event_gain(cancelled, winner, event) for event in boosted)
+                bonus = sum(
+                    _remaining_event_gain(cancelled, boost_side, event) for event in boosted
+                )
                 ordinals = [int(event["ordinal"]) for event in boosted]
-                state["sides"][winner]["weight"] += bonus
+                state["sides"][boost_side]["weight"] += bonus
                 domain.update(
-                    boost_side=winner,
+                    boost_side=boost_side,
                     boosted_ordinal=ordinals[-1],
                     boosted_ordinals=ordinals,
                     bonus_gain=bonus,
+                    boost_reason=boost_reason,
                 )
 
     domain_effects: list[str] = []
     auto_mimic = None
-    extra_round_reduction = [0, 0]
+    extra_round_reduction = list(yilu_defender_reductions)
     if domain is not None and domain.get("hit_side") in (0, 1):
         hit_side = int(domain["hit_side"])
         target = 1 - hit_side
@@ -1656,6 +2039,17 @@ def _settle_interactions(state: dict, seed: str) -> dict:
             if numeric_suppressed:
                 domain_effects.append(f"自动模仿数值被{suppressed_reason}清零，领域功能仍生效")
 
+        if fighter_id == "yilu" and "yilu-domain" in hit_ids:
+            player = state["sides"][hit_side]
+            player["next_action_bonus"] += 1
+            player["yilu_next_round_base_bonus"] = int(
+                player.get("yilu_next_round_base_bonus", 0)
+            ) + 1
+            trigger = "领域战获胜" if domain.get("mode") == "clash" else "领域命中"
+            domain_effects.append(
+                f"末日方舟{trigger}：获得明日，下回合+1招且该回合所有招式基础胜率+1"
+            )
+
     if domain is not None:
         domain["effects"] = domain_effects
         domain["effect"] = "；".join(domain_effects)
@@ -1764,6 +2158,22 @@ def _settle_interactions(state: dict, seed: str) -> dict:
     for current_side, player in enumerate(state["sides"]):
         player["weight"] = max(Fraction(1, VICTORY_WEIGHT_SCALE), retaliation_after[current_side])
 
+    yilu_true_damage = []
+    for current_side, player in enumerate(state["sides"]):
+        layers = int(player["turn"].get("yilu_true_damage_layers", 0))
+        if not layers:
+            continue
+        before_true_damage = Fraction(player["weight"])
+        player["weight"] *= 2**layers
+        yilu_true_damage.append(
+            {
+                "side": current_side,
+                "layers": layers,
+                "before": before_true_damage,
+                "after": Fraction(player["weight"]),
+            }
+        )
+
     return {
         "domain": domain,
         "daniya_transition": daniya_transition,
@@ -1774,11 +2184,14 @@ def _settle_interactions(state: dict, seed: str) -> dict:
         "future_simulations": tuple(future_simulations),
         "sand_bodies": tuple(sand_bodies),
         "pressure_checks": tuple(pressure_checks),
+        "yilu_defender_results": tuple(yilu_defender_results),
+        "yilu_true_damage": tuple(yilu_true_damage),
         "zeroes": tuple(zeroes),
         "round_reductions": tuple(round_reductions),
         "cross_effects": tuple(cross_effects),
         "retaliations": tuple(retaliation_records),
         "retaliation_snapshot": tuple(retaliation_before),
+        "retaliation_after_snapshot": tuple(retaliation_after),
     }
 
 
@@ -1800,7 +2213,16 @@ def _dynamic_injury_wheel(state: dict, loser: int) -> tuple[tuple, dict]:
     )
     multiplier = (5**misfortune_count) * (5 if current_collapse else 1) * max(1, rebound)
     weights["exhausted"] *= multiplier
-    wheel = tuple((name, weights[name]) for name, _weight in base)
+    recovery_layers = int(player["turn"].get("yilu_injury_recovery_layers", 0))
+    worsen_layers = int(player["turn"].get("yilu_injury_worsen_layers", 0))
+    injury_factor = Fraction(1, 2) ** recovery_layers * Fraction(3, 2) ** worsen_layers
+    exact_weights = {name: Fraction(value) for name, value in weights.items()}
+    for name in ("heavy", "exhausted"):
+        exact_weights[name] *= injury_factor
+    weight_scale = 1
+    for value in exact_weights.values():
+        weight_scale = lcm(weight_scale, value.denominator)
+    wheel = tuple((name, int(exact_weights[name] * weight_scale)) for name, _weight in base)
     return wheel, {
         "base_wheel": base,
         "permanent_exhaust_bonus_units": permanent_bonus,
@@ -1808,6 +2230,10 @@ def _dynamic_injury_wheel(state: dict, loser: int) -> tuple[tuple, dict]:
         "current_collapse_multiplier": 5 if current_collapse else 1,
         "rebound_multiplier": rebound,
         "total_exhaust_multiplier": multiplier,
+        "yilu_recovery_layers": recovery_layers,
+        "yilu_worsen_layers": worsen_layers,
+        "yilu_injury_factor": injury_factor,
+        "weight_scale": weight_scale,
     }
 
 
@@ -1907,6 +2333,10 @@ def resolve_round(state: dict, seed: str) -> dict | None:
             player["weight"] = carryover[index]["next_round_weight"]
             player["round_start_weight"] = carryover[index]["next_round_weight"]
             player["turn"] = fresh_turn()
+            player["turn"]["yilu_round_base_bonus"] = int(
+                player.get("yilu_next_round_base_bonus", 0)
+            )
+            player["yilu_next_round_base_bonus"] = 0
     return result
 
 

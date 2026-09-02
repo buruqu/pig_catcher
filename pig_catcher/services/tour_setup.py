@@ -5,13 +5,14 @@ from __future__ import annotations
 import json
 from collections import Counter
 from dataclasses import replace
+from itertools import combinations, product
 
 from ..domain.dispatch import MATERIAL_SCALE
 from ..domain.dispatch_views import DispatchLine as Line
 from ..domain.dispatch_views import DispatchPanel as Panel
 from ..domain.models import CommandIdentity
 from ..domain.selectors import parse_asset_selector
-from ..domain.tour import canonical_members, ensemble_available, validate_formation, validate_plan
+from ..domain.tour import canonical_members, ensemble_available, forecast_route, validate_formation, validate_plan
 from ..domain.tour_catalog import (
     BRANCH_COST,
     BRANCHES,
@@ -25,6 +26,7 @@ from ..domain.tour_catalog import (
     TOOLS_BY_ID,
     VENUES_BY_ID,
     TourError,
+    default_plan,
     training_level,
 )
 from ..infrastructure.database import DatabaseSession
@@ -173,6 +175,238 @@ class TourSetup:
                 and (member_fingerprint(before["guest"]) if before["guest"] else None)
                 == (member_fingerprint(after["guest"]) if after["guest"] else None)
             )
+        )
+
+    async def auto_selection(
+        self,
+        session: DatabaseSession,
+        identity: CommandIdentity,
+        profile: dict,
+        theme_id: str,
+    ) -> dict:
+        """从空闲同团猪中选择现有评分器下的最佳阵容与三站路线。"""
+        if theme_id not in THEMES_BY_ID:
+            raise TourError("未知乐队；可先用 /猪猪巡演 主题 查看可选乐队。")
+        if await self.repo.active_run(session, identity.player_id):
+            raise TourError("还有进行中的巡演，请先 /巡演一键 完成，或明确结束。")
+        rows = await session.fetch_all(
+            """SELECT p.pig_instance_id,p.template_id FROM pig_instances p JOIN pig_templates t
+            ON t.template_id=p.template_id
+            WHERE p.owner_player_id=? AND p.scope_id=? AND p.state='active'
+            AND p.locked_trade_id IS NULL
+            AND NOT EXISTS(SELECT 1 FROM asset_occupancies o WHERE o.pig_instance_id=p.pig_instance_id)
+            AND (t.scope_type='common' OR EXISTS(SELECT 1 FROM scope_pig_templates s
+                WHERE s.scope_id=p.scope_id AND s.template_id=p.template_id
+                AND s.authorized=1 AND s.consent_status='granted'))
+            ORDER BY p.official_value,p.acquired_at,p.pig_instance_id""",
+            (identity.player_id, identity.scope.value),
+        )
+        candidates = []
+        for row in rows:
+            character = CHARACTERS.get(row["template_id"])
+            if character and character.band == theme_id:
+                candidates.append(
+                    await self.repo.member(session, identity.player_id, row["pig_instance_id"], available=True)
+                )
+        if not candidates:
+            raise TourError("没有可自动编队的该乐队空闲猪；请检查持有角色、交易、派遣或对战状态。")
+
+        # 同一角色的不同立绘只保留培养最好的一只；培养相同则优先低价值实例。
+        representatives: dict[str, dict] = {}
+        for member in candidates:
+            identity_id = CHARACTERS[member["template_id"]].identity
+            key = (
+                training_level(int(member["training_exp"])),
+                int(member["rapport"]),
+                int(member["own_experience"]),
+                bool(member["branch"]),
+                bool(member["favorite"]),
+                -int(member["official_value"]),
+            )
+            current = representatives.get(identity_id)
+            if current is None:
+                representatives[identity_id] = member
+                continue
+            current_key = (
+                training_level(int(current["training_exp"])),
+                int(current["rapport"]),
+                int(current["own_experience"]),
+                bool(current["branch"]),
+                bool(current["favorite"]),
+                -int(current["official_value"]),
+            )
+            if key > current_key:
+                representatives[identity_id] = member
+        available = list(representatives.values())
+        if len(available) < 3:
+            raise TourError("该乐队至少需要三位不同角色的空闲猪才能自动编队。")
+
+        unlocked_venues = [venue for venue in VENUES_BY_ID.values() if int(profile["fans"]) >= venue.fans]
+        song_plays = await self.repo.songs(session, identity.player_id)
+        order = {
+            character.identity: index
+            for index, character in enumerate(CHARACTERS.values())
+            if character.band == theme_id
+        }
+        best: dict | None = None
+        best_key: tuple[float, float, int, int, int] | None = None
+        for size in range(3, min(5, len(available)) + 1):
+            for chosen_tuple in combinations(available, size):
+                chosen = sorted(chosen_tuple, key=lambda member: order[CHARACTERS[member["template_id"]].identity])
+                try:
+                    unique = validate_formation(chosen)
+                except TourError:
+                    continue
+                melody = [
+                    member for member in unique if "主旋律" in CHARACTERS[member["template_id"]].roles
+                ]
+                center = max(
+                    melody,
+                    key=lambda member: (
+                        training_level(int(member["training_exp"])),
+                        int(member["rapport"]),
+                        -int(member["official_value"]),
+                    ),
+                )["pig_instance_id"]
+                for venues in product(unlocked_venues, repeat=3):
+                    plans = []
+                    for venue in venues:
+                        plan = default_plan(theme_id)
+                        plan["venue"] = venue.venue_id
+                        plans.append(plan)
+                    forecast = forecast_route(
+                        chosen,
+                        plans,
+                        equipment=int(profile["equipment"]),
+                        song_plays=song_plays,
+                        center=center,
+                    )
+                    key = (
+                        round(sum(float(stage["score"]) for stage in forecast), 3),
+                        min(float(stage["score"]) for stage in forecast),
+                        len({venue.venue_id for venue in venues}),
+                        size,
+                        sum(venue.fans for venue in venues),
+                    )
+                    if best_key is None or key > best_key:
+                        best_key = key
+                        best = {
+                            "theme": theme_id,
+                            "members": chosen,
+                            "plans": plans,
+                            "forecast": forecast,
+                            "center_id": center,
+                            "captain_id": chosen[0]["pig_instance_id"],
+                        }
+        if best is None:
+            raise TourError("现有同团猪无法同时覆盖主旋律、节奏与伴奏；可继续使用手动混编。")
+        return best
+
+    async def auto_preview(
+        self,
+        session: DatabaseSession,
+        identity: CommandIdentity,
+        profile: dict,
+        theme_id: str,
+        now_ms: int,
+        *,
+        full_tour: bool,
+    ):
+        if full_tour and int(profile["tickets"]) < 1:
+            raise TourError("没有可用档期。每天补一张、最多七张；自动配队本身仍可使用。")
+        selected = await self.auto_selection(session, identity, profile, theme_id)
+        slot = int(profile["active_slot"])
+        current_roster = await session.fetch_one(
+            "SELECT revision FROM tour_rosters WHERE player_id=? AND slot=?", (identity.player_id, slot)
+        )
+        roster_revision = int(current_roster[0]) if current_roster else 0
+        if not full_tour:
+            payload = {
+                "revision": profile["revision"],
+                "args": {
+                    "slot": slot,
+                    "selectors": [f"{member['name']}#{member['short_code']}" for member in selected["members"]],
+                },
+                "members": selected["members"],
+                "costs": {},
+            }
+            await self.pending(session, identity.player_id, "roster", payload, now_ms)
+            return self.queries.view(
+                identity,
+                "同乐队一键配队 · 请确认",
+                profile,
+                banner=(
+                    f"已从{THEMES_BY_ID[theme_id].band_name}选择当前最佳的{len(selected['members'])}位空闲成员，"
+                    f"保存到阵容{slot}；不消耗档期。"
+                ),
+                pigs=tuple(tour_pig(member, position=index) for index, member in enumerate(selected["members"], 1)),
+                panels=(
+                    Panel(
+                        "自动站位",
+                        (
+                            Line(
+                                "中心",
+                                next(
+                                    member["name"]
+                                    for member in selected["members"]
+                                    if member["pig_instance_id"] == selected["center_id"]
+                                ),
+                            ),
+                            Line("队长", selected["members"][0]["name"]),
+                        ),
+                    ),
+                ),
+                hints=("2分钟内 /猪猪巡演 确认；/猪猪巡演 取消", "/猪猪巡演 自动 乐队名 · 自动完成路线与三站"),
+            )
+
+        guest = (
+            await self.repo.member(
+                session, identity.player_id, profile["guest_id"], available=True, guest=True
+            )
+            if profile["guest_id"]
+            else None
+        )
+        roster = {
+            "player_id": identity.player_id,
+            "slot": slot,
+            "member_ids_json": encode([member["pig_instance_id"] for member in selected["members"]]),
+            "captain_id": selected["captain_id"],
+            "center_id": selected["center_id"],
+            "revision": roster_revision + 1,
+        }
+        ready = {
+            "revision": int(profile["revision"]) + 1,
+            "roster": roster,
+            "members": selected["members"],
+            "guest": guest,
+            "plans": selected["plans"],
+            "equipment": profile["equipment"],
+            "songs": await self.repo.songs(session, identity.player_id),
+            "coupons": await AchievementCouponRepository().selected(
+                session, identity.player_id, ("tour-stage", "tour-visual")
+            ),
+        }
+        payload = {
+            "base_revision": profile["revision"],
+            "base_roster_revision": roster_revision,
+            "slot": slot,
+            "theme": theme_id,
+            "ready": ready,
+        }
+        await self.pending(session, identity.player_id, "auto_start", payload, now_ms)
+        shadow = {**profile, "plans_json": encode(selected["plans"])}
+        view = await self.queries.preview(
+            session, identity, shadow, roster, selected["members"], confirmation=True
+        )
+        route = " → ".join(VENUES_BY_ID[plan["venue"]].name for plan in selected["plans"])
+        return replace(
+            view,
+            title="同乐队自动巡演 · 请确认",
+            banner=(
+                f"{THEMES_BY_ID[theme_id].band_name}已自动完成最佳配队与路线：{route}。"
+                "确认后扣1张档期，并在同一条指令中完成全部三站。"
+            ),
+            hints=("2分钟内 /猪猪巡演 确认；只需确认这一次。", "/猪猪巡演 取消 · 不改阵容、不扣档期"),
         )
 
     async def preview(

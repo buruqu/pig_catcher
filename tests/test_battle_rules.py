@@ -6,6 +6,7 @@ from fractions import Fraction
 import pytest
 
 from pig_catcher.domain.battle import (
+    _settle_interactions,
     apply_injury,
     apply_move,
     choose,
@@ -57,7 +58,7 @@ def ready(player, pending=1):
 
 
 def test_exact_catalog_and_growth_costs():
-    assert [len(f.moves) for f in FIGHTERS] == [10, 10, 16, 12, 10]
+    assert [len(f.moves) for f in FIGHTERS] == [10, 10, 16, 14, 10, 9]
     assert all(move.draw_weight == 1 for fighter in FIGHTERS for move in fighter.moves)
     assert [m.gain for m in FIGHTERS[0].moves] == [10, 10, 15, 21, 35, 0, 14, 7, 12, 28]
     assert [m.gain for m in FIGHTERS[1].moves] == [13, 20, 14, 10, 10, 14, 24, 30, 14, 35]
@@ -258,7 +259,7 @@ def test_cancelled_domain_updates_every_following_displayed_cumulative_total():
     follow_up = _record(s["sides"][0], FIGHTERS[0].moves[1], 0)
     ready(s["sides"][1])
     _record(s["sides"][1], FIGHTERS[1].moves[7], 1)
-    wheel = (("side-0", 8), ("side-1", 6), ("tie", 6))
+    wheel = (("side-0", 40), ("side-1", 30), ("tie", 30))
     summary = resolve_round(s, _seed_for("1:domain:clash", wheel, "side-1"))
     adjustments = {item["ordinal"]: item for item in summary["interactions"]["adjustments"][0]}
     assert adjustments[domain["ordinal"]]["gain"] == domain["gain"]
@@ -311,7 +312,7 @@ def test_domain_clash_is_once_and_zeroes_every_losing_domain_gain(outcome):
         ready(s["sides"][side], 2)
         _record(s["sides"][side], move, side)
         _record(s["sides"][side], move, side)
-    wheel = (("side-0", 8), ("side-1", 6), ("tie", 6))
+    wheel = (("side-0", 40), ("side-1", 30), ("tie", 30))
     summary = resolve_round(s, _seed_for("1:domain:clash", wheel, outcome))
     domain = summary["interactions"]["domain"]
     assert domain["outcome"] == outcome and domain["domain_counts"] == [2, 2]
@@ -324,7 +325,8 @@ def test_domain_clash_is_once_and_zeroes_every_losing_domain_gain(outcome):
         assert summary["before"][0]["weight"] == 5
         assert summary["before"][0]["next_debt"] == 1
         assert domain["boost_side"] == 1 and domain["boosted_ordinal"] == 1
-        assert domain["bonus_gain"] == 30 and summary["before"][1]["weight"] == 95
+        assert domain["bonus_gain"] == 30 and domain["boost_reason"] == "领域战获胜"
+        assert summary["before"][1]["weight"] == 95
     else:
         assert [side["weight"] for side in summary["before"]] == [5, 5]
         assert domain["boost_side"] is None and domain["bonus_gain"] == 0
@@ -338,12 +340,72 @@ def test_single_gojo_domain_uses_eight_two_and_effect_only_on_hit(outcome):
     _record(s["sides"][1], FIGHTERS[1].moves[7], 1)
     wheel = (("hit", 8), ("simple-domain", 2))
     summary = resolve_round(s, _seed_for("1:domain:solo:1", wheel, outcome))
-    assert summary["interactions"]["domain"]["outcome"] == outcome
-    assert summary["interactions"]["domain"]["bonus_gain"] == 0
+    domain = summary["interactions"]["domain"]
+    assert domain["outcome"] == outcome
     if outcome == "hit":
-        assert summary["before"][0]["next_debt"] == 1 and summary["before"][1]["weight"] == 35
+        assert domain["boost_side"] == 1
+        assert domain["boosted_ordinal"] == 1
+        assert domain["boosted_ordinals"] == [1]
+        assert domain["bonus_gain"] == 30
+        assert domain["boost_reason"] == "领域命中"
+        assert summary["before"][0]["next_debt"] == 1
+        assert summary["before"][1]["weight"] == 65
     else:
+        assert domain["boost_side"] is None and domain["bonus_gain"] == 0
         assert summary["before"][0]["next_debt"] == 0 and summary["before"][1]["weight"] == 5
+
+
+def test_battle_v9_single_gojo_domain_keeps_legacy_non_doubled_result():
+    s = state()
+    s["version"] = 9
+    s["sides"][0]["turn"]["done"] = True
+    ready(s["sides"][1])
+    _record(s["sides"][1], FIGHTERS[1].moves[7], 1)
+    wheel = (("hit", 8), ("simple-domain", 2))
+    seed = next(
+        candidate
+        for candidate in (f"legacy-v9-{index}" for index in range(10_000))
+        if choose(candidate, "1:domain:solo:1", wheel, version=9)[0] == "hit"
+    )
+    interactions = _settle_interactions(s, seed)
+    domain = interactions["domain"]
+    assert domain["outcome"] == "hit"
+    assert domain["boost_side"] is None and domain["bonus_gain"] == 0
+    assert s["sides"][0]["next_debt"] == 1
+    assert s["sides"][1]["weight"] == 35
+
+
+def test_battle_v10_non_gojo_solo_domain_keeps_legacy_non_doubled_result():
+    s = state(left="sukuna", right="gojo")
+    s["version"] = 10
+    ready(s["sides"][0])
+    _record(s["sides"][0], FIGHTERS_BY_ID["sukuna"].moves[4], 0)
+    s["sides"][1]["turn"]["done"] = True
+    wheel = (("hit", 8), ("simple-domain", 2))
+    seed = next(
+        candidate
+        for candidate in (f"legacy-v10-sukuna-{index}" for index in range(10_000))
+        if choose(candidate, "1:domain:solo:0", wheel, version=10)[0] == "hit"
+    )
+    interactions = _settle_interactions(s, seed)
+    domain = interactions["domain"]
+    assert domain["outcome"] == "hit"
+    assert domain["boost_side"] is None and domain["bonus_gain"] == 0
+    assert s["sides"][0]["weight"] == 40
+
+
+def test_battle_v11_sukuna_solo_domain_hit_doubles_one_effective_domain():
+    s = state(left="sukuna", right="gojo")
+    ready(s["sides"][0])
+    shrine = _record(s["sides"][0], FIGHTERS_BY_ID["sukuna"].moves[4], 0)
+    s["sides"][1]["turn"]["done"] = True
+    wheel = (("hit", 8), ("simple-domain", 2))
+    summary = resolve_round(s, _seed_for("1:domain:solo:0", wheel, "hit"))
+    domain = summary["interactions"]["domain"]
+    assert domain["boost_side"] == 0 and domain["boost_reason"] == "领域命中"
+    assert domain["boosted_ordinals"] == [shrine["ordinal"]]
+    assert domain["bonus_gain"] == 35
+    assert summary["before"][0]["weight"] == 75
 
 
 def test_infinity_skips_loan_and_cancels_only_first_still_effective_numeric_move():
@@ -411,10 +473,14 @@ def test_domain_bonus_enters_net_round_gain_and_displayed_cumulative_total():
         event = _record(s["sides"][side], move, side)
         if side == 0:
             boosted_event = event
-    wheel = (("side-0", 8), ("side-1", 6), ("tie", 6))
+    wheel = (("side-0", 40), ("side-1", 30), ("tie", 30))
     summary = resolve_round(s, _seed_for("1:domain:clash", wheel, "side-0"))
     domain = summary["interactions"]["domain"]
-    bonus = {"ordinal": domain["boosted_ordinal"], "gain": domain["bonus_gain"]}
+    bonus = {
+        "ordinal": domain["boosted_ordinal"],
+        "gain": domain["bonus_gain"],
+        "reason": domain["boost_reason"],
+    }
     assert summary["carryover"][0]["round_gain"] == 70
     assert effective_total_after(boosted_event, {}, bonus) == summary["before"][0]["weight"] == 75
     assert "领域战获胜" in move_line(
@@ -437,12 +503,15 @@ def test_huge_odd_round_gain_uses_integer_ceiling_without_float_conversion():
 
 
 def test_juejue_catalog_aliases_forms_and_legacy_query_boundary():
-    assert BATTLE_RULE_VERSION == 6
+    assert BATTLE_RULE_VERSION == 11
     assert all(FIGHTERS_BY_TEMPLATE[template_id].fighter_id == "juejue" for template_id in JUEJUE_PIG_TEMPLATE_IDS)
     assert {move.move_id for move in JUEJUE_TIME_MOVES}.isdisjoint(
         {move.move_id for move in JUEJUE_VIRTUAL_MOVES}
     )
     assert len(JUEJUE_TIME_MOVES) == len(JUEJUE_VIRTUAL_MOVES) == 8
+    weights = {move.move_id: move.resolved_draw_weight_units for move in JUEJUE_TIME_MOVES}
+    assert weights["sand-accelerate"] == 1500
+    assert weights["sand-delay"] == 1500
     assert fighter_moves("juejue", 3) == ()
     assert fighter_moves("juejue", 4) == JUEJUE_TIME_MOVES + JUEJUE_VIRTUAL_MOVES
 
@@ -601,19 +670,19 @@ def test_relative_zero_keeps_failed_delay_bonus_for_the_defender():
 def _chaos_domain_hits_relative_zero(*, direction: str = "self") -> dict:
     s = state(left="juejue", right="juejue", seed=f"zero-auto-mimic-{direction}")
     attacker, defender = s["sides"]
-    if direction == "opponent":
-        attacker["juejue_mimic_pool"] = {
-            "large": [],
-            "small": [
-                {
-                    "fighter_id": "future",
-                    "move_id": "future-opponent-reduction",
-                    "name": "未来减权招式",
-                    "base": 13,
-                    "direction": "opponent",
-                }
-            ],
-        }
+    attacker["juejue_mimic_pool"] = {
+        "large": [],
+        "small": [
+            {
+                "fighter_id": "future",
+                "move_id": f"future-{direction}-numeric",
+                "name": "未来数值招式",
+                "base": 13,
+                "direction": direction,
+                "opponent_reduction": 13 if direction == "opponent" else 0,
+            }
+        ],
+    }
     ready(attacker)
     _record(attacker, JUEJUE_VIRTUAL_MOVES[-1], 0)
     defender["turn"].update(raw=0, effective=0, pending=0, done=True, juejue_zero_active=True)
@@ -639,16 +708,30 @@ def test_relative_zero_suppresses_late_domain_auto_mimic_numeric_but_keeps_funct
 
 def test_domain_auto_mimic_numeric_still_applies_without_relative_zero():
     s = state(left="juejue", right="juejue", seed="auto-mimic-control")
+    s["sides"][0]["juejue_mimic_pool"] = {
+        "large": [],
+        "small": [
+            {
+                "fighter_id": "future",
+                "move_id": "future-self-numeric",
+                "name": "未来自增招式",
+                "base": 13,
+                "direction": "self",
+            }
+        ],
+    }
     ready(s["sides"][0])
     chaos = _record(s["sides"][0], JUEJUE_VIRTUAL_MOVES[-1], 0)
     s["sides"][1]["turn"].update(raw=0, effective=0, pending=0, done=True)
     seed = _seed_for("1:domain:solo:0", (("hit", 8), ("simple-domain", 2)), "hit")
     summary = resolve_round(s, seed)
-    mimic = summary["interactions"]["domain"]["auto_mimic"]
+    domain = summary["interactions"]["domain"]
+    mimic = domain["auto_mimic"]
     assert mimic["available"] and not mimic["numeric_suppressed"]
     assert mimic["gain"] == mimic["raw_gain"] != 0
+    assert domain["bonus_gain"] == chaos["gain"]
     assert summary["before"][0]["weight"] == max(
-        Fraction(1, 10), 5 + chaos["gain"] + mimic["gain"]
+        Fraction(1, 10), 5 + chaos["gain"] * 2 + mimic["gain"]
     )
 
 
@@ -661,7 +744,9 @@ def test_juejue_mimic_uses_frozen_non_juejue_numeric_pool_and_growth_once():
         player, JUEJUE_VIRTUAL_MOVES[3], seed="mimic", round_number=1, side=0, version=4
     )
     mimic = event["mimic"]
-    assert mimic["available"] and mimic["source_fighter_id"] in {"sukuna", "gojo", "daniya", "asamu"}
+    assert mimic["available"] and mimic["source_fighter_id"] in {
+        "sukuna", "gojo", "daniya", "asamu", "yilu"
+    }
     assert mimic["source_fighter_id"] != "juejue"
     assert event["special_base"] == abs(mimic["base"])
     assert event["gain"] == abs(mimic["base"]) + 5 + 2 - 1
@@ -681,9 +766,9 @@ def test_make_real_grows_only_its_direct_numeric_value_for_the_whole_match():
 @pytest.mark.parametrize(
     "left,right,expected",
     [
-        ("gojo", "gojo", (("side-0", 6), ("side-1", 6), ("tie", 6))),
-        ("sukuna", "sukuna", (("side-0", 8), ("side-1", 8), ("tie", 6))),
-        ("juejue", "gojo", (("side-0", 5), ("side-1", 6), ("tie", 6))),
+        ("gojo", "gojo", (("side-0", 30), ("side-1", 30), ("tie", 30))),
+        ("sukuna", "sukuna", (("side-0", 40), ("side-1", 40), ("tie", 30))),
+        ("juejue", "gojo", (("side-0", 25), ("side-1", 30), ("tie", 30))),
     ],
 )
 def test_domain_clash_uses_scaled_integer_strengths(left, right, expected):
@@ -698,7 +783,7 @@ def test_domain_clash_uses_scaled_integer_strengths(left, right, expected):
         _record(s["sides"][side], moves[fighter_id], side)
     summary = resolve_round(s, f"domain-{left}-{right}")
     assert summary["interactions"]["domain"]["wheel"] == expected
-    assert summary["interactions"]["domain"]["weight_scale"] == 2
+    assert summary["interactions"]["domain"]["weight_scale"] == 10
 
 
 def test_juejue_distinct_dual_domain_has_eleven_strength_and_only_winning_clash_special():
@@ -708,7 +793,7 @@ def test_juejue_distinct_dual_domain_has_eleven_strength_and_only_winning_clash_
     chaos = _record(s["sides"][0], JUEJUE_VIRTUAL_MOVES[-1], 0)
     ready(s["sides"][1])
     shrine = _record(s["sides"][1], FIGHTERS_BY_ID["sukuna"].moves[4], 1)
-    wheel = (("side-0", 11), ("side-1", 8), ("tie", 6))
+    wheel = (("side-0", 55), ("side-1", 40), ("tie", 30))
     seed = _seed_for("1:domain:clash", wheel, "side-0")
     summary = resolve_round(s, seed)
     domain = summary["interactions"]["domain"]

@@ -502,8 +502,10 @@ class PigCatcherRenderer:
         return await self._render_template("weekly_competition_award.html", view=view)
 
     async def render_dispatch(self, view: DispatchView, media_paths: Mapping[str, Path]) -> RenderedImage:
+        # 派遣/奖励行李箱都是静态总览卡；遇到 GIF/APNG 猪图时取中间帧，
+        # 不能让一只动态素材导致整张已结算回执降级成文字。
         previews = await self._list_media_data_urls(
-            ((pig.short_code, bool(pig.image_relpath), False) for pig in view.pigs),
+            ((pig.short_code, bool(pig.image_relpath), True) for pig in view.pigs),
             media_paths,
         )
         template = (
@@ -527,7 +529,7 @@ class PigCatcherRenderer:
         from .food_rewards import reveal_receipt
 
         previews = await self._list_media_data_urls(
-            ((item.key, bool(item.image_relpath) and item.media_visible, False) for item in view.items), media_paths,
+            ((item.key, bool(item.image_relpath) and item.media_visible, True) for item in view.items), media_paths,
         )
         artwork = ""
         if view.animation in {"pure-947", "original-947"}:
@@ -554,7 +556,7 @@ class PigCatcherRenderer:
 
     async def render_tour(self, view: TourView, media_paths: Mapping[str, Path]) -> RenderedImage:
         previews = await self._list_media_data_urls(
-            ((pig.short_code, bool(pig.image_relpath), False) for pig in view.pigs),
+            ((pig.short_code, bool(pig.image_relpath), True) for pig in view.pigs),
             media_paths,
         )
         return await self._render_template("tour.html", view=view, previews=previews)

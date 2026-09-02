@@ -28,7 +28,7 @@ ROOT_FILES = (
     "uv.lock",
     "LICENSE",
 )
-OPTIONAL_ROOT_FILES = ("ASSET_NOTICE.md",)
+OPTIONAL_ROOT_FILES = ("ASSET_NOTICE.md", "README.md", "CHANGELOG.md")
 RUNTIME_DIRECTORIES = (
     "pig_catcher",
     "catalogs",

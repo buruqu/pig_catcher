@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 from pathlib import Path
 
@@ -215,6 +216,41 @@ async def test_plugin_panel_executes_blacklist_and_announcement_operations(
         "announcement-send-claimed",
         "announcement-send-succeeded",
     }
+    await plugin.on_unload()
+
+
+@pytest.mark.asyncio
+async def test_panel_announcement_with_image_is_sent_as_one_hybrid_message(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    plugin, context = await create_test_plugin(tmp_path)
+    assert plugin.gameplay_service is not None
+    await plugin.gameplay_service.profile(_identity("member-a", "成员甲"))
+    monkeypatch.setattr(plugin, "_clear_administration_triggers", lambda: None)
+    image_path = tmp_path / "release-banner.jpg"
+    image_payload = b"\xff\xd8\xff\xe0pig-catcher-v2\xff\xd9"
+    image_path.write_bytes(image_payload)
+
+    config = plugin.get_plugin_config_data()
+    config["announcement_administration"] = {
+        "group_id": "10001",
+        "platform": "qq",
+        "content": "2.0 图文公告",
+        "image_path": str(image_path),
+        "execute_send": True,
+    }
+    plugin.set_plugin_config(config)
+    await plugin.on_config_update(CONFIG_RELOAD_SCOPE_SELF, config, "hybrid-announcement")
+
+    assert context.send.texts == []
+    assert context.send.images == []
+    assert len(context.send.hybrids) == 1
+    stream_id, segments = context.send.hybrids[0]
+    assert stream_id == "stream-10001"
+    assert segments[0] == {"type": "text", "content": "2.0 图文公告"}
+    assert segments[1]["type"] == "image"
+    assert base64.b64decode(segments[1]["binary_data_base64"]) == image_payload
     await plugin.on_unload()
 
 

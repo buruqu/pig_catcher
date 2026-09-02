@@ -436,7 +436,10 @@ def move_line(
             shown_total=shown_total,
             domain_bonus=domain_bonus,
         )
-    numeric_base = bool(event.get("numeric_base", event.get("base", 0)))
+    numeric_base = bool(
+        event.get("numeric_base", event.get("base", 0))
+        or event.get("has_numeric_contribution")
+    )
     special_base = Fraction(event.get("special_base", event.get("base", 0)))
     gain = Fraction(event.get("gain", 0))
     opponent_reduction = Fraction(event.get("opponent_reduction", 0))
@@ -450,6 +453,9 @@ def move_line(
         if event["trait_gain"] or event["tool_gain"]:
             note += f"，个体+{event['trait_gain']} / 器具+{event['tool_gain']}（不翻倍）"
         value = f"{_signed_weight(gain)} → 累计{weight_label(shown_total)}"
+    elif opponent_reduction:
+        value = f"对方-{weight_label(opponent_reduction)} → 累计{weight_label(shown_total)}"
+        note = "定向减权招式；功能与伤势效果独立结算"
     else:
         value = (
             f"黑闪领悟+{weight_label(event['black_flash_bonus'])} → 累计{weight_label(shown_total)}"
@@ -475,15 +481,16 @@ def move_line(
         if "daniya-timed-collapse" in event.get("tags", ()):
             note += "；对方本回合力竭权重×5；若未力竭，自己下回合力竭权重×5"
         if "daniya-domain" in event.get("tags", ()):
-            note += "；领域胜利后切换幻灭形态，自己下回合出招数+1"
+            note += "；领域战胜利或单方命中后切换幻灭形态，自己下回合出招数+1"
+        if "daniya-flawless" in event.get("tags", ()):
+            note += "；本回合自身领域战胜利权重+0.2"
+        if "daniya-loan" in event.get("tags", ()):
+            note += "；对方本回合领域战胜利权重-0.2"
     elif fighter_id == "asamu":
         if event.get("forced"):
             note += f"；奶龙覆盖：原本将抽中“{event.get('original_move_name') or '未知招式'}”"
-        if event.get("asamu_big_stacks_after") != event.get("asamu_big_stacks_before"):
-            note += f"；憋大层数 {event.get('asamu_big_stacks_before', 0)} → {event.get('asamu_big_stacks_after', 0)}"
         dynamic = (
             ("喝奶茶", "asamu_tea_bonus_before", "asamu_tea_bonus_after"),
-            ("睡觉", "asamu_sleep_bonus_before", "asamu_sleep_bonus_after"),
             ("全盛姿态", "asamu_prime_bonus_before", "asamu_prime_bonus_after"),
         )
         for label, before_key, after_key in dynamic:
@@ -501,7 +508,42 @@ def move_line(
         if "asamu-tit-for-tat" in event.get("tags", ()):
             note += "；回合末若落后则交换双方权重并再+4，否则自身+40"
         if "asamu-domain" in event.get("tags", ()):
-            note += "；领域胜利后复制对方4个随机招式"
+            note += "；领域战胜利或单方命中后复制对方2个随机招式"
+        if event.get("asamu_future_gain"):
+            note += f"；睡觉成长额外+{weight_label(event['asamu_future_gain'])}"
+    elif fighter_id == "yilu":
+        if event.get("yilu_babel_redeploy"):
+            note += "；巴别塔再部署，本干员完整效果生效2次"
+        if event.get("yilu_specialist_redeploy"):
+            note += "；特种再部署：本次限定抽取非医疗、非特种的其他干员"
+        if event.get("yilu_marker_events"):
+            note += (
+                f"；当前指示物{event.get('yilu_markers', 0)}，"
+                f"累计{event.get('yilu_markers_total', 0)}"
+            )
+        if event.get("yilu_consumed_markers"):
+            note += f"；消耗指示物{event['yilu_consumed_markers']}"
+        if event.get("yilu_threshold_draws"):
+            note += f"；跨越9倍数里程碑，再抽{event['yilu_threshold_draws']}次"
+        if event.get("yilu_true_damage_added"):
+            note += f"；真伤翻倍层数+{event['yilu_true_damage_added']}"
+        if event.get("yilu_sniper_shots"):
+            note += f"；狙击连射{len(event['yilu_sniper_shots'])}次"
+        if event.get("yilu_medic_recoveries"):
+            recoveries = event["yilu_medic_recoveries"]
+            recovered = sum(int(item.get("recovered", False)) for item in recoveries)
+            note += f"；冥土追魂令重伤/力竭盘减半×{len(recoveries)}"
+            if recovered:
+                note += f"，并完成重伤→轻伤恢复×{recovered}"
+        if event.get("yilu_specialist_draws_added"):
+            note += f"；限定再部署其他干员{event['yilu_specialist_draws_added']}次"
+        if "yilu-defender" in event.get("tags", ()):
+            hits = sum(int(item.get("hit", False)) for item in event.get("yilu_defender_checks", ()))
+            note += f"；重装70%预判命中{hits}/{len(event.get('yilu_defender_checks', ())) or 1}"
+        if "yilu-babel" in event.get("tags", ()):
+            note += "；下一抽限定干员且效果生效2次；下回合-1招"
+        if event.get("yilu_future_gain"):
+            note += f"；先锋/明日成长额外+{weight_label(event['yilu_future_gain'])}"
     if event["loan"]:
         note += f"；下回合扣招累计{weight_label(event['next_debt'])}，仅保留一份×2"
     if event.get("extra_draws"):
@@ -532,7 +574,8 @@ def move_line(
         )
         note += "；" + "、".join(adjustment["reasons"]) + "；本招全部胜率数值归零，功能保留"
     if domain_bonus:
-        note += f"；领域战获胜，本招额外+{weight_label(domain_bonus['gain'])}（本回合仅一次）"
+        reason = str(domain_bonus.get("reason") or "领域战获胜")
+        note += f"；{reason}，本招额外+{weight_label(domain_bonus['gain'])}（本回合仅一次）"
     if event["tool_used"]:
         note += f"；{TOOLS_BY_ID[event['tool_used']].name}已消耗"
     return Line(f"{event['ordinal']}. {event['name']}", value, note)
@@ -771,11 +814,14 @@ def _asamu_state_projection(side: dict) -> tuple[str, str, str]:
         str(side.get("injury_state", "none")), str(side.get("injury_state", "none"))
     )
     tea = 1000 + int(side.get("asamu_tea_bonus_units", 0))
-    sleep = 1000 + int(side.get("asamu_sleep_bonus_units", 0))
-    prime = 200 + int(side.get("asamu_prime_bonus_units", 0))
+    prime = (
+        200
+        + int(side.get("asamu_prime_bonus_units", 0))
+        + int(side.get("asamu_prime_temp_bonus_units", 0))
+    )
     facts = [
-        f"憋大永久层数{side.get('asamu_big_stacks', 0)}（后续每个招式的胜率数值每层+3）",
-        f"喝奶茶/睡觉/全盛姿态权重 {tea / 1000:g}/{sleep / 1000:g}/{prime / 1000:g}",
+        f"睡觉成长：后续每招+{side.get('asamu_future_gain_bonus', 0)}",
+        f"喝奶茶/全盛姿态权重 {tea / 1000:g}/{prime / 1000:g}",
     ]
     milk = int(side.get("asamu_milk_dragon_next_count", 0))
     if milk:
@@ -789,6 +835,27 @@ def _asamu_state_projection(side: dict) -> tuple[str, str, str]:
     if turn.get("forced_milk_dragon_used"):
         facts.append(f"本回合奶龙覆盖{turn['forced_milk_dragon_used']}招")
     return f"当前伤势 · {injury}", "动态抽取盘", " · ".join(facts)
+
+
+def _yilu_state_projection(side: dict) -> tuple[str, str, str]:
+    turn = side.get("turn", {})
+    facts = [
+        f"持有指示物{side.get('yilu_markers', 0)}",
+        f"累计指示物{side.get('yilu_markers_total', 0)}",
+        f"基础加权：永久+{side.get('yilu_future_base_bonus', 0)} / 本回合+{turn.get('yilu_round_base_bonus', 0)}",
+        f"本回合干员{turn.get('yilu_operator_placements', 0)}/10",
+    ]
+    if turn.get("yilu_double_operator_draws"):
+        facts.append(f"待再部署干员×{turn['yilu_double_operator_draws']}")
+    if turn.get("yilu_specialist_operator_draws"):
+        facts.append(f"待特种限定再部署×{turn['yilu_specialist_operator_draws']}")
+    if turn.get("yilu_true_damage_layers"):
+        facts.append(f"本回合真伤翻倍×{turn['yilu_true_damage_layers']}")
+    if turn.get("yilu_injury_recovery_layers"):
+        facts.append(f"冥土追魂×{turn['yilu_injury_recovery_layers']}")
+    if turn.get("yilu_injury_worsen_layers"):
+        facts.append(f"旧版特种伤势加重×{turn['yilu_injury_worsen_layers']}")
+    return "罗德岛干员编队", "指示物持续整场", " · ".join(facts)
 
 
 def _v4_interaction_panels(interactions: dict, names: list[str]) -> tuple[Panel, ...]:
@@ -980,25 +1047,54 @@ def _v4_interaction_panels(interactions: dict, names: list[str]) -> tuple[Panel,
             "该招全部胜率数值归零，功能照常结算。"
         )
         v5_lines.append(Line(names[int(fact["side"])] + " · 传奇耐压王", value, note))
+    for fact in interactions.get("yilu_defender_results", ()):
+        if fact.get("selected_ordinal") is not None:
+            value = f"{names[int(fact['target_side'])]}第{fact['selected_ordinal']}招数值失效"
+            note = (
+                f"70%判定命中；归零{weight_label(fact.get('cancelled_gain', 0))}，"
+                f"并申请对方-{weight_label(fact.get('opponent_reduction', 0))}。"
+            )
+        elif fact.get("hit"):
+            value, note = "预判命中但无可失效数值招式", "不追加-5胜率。"
+        else:
+            value, note = "70%判定未命中", "本次重装只保留自身基础效果。"
+        v5_lines.append(Line(names[int(fact["side"])] + " · 干员放置·重装", value, note))
     for event in interactions.get("asamu_domain_copies", ()):
         value = f"复制{names[int(event['source_side'])]}的“{event['source_move_name']}”"
         note = f"第{event['copy_slot']}份复制；数值{_signed_weight(event.get('gain', 0))}"
         if event.get("domain_reentry_suppressed"):
             note += "；复制到领域招式时不再次触发领域判定"
         v5_lines.append(Line("领域·呃呃阿萨姆奶茶", value, note))
+    retaliation_before = interactions.get("retaliation_snapshot", ())
+    retaliation_after = interactions.get("retaliation_after_snapshot", ())
     for fact in interactions.get("retaliations", ()):
-        before, after = fact.get("before", ()), fact.get("after", ())
         value = "交换双方权重后再加成" if fact.get("swapped") else "优势状态直接加成"
-        note = (
-            f"连续结算{fact.get('count', 1)}次；"
-            f"{weight_label(before[0])}/{weight_label(before[1])} → "
-            f"{weight_label(after[0])}/{weight_label(after[1])}"
-        )
+        if len(retaliation_before) == 2 and len(retaliation_after) == 2:
+            note = (
+                f"连续结算{fact.get('count', 1)}次；"
+                f"{weight_label(retaliation_before[0])}/{weight_label(retaliation_before[1])} → "
+                f"{weight_label(retaliation_after[0])}/{weight_label(retaliation_after[1])}"
+            )
+        else:
+            # 兼容已经落库、仅保存单方数值的早期 v7 回合事实。
+            note = (
+                f"连续结算{fact.get('count', 1)}次；"
+                f"本方{weight_label(fact.get('before', 0))} → "
+                f"{weight_label(fact.get('after', 0))}"
+            )
         v5_lines.append(Line(names[int(fact["side"])] + " · 以牙还牙", value, note))
+    for fact in interactions.get("yilu_true_damage", ()):
+        v5_lines.append(
+            Line(
+                names[int(fact["side"])] + " · 近卫真伤",
+                f"{weight_label(fact['before'])} → {weight_label(fact['after'])}",
+                f"本回合胜率连续翻倍{fact['layers']}次。",
+            )
+        )
     if v5_lines:
         panels.append(
             Panel(
-                "达妮娅猪 / 阿萨姆猪 · 回合机制",
+                "达妮娅猪 / 阿萨姆猪 / 熠～噜猪 · 回合机制",
                 tuple(v5_lines),
                 "失效统一只将一招的全部胜率数值归零；抽数、状态、领域及其他功能事实全部保留。",
             )
@@ -1041,6 +1137,10 @@ def matchup(
                 "ordinal": int(domain["boosted_ordinal"]),
                 "ordinals": tuple(int(item) for item in domain.get("boosted_ordinals", ())),
                 "gain": Fraction(domain.get("bonus_gain") or 0),
+                "reason": str(
+                    domain.get("boost_reason")
+                    or ("领域命中" if domain.get("mode") == "solo" else "领域战获胜")
+                ),
             }
     for index, count_side in enumerate(count_sides):
         turn = count_side["turn"]
@@ -1181,6 +1281,8 @@ def matchup(
             form, form_track, mechanic_summary = _daniya_state_projection(side)
         elif snap.get("fighter_id") == "asamu":
             form, form_track, mechanic_summary = _asamu_state_projection(side)
+        elif snap.get("fighter_id") == "yilu":
+            form, form_track, mechanic_summary = _yilu_state_projection(side)
         cards.append(
             FighterCard(
                 player_name=snap["player_name"],
@@ -1311,12 +1413,17 @@ def matchup(
                     if ordinals
                     else f"第{domain['boosted_ordinal']}招"
                 )
+                solo_hit_boost = domain.get("mode") == "solo"
                 domain_lines.append(
                     Line(
-                        "领域胜方加倍",
+                        "领域命中加倍" if solo_hit_boost else "领域胜方加倍",
                         f"{names[int(domain['boost_side'])]} {target}合计额外 "
                         f"+{weight_label(domain['bonus_gain'])}",
-                        "普通领域只翻倍一份；撅撅猪两个不同领域同回合齐出且胜出时，两份相加后一起翻倍。",
+                        (
+                            "任意战斗猪单方领域命中后，只把一份仍有效领域胜率翻倍。"
+                            if solo_hit_boost
+                            else "普通领域只翻倍一份；撅撅猪两个不同领域同回合齐出且胜出时，两份相加后一起翻倍。"
+                        ),
                     )
                 )
             dual = [names[index] for index, active in enumerate(domain.get("dual_juejue", ())) if active]
@@ -1679,19 +1786,22 @@ def _daniya_effect(move, level: int) -> str:
     numeric = f"自身胜率{_signed_weight(enhanced)}" if gain else ""
     if move.resolved_opponent_reduction_tenths:
         numeric += f"、对方-{weight_label(Fraction(move.resolved_opponent_reduction_tenths, VICTORY_WEIGHT_SCALE))}"
+    numeric = numeric.lstrip("、")
     mechanics = {
+        "daniya-staging-virtual-particle": "下一次蚀域主盘权重+0.1",
         "daniya-staging-dream-feast": "下一次蚀域主盘权重+0.1",
         "daniya-staging-mimic-bubble": "下一次蚀域主盘权重+0.1",
         "daniya-staging-final-curtain": "下一次蚀域主盘权重+0.1",
         "daniya-staging-greeting": "下一次蚀域主盘权重+0.1",
+        "daniya-disillusion-dark-core": "对方力竭盘永久+0.1",
         "daniya-disillusion-dream-feast": "对方力竭盘永久+0.1",
         "daniya-disillusion-banish": "对方力竭盘永久+0.1",
         "daniya-disillusion-final-curtain": "对方力竭盘永久+0.1",
         "daniya-disillusion-knock": "对方力竭盘永久+0.1",
-        "daniya-flawless": "再抽2次",
-        "daniya-unfinished-lie": "再抽1次；下一次数值招式自身加权及对方减权同步×2；下回合-1招",
+        "daniya-flawless": "再抽2次；自身本回合领域战胜利权重+0.2",
+        "daniya-unfinished-lie": "再抽1次；下一次数值招式双方数值同步×2；对方本回合领域战权重-0.2；下回合-1招",
         "daniya-timed-collapse": "对方本回合力竭权重×5；若对方未力竭，自己下回合力竭权重×5",
-        "daniya-domain": "领域胜利后切换幻灭形态，自己下回合+1招",
+        "daniya-domain": "领域战胜利或单方命中后切换幻灭形态，自己下回合+1招",
     }[move.move_id]
     return "；".join(part for part in (numeric, mechanics) if part)
 
@@ -1704,7 +1814,7 @@ def _daniya_wheels(identity: CommandIdentity, level: int) -> BattleView:
             "move",
             f"达妮娅猪 · {DANIYA_FORM_NAMES[form_id]}",
             tuple((move.name, _move_weight(move)) for move in forms[form_id].moves),
-            note="形态专属4招与公共4招同盘；计时的溃灭基础权重0.5，其余基础权重1。",
+            note="形态专属5招与公共4招同盘；天衣无缝/未竟谎言0.8、计时溃灭0.2，其余基础权重1。",
         )
         for form_id in (DANIYA_FORM_STAGING, DANIYA_FORM_DISILLUSION)
     )
@@ -1720,16 +1830,16 @@ def _daniya_wheels(identity: CommandIdentity, level: int) -> BattleView:
     return view(
         identity,
         "达妮娅猪 · 双形态战斗轮盘",
-        banner=f"展示强化+{level}的数值。默认布景；蚀域在领域战胜利后即时切换为幻灭。",
+        banner=f"展示强化+{level}的数值。默认布景；蚀域在领域战胜利或单方命中后切换幻灭。",
         wheels=(*form_wheels, *_common_battle_wheels()),
         panels=(
             Panel("双形态招式", lines, "重复出现的公共招式是同一规则，只因当前形态不同而进入不同轮盘。"),
             Panel(
                 "形态与伤势机制",
                 (
-                    Line("布景", "每次布景数值招式令下次蚀域抽取权重+0.1", "蚀域实际使用后清除累计。"),
-                    Line("幻灭", "每次幻灭数值招式令对方力竭盘永久+0.1", "精确累积，不提前取整。"),
-                    Line("计时的溃灭", "自身-52.1", "若对手未在本回合力竭，×5反噬登记到自己下回合。"),
+                    Line("布景", "每次布景招式令下次蚀域抽取权重+0.1", "蚀域实际使用后清除累计。"),
+                    Line("幻灭", "每次幻灭招式令对方力竭盘永久+0.1", "精确累积，不提前取整。"),
+                    Line("计时的溃灭", "对方-52.1", "若对手未在本回合力竭，×5反噬登记到自己下回合。"),
                 ),
             ),
         ),
@@ -1745,15 +1855,15 @@ def _asamu_effect(move, level: int) -> str:
     numeric = f"胜率+{weight_label(gain + level)}" if gain > 0 else ""
     mechanics = {
         "asamu-bathe": "喝奶茶抽取权重+0.5",
-        "asamu-milk-tea": "睡觉抽取权重+0.25，并重置喝奶茶当前加权",
-        "asamu-sleep": "全盛姿态抽取权重永久+0.1，并重置睡觉当前加权",
-        "asamu-prime": "再抽1次",
-        "asamu-charge-up": "本场后续每个招式的胜率数值额外+3，可无限累积",
+        "asamu-milk-tea": "全盛姿态抽取权重永久+0.1，并重置喝奶茶当前加权",
+        "asamu-sleep": "本场之后所有招式胜率额外+5，可无限累积",
+        "asamu-prime": "再抽2次，并清空憋个大的临时出现权重",
+        "asamu-charge-up": "再抽1次；全盛姿态临时出现权重+1，打出后清空",
         "asamu-pressure-king": "本层对方每个数值招式独立33%失效；功能保留",
         "asamu-misfortune-transfer": "双方本回合力竭倒下权重各×5",
         "asamu-milk-dragon": "依次覆盖对方下回合第一、第二……招为发奶龙",
         "asamu-tit-for-tat": "回合末落后则交换双方权重并再+4；未落后则自身+40",
-        "asamu-domain": "领域胜利后随机使用对方4个招式；复制领域不再次发起领域判定",
+        "asamu-domain": "领域战胜利或单方命中后随机使用对方2个招式；复制领域不再次判定",
     }[move.move_id]
     return "；".join(part for part in (numeric, mechanics) if part)
 
@@ -1774,7 +1884,7 @@ def _asamu_wheels(identity: CommandIdentity, level: int) -> BattleView:
     return view(
         identity,
         "阿萨姆猪 · 动态战斗轮盘",
-        banner=f"展示强化+{level}的数值。喝奶茶、睡觉、全盛姿态会在战斗中动态改变抽取权重。",
+        banner=f"展示强化+{level}的数值。喝奶茶与憋个大的动态养成全盛姿态，睡觉永久叠加后续招式胜率。",
         wheels=(
             wheel_card("move", "阿萨姆猪 · 基础招式盘", tuple((move.name, _move_weight(move)) for move in moves)),
             *_common_battle_wheels(),
@@ -1795,11 +1905,62 @@ def _asamu_wheels(identity: CommandIdentity, level: int) -> BattleView:
                         "无伤0.4 / 轻伤0.749 / 重伤0.947",
                         "回合末共用同一结算快照；每次抽中各给后置奖励，双方权重交换至多一次。",
                     ),
-                    Line("领域·呃呃阿萨姆奶茶", "领域胜利复制对方4招", "逐份展示来源、数值与领域再入抑制。"),
+                    Line("领域·呃呃阿萨姆奶茶", "领域胜利或命中复制对方2招", "逐份展示来源、数值与领域再入抑制。"),
                 ),
             ),
         ),
-        hints=("憋个大的永久+3只增加招式胜率数值，不改变抽中权重。", "厄运传递和计时的溃灭按独立倍率乘入伤势盘。"),
+        hints=("传奇耐压王抽取权重随无伤/轻伤/重伤变为0.5/1/2。", "厄运传递和计时的溃灭按独立倍率乘入伤势盘。"),
+    )
+
+
+def _yilu_effect(move, level: int) -> str:
+    mechanics = {
+        "yilu-vanguard": "胜率+5；再抽1次、指示物+2；此后所有招式基础胜率+2",
+        "yilu-guard": "指示物+1后全部融合；每点+5，消耗>5触发本回合胜率翻倍",
+        "yilu-defender": "胜率+2、指示物+1；70%令对方随机一招数值归零并额外-5",
+        "yilu-caster": "指示物+3；每6点换+40，可连续；不足6再+1指示物",
+        "yilu-sniper": "等概率连射1至10枪；每枪+1，并独立执行两次50%指示物判定",
+        "yilu-medic": "权重0.2；清空指示物，重伤/力竭盘×0.5；重伤恢复轻伤，再+2指示物",
+        "yilu-specialist": "权重0.5；清空指示物，再抽2次非医疗、非特种干员，并+1指示物",
+        "yilu-domain": "胜率+32.5；领域战获胜或单方命中后，下回合+1招且该回合所有招式基础胜率+1",
+        "yilu-babel-ghost": "下一抽限定干员且完整效果×2；下回合-1招",
+    }[move.move_id]
+    return mechanics + (f"；基础正数招式受强化+{level}" if move.resolved_gain_tenths > 0 else "")
+
+
+def _yilu_wheels(identity: CommandIdentity, level: int) -> BattleView:
+    moves = FIGHTERS_BY_ID["yilu"].moves
+    return view(
+        identity,
+        "熠～噜猪 · 罗德岛干员战斗盘",
+        banner=f"展示强化+{level}的规则。指示物跨回合保留；累计每跨9点再抽1次。",
+        wheels=(
+            wheel_card("move", "熠～噜猪 · 基础招式盘", tuple((move.name, _move_weight(move)) for move in moves)),
+            *_common_battle_wheels(),
+        ),
+        panels=(
+            Panel(
+                "干员与领域",
+                tuple(
+                    Line(move.name, _yilu_effect(move, level), f"基础抽取权重 {_move_weight(move)}")
+                    for move in moves
+                ),
+                "每回合最多放置10名干员；第10名落地后强制结束己方本回合连锁。",
+            ),
+            Panel(
+                "指示物与再部署",
+                (
+                    Line("指示物", "持有量可消费，累计量不倒退", "累计总量每达到9的倍数，再抽1次。"),
+                    Line("巴别塔的恶灵", "下一名干员效果按顺序完整执行2次", "只占1个干员放置名额。"),
+                    Line("特种再部署", "限定非医疗、非特种干员2次", "两次分别抽取并正常计算指示物与10名上限。"),
+                    Line("近卫真伤", "融合消耗超过5时本回合胜率翻倍", "多次触发按层连续翻倍。"),
+                ),
+            ),
+        ),
+        hints=(
+            "末日方舟的“明日”会在双方领域对抗获胜或单方领域命中时触发。",
+            "医疗会即时把重伤恢复为轻伤；特种不再加重伤势盘。",
+        ),
     )
 
 
@@ -1810,6 +1971,8 @@ def wheels(identity: CommandIdentity, fighter_id: str, level: int = 0) -> Battle
         return _daniya_wheels(identity, level)
     if fighter_id == "asamu":
         return _asamu_wheels(identity, level)
+    if fighter_id == "yilu":
+        return _yilu_wheels(identity, level)
     definition = FIGHTERS_BY_ID[fighter_id]
     moves = []
     for move in definition.moves:
@@ -1877,7 +2040,7 @@ def wheels(identity: CommandIdentity, fighter_id: str, level: int = 0) -> Battle
             "每次核心解除重伤并使后续数值招式+1，无叠加上限；历史风险不降低。",
             "个体体型/体重在各自模板范围的平均位置≥75%：每回合首个数值招式另+1，不参与贷款翻倍。",
             "黑闪基础+10并再抽2次；每次黑闪令后续数值招式再+1。苍/赫令两种茈的抽取权重各+0.1，任意茈发动后归零重算。",
-            "双领域胜方仅一份仍有效的领域招式权重翻倍；本回合净增仅有50%向上取整迁移到后续回合。",
+            "任意战斗猪单方领域命中或领域战获胜后，都会触发领域效果并翻倍一份仍有效领域胜率；撅撅猪双领域胜出使用双领域特例。",
             "无下限每回合只免疫对方首个仍有效的数值招式；领域同回合只判定一次。",
         ),
     )

@@ -81,6 +81,7 @@ from .gameplay import (
     format_profile_summary,
     format_records_summary,
 )
+from .launch_campaign import LaunchCampaignService, LaunchCouponBackfillSummary
 from .maintenance import MaintenanceOptions, MaintenanceReport, MaintenanceRunner
 from .quota import (
     CatchQuotaResetResult,
@@ -182,6 +183,8 @@ __all__ = [
     "MaintenanceOptions",
     "MaintenanceReport",
     "MaintenanceRunner",
+    "LaunchCampaignService",
+    "LaunchCouponBackfillSummary",
     "PigView",
     "PlayerProfile",
     "RecordEntry",

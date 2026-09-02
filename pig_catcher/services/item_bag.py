@@ -9,19 +9,24 @@ from dataclasses import replace
 from uuid import uuid4
 
 from ..commands.item_bag import ItemBagRequest, parse_item_bag_request
+from ..domain.battle_catalog import FIGHTERS_BY_TEMPLATE
 from ..domain.dispatch import safe_display_name
 from ..domain.dispatch_views import DispatchLine as Line
 from ..domain.dispatch_views import DispatchPanel as Panel
 from ..domain.dispatch_views import DispatchPigCard, DispatchView
 from ..domain.display import display_tags_from_json, format_length, format_weight
+from ..domain.economy import generate_food_attributes, recipe_affinity
 from ..domain.enums import AssetKind
 from ..domain.errors import AssetStateConflictError, DomainValidationError
 from ..domain.gameplay import generate_pig_attributes
 from ..domain.item_bag import (
     BAG_PAGE_SIZE,
+    BATTLE_PIG_CHOICE_COUPON,
     CHOICE_TTL_MS,
     CODE_CHANGE_COUPON,
     COUPON_HELP,
+    FIVE_STAR_COLLAB_RANDOM_COUPON,
+    FOOD_CHOICE_COUPON,
     LEGACY_CODE_CHANGE_COUPON,
     PIG_CHOICE_COUPON,
     REWARD_NAMES,
@@ -34,6 +39,7 @@ from ..infrastructure.database import DatabaseSession, PigCatcherDatabase
 from ..infrastructure.repositories.administration import AdministrationRepository
 from ..infrastructure.repositories.asset_codes import AssetCodeRepository
 from ..infrastructure.repositories.dispatch import encode, iso_ms, timestamp_ms
+from ..infrastructure.repositories.economy import EconomyRepository
 from ..infrastructure.repositories.framework import FrameworkRepository
 from ..infrastructure.repositories.gameplay import GameplayRepository
 from ..infrastructure.repositories.item_bag import ItemBagRepository
@@ -63,6 +69,7 @@ class ItemBagService:
         self.assets = AdministrationRepository()
         self.codes = AssetCodeRepository()
         self.gameplay = GameplayRepository()
+        self.economy = EconomyRepository()
 
     async def grant_coupon(
         self,
@@ -111,7 +118,16 @@ class ItemBagService:
     ) -> DispatchResult:
         if isinstance(request, str):
             request = parse_item_bag_request(request, section=section)
-        if request.action not in {"bag", "rename", "choose-pig", "confirm", "cancel"}:
+        if request.action not in {
+            "bag",
+            "rename",
+            "choose-pig",
+            "choose-food",
+            "choose-battle-pig",
+            "random-collab-pig",
+            "confirm",
+            "cancel",
+        }:
             raise DomainValidationError("未知道具背包操作。")
         now_ms = timestamp_ms(self.clock.now())
         now = iso_ms(now_ms)
@@ -141,8 +157,14 @@ class ItemBagService:
                 view = await self._rename(session, identity, request.args, now, key)
             elif request.action == "choose-pig":
                 view = await self._choose_pig(session, identity, str(request.args["selector"]), now_ms)
+            elif request.action == "choose-food":
+                view = await self._choose_food(session, identity, str(request.args["selector"]), now_ms)
+            elif request.action == "choose-battle-pig":
+                view = await self._choose_battle_pig(session, identity, str(request.args["selector"]), now_ms)
+            elif request.action == "random-collab-pig":
+                view = await self._random_collab_pig(session, identity, now, key)
             elif request.action == "confirm":
-                view = await self._confirm_pig(session, identity, now_ms, key)
+                view = await self._confirm_choice(session, identity, now_ms, key)
             else:
                 await session.execute("DELETE FROM item_coupon_choices WHERE player_id=?", (identity.player_id,))
                 view = self._view(identity, "奖励券确认已取消", banner="没有扣除奖励券，也没有生成或修改资产。")
@@ -263,21 +285,33 @@ class ItemBagService:
             raise DomainValidationError("同名资产有多件，请用完整的 名称#编号，或直接填写旧编号。")
         return dict(rows[0])
 
-    async def _template(self, session: DatabaseSession, identity: CommandIdentity, selector: str) -> dict:
+    async def _template(
+        self,
+        session: DatabaseSession,
+        identity: CommandIdentity,
+        selector: str,
+        *,
+        asset_kind: AssetKind = AssetKind.PIG,
+        battle_only: bool = False,
+    ) -> dict:
         rows = await self.assets.eligible_templates(
-            session, scope_id=identity.scope.value, asset_kind=AssetKind.PIG, selector=selector
+            session, scope_id=identity.scope.value, asset_kind=asset_kind, selector=selector
         )
         if not rows:
-            raise DomainValidationError("当前群没有已启用且已授权的这只猪；不能选择其他群的六星。")
+            label = "猪猪" if asset_kind is AssetKind.PIG else "美食"
+            raise DomainValidationError(f"当前群没有已启用且已授权的这件{label}。")
         if len(rows) != 1:
             raise DomainValidationError(
-                "同名猪模板不唯一，请选择一个模板ID：" + "、".join(str(row["template_id"]) for row in rows)
+                "同名模板不唯一，请选择一个模板ID：" + "、".join(str(row["template_id"]) for row in rows)
             )
-        return rows[0]
+        template = rows[0]
+        if battle_only and str(template["template_id"]) not in FIGHTERS_BY_TEMPLATE:
+            raise DomainValidationError("这只猪猪当前没有战斗盘，不能使用战斗猪自选券选择。")
+        return template
 
     @staticmethod
-    def _template_fingerprint(template: dict) -> str:
-        fields = (
+    def _template_fingerprint(template: dict, *, asset_kind: AssetKind = AssetKind.PIG) -> str:
+        pig_fields = (
             "template_id",
             "template_version",
             "display_name",
@@ -290,7 +324,49 @@ class ItemBagService:
             "image_relpath",
             "stature_profile",
         )
+        food_fields = (
+            "template_id",
+            "template_version",
+            "display_name",
+            "rarity",
+            "image_relpath",
+            "effect_id",
+            "effect_params_json",
+            "recipe_tags_json",
+        )
+        fields = pig_fields if asset_kind is AssetKind.PIG else food_fields
         return request_fingerprint({field: template[field] for field in fields})
+
+    async def _save_choice(
+        self,
+        session: DatabaseSession,
+        identity: CommandIdentity,
+        *,
+        operation: str,
+        template: dict,
+        coupon_id: str,
+        asset_kind: AssetKind,
+        now_ms: int,
+    ) -> None:
+        payload = {
+            "template_id": template["template_id"],
+            "fingerprint": self._template_fingerprint(template, asset_kind=asset_kind),
+            "coupon_id": coupon_id,
+            "asset_kind": asset_kind.value,
+        }
+        await session.execute(
+            "INSERT INTO item_coupon_choices VALUES(?,?,?,?,?,?) ON CONFLICT(player_id) DO UPDATE SET "
+            "scope_id=excluded.scope_id,operation=excluded.operation,payload_json=excluded.payload_json,"
+            "expires_ms=excluded.expires_ms,created_at=excluded.created_at",
+            (
+                identity.player_id,
+                identity.scope.value,
+                operation,
+                encode(payload),
+                now_ms + CHOICE_TTL_MS,
+                iso_ms(now_ms),
+            ),
+        )
 
     async def _choose_pig(
         self, session: DatabaseSession, identity: CommandIdentity, selector: str, now_ms: int
@@ -298,11 +374,14 @@ class ItemBagService:
         if await self.repository.quantity(session, identity.player_id, PIG_CHOICE_COUPON) < 1:
             raise DomainValidationError("你没有可用的猪猪自选券。")
         template = await self._template(session, identity, selector)
-        payload = {"template_id": template["template_id"], "fingerprint": self._template_fingerprint(template)}
-        await session.execute(
-            "INSERT INTO item_coupon_choices VALUES(?,?,'pig-choice',?,?,?) ON CONFLICT(player_id) DO UPDATE SET "
-            "scope_id=excluded.scope_id,payload_json=excluded.payload_json,expires_ms=excluded.expires_ms,created_at=excluded.created_at",
-            (identity.player_id, identity.scope.value, encode(payload), now_ms + CHOICE_TTL_MS, iso_ms(now_ms)),
+        await self._save_choice(
+            session,
+            identity,
+            operation="pig-choice",
+            template=template,
+            coupon_id=PIG_CHOICE_COUPON,
+            asset_kind=AssetKind.PIG,
+            now_ms=now_ms,
         )
         return self._view(
             identity,
@@ -312,7 +391,59 @@ class ItemBagService:
             hints=("30秒内输入 /使用奖励券 确认；/使用奖励券 取消。选择新的猪会替换旧预览。",),
         )
 
-    async def _confirm_pig(
+    async def _choose_battle_pig(
+        self, session: DatabaseSession, identity: CommandIdentity, selector: str, now_ms: int
+    ) -> DispatchView:
+        if await self.repository.quantity(session, identity.player_id, BATTLE_PIG_CHOICE_COUPON) < 1:
+            raise DomainValidationError("你没有可用的战斗猪自选券。")
+        template = await self._template(session, identity, selector, battle_only=True)
+        await self._save_choice(
+            session,
+            identity,
+            operation="battle-pig-choice",
+            template=template,
+            coupon_id=BATTLE_PIG_CHOICE_COUPON,
+            asset_kind=AssetKind.PIG,
+            now_ms=now_ms,
+        )
+        return self._view(
+            identity,
+            "战斗猪自选 · 等待确认",
+            banner="将消耗1张战斗猪自选券；仅能选择当前版本已有完整战斗盘的猪猪。",
+            pigs=(self._pig_card(template, "待生成", "确认后生成自然体型与重量，不增加抓猪排行。"),),
+            hints=("30秒内输入 /使用奖励券 确认；/使用奖励券 取消。",),
+        )
+
+    async def _choose_food(
+        self, session: DatabaseSession, identity: CommandIdentity, selector: str, now_ms: int
+    ) -> DispatchView:
+        if await self.repository.quantity(session, identity.player_id, FOOD_CHOICE_COUPON) < 1:
+            raise DomainValidationError("你没有可用的美食自选券。")
+        template = await self._template(session, identity, selector, asset_kind=AssetKind.FOOD)
+        await self._save_choice(
+            session,
+            identity,
+            operation="food-choice",
+            template=template,
+            coupon_id=FOOD_CHOICE_COUPON,
+            asset_kind=AssetKind.FOOD,
+            now_ms=now_ms,
+        )
+        return self._view(
+            identity,
+            "美食自选 · 等待确认",
+            banner="将消耗1张美食自选券；确认后按自然规则生成份量和价值，不产生做菜收益或排行。",
+            panels=(
+                Panel(
+                    f"{'★' * int(template['rarity'])} {template['display_name']}",
+                    (Line("状态", "待生成"), Line("效果", str(template.get("effect_id") or "无"))),
+                    "这是选择预览，尚未扣券。",
+                ),
+            ),
+            hints=("30秒内输入 /使用奖励券 确认；/使用奖励券 取消。",),
+        )
+
+    async def _confirm_choice(
         self, session: DatabaseSession, identity: CommandIdentity, now_ms: int, key: str
     ) -> DispatchView:
         pending = await session.fetch_one(
@@ -320,14 +451,36 @@ class ItemBagService:
             (identity.player_id, identity.scope.value, now_ms),
         )
         if pending is None:
-            raise DomainValidationError("没有有效的自选猪确认；30秒后自动失效，请重新选择。")
+            raise DomainValidationError("没有有效的自选确认；30秒后会自动失效，请重新选择。")
         payload = json.loads(pending["payload_json"])
-        template = await self._template(session, identity, payload["template_id"])
+        operation = str(pending["operation"])
+        if operation == "food-choice":
+            return await self._confirm_food_choice(session, identity, now_ms, key, payload)
+        coupon_id = (
+            BATTLE_PIG_CHOICE_COUPON if operation == "battle-pig-choice" else PIG_CHOICE_COUPON
+        )
+        return await self._confirm_pig_choice(session, identity, now_ms, key, payload, coupon_id)
+
+    async def _confirm_pig_choice(
+        self,
+        session: DatabaseSession,
+        identity: CommandIdentity,
+        now_ms: int,
+        key: str,
+        payload: dict,
+        coupon_id: str,
+    ) -> DispatchView:
+        template = await self._template(
+            session,
+            identity,
+            payload["template_id"],
+            battle_only=coupon_id == BATTLE_PIG_CHOICE_COUPON,
+        )
         if self._template_fingerprint(template) != payload["fingerprint"]:
             raise DomainValidationError("所选猪的模板已更新，请重新预览确认；奖励券未消耗。")
         now = iso_ms(now_ms)
         remaining = await self.repository.consume_coupon(
-            session, player_id=identity.player_id, coupon_id=PIG_CHOICE_COUPON, now=now
+            session, player_id=identity.player_id, coupon_id=coupon_id, now=now
         )
         rolls = tuple(self.random_source.random() for _ in range(5))
         attributes = generate_pig_attributes(
@@ -343,7 +496,7 @@ class ItemBagService:
         instance_id = self.id_factory()
         snapshot = {
             "source": "reward-pig-choice",
-            "coupon_id": PIG_CHOICE_COUPON,
+            "coupon_id": coupon_id,
             "source_receipt_key": key,
             "attribute_rolls": rolls,
             "gameplay_rewards_applied": False,
@@ -386,7 +539,7 @@ class ItemBagService:
             session,
             identity,
             key,
-            PIG_CHOICE_COUPON,
+            coupon_id,
             "pig-selected",
             {
                 "instance_id": instance_id,
@@ -406,7 +559,223 @@ class ItemBagService:
             "自选猪猪已到背包",
             banner="已消耗1张猪猪自选券，图鉴已记录；不扣抓猪额度、不增加抓猪奖励、经验或抓猪排行。",
             pigs=(self._pig_card(template, short_code, summary),),
-            stats=(Line("猪猪自选券剩余", f"{remaining} 张"),),
+            stats=(Line(f"{REWARD_NAMES[coupon_id]}剩余", f"{remaining} 张"),),
+            hints=(f"/猪猪详情 {template['display_name']}#{short_code}；/道具背包 查看道具。",),
+        )
+
+    async def _confirm_food_choice(
+        self,
+        session: DatabaseSession,
+        identity: CommandIdentity,
+        now_ms: int,
+        key: str,
+        payload: dict,
+    ) -> DispatchView:
+        template = await self._template(
+            session,
+            identity,
+            payload["template_id"],
+            asset_kind=AssetKind.FOOD,
+        )
+        if self._template_fingerprint(template, asset_kind=AssetKind.FOOD) != payload["fingerprint"]:
+            raise DomainValidationError("所选美食模板已更新，请重新预览确认；奖励券未消耗。")
+        now = iso_ms(now_ms)
+        remaining = await self.repository.consume_coupon(
+            session, player_id=identity.player_id, coupon_id=FOOD_CHOICE_COUPON, now=now
+        )
+        portion_roll = self.random_source.random()
+        attributes = generate_food_attributes(
+            rarity=int(template["rarity"]),
+            template_id=str(template["template_id"]),
+            source_weight=60.0,
+            source_weight_percentile=0.5,
+            portion_roll=portion_roll,
+        )
+        try:
+            tag_payload = json.loads(str(template.get("recipe_tags_json") or "[]"))
+        except json.JSONDecodeError:
+            tag_payload = []
+        fat_category = recipe_affinity(
+            tuple(str(item) for item in tag_payload) if isinstance(tag_payload, list) else ()
+        )
+        short_code = await self._new_short_code(session)
+        instance_id = self.id_factory()
+        snapshot = {
+            "source": "reward-food-choice",
+            "coupon_id": FOOD_CHOICE_COUPON,
+            "source_receipt_key": key,
+            "portion_roll": portion_roll,
+            "synthetic_source_weight": 60.0,
+            "gameplay_rewards_applied": False,
+            "statistics_incremented": False,
+            "ruleset_version": RULESET_VERSION,
+        }
+        await self.economy.insert_food_instance(
+            session,
+            values={
+                "food_instance_id": instance_id,
+                "short_code": short_code,
+                "scope_id": identity.scope.value,
+                "owner_player_id": identity.player_id,
+                "template_id": template["template_id"],
+                "template_version": int(template["template_version"]),
+                "source_pig_instance_id": None,
+                "rarity": int(template["rarity"]),
+                "display_name_snapshot": template["display_name"],
+                "portion_weight": attributes.portion_weight,
+                "fat_category": fat_category,
+                "official_value": attributes.official_value,
+                "effect_id": str(template.get("effect_id") or ""),
+                "effect_params_json": str(template.get("effect_params_json") or "{}"),
+                "ruleset_version": RULESET_VERSION,
+                "random_snapshot_json": encode(snapshot),
+                "acquired_at": now,
+                "updated_at": now,
+            },
+        )
+        await self.economy.upsert_food_catalog(
+            session,
+            player_id=identity.player_id,
+            template_id=str(template["template_id"]),
+            portion_weight=attributes.portion_weight,
+            now=now,
+        )
+        await session.execute("DELETE FROM item_coupon_choices WHERE player_id=?", (identity.player_id,))
+        await self._audit_use(
+            session,
+            identity,
+            key,
+            FOOD_CHOICE_COUPON,
+            "food-selected",
+            {
+                "instance_id": instance_id,
+                "template_id": template["template_id"],
+                "short_code": short_code,
+                "remaining": remaining,
+                "portion_roll": portion_roll,
+            },
+            now,
+        )
+        return self._view(
+            identity,
+            "自选美食已到背包",
+            banner="已消耗1张美食自选券；不增加做菜经验、收益或周榜成绩。",
+            panels=(
+                Panel(
+                    f"{'★' * int(template['rarity'])} {template['display_name']}#{short_code}",
+                    (
+                        Line("份量", format_weight(attributes.portion_weight)),
+                        Line("官方价值", f"{attributes.official_value} 猪币"),
+                    ),
+                    "美食效果将在正常吃菜时结算。",
+                ),
+            ),
+            stats=(Line("美食自选券剩余", f"{remaining} 张"),),
+            hints=(f"/美食详情 {template['display_name']}#{short_code}；/道具背包 查看道具。",),
+        )
+
+    async def _random_collab_pig(
+        self,
+        session: DatabaseSession,
+        identity: CommandIdentity,
+        now: str,
+        key: str,
+    ) -> DispatchView:
+        if await self.repository.quantity(session, identity.player_id, FIVE_STAR_COLLAB_RANDOM_COUPON) < 1:
+            raise DomainValidationError("你没有可用的五星联动猪随机券。")
+        templates = tuple(
+            template
+            for template in await self.gameplay.list_drawable_pig_templates(
+                session, scope_id=identity.scope.value
+            )
+            if int(template["rarity"]) == 5 and str(template.get("collection_id") or "").strip()
+        )
+        if not templates:
+            raise DomainValidationError("当前群没有可随机发放的五星联动猪；奖励券未消耗。")
+        template = templates[min(int(self.random_source.random() * len(templates)), len(templates) - 1)]
+        remaining = await self.repository.consume_coupon(
+            session,
+            player_id=identity.player_id,
+            coupon_id=FIVE_STAR_COLLAB_RANDOM_COUPON,
+            now=now,
+        )
+        rolls = tuple(self.random_source.random() for _ in range(5))
+        attributes = generate_pig_attributes(
+            rarity=5,
+            length_min=float(template["length_min"]),
+            length_max=float(template["length_max"]),
+            weight_min=float(template["weight_min"]),
+            weight_max=float(template["weight_max"]),
+            fat_profile=str(template["fat_profile"]),
+            random_values=rolls,
+        )
+        short_code = await self._new_short_code(session)
+        instance_id = self.id_factory()
+        snapshot = {
+            "source": "reward-five-star-collab-random",
+            "coupon_id": FIVE_STAR_COLLAB_RANDOM_COUPON,
+            "source_receipt_key": key,
+            "attribute_rolls": rolls,
+            "gameplay_rewards_applied": False,
+            "statistics_incremented": False,
+            "ruleset_version": RULESET_VERSION,
+        }
+        await self.gameplay.insert_pig_instance(
+            session,
+            values={
+                "pig_instance_id": instance_id,
+                "short_code": short_code,
+                "scope_id": identity.scope.value,
+                "owner_player_id": identity.player_id,
+                "template_id": template["template_id"],
+                "template_version": int(template["template_version"]),
+                "rarity": 5,
+                "display_name_snapshot": template["display_name"],
+                "size_value": attributes.size_value,
+                "size_percentile": attributes.size_percentile,
+                "weight_value": attributes.weight_value,
+                "weight_percentile": attributes.weight_percentile,
+                "fat_ratio": attributes.fat_ratio,
+                "official_value": attributes.official_value,
+                "ruleset_version": RULESET_VERSION,
+                "random_snapshot_json": encode(snapshot),
+                "acquired_at": now,
+                "updated_at": now,
+            },
+        )
+        await self.gameplay.upsert_pig_catalog(
+            session,
+            player_id=identity.player_id,
+            template_id=str(template["template_id"]),
+            size_value=attributes.size_value,
+            weight_value=attributes.weight_value,
+            now=now,
+        )
+        await self._audit_use(
+            session,
+            identity,
+            key,
+            FIVE_STAR_COLLAB_RANDOM_COUPON,
+            "five-star-collab-random",
+            {
+                "instance_id": instance_id,
+                "template_id": template["template_id"],
+                "short_code": short_code,
+                "remaining": remaining,
+                "attribute_rolls": list(rolls),
+            },
+            now,
+        )
+        summary = (
+            f"{format_length(attributes.size_value)} · {format_weight(attributes.weight_value)}"
+            f" · 价值 {attributes.official_value} 猪币"
+        )
+        return self._view(
+            identity,
+            "五星联动猪已到背包",
+            banner="随机券已结算；不占抓猪额度，也不增加抓猪经验、收益或周榜成绩。",
+            pigs=(self._pig_card(template, short_code, summary),),
+            stats=(Line("随机券剩余", f"{remaining} 张"),),
             hints=(f"/猪猪详情 {template['display_name']}#{short_code}；/道具背包 查看道具。",),
         )
 

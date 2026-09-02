@@ -211,6 +211,18 @@ def test_attribute_neutral_and_team_rules():
     assert [team_slots(h * 3600) for h in (0, 11, 12, 71, 72)] == [1, 1, 2, 2, 3]
 
 
+def test_auto_dispatch_parser_uses_balanced_default_and_accepts_duration():
+    default = parse_dispatch_request("自动 回声矿洞")
+    assert default.action == "auto"
+    assert default.args == {
+        "region_id": "echo-mine",
+        "hours": 8,
+        "tool_id": "",
+        "tool_options": {},
+    }
+    assert parse_dispatch_request("智能 风铃林地 12小时").args["hours"] == 12
+
+
 def test_exploration_fraction_and_tenth_pity():
     fraction, misses = 0, 0
     for _ in range(9):
@@ -239,6 +251,30 @@ def test_exploration_fraction_and_tenth_pity():
 def test_parser_rejects_ambiguous_and_unsafe_input(text, section):
     with pytest.raises(DispatchError):
         parse_dispatch_request(text, section=section)
+
+
+async def test_auto_dispatch_selects_best_idle_team_and_needs_only_one_confirmation(world: World):
+    favorite = await world.db.fetch_one(
+        "SELECT pig_instance_id FROM pig_instances WHERE owner_player_id=? ORDER BY official_value LIMIT 1",
+        (world.identity.player_id,),
+    )
+    async with world.db.transaction() as session:
+        await session.execute("UPDATE pig_instances SET is_favorite=1 WHERE pig_instance_id=?", (favorite[0],))
+    preview = await world.send("自动 回声矿洞")
+    assert "自动配队" in preview.view.title and "只需确认这一次" in preview.view.text()
+    assert (await world.db.fetch_one("SELECT COUNT(*) FROM dispatch_teams"))[0] == 0
+    assert (await world.db.fetch_one("SELECT COUNT(*) FROM dispatch_trips"))[0] == 0
+
+    result = await world.send("确认", message_id="auto-dispatch-confirm")
+    assert result.receipt is not None and "出发啦" in result.view.title
+    trip = await world.db.fetch_one("SELECT * FROM dispatch_trips")
+    snapshot = json.loads(trip["snapshot_json"])
+    assert snapshot["automatic"] is True
+    assert snapshot["region_id"] == "echo-mine" and snapshot["hours"] == 8
+    assert len(snapshot["members"]) == 3
+    assert favorite[0] not in {member["pig_instance_id"] for member in snapshot["members"]}
+    team_ids = json.loads((await world.db.fetch_one("SELECT member_ids_json FROM dispatch_teams"))[0])
+    assert team_ids == [member["pig_instance_id"] for member in snapshot["members"]]
 
 
 async def test_complete_trip_is_atomic_persistent_and_no_gameplay_effects_consumed(world: World):

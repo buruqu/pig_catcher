@@ -18,6 +18,8 @@ from ..domain.tour_catalog import (
 )
 
 TOUR_HELP = """【PiG Dream! 猪猪巡演】
+/猪猪巡演 自动 Pastel＊Palettes — 同团最佳配队、自动路线，确认后直接完成三站
+/猪猪巡演 自动配队 Pastel＊Palettes — 只保存同团最佳阵容，不消耗档期
 /组建乐队 乐队名
 /乐队编队 1 猪名、猪名、猪名（保存三套，3–5只；编号可精确指定）
 /猪猪巡演 确认（所有巡演预览两分钟内确认；取消用 /猪猪巡演 取消）
@@ -164,6 +166,13 @@ def parse_tour_request(
                 },
             )
     if section == "tour":
+        if head in {"自动", "自动巡演", "自动配队", "一键配队"}:
+            if not tail:
+                raise TourError("请填写喜欢的乐队名，例如：/猪猪巡演 自动 Pastel＊Palettes。")
+            return TourRequest(
+                "auto_roster" if head in {"自动配队", "一键配队"} else "auto_tour",
+                {"theme": resolve_definition(tail, THEMES_BY_ID, label="乐队")},
+            )
         if value in {"", "排练", "预览", "出发", "继续", "一键", "结束", "场地", "主题", "合奏"}:
             return TourRequest(
                 {

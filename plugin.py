@@ -1,4 +1,4 @@
-"""MaiBot 抓猪插件第五轮显式命令入口。"""
+"""MaiBot 抓猪 2.0 正式版显式命令入口。"""
 
 from __future__ import annotations
 
@@ -52,6 +52,7 @@ from .pig_catcher.commands.item_bag import ITEM_BAG_PATTERN, REWARD_COUPON_PATTE
 from .pig_catcher.commands.tour import TOUR_HELP, parse_tour_request
 from .pig_catcher.config import AccessPolicy, PigCatcherConfig
 from .pig_catcher.domain.achievements import AchievementReward
+from .pig_catcher.domain.activity_achievements import ACTIVITY_REWARDS
 from .pig_catcher.domain.battle_views import BattleView
 from .pig_catcher.domain.dispatch_views import DispatchLine, DispatchView
 from .pig_catcher.domain.enums import AssetKind
@@ -149,6 +150,7 @@ from .pig_catcher.services import (
     FoodView,
     FrameworkService,
     GameplayService,
+    LaunchCampaignService,
     MaintenanceOptions,
     MaintenanceRunner,
     PigView,
@@ -234,12 +236,14 @@ class PigCatcherPlugin(MaiBotPlugin):
         self._weekly_competition_service: WeeklyCompetitionService | None = None
         self._dispatch_service: DispatchService | None = None
         self._item_bag_service: ItemBagService | None = None
+        self._launch_campaign_service: LaunchCampaignService | None = None
         self._tour_service: TourService | None = None
         self._battle_service: BattleService | None = None
         self._renderer: PigCatcherRenderer | None = None
         self._animation_composer: AnimatedCardComposer | None = None
         self._delivery: RenderDelivery | None = None
         self._maintenance: MaintenanceRunner | None = None
+        self._config_update_lock = asyncio.Lock()
 
     def get_components(self) -> list[dict[str, Any]]:
         """Expose commands only to configured sessions during a dual-version rollout."""
@@ -346,14 +350,15 @@ class PigCatcherPlugin(MaiBotPlugin):
         del config_data
         if scope != CONFIG_RELOAD_SCOPE_SELF:
             return
-        if self.settings.plugin.enabled and self._has_pending_admin_operation():
-            if self._database is None:
+        async with self._config_update_lock:
+            if self.settings.plugin.enabled and self._has_pending_admin_operation():
+                if self._database is None:
+                    await self._open_runtime()
+                await self._execute_pending_admin_operations(source="admin-panel-save")
+            await self._close_runtime()
+            if self.settings.plugin.enabled:
                 await self._open_runtime()
-            await self._execute_pending_admin_operations(source="admin-panel-save")
-        await self._close_runtime()
-        if self.settings.plugin.enabled:
-            await self._open_runtime()
-        self.ctx.logger.info("抓猪插件配置已更新，version=%s", version)
+            self.ctx.logger.info("抓猪插件配置已更新，version=%s", version)
 
     async def _open_runtime(self) -> None:
         if self._database is not None:
@@ -429,11 +434,13 @@ class PigCatcherPlugin(MaiBotPlugin):
             self._framework_service = FrameworkService(database)
             self._dispatch_service = DispatchService(database)
             self._item_bag_service = ItemBagService(database)
+            self._launch_campaign_service = LaunchCampaignService(database, settings.launch_campaign)
             self._tour_service = TourService(database)
             self._gameplay_service = GameplayService(
                 database,
                 settings.catching,
                 ranking=settings.ranking,
+                launch_campaign=settings.launch_campaign,
             )
             self._economy_service = EconomyService(
                 database,
@@ -529,6 +536,7 @@ class PigCatcherPlugin(MaiBotPlugin):
         self._weekly_competition_service = None
         self._dispatch_service = None
         self._item_bag_service = None
+        self._launch_campaign_service = None
         self._tour_service = None
         self._battle_service = None
         self._receipt_service = None
@@ -668,7 +676,12 @@ class PigCatcherPlugin(MaiBotPlugin):
                 self.ctx.logger.exception("控制面板群公告认领失败；触发开关已关闭，不会自动重试")
                 return
             try:
-                sent = await self._send_text_capability(claim.content, claim.stream_id)
+                image_path = str(announcement.image_path or "").strip()
+                sent = await self._send_announcement_capability(
+                    claim.content,
+                    claim.stream_id,
+                    image_path=image_path,
+                )
             except Exception as exc:
                 try:
                     await service.record_result(claim, success=False, error=str(exc))
@@ -994,6 +1007,24 @@ class PigCatcherPlugin(MaiBotPlugin):
                 success=False,
             )
             return None, rejected
+        campaign_service = self._launch_campaign_service
+        if campaign_service is not None:
+            try:
+                starter_pack = await campaign_service.claim_if_eligible(identity)
+                if starter_pack is not None:
+                    await self._deliver_item_bag_result(identity, starter_pack)
+            except Exception as exc:
+                self.ctx.logger.exception(
+                    "2.0 开服礼包发放失败，已回滚整包：scope=%s player=%s",
+                    identity.scope.value,
+                    identity.player_id,
+                )
+                rejected = await self._reply_text(
+                    identity.stream_id,
+                    f"2.0 开服礼包暂未成功发放，本次没有扣除或生成半包资产：{exc}",
+                    success=False,
+                )
+                return None, rejected
         return identity, None
 
     async def _deliver_player_status(
@@ -1453,6 +1484,36 @@ class PigCatcherPlugin(MaiBotPlugin):
         except Exception:
             self.ctx.logger.exception("备用图片独立发送失败：%s", relative_path)
             return False
+
+    async def _send_announcement_capability(
+        self,
+        content: str,
+        stream_id: str,
+        *,
+        image_path: str = "",
+    ) -> bool:
+        """Send an announcement as one outbound message when an image is attached."""
+
+        if not image_path:
+            return await self._send_text_capability(content, stream_id)
+        source_path = Path(image_path).expanduser().resolve()
+        allowed_suffixes = {".png", ".jpg", ".jpeg", ".gif"}
+        if not source_path.is_file() or source_path.suffix.casefold() not in allowed_suffixes:
+            raise ValueError(f"公告长图路径无效：{source_path}")
+        payload = source_path.read_bytes()
+        if len(payload) > 12 * 1024 * 1024:
+            raise ValueError("公告长图不能超过 12 MiB。")
+        encoded = base64.b64encode(payload).decode("ascii")
+        segments = [
+            {"type": "text", "content": content},
+            {"type": "image", "binary_data_base64": encoded},
+        ]
+        return bool(
+            await asyncio.wait_for(
+                self.ctx.send.hybrid(segments, stream_id),
+                timeout=self.settings.rendering.image_send_timeout_ms / 1000,
+            )
+        )
 
     async def _render_food_card(
         self,
@@ -4363,8 +4424,6 @@ class PigCatcherPlugin(MaiBotPlugin):
             return rejected or (False, "", 0)
         try:
             name = matched_group(kwargs, "arguments").strip()
-            from pig_catcher.domain.activity_achievements import ACTIVITY_REWARDS
-
             if any(item["kind"] == "ticket" and name in {key, item["name"]} for key, item in ACTIVITY_REWARDS.items()):
                 return await self._activity_reward_command(identity, "使用 " + name)
             ticket_id = await cast(AchievementService, self._achievement_service).activate_ticket(

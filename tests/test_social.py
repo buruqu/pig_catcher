@@ -16,6 +16,7 @@ from pig_catcher.domain.enums import AssetKind, StatureProfile, TradeStatus
 from pig_catcher.domain.errors import (
     AssetStateConflictError,
     DailyCatchLimitError,
+    DomainValidationError,
     InsufficientBalanceError,
     SelfTransferError,
     SocialTransferRestrictedError,
@@ -170,6 +171,7 @@ async def _database_with_social_catalog(tmp_path: Path) -> PigCatcherDatabase:
 
 def _catching() -> CatchingSection:
     return CatchingSection(
+        daily_limit=10,
         cooldown_seconds=0,
         rarity_1_weight=0,
         rarity_2_weight=1,
@@ -190,7 +192,8 @@ async def _catch_many(
     rolls: list[float] = []
     for _ in range(count):
         rolls.extend((0.5, 0.0, 0.5, 0.5, 0.5, 0.5, 0.5))
-    codes = iter(f"A00000{index:02X}" for index in range(1, count + 1))
+    prefix = chr(ord("A") + sum(user_id.encode("utf-8")) % 26)
+    codes = iter(f"{prefix}00000{index:02X}" for index in range(1, count + 1))
     service = GameplayService(
         database,
         _catching(),
@@ -365,6 +368,7 @@ async def test_gift_and_trade_are_atomic_idempotent_and_history_stable(
     accepted_identity = _identity(user_id="buyer", message_id="trade-accept")
     accepted = await service.accept_trade(accepted_identity, "AAAABBBB")
     assert accepted.trade.status is TradeStatus.ACCEPTED
+    assert (accepted.tax_amount, accepted.seller_net) == (6, 114)
     accepted_duplicate = await SocialService(
         database,
         TradingSection(),
@@ -423,7 +427,7 @@ async def test_gift_and_trade_are_atomic_idempotent_and_history_stable(
         """
     )
     assert trade_ledger is not None
-    assert tuple(trade_ledger) == (2, 0)
+    assert tuple(trade_ledger) == (2, -6)
 
     insufficient_offer = await service.create_trade(
         _identity(user_id="seller", message_id="trade-expensive"),
@@ -457,6 +461,48 @@ async def test_gift_and_trade_are_atomic_idempotent_and_history_stable(
             asset_kind=AssetKind.PIG,
             selector_text=caught[2].pig.selector,
         )
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_manual_gifts_have_separate_beijing_daily_send_and_receive_limits(tmp_path: Path) -> None:
+    database = await _database_with_social_catalog(tmp_path)
+    clock = MutableClock()
+    caught = await _catch_many(database, clock, count=6)
+    other_catch = (await _catch_many(database, clock, count=1, user_id="other-sender"))[0]
+    service = SocialService(database, TradingSection(), RankingSection(), clock=clock)
+    recipient = _identity(user_id="recipient", message_id="target")
+    for index, catch in enumerate(caught[:5]):
+        result = await service.gift(
+            _identity(user_id="seller", message_id=f"gift-limit-{index}"),
+            recipient,
+            asset_kind=AssetKind.PIG,
+            selector_text=catch.pig.selector,
+        )
+        assert result.sender_remaining == result.recipient_remaining == 4 - index
+    with pytest.raises(DomainValidationError, match="主动赠送额度"):
+        await service.gift(
+            _identity(user_id="seller", message_id="gift-limit-sixth"),
+            recipient,
+            asset_kind=AssetKind.PIG,
+            selector_text=caught[5].pig.selector,
+        )
+    with pytest.raises(DomainValidationError, match="收赠"):
+        await service.gift(
+            _identity(user_id="other-sender", message_id="gift-receive-sixth"),
+            recipient,
+            asset_kind=AssetKind.PIG,
+            selector_text=other_catch.pig.selector,
+        )
+    # Exactly at Beijing midnight both counters reset; the same recipient can receive again.
+    clock.value = datetime(2026, 7, 28, 16, 0, tzinfo=UTC)
+    reset = await service.gift(
+        _identity(user_id="other-sender", message_id="gift-after-midnight"),
+        recipient,
+        asset_kind=AssetKind.PIG,
+        selector_text=other_catch.pig.selector,
+    )
+    assert (reset.sender_remaining, reset.recipient_remaining) == (4, 4)
     await database.close()
 
 
@@ -695,7 +741,7 @@ async def test_concurrent_acceptance_has_exactly_one_winner(tmp_path: Path) -> N
     )
     assert row is not None and row["status"] == "accepted"
     assert transfer is not None and transfer["count"] == 1
-    assert ledger is not None and tuple(ledger) == (2, 0)
+    assert ledger is not None and tuple(ledger) == (2, -5)
     await database.close()
 
 

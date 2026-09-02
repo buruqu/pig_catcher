@@ -7,7 +7,15 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from ..domain.errors import DomainValidationError
-from ..domain.item_bag import CODE_CHANGE_COUPON, COUPON_HELP, coupon_definition
+from ..domain.item_bag import (
+    BATTLE_PIG_CHOICE_COUPON,
+    CODE_CHANGE_COUPON,
+    COUPON_HELP,
+    FIVE_STAR_COLLAB_RANDOM_COUPON,
+    FOOD_CHOICE_COUPON,
+    PIG_CHOICE_COUPON,
+    coupon_definition,
+)
 
 ITEM_BAG_PATTERN = r"^/道具背包(?:\s+(?P<arguments>.*?))?\s*$"
 REWARD_COUPON_PATTERN = r"^/使用奖励券(?:\s+(?P<arguments>.*?))?\s*$"
@@ -37,6 +45,10 @@ def parse_item_bag_request(text: str, *, section: str = "bag") -> ItemBagRequest
     if not parts:
         raise DomainValidationError("\n".join(COUPON_HELP))
     coupon = coupon_definition(parts[0])
+    if coupon.coupon_id == FIVE_STAR_COLLAB_RANDOM_COUPON:
+        if len(parts) != 1:
+            raise DomainValidationError("五星联动猪随机券不需要填写猪名。")
+        return ItemBagRequest("random-collab-pig")
     if len(parts) != 2:
         raise DomainValidationError("\n".join(COUPON_HELP))
     if coupon.coupon_id == CODE_CHANGE_COUPON:
@@ -50,4 +62,11 @@ def parse_item_bag_request(text: str, *, section: str = "bag") -> ItemBagRequest
             "rename",
             {"asset_kind": words[0], "selector": selector_and_code[0], "new_code": selector_and_code[1]},
         )
-    return ItemBagRequest("choose-pig", {"selector": parts[1].strip()})
+    action = {
+        PIG_CHOICE_COUPON: "choose-pig",
+        FOOD_CHOICE_COUPON: "choose-food",
+        BATTLE_PIG_CHOICE_COUPON: "choose-battle-pig",
+    }.get(coupon.coupon_id)
+    if action is None:
+        raise DomainValidationError("该奖励券暂不支持此用法。")
+    return ItemBagRequest(action, {"selector": parts[1].strip()})

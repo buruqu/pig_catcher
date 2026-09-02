@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import UTC, datetime, time, timedelta, timezone
 from typing import Any
 from uuid import uuid4
 
@@ -14,6 +14,7 @@ from ..domain.display import format_length, format_weight
 from ..domain.enums import AssetKind, ReceiptSendStatus, TradeStatus
 from ..domain.errors import (
     AssetStateConflictError,
+    DomainValidationError,
     FoodNotFoundError,
     InsufficientBalanceError,
     PigNotFoundError,
@@ -100,6 +101,8 @@ class GiftResult:
     recipient_display_name: str
     asset: SocialAsset
     regulation: RegulationOutcome | None = None
+    sender_remaining: int | None = None
+    recipient_remaining: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -133,6 +136,8 @@ class TradeActionResult:
     trade: TradeView
     buyer_balance: int | None = None
     seller_balance: int | None = None
+    tax_amount: int | None = None
+    seller_net: int | None = None
     regulation: RegulationOutcome | None = None
 
 
@@ -300,6 +305,11 @@ def format_gift_summary(result: GiftResult) -> str:
         f"品质：{'★' * result.asset.rarity}\n"
         f"属性：{result.asset.detail_text}\n"
         "本次不产生猪币或经验。"
+        + (
+            f"\n今日剩余：赠送方 {result.sender_remaining} 次 / 接收方 {result.recipient_remaining} 次"
+            if result.sender_remaining is not None and result.recipient_remaining is not None
+            else ""
+        )
     )
 
 
@@ -318,6 +328,9 @@ def format_trade_summary(result: TradeActionResult) -> str:
             f"\n成交后余额：买方 {result.buyer_balance} / "
             f"卖方 {result.seller_balance} 猪币"
         )
+    tax = ""
+    if result.tax_amount is not None and result.seller_net is not None:
+        tax = f"\n交易税：{result.tax_amount} 猪币；卖方实收：{result.seller_net} 猪币"
     return (
         f"【交易{trade.status_label}】\n"
         f"交易号：{trade.trade_id}\n"
@@ -326,8 +339,15 @@ def format_trade_summary(result: TradeActionResult) -> str:
         f"物品：{'★' * trade.asset.rarity} {trade.asset.selector}\n"
         f"价格：{trade.price} 猪币\n"
         f"状态：{trade.status_label}\n"
-        f"有效期至：{trade.expires_at}{balance}"
+        f"有效期至：{trade.expires_at}{tax}{balance}"
     )
+
+
+def _beijing_day_bounds(value: datetime) -> tuple[str, str]:
+    aware = value.replace(tzinfo=UTC) if value.tzinfo is None else value
+    local = aware.astimezone(timezone(timedelta(hours=8)))
+    start = datetime.combine(local.date(), time.min, tzinfo=local.tzinfo)
+    return iso_timestamp(start), iso_timestamp(start + timedelta(days=1))
 
 
 def format_trade_page_summary(page: TradePage) -> str:
@@ -435,7 +455,9 @@ class SocialService:
             "recipient_user_id": recipient.user_id,
         }
         idempotency_key = MessageKeyFactory.build(identity, _GIFT_COMMAND)
-        now = iso_timestamp(self.clock.now())
+        now_datetime = self.clock.now()
+        now = iso_timestamp(now_datetime)
+        gift_day_start, gift_day_end = _beijing_day_bounds(now_datetime)
         activity_snapshot = (
             await self.regulation_service.chat_activity_snapshot(
                 stream_id=identity.stream_id,
@@ -538,6 +560,25 @@ class SocialService:
                     asset=asset,
                     regulation=regulation,
                 )
+            sender_used, recipient_used = await self.repository.manual_gift_counts(
+                session,
+                scope_id=identity.scope.value,
+                sender_player_id=identity.player_id,
+                recipient_player_id=recipient.player_id,
+                day_start=gift_day_start,
+                day_end=gift_day_end,
+            )
+            if sender_used >= self.trading.daily_gift_send_limit:
+                raise DomainValidationError(
+                    f"你今天已成功赠送 {sender_used} 次，主动赠送额度已用完；北京时间 00:00 刷新。"
+                )
+            if recipient_used >= self.trading.daily_gift_receive_limit:
+                raise DomainValidationError(
+                f"{recipient.display_name} 今天已成功收赠 {recipient_used} 次，"
+                "暂时不能继续接收；北京时间 00:00 刷新。"
+                )
+            sender_remaining = self.trading.daily_gift_send_limit - sender_used - 1
+            recipient_remaining = self.trading.daily_gift_receive_limit - recipient_used - 1
             transferred = await self.repository.transfer_active_asset(
                 session,
                 asset_kind=asset_kind,
@@ -592,6 +633,8 @@ class SocialService:
                 "recipient_display_name": recipient.display_name,
                 "asset": _asset_payload(asset),
                 "regulation": regulation.to_payload() if regulation is not None else None,
+                "sender_remaining": sender_remaining,
+                "recipient_remaining": recipient_remaining,
             }
             provisional = GiftResult(
                 receipt=self._provisional_receipt(
@@ -609,6 +652,8 @@ class SocialService:
                 recipient_display_name=recipient.display_name,
                 asset=asset,
                 regulation=regulation,
+                sender_remaining=sender_remaining,
+                recipient_remaining=recipient_remaining,
             )
             receipt = await self._reserve_receipt(
                 session,
@@ -622,6 +667,8 @@ class SocialService:
                 recipient_display_name=recipient.display_name,
                 asset=asset,
                 regulation=regulation,
+                sender_remaining=sender_remaining,
+                recipient_remaining=recipient_remaining,
             )
 
     async def create_trade(
@@ -730,7 +777,14 @@ class SocialService:
                 expires_at=expires_at,
                 resolved_at="",
             )
-            payload = self._trade_payload(trade, operation="created")
+            tax_amount = trade.price * self.trading.trade_tax_percent // 100
+            seller_net = trade.price - tax_amount
+            payload = self._trade_payload(
+                trade,
+                operation="created",
+                tax_amount=tax_amount,
+                seller_net=seller_net,
+            )
             provisional = TradeActionResult(
                 receipt=self._provisional_receipt(
                     identity=identity,
@@ -745,6 +799,8 @@ class SocialService:
                 receipt_created=True,
                 operation="created",
                 trade=trade,
+                tax_amount=tax_amount,
+                seller_net=seller_net,
             )
             receipt = await self._reserve_receipt(
                 session,
@@ -756,6 +812,8 @@ class SocialService:
                 receipt_created=True,
                 operation="created",
                 trade=trade,
+                tax_amount=tax_amount,
+                seller_net=seller_net,
             )
 
     async def accept_trade(
@@ -915,13 +973,17 @@ class SocialService:
                 raise InsufficientBalanceError(
                     f"猪币不足，需要 {trade.price}；报价保持待处理。"
                 )
+            tax_amount = trade.price * self.trading.trade_tax_percent // 100
+            seller_net = trade.price - tax_amount
             seller_balance = await self.economy_repository.apply_currency_change(
                 session,
                 player_id=trade.sender_player_id,
                 scope_id=identity.scope.value,
-                amount=trade.price,
+                amount=seller_net,
                 reason_code="player-trade-sale",
-                reason_text=f"出售 {trade.asset.selector}",
+                reason_text=(
+                    f"出售 {trade.asset.selector}（成交 {trade.price}，交易税 {tax_amount}，实收 {seller_net}）"
+                ),
                 source_object_type="trade",
                 source_object_id=trade.trade_id,
                 ledger_entry_id=self.id_factory(),
@@ -1010,6 +1072,8 @@ class SocialService:
                 operation="accepted",
                 buyer_balance=buyer_balance,
                 seller_balance=seller_balance,
+                tax_amount=tax_amount,
+                seller_net=seller_net,
                 regulation=regulation,
             )
             provisional = TradeActionResult(
@@ -1028,6 +1092,8 @@ class SocialService:
                 trade=accepted,
                 buyer_balance=buyer_balance,
                 seller_balance=seller_balance,
+                tax_amount=tax_amount,
+                seller_net=seller_net,
                 regulation=regulation,
             )
             receipt = await self._reserve_receipt(
@@ -1042,6 +1108,8 @@ class SocialService:
                 trade=accepted,
                 buyer_balance=buyer_balance,
                 seller_balance=seller_balance,
+                tax_amount=tax_amount,
+                seller_net=seller_net,
                 regulation=regulation,
             )
 
@@ -1799,6 +1867,8 @@ class SocialService:
         operation: str,
         buyer_balance: int | None = None,
         seller_balance: int | None = None,
+        tax_amount: int | None = None,
+        seller_net: int | None = None,
         regulation: RegulationOutcome | None = None,
     ) -> dict[str, object]:
         return {
@@ -1818,6 +1888,8 @@ class SocialService:
             },
             "buyer_balance": buyer_balance,
             "seller_balance": seller_balance,
+            "tax_amount": tax_amount,
+            "seller_net": seller_net,
             "regulation": regulation.to_payload() if regulation is not None else None,
         }
 
@@ -1849,6 +1921,8 @@ class SocialService:
         )
         buyer = payload.get("buyer_balance")
         seller = payload.get("seller_balance")
+        tax = payload.get("tax_amount")
+        seller_net = payload.get("seller_net")
         return TradeActionResult(
             receipt=receipt,
             receipt_created=receipt_created,
@@ -1856,6 +1930,8 @@ class SocialService:
             trade=trade,
             buyer_balance=int(buyer) if buyer is not None else None,
             seller_balance=int(seller) if seller is not None else None,
+            tax_amount=int(tax) if tax is not None else None,
+            seller_net=int(seller_net) if seller_net is not None else None,
             regulation=RegulationOutcome.from_payload(payload.get("regulation")),
         )
 
@@ -1876,6 +1952,12 @@ class SocialService:
             recipient_display_name=str(payload["recipient_display_name"]),
             asset=_asset_from_payload(asset_payload),
             regulation=RegulationOutcome.from_payload(payload.get("regulation")),
+            sender_remaining=(
+                int(payload["sender_remaining"]) if payload.get("sender_remaining") is not None else None
+            ),
+            recipient_remaining=(
+                int(payload["recipient_remaining"]) if payload.get("recipient_remaining") is not None else None
+            ),
         )
 
     @staticmethod

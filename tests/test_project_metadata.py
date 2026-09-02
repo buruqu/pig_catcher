@@ -34,6 +34,7 @@ def test_manifest_versions_dependencies_and_capabilities_are_narrow() -> None:
     assert manifest["capabilities"] == [
         "message.get_by_time_in_chat",
         "render.html2png",
+        "send.hybrid",
         "send.image",
         "send.text",
     ]

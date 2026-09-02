@@ -10,6 +10,9 @@ from .errors import DomainValidationError
 
 CODE_CHANGE_COUPON = "asset-code-change"
 PIG_CHOICE_COUPON = "pig-choice"
+FOOD_CHOICE_COUPON = "food-choice"
+BATTLE_PIG_CHOICE_COUPON = "battle-pig-choice"
+FIVE_STAR_COLLAB_RANDOM_COUPON = "five-star-collab-random"
 LEGACY_CODE_CHANGE_COUPON = "identifier-reforge"
 CHOICE_TTL_MS = 30_000
 BAG_PAGE_SIZE = 8
@@ -34,6 +37,21 @@ COUPONS = MappingProxyType(
             "猪猪自选券",
             "选择当前群已启用、已授权的任意一只猪猪，含本群六星；自然随机体型和重量。",
         ),
+        FOOD_CHOICE_COUPON: CouponDefinition(
+            FOOD_CHOICE_COUPON,
+            "美食自选券",
+            "选择当前群已启用、已授权的任意一道美食；自然随机份量和价值。",
+        ),
+        BATTLE_PIG_CHOICE_COUPON: CouponDefinition(
+            BATTLE_PIG_CHOICE_COUPON,
+            "战斗猪自选券",
+            "选择当前版本拥有战斗盘且在本群已授权的任意一只猪猪。",
+        ),
+        FIVE_STAR_COLLAB_RANDOM_COUPON: CouponDefinition(
+            FIVE_STAR_COLLAB_RANDOM_COUPON,
+            "五星联动猪随机券",
+            "随机获得当前群已启用、已授权的一只五星联动猪猪；每次使用一张。",
+        ),
     }
 )
 
@@ -57,6 +75,8 @@ REWARD_NAMES = MappingProxyType(
 COUPON_HELP = (
     "/使用奖励券 编号修改券 猪猪 猪名#旧编号 新编号（美食同理；卷也可识别）。",
     "/使用奖励券 猪猪自选券 猪名 → 30秒内 /使用奖励券 确认；/使用奖励券 取消。",
+    "/使用奖励券 美食自选券 菜名；/使用奖励券 战斗猪自选券 猪名 → 30秒内确认。",
+    "/使用奖励券 五星联动猪随机券（每次随机发放一只当前群五星联动猪）。",
     "编号修改也可 /重铸编号 猪猪 旧编号 新编号；优先使用编号修改券，再使用旧编号重铸券。",
     "奖励券不可赠送或交易；未确认自选猪前不扣券，不占抓猪额度、不发抓猪收益。",
 )
@@ -67,7 +87,7 @@ def coupon_definition(value: str) -> CouponDefinition:
     for key, definition in COUPONS.items():
         if normalized in {key, definition.name}:
             return definition
-    raise DomainValidationError("请选择编号修改券或猪猪自选券；/道具背包 查看实际库存。")
+    raise DomainValidationError("请选择道具背包中实际持有的奖励券；/道具背包 查看库存和用法。")
 
 
 @dataclass(frozen=True, slots=True)

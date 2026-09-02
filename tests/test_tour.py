@@ -180,6 +180,8 @@ def test_random_bounded_reproducible_and_preview_never_random(seed):
         ("收藏 2", "journal", "collections"),
         ("T12345678ab", "journal", "detail"),
         ("接受", "joint", "joint_accept"),
+        ("自动 Pastel＊Palettes", "tour", "auto_tour"),
+        ("自动配队 Pastel＊Palettes", "tour", "auto_roster"),
     ],
 )
 def test_parser(text, section, action):
@@ -202,6 +204,63 @@ def test_parser(text, section, action):
 def test_parser_rejects_unsafe_inputs(text, section):
     with pytest.raises(TourError):
         parse_tour_request(text, section=section)
+
+
+async def test_same_band_auto_roster_and_auto_tour_complete_in_one_confirmation(world):
+    pastel = ("aya", "hina", "chisato", "maya", "eve")
+    pig_ids = {}
+    for identity_id in pastel:
+        pig_ids[identity_id] = (
+            await seed_pigs(world.db, world.identity, template_id=character(identity_id).template_id, count=1)
+        )[0]
+    async with world.db.transaction() as session:
+        await session.execute(
+            "UPDATE pig_instances SET is_favorite=1 WHERE pig_instance_id IN ("
+            + ",".join("?" for _ in pig_ids)
+            + ")",
+            list(pig_ids.values()),
+        )
+
+    roster_preview = await world.send("自动配队 Pastel＊Palettes")
+    assert "一键配队" in roster_preview.view.title and "不消耗档期" in roster_preview.view.text()
+    await world.send("确认")
+    roster_ids = json.loads((await world.db.fetch_one("SELECT member_ids_json FROM tour_rosters WHERE slot=1"))[0])
+    assert roster_ids and set(roster_ids) <= set(pig_ids.values())
+    roster_templates = await world.db.fetch_all(
+        "SELECT template_id FROM pig_instances WHERE pig_instance_id IN (" + ",".join("?" for _ in roster_ids) + ")",
+        roster_ids,
+    )
+    assert {CHARACTERS[row[0]].band for row in roster_templates} == {"pastel"}
+
+    preview = await world.send("自动 Pastel＊Palettes")
+    assert "自动巡演" in preview.view.title and len(preview.view.scorecards) == 3
+    before = (await world.db.fetch_one("SELECT tickets FROM tour_profiles"))[0]
+    result = await world.send("确认", message_id="auto-tour-confirm")
+    assert "三站落幕" in result.view.title
+    run = await world.db.fetch_one("SELECT * FROM tour_runs WHERE status='completed'")
+    plans = json.loads(run["plans_json"])
+    assert all(plan["theme"] == "pastel" and plan["venue"] == "street" for plan in plans)
+    assert (await world.db.fetch_one("SELECT tickets FROM tour_profiles"))[0] == before - 1
+    assert (await world.db.fetch_one("SELECT COUNT(*) FROM tour_stages"))[0] == 3
+
+
+async def test_auto_tour_creates_first_band_profile_for_new_player(world):
+    newcomer = replace(world.identity, user_id="auto-new-player", display_name="自动巡演新人")
+    for identity_id in ("kasumi", "tae", "rimi", "saya", "arisa"):
+        await seed_pigs(world.db, newcomer, template_id=character(identity_id).template_id, count=1)
+    preview = await world.send("自动 Poppin'Party", identity=newcomer)
+    assert "自动巡演" in preview.view.title
+    profile = await world.db.fetch_one(
+        "SELECT name,tickets FROM tour_profiles WHERE player_id=?", (newcomer.player_id,)
+    )
+    assert profile[0] == "Poppin'Party猪猪乐队" and profile[1] == 2
+    result = await world.send("确认", identity=newcomer)
+    assert "三站落幕" in result.view.title
+    assert (
+        await world.db.fetch_one(
+            "SELECT COUNT(*) FROM tour_runs WHERE player_id=? AND status='completed'", (newcomer.player_id,)
+        )
+    )[0] == 1
 
 
 async def test_full_tour_growth_rewards_and_receipt_replay(world):

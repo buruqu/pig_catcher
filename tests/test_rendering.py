@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
+from pig_catcher.domain.dispatch_views import DispatchPigCard, DispatchView
 from pig_catcher.domain.errors import RenderError
 from pig_catcher.rendering import (
     AnimatedCardComposer,
@@ -443,6 +444,36 @@ async def test_animated_inventory_and_catalog_use_static_middle_frame_preview(
     assert "data:image/webp;base64," in catalog_html
     assert "动态猪猪<br>详情查看" not in catalog_html
     assert hashlib.sha256(source.read_bytes()).hexdigest() == source_hash
+
+
+@pytest.mark.asyncio
+async def test_dispatch_receipt_uses_static_preview_for_animated_pig(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "animated-dispatch.gif"
+    _write_animated_gif(source, durations=[80, 120, 200])
+    capability = FakeRender()
+    renderer = PigCatcherRenderer(capability, _options())
+    view = DispatchView(
+        title="派遣归来",
+        player_name="测试成员",
+        pigs=(
+            DispatchPigCard(
+                name="动画猪",
+                short_code="GIFPIG01",
+                rarity=5,
+                image_relpath="animated-dispatch.gif",
+                tags=("联动",),
+                summary="平安归来",
+            ),
+        ),
+    )
+
+    await renderer.render_dispatch(view, {"GIFPIG01": source})
+
+    html, _ = capability.calls[-1]
+    assert "data:image/webp;base64," in html
+    assert "动画猪" in html
 
 
 @pytest.mark.asyncio

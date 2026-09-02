@@ -1554,6 +1554,14 @@ def gift_receipt_view(result: GiftResult) -> EconomyReceiptViewModel:
             EconomyReceiptRowViewModel("接收方", result.recipient_display_name),
             EconomyReceiptRowViewModel("资产属性", result.asset.detail_text),
             EconomyReceiptRowViewModel("官方价值", f"{result.asset.official_value} 猪币"),
+            *(
+                (
+                    EconomyReceiptRowViewModel("赠送方今日剩余", f"{result.sender_remaining} 次"),
+                    EconomyReceiptRowViewModel("接收方今日剩余", f"{result.recipient_remaining} 次"),
+                )
+                if result.sender_remaining is not None and result.recipient_remaining is not None
+                else ()
+            ),
         ),
         note="赠送不产生猪币或经验，资产已在当前群内完成转移。",
     )
@@ -1584,6 +1592,14 @@ def trade_receipt_view(result: TradeActionResult) -> EconomyReceiptViewModel:
                 f"买方 {result.buyer_balance} / 卖方 {result.seller_balance}",
             )
         )
+    if result.tax_amount is not None and result.seller_net is not None:
+        rows.insert(
+            3,
+            EconomyReceiptRowViewModel(
+                "5% 交易税 / 卖方实收",
+                f"{result.tax_amount} / {result.seller_net} 猪币",
+            ),
+        )
     return EconomyReceiptViewModel(
         eyebrow="双方确认交易 · 当前群",
         title=title,
@@ -1592,7 +1608,8 @@ def trade_receipt_view(result: TradeActionResult) -> EconomyReceiptViewModel:
         summary=f"{'★' * result.trade.asset.rarity} {result.trade.asset.selector}",
         rows=tuple(rows),
         note=(
-            "接收方使用 /接受交易 交易号 完成付款；未完成报价会在五分钟后自动解锁。"
+                    "接收方使用 /接受交易 交易号 完成付款；成交时买方支付原价，"
+                    "卖方收入扣除5%交易税；未完成报价会在五分钟后自动解锁。"
             if result.operation == "created"
             else "交易状态已原子写入，重复命令不会再次转移资产或猪币。"
         ),

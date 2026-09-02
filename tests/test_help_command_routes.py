@@ -51,6 +51,7 @@ def _registered_match(patterns: dict[str, re.Pattern[str]], command: str, compon
 # The command, its registered entry, and the parsed action are the contract.
 # No help module implementation detail is needed to run these examples.
 _PARSER_EXAMPLES = (
+    ("pig_catcher_dispatch", "/猪猪派遣 自动 回声矿洞", "dispatch", "dispatch", "auto"),
     ("pig_catcher_dispatch", "/猪猪派遣 编队 1 笨猪、草莓猪", "dispatch", "dispatch", "team"),
     ("pig_catcher_dispatch", "/猪猪派遣 出发 1 青草近郊 4小时", "dispatch", "dispatch", "start"),
     (
@@ -97,6 +98,8 @@ _PARSER_EXAMPLES = (
     ("pig_catcher_band", "/组建乐队 我的小猪团", "tour", "band", "create"),
     ("pig_catcher_band", "/乐队编队 1 偶像猪、天才猪、武士道猪", "tour", "band", "roster"),
     ("pig_catcher_band", "/我的猪猪乐队 切换 1", "tour", "band", "switch"),
+    ("pig_catcher_tour", "/猪猪巡演 自动 Pastel＊Palettes", "tour", "tour", "auto_tour"),
+    ("pig_catcher_tour", "/猪猪巡演 自动配队 Pastel＊Palettes", "tour", "tour", "auto_roster"),
     ("pig_catcher_tour", "/猪猪巡演 主题 星星落进练习室", "tour", "tour", "theme"),
     ("pig_catcher_tour", "/猪猪巡演 路线 街头舞台、街头舞台、街头舞台", "tour", "tour", "route"),
     (

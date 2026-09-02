@@ -588,6 +588,40 @@ class SocialRepository:
             ),
         )
 
+    async def manual_gift_counts(
+        self,
+        session: DatabaseSession,
+        *,
+        scope_id: str,
+        sender_player_id: str,
+        recipient_player_id: str,
+        day_start: str,
+        day_end: str,
+    ) -> tuple[int, int]:
+        """Count only committed player-to-player gifts in one Beijing day."""
+
+        sender = await session.fetch_one(
+            """
+            SELECT COUNT(*) AS amount
+            FROM asset_transfer_events
+            WHERE scope_id=? AND from_player_id=? AND transfer_type='gift'
+              AND created_at>=? AND created_at<?
+            """,
+            (scope_id, sender_player_id, day_start, day_end),
+        )
+        recipient = await session.fetch_one(
+            """
+            SELECT COUNT(*) AS amount
+            FROM asset_transfer_events
+            WHERE scope_id=? AND to_player_id=? AND transfer_type='gift'
+              AND created_at>=? AND created_at<?
+            """,
+            (scope_id, recipient_player_id, day_start, day_end),
+        )
+        return int(sender["amount"] if sender is not None else 0), int(
+            recipient["amount"] if recipient is not None else 0
+        )
+
     async def clear_showcase_asset(
         self,
         session: DatabaseSession,

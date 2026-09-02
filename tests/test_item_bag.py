@@ -15,7 +15,12 @@ import pytest
 from pig_catcher.commands.item_bag import parse_item_bag_request
 from pig_catcher.domain.errors import AssetStateConflictError, DomainValidationError, ReceiptConflictError
 from pig_catcher.domain.gameplay import generate_pig_attributes
-from pig_catcher.domain.item_bag import CODE_CHANGE_COUPON, LEGACY_CODE_CHANGE_COUPON, PIG_CHOICE_COUPON
+from pig_catcher.domain.item_bag import (
+    CODE_CHANGE_COUPON,
+    FOOD_CHOICE_COUPON,
+    LEGACY_CODE_CHANGE_COUPON,
+    PIG_CHOICE_COUPON,
+)
 from pig_catcher.domain.models import CommandIdentity
 from pig_catcher.infrastructure.database import PigCatcherDatabase
 from pig_catcher.infrastructure.repositories.achievement_coupons import AchievementCouponRepository
@@ -131,6 +136,8 @@ def test_coupon_parser_accepts_new_spelling_and_old_code(name):
     assert request.action == "rename"
     assert request.args == {"asset_kind": "猪猪", "selector": "猪 猪#Abcd", "new_code": "Efgh"}
     assert parse_item_bag_request("猪猪自选卷 6星测试猪", section="coupon").args == {"selector": "6星测试猪"}
+    assert parse_item_bag_request("美食自选券 测试菜", section="coupon").action == "choose-food"
+    assert parse_item_bag_request("五星联动猪随机券", section="coupon").action == "random-collab-pig"
 
 
 @pytest.mark.parametrize("text", ["", "编号修改券", "编号修改券 猪猪", "编号修改券 猪猪 A", "陌生券 xyz", "猪猪自选券"])
@@ -424,6 +431,30 @@ async def test_choice_preview_confirm_natural_attributes_and_no_gameplay_reward(
     repeat = await w.use("确认", message_id="confirm")
     assert repeat.receipt.receipt_id == result.receipt.receipt_id
     assert len(w.service.random_source.values) == 95
+
+
+async def test_food_choice_preview_confirm_creates_food_without_cooking_rewards(world):
+    w = world
+    await w.grant(FOOD_CHOICE_COUPON)
+    preview = await w.use("美食自选券 测试菜", message_id="food-preview")
+    assert "美食自选" in preview.view.title
+    assert await w.quantity(FOOD_CHOICE_COUPON) == 1
+    result = await w.use("确认", message_id="food-confirm")
+    assert "测试菜" in result.view.text()
+    assert await w.quantity(FOOD_CHOICE_COUPON) == 0
+    generated = await w.db.fetch_one(
+        "SELECT random_snapshot_json FROM food_instances WHERE template_id='food' AND food_instance_id<>'food-instance'"
+    )
+    assert generated is not None
+    assert json.loads(generated["random_snapshot_json"])["source"] == "reward-food-choice"
+    stats = await w.db.fetch_one(
+        "SELECT total_cooks FROM player_statistics WHERE player_id=?", (w.identity.player_id,)
+    )
+    assert stats is not None and int(stats["total_cooks"]) == 0
+    assert len(w.service.random_source.values) == 99
+    repeat = await w.use("确认", message_id="food-confirm")
+    assert repeat.receipt.receipt_id == result.receipt.receipt_id
+    assert len(w.service.random_source.values) == 99
 
 
 @pytest.mark.parametrize("case", ["another-group", "disabled", "revoked", "consent"])

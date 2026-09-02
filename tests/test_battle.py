@@ -260,7 +260,7 @@ async def test_round_settles_after_both_moves_and_shows_every_action_for_both_fi
     assert (await world.db.fetch_one("SELECT COUNT(*) FROM activity_facts WHERE subevent_id LIKE 'ready:%'"))[0] == 0
 
 
-async def test_asamu_domain_copies_persist_four_moves_and_facts_with_exact_fraction(world):
+async def test_asamu_domain_copies_persist_two_moves_and_facts_with_exact_fraction(world):
     await world.assign(world.a, "阿萨姆猪")
     await world.assign(world.b, "达妮娅猪")
     await world.start()
@@ -284,14 +284,18 @@ async def test_asamu_domain_copies_persist_four_moves_and_facts_with_exact_fract
         player["turn"]["events"].append(deepcopy(event))
         player["turn"]["done"] = True
 
-    # 找出一份固定可重现的v6事实：阿萨姆赢得真实领域战，且四个复制位
-    # 至少一次命中达妮娅的 -52.1 分数招式，顺带验收分数序列化。
+    # 找出一份固定可重现的v7事实：阿萨姆赢得真实领域战，且两个复制位
+    # 至少一次命中达妮娅对手-52.1的分数招式，顺带验收分数序列化。
     seed = None
     for index in range(1000):
         candidate = f"service-asamu-domain-copy-{index}"
         probe = resolve_round(deepcopy(state), candidate)
         copies = probe["interactions"]["generated_events"]
-        if len(copies) == 4 and any(event["source_move_id"] == "daniya-timed-collapse" for event in copies):
+        if len(copies) == 2 and any(
+            event["source_move_id"] == "daniya-timed-collapse"
+            and event["opponent_reduction"] == Fraction(521, 10)
+            for event in copies
+        ):
             seed = candidate
             break
     assert seed is not None
@@ -310,8 +314,8 @@ async def test_asamu_domain_copies_persist_four_moves_and_facts_with_exact_fract
         (match["battle_id"],),
     )
     stored_moves = [loads(row["event_json"]) for row in move_rows]
-    assert len(stored_moves) == 4
-    assert [event["copy_slot"] for event in stored_moves] == [1, 2, 3, 4]
+    assert len(stored_moves) == 2
+    assert [event["copy_slot"] for event in stored_moves] == [1, 2]
     assert all(event["generated_by"] == "asamu-domain-copy" for event in stored_moves)
 
     fact_rows = await world.db.fetch_all(
@@ -321,19 +325,20 @@ async def test_asamu_domain_copies_persist_four_moves_and_facts_with_exact_fract
         (match["battle_id"],),
     )
     stored_facts = [loads(row["payload_json"]) for row in fact_rows]
-    assert len(stored_facts) == 4
+    assert len(stored_facts) == 2
     assert all(row["player_id"] == world.a.player_id for row in fact_rows)
     assert stored_facts == stored_moves
 
     collapse = next(event for event in stored_moves if event["source_move_id"] == "daniya-timed-collapse")
-    assert collapse["gain"] == Fraction(-521, 10)
-    assert type(collapse["gain"]) is Fraction
+    assert collapse["gain"] == 0
+    assert collapse["opponent_reduction"] == Fraction(521, 10)
+    assert type(collapse["opponent_reduction"]) is Fraction
     raw_collapse = next(
         row["event_json"]
         for row, event in zip(move_rows, stored_moves, strict=True)
         if event["source_move_id"] == "daniya-timed-collapse"
     )
-    assert '"$battle-fraction":["-0x209","0xa"]' in raw_collapse
+    assert '"$battle-fraction":["0x209","0xa"]' in raw_collapse
 
     replay = await world.send(section="move", actor=world.a, mid="asamu-domain-copy-persistence")
     assert replay.receipt.receipt_id == result.receipt.receipt_id
@@ -342,14 +347,14 @@ async def test_asamu_domain_copies_persist_four_moves_and_facts_with_exact_fract
             "SELECT COUNT(*) FROM battle_moves WHERE battle_id=? AND round_number=1",
             (match["battle_id"],),
         )
-    )[0] == 4
+    )[0] == 2
     assert (
         await world.db.fetch_one(
             """SELECT COUNT(*) FROM activity_facts
             WHERE source_type='battle' AND source_id=? AND subevent_id LIKE 'move:1:%'""",
             (match["battle_id"],),
         )
-    )[0] == 4
+        )[0] == 2
 
 
 async def test_chaos_domain_auto_mimic_persists_one_move_and_fact_and_replays_idempotently(world):

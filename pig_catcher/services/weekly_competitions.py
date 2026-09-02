@@ -416,13 +416,17 @@ class WeeklyCompetitionService:
         )
 
     async def _sync_definitions(self, session: DatabaseSession, *, now_value: datetime, now: str) -> None:
-        start, end = beijing_week_window(now_value)
         for definition in WEEKLY_COMPETITION_DEFINITIONS:
             if await self.repository.competition_by_definition(
                 session,
                 definition_key=definition.definition_key,
             ) is not None:
                 continue
+            if definition.fixed_starts_at and definition.fixed_ends_at:
+                start = datetime.fromisoformat(definition.fixed_starts_at.replace("Z", "+00:00"))
+                end = datetime.fromisoformat(definition.fixed_ends_at.replace("Z", "+00:00"))
+            else:
+                start, end = beijing_week_window(now_value)
             definition_snapshot = {
                 "source_command_names": list(definition.source_command_names),
                 "reward_tiers": [
@@ -439,6 +443,8 @@ class WeeklyCompetitionService:
                     }
                     for tier in definition.reward_tiers
                 ],
+                "fixed_starts_at": definition.fixed_starts_at,
+                "fixed_ends_at": definition.fixed_ends_at,
             }
             await self.repository.insert_competition(
                 session,

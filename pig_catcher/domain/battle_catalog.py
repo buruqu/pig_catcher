@@ -9,7 +9,7 @@ from .special_content import GOJO_PIG_TEMPLATE_ID, SUKUNA_PIG_TEMPLATE_ID
 
 # 对战规则版本与活动成就事实版本分离：新版对战会改变随机命名空间，
 # 但新增字段仍是 activity_progress v1 可以向后兼容读取的事实载荷。
-BATTLE_RULE_VERSION = 6
+BATTLE_RULE_VERSION = 11
 BATTLE_FACT_VERSION = 1
 BATTLE_VERSION = BATTLE_RULE_VERSION
 INVITE_TTL_MS = 5 * 60 * 1000
@@ -64,6 +64,7 @@ class Move:
     # None 保留旧三猪的整数定义，不迫使旧数据改写或使用浮点数。
     gain_tenths: int | None = None
     opponent_reduction: int = 0
+    opponent_reduction_tenths: int | None = None
     draw_weight_units: int | None = None
 
     @property
@@ -72,7 +73,11 @@ class Move:
 
     @property
     def resolved_opponent_reduction_tenths(self) -> int:
-        return self.opponent_reduction * VICTORY_WEIGHT_SCALE
+        return (
+            self.opponent_reduction * VICTORY_WEIGHT_SCALE
+            if self.opponent_reduction_tenths is None
+            else self.opponent_reduction_tenths
+        )
 
     @property
     def resolved_draw_weight_units(self) -> int:
@@ -134,6 +139,12 @@ ASAMU_PIG_TEMPLATE_IDS = (
     "pig-qo5e5854406d0297d6feae696a13e3a339-asamu",
     "pig-qo9ea2810f378fbd7dc3219c56ceab3520-asamu",
 )
+YILU_PIG_TEMPLATE_IDS = (
+    "pig-g1092931381-yilu-green-core",
+    "pig-g237716658-yilu-green-core",
+    "pig-qo5e5854406d0297d6feae696a13e3a339-yilu-green-core",
+    "pig-qo9ea2810f378fbd7dc3219c56ceab3520-yilu-green-core",
+)
 JUEJUE_FORM_TIME = "time-sand"
 JUEJUE_FORM_VIRTUAL = "virtual-sound"
 DANIYA_FORM_STAGING = "staging"
@@ -166,12 +177,14 @@ JUEJUE_TIME_MOVES = (
     Move(
         "sand-accelerate",
         "时之沙·加速",
+        draw_weight_units=1500,
         tags=("juejue-accelerate",),
         description="进入等权三档加速盘；成功增加胜利权重并在本回合追加1/2/3次抽取，失败产生下回合欠招。",
     ),
     Move(
         "sand-delay",
         "时之沙·时延",
+        draw_weight_units=1500,
         tags=("juejue-delay",),
         description="进入等权三档时延盘；成功削减对方本轮数值并可能扣对方下回合招数，失败可能令对方加招。",
     ),
@@ -195,7 +208,7 @@ JUEJUE_TIME_MOVES = (
         "领域展开·荒时之沙",
         25,
         tags=("domain", "juejue-sand-domain"),
-        description="胜利权重+25；领域命中后对方下回合-1招、自己下回合+1招；主招式盘基础权重1，领域战单领域权重2.5。",
+        description="胜利权重+25；单方命中或领域战获胜后翻倍一份有效领域胜率，并令对方下回合-1招、自己下回合+1招；主招式盘基础权重1，领域战单领域权重2.5。",
     ),
 )
 JUEJUE_VIRTUAL_MOVES = (
@@ -253,7 +266,7 @@ JUEJUE_VIRTUAL_MOVES = (
         "领域展开·乱序数虚时空",
         15,
         tags=("domain", "juejue-chaos-domain"),
-        description="胜利权重+15；领域命中后自动模仿、自己下回合+1招并保证下一次加速或时延成功；主招式盘基础权重1，领域战单领域权重2.5。",
+        description="胜利权重+15；单方命中或领域战获胜后翻倍一份有效领域胜率，并自动模仿、自己下回合+1招、保证下一次加速或时延成功；主招式盘基础权重1，领域战单领域权重2.5。",
     ),
 )
 JUEJUE_FORMS = (
@@ -263,73 +276,89 @@ JUEJUE_FORMS = (
 
 DANIYA_STAGING_MOVES = (
     Move(
+        "daniya-staging-virtual-particle",
+        "达妮娅-布景·虚质粒子",
+        7,
+        tags=("daniya", "daniya-staging"),
+        description="胜利权重+7；下一次蚀域主盘抽取权重+0.1。",
+        draw_weight_units=1000,
+    ),
+    Move(
         "daniya-staging-dream-feast",
         "达妮娅-布景·织梦的飨宴",
-        14,
+        12,
         tags=("daniya", "daniya-staging"),
-        description="胜利权重+14；下一次蚀域主盘抽取权重+0.1。",
+        description="胜利权重+12；下一次蚀域主盘抽取权重+0.1。",
         draw_weight_units=1000,
     ),
     Move(
         "daniya-staging-mimic-bubble",
         "达妮娅-布景·拟态泡泡",
-        20,
+        18,
         tags=("daniya", "daniya-staging"),
-        description="胜利权重+20；下一次蚀域主盘抽取权重+0.1。",
+        description="胜利权重+18；下一次蚀域主盘抽取权重+0.1。",
         draw_weight_units=1000,
     ),
     Move(
         "daniya-staging-final-curtain",
         "达妮娅-布景·帷幕终景",
-        42,
+        40,
         tags=("daniya", "daniya-staging"),
-        description="胜利权重+42；下一次蚀域主盘抽取权重+0.1。",
+        description="胜利权重+40；下一次蚀域主盘抽取权重+0.1。",
         draw_weight_units=1000,
     ),
     Move(
         "daniya-staging-greeting",
         "达妮娅-布景·久疏问候！",
-        26,
+        24,
         tags=("daniya", "daniya-staging"),
-        description="胜利权重+26；下一次蚀域主盘抽取权重+0.1。",
+        description="胜利权重+24；下一次蚀域主盘抽取权重+0.1。",
         draw_weight_units=1000,
     ),
 )
 DANIYA_DISILLUSION_MOVES = (
     Move(
+        "daniya-disillusion-dark-core",
+        "达妮娅-幻灭·黯核",
+        tags=("daniya", "daniya-disillusion"),
+        description="对方胜利权重-9；对方本场后续伤势盘的力竭权重永久+0.1。",
+        opponent_reduction=9,
+        draw_weight_units=1000,
+    ),
+    Move(
         "daniya-disillusion-dream-feast",
         "达妮娅-幻灭·织梦的飨宴",
-        8,
+        7,
         tags=("daniya", "daniya-disillusion"),
-        description="自身胜利权重+8、对方胜利权重-8；对方本场后续伤势盘的力竭权重永久+0.1。",
-        opponent_reduction=8,
+        description="自身胜利权重+7、对方胜利权重-7；对方本场后续伤势盘的力竭权重永久+0.1。",
+        opponent_reduction=7,
         draw_weight_units=1000,
     ),
     Move(
         "daniya-disillusion-banish",
         "达妮娅-幻灭·放逐",
-        11,
+        10,
         tags=("daniya", "daniya-disillusion"),
-        description="自身胜利权重+11、对方胜利权重-11；对方本场后续伤势盘的力竭权重永久+0.1。",
-        opponent_reduction=11,
+        description="自身胜利权重+10、对方胜利权重-10；对方本场后续伤势盘的力竭权重永久+0.1。",
+        opponent_reduction=10,
         draw_weight_units=1000,
     ),
     Move(
         "daniya-disillusion-final-curtain",
         "达妮娅-幻灭·帷幕终景",
-        22,
+        21,
         tags=("daniya", "daniya-disillusion"),
-        description="自身胜利权重+22、对方胜利权重-22；对方本场后续伤势盘的力竭权重永久+0.1。",
-        opponent_reduction=22,
+        description="自身胜利权重+21、对方胜利权重-21；对方本场后续伤势盘的力竭权重永久+0.1。",
+        opponent_reduction=21,
         draw_weight_units=1000,
     ),
     Move(
         "daniya-disillusion-knock",
         "达妮娅-幻灭·轻叩门扉",
-        14,
+        13,
         tags=("daniya", "daniya-disillusion"),
-        description="自身胜利权重+14、对方胜利权重-14；对方本场后续伤势盘的力竭权重永久+0.1。",
-        opponent_reduction=14,
+        description="自身胜利权重+13、对方胜利权重-13；对方本场后续伤势盘的力竭权重永久+0.1。",
+        opponent_reduction=13,
         draw_weight_units=1000,
     ),
 )
@@ -339,8 +368,8 @@ DANIYA_COMMON_MOVES = (
         "达妮娅·天衣无缝",
         draws=2,
         tags=("daniya", "daniya-flawless"),
-        description="再抽两次。",
-        draw_weight_units=1000,
+        description="再抽两次；本回合自身领域战胜利权重+0.2。",
+        draw_weight_units=800,
     ),
     Move(
         "daniya-unfinished-lie",
@@ -348,23 +377,23 @@ DANIYA_COMMON_MOVES = (
         draws=1,
         loan=True,
         tags=("daniya", "daniya-loan"),
-        description="本回合再抽一次；下一个数值招式的自身加权与对方减权同步翻倍，下回合出招数-1。",
-        draw_weight_units=1000,
+        description="本回合再抽一次；下一个数值招式的双方数值同步翻倍；对方本回合领域战胜利权重-0.2；下回合-1招。",
+        draw_weight_units=800,
     ),
     Move(
         "daniya-timed-collapse",
         "达妮娅·计时的溃灭",
         tags=("daniya", "daniya-timed-collapse"),
-        description="自身胜利权重-52.1；对方本回合力竭权重×5，若未力竭，自身下回合力竭权重×5。",
-        gain_tenths=-521,
-        draw_weight_units=500,
+        description="对方胜利权重-52.1；对方本回合力竭权重×5，若未力竭，自身下回合力竭权重×5。",
+        opponent_reduction_tenths=521,
+        draw_weight_units=200,
     ),
     Move(
         "daniya-domain",
         "达妮娅·蚀域",
         30,
         tags=("domain", "daniya", "daniya-domain"),
-        description="领域对抗胜利后立即切换为幻灭形态，并使自身下回合出招数+1。",
+        description="领域对抗胜利或单方领域命中后翻倍一份有效领域胜率、切换幻灭形态，并使自身下回合出招数+1。",
         draw_weight_units=1000,
     ),
 )
@@ -385,34 +414,34 @@ ASAMU_MOVES = (
     Move(
         "asamu-milk-tea",
         "喝奶茶",
-        13,
+        20,
         tags=("asamu", "asamu-milk-tea"),
-        description="睡觉的抽取权重+0.25，并重置喝奶茶当前抽取权重。",
+        description="本场永久使全盛姿态抽取权重+0.1，并重置喝奶茶当前抽取权重。",
         draw_weight_units=1000,
     ),
     Move(
         "asamu-sleep",
         "睡觉",
-        20,
+        1,
         tags=("asamu", "asamu-sleep"),
-        description="本场永久使全盛姿态抽取权重+0.1，并重置睡觉当前抽取权重。",
+        description="胜利权重+1；本场之后所有招式胜利权重额外+5，可累加。",
         draw_weight_units=1000,
     ),
     Move(
         "asamu-prime",
         "全盛姿态",
-        44,
-        draws=1,
+        30,
+        draws=2,
         tags=("asamu", "asamu-prime"),
-        description="胜利权重+44，再抽一次。",
+        description="胜利权重+30，再抽两次；清空憋个大的临时出现权重。",
         draw_weight_units=200,
     ),
     Move(
         "asamu-charge-up",
         "憋个大的",
-        1,
+        draws=1,
         tags=("asamu", "asamu-charge-up"),
-        description="本场后续所有招式的胜利权重额外+3，可累加。",
+        description="再抽一次；全盛姿态临时出现权重+1，打出全盛姿态后清空。",
         draw_weight_units=1000,
     ),
     Move(
@@ -452,8 +481,70 @@ ASAMU_MOVES = (
         "领域·呃呃阿萨姆奶茶",
         22,
         tags=("domain", "asamu", "asamu-domain"),
-        description="领域对抗胜利后，使用对方4个随机招式。",
+        description="领域对抗胜利或单方领域命中后翻倍一份有效领域胜率，并使用对方2个随机招式。",
         draw_weight_units=1000,
+    ),
+)
+
+YILU_MOVES = (
+    Move(
+        "yilu-vanguard",
+        "干员放置·先锋",
+        5,
+        tags=("yilu", "yilu-operator", "yilu-vanguard"),
+        description="胜利权重+5；再抽一次并累计2指示物；此后所有招式基础胜率+2。",
+    ),
+    Move(
+        "yilu-guard",
+        "干员放置·近卫",
+        tags=("yilu", "yilu-operator", "yilu-guard"),
+        description="先累计1指示物，再消耗全部指示物，胜率+消耗数×5；消耗超过5时触发本回合真伤翻倍。",
+    ),
+    Move(
+        "yilu-defender",
+        "干员放置·重装",
+        2,
+        tags=("yilu", "yilu-operator", "yilu-defender"),
+        description="胜率+2并累计1指示物；70%令对方随机一招数值归零并额外使对方胜率-5。",
+    ),
+    Move(
+        "yilu-caster",
+        "干员放置·术师",
+        tags=("yilu", "yilu-operator", "yilu-caster"),
+        description="先累计3指示物；每消耗6个胜率+40，可连续结算；不足6时再累计1指示物。",
+    ),
+    Move(
+        "yilu-sniper",
+        "干员放置·狙击",
+        tags=("yilu", "yilu-operator", "yilu-sniper"),
+        description="等概率连射1至10次；每枪+1，独立50%累计指示物、50%消耗1指示物令该枪再+2。",
+    ),
+    Move(
+        "yilu-medic",
+        "干员放置·医疗·冥土追魂",
+        tags=("yilu", "yilu-operator", "yilu-medic"),
+        description="消耗全部指示物，使本回合重伤和力竭权重各减半；若处于重伤则恢复为轻伤，再累计2指示物。",
+        draw_weight_units=200,
+    ),
+    Move(
+        "yilu-specialist",
+        "干员放置·特种",
+        tags=("yilu", "yilu-operator", "yilu-specialist"),
+        description="消耗全部指示物，再抽两次非医疗、非特种的其他干员招式，并累计1指示物。",
+        draw_weight_units=500,
+    ),
+    Move(
+        "yilu-domain",
+        "领域展开·末日方舟",
+        tags=("domain", "yilu", "yilu-domain"),
+        description="胜率+32.5；领域对抗获胜或单方领域命中后翻倍一份有效领域胜率并获得明日：下回合+1招且该回合所有招式基础胜率+1。",
+        gain_tenths=325,
+    ),
+    Move(
+        "yilu-babel-ghost",
+        "巴别塔的恶灵",
+        tags=("yilu", "yilu-babel"),
+        description="再部署1名干员且该干员效果生效两次；下回合理智缺失，出招数-1。",
     ),
 )
 
@@ -468,7 +559,13 @@ FIGHTERS = (
             Move("dismantle", "解", 10),
             Move("cleave", "捌", 15),
             Move("furnace", "灶·开", 21),
-            Move("shrine", "领域展开·伏魔御厨子！", 35, tags=("domain",)),
+            Move(
+                "shrine",
+                "领域展开·伏魔御厨子！",
+                35,
+                tags=("domain",),
+                description="单方领域命中或领域战获胜后，翻倍一份仍有效的领域胜率贡献；领域战基础权重4。",
+            ),
             Move("loan", "束缚·贷款", draws=1, loan=True),
             Move("reverse", "反转·修复", 14),
             Move("elbow", "肘击", 7),
@@ -488,7 +585,13 @@ FIGHTERS = (
             Move("black-flash", "黑闪！", 10, draws=2, tags=("black-flash",)),
             Move("teleport", "无下限·瞬移", 14),
             Move("purple", "虚式·茈", 24, tags=("purple",)),
-            Move("void", "领域展开·无量空处！", 30, tags=("domain",)),
+            Move(
+                "void",
+                "领域展开·无量空处！",
+                30,
+                tags=("domain",),
+                description="单方领域命中或领域战获胜后，翻倍一份仍有效的领域胜率贡献，并使对方下回合出招数-1。",
+            ),
             Move("reverse", "反转·修复", 14),
             Move("unlimited-purple", "无限制·茈！", 35, tags=("purple",)),
         ),
@@ -517,6 +620,13 @@ FIGHTERS = (
         ASAMU_MOVES,
         template_aliases=ASAMU_PIG_TEMPLATE_IDS[1:],
     ),
+    FighterDefinition(
+        "yilu",
+        YILU_PIG_TEMPLATE_IDS[0],
+        "熠～噜猪",
+        YILU_MOVES,
+        template_aliases=YILU_PIG_TEMPLATE_IDS[1:],
+    ),
 )
 FIGHTERS_BY_ID = {item.fighter_id: item for item in FIGHTERS}
 FIGHTERS_BY_TEMPLATE = {
@@ -540,6 +650,8 @@ LEGACY_MOVE_IDS = {
 def fighter_moves(fighter_id: str, rule_version: int = BATTLE_RULE_VERSION) -> tuple[Move, ...]:
     moves = FIGHTERS_BY_ID[fighter_id].moves
     if fighter_id in {"daniya", "asamu"} and rule_version < 5:
+        return ()
+    if fighter_id == "yilu" and rule_version < 7:
         return ()
     if fighter_id == "juejue" and rule_version < 4:
         return ()

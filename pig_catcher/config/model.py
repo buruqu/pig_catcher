@@ -776,6 +776,84 @@ class TradingSection(PluginConfigBase):
         description="我的交易列表每页显示数量",
         json_schema_extra=_ui("交易列表每页数量", "默认 8，按创建时间倒序展示"),
     )
+    daily_gift_send_limit: int = Field(
+        default=5,
+        ge=1,
+        le=1000,
+        description="每位玩家每天成功主动赠送猪猪或美食的合计次数上限",
+        json_schema_extra=_ui("每日赠送次数", "默认 5 次；北京时间 00:00 刷新，失败或系统赠送不计数"),
+    )
+    daily_gift_receive_limit: int = Field(
+        default=5,
+        ge=1,
+        le=1000,
+        description="每位玩家每天成功收到其他玩家赠送的合计次数上限",
+        json_schema_extra=_ui("每日收赠次数", "默认 5 次；北京时间 00:00 刷新，系统群体效果不计数"),
+    )
+    trade_tax_percent: int = Field(
+        default=5,
+        ge=0,
+        le=100,
+        description="玩家交易成交时从卖方收入中扣除的整数百分比税率",
+        json_schema_extra=_ui("玩家交易税率", "默认 5%；买方支付原价，税额向下取整，卖方收到税后净额"),
+    )
+
+
+class LaunchCampaignSection(PluginConfigBase):
+    """2.0 开服活动；开发与普通安装默认关闭，由正式配置显式开启。"""
+
+    __ui_label__ = "2.0 开服活动"
+    __ui_icon__ = "party-popper"
+    __ui_order__ = 85
+
+    enabled: bool = Field(
+        default=False,
+        description="是否启用 2.0 开服礼包和首日临时规则",
+        json_schema_extra=_ui("启用开服活动", "正式上线时开启；每名玩家的礼包只会原子发放一次"),
+    )
+    campaign_id: str = Field(
+        default="pig-dream-2.0-launch",
+        min_length=1,
+        max_length=80,
+        frozen=True,
+        description="开服活动稳定编号",
+        json_schema_extra=_ui("活动编号", "固定用于防止重复领取", disabled=True),
+    )
+    starts_at: str = Field(
+        default="2026-09-01T00:00:00+08:00",
+        frozen=True,
+        description="开服礼包开始时间",
+        json_schema_extra=_ui("开服时间", "北京时间 2026-09-01 00:00", disabled=True),
+    )
+    first_day_ends_at: str = Field(
+        default="2026-09-02T00:00:00+08:00",
+        frozen=True,
+        description="首日额度与概率加成结束时间",
+        json_schema_extra=_ui("首日结束", "北京时间 2026-09-02 00:00 自动恢复", disabled=True),
+    )
+    first_day_window_limit: int = Field(
+        default=20,
+        ge=1,
+        le=1000,
+        frozen=True,
+        description="开服首日每个正常刷新时段的基础抓猪额度",
+        json_schema_extra=_ui("首日每时段额度", "首日每个刷新时段 20 次，结束后恢复抓猪规则中的 5 次", disabled=True),
+    )
+    first_day_high_star_multiplier: float = Field(
+        default=2.0,
+        ge=1.0,
+        le=100.0,
+        frozen=True,
+        description="开服首日普通抓猪四至六星权重乘数",
+        json_schema_extra=_ui("首日高星权重", "普通抓猪 4/5/6 星权重 ×2；六星菜独占效果不参与", disabled=True),
+    )
+    starter_coin_amount: int = Field(default=50_000, ge=0, le=2_147_483_647, frozen=True)
+    starter_pig_choice_tickets: int = Field(default=2, ge=0, le=100, frozen=True)
+    starter_food_choice_tickets: int = Field(default=1, ge=0, le=100, frozen=True)
+    starter_battle_pig_choice_tickets: int = Field(default=1, ge=0, le=100, frozen=True)
+    starter_five_star_collab_random_tickets: int = Field(default=5, ge=0, le=100, frozen=True)
+    starter_code_change_tickets: int = Field(default=3, ge=0, le=100, frozen=True)
+    starter_six_ways_foods: int = Field(default=6, ge=0, le=100, frozen=True)
 
 
 class RegulationSection(PluginConfigBase):
@@ -1353,6 +1431,16 @@ class AnnouncementAdministrationSection(PluginConfigBase):
             **{"input_type": "textarea", "x-widget": "textarea"},
         ),
     )
+    image_path: str = Field(
+        default="",
+        max_length=1024,
+        description="公告正文后需要附带发送的本机图片绝对路径",
+        json_schema_extra=_ui(
+            "公告长图（可选）",
+            "填写 PNG/JPG/GIF 的本机绝对路径；正文成功后会向同一聊天流发送图片",
+            placeholder=r"例如 C:\Users\Administrator\Desktop\抓猪2.0长图.jpg",
+        ),
+    )
     execute_send: bool = Field(
         default=False,
         description="保存配置后立即尝试向目标群发送一次公告",
@@ -1431,6 +1519,7 @@ class PigCatcherConfig(PluginConfigBase):
     cooking: CookingSection = Field(default_factory=CookingSection)
     economy: EconomySection = Field(default_factory=EconomySection)
     trading: TradingSection = Field(default_factory=TradingSection)
+    launch_campaign: LaunchCampaignSection = Field(default_factory=LaunchCampaignSection)
     regulation: RegulationSection = Field(default_factory=RegulationSection)
     ranking: RankingSection = Field(default_factory=RankingSection)
     rendering: RenderingSection = Field(default_factory=RenderingSection)

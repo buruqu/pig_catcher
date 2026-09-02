@@ -8,10 +8,11 @@ from dataclasses import dataclass
 from ..domain.battle_catalog import BattleError, tool_id
 
 BATTLE_HELP = """【PiG Dream! 猪猪对战】
-/战斗猪 设置 宿傩猪（也支持五条猪、撅撅猪、达妮娅猪、阿萨姆猪；同名自动选低价值，收藏猪用全名#编号）
+/战斗猪 设置 宿傩猪（也支持五条猪、撅撅猪、达妮娅猪、阿萨姆猪、熠～噜猪；同名自动选低价值，收藏猪用全名#编号）
 /战斗猪；/战斗猪 强化；/战斗猪 解除保护 名称#编号
 /战斗猪 确认（设置、强化、解除保护需2分钟内确认）；/战斗猪 取消
-/战斗猪 轮盘 宿傩猪；/战斗猪 轮盘 五条猪；/战斗猪 轮盘 撅撅猪；/战斗猪 轮盘 达妮娅猪；/战斗猪 轮盘 阿萨姆猪
+/战斗猪 轮盘 宿傩猪；/战斗猪 轮盘 五条猪；/战斗猪 轮盘 撅撅猪
+/战斗猪 轮盘 达妮娅猪；/战斗猪 轮盘 阿萨姆猪；/战斗猪 轮盘 熠～噜猪
 /战斗猪 器具；/战斗猪 制作 练习护腕 2；/战斗猪 器具 练习护腕（或 无）
 /比划比划 @群友；/比划比划 接受；/比划比划 拒绝；/比划比划 取消
 /出招数 → /出招（第二位完成出招后立即结算，结算图完整展示双方本回合招式）
@@ -104,7 +105,7 @@ def parse_battle_request(
         return BattleRequest({"": "profile", "确认": "confirm", "取消": "cancel_setup"}[value], {})
     if head in {"设置", "强化", "解除保护"}:
         if head == "设置" and not tail:
-            raise BattleError("格式：/战斗猪 设置 宿傩猪（也支持五条猪、撅撅猪、达妮娅猪、阿萨姆猪）。")
+            raise BattleError("格式：/战斗猪 设置 宿傩猪（也支持五条猪、撅撅猪、达妮娅猪、阿萨姆猪、熠～噜猪）。")
         return BattleRequest(
             {"设置": "assign_preview", "强化": "upgrade_preview", "解除保护": "retire_preview"}[head],
             {"selector": tail},
@@ -116,14 +117,16 @@ def parse_battle_request(
             "撅撅猪",
             "达妮娅猪",
             "阿萨姆猪",
+            "熠～噜猪",
             "sukuna",
             "gojo",
             "juejue",
             "daniya",
             "asamu",
+            "yilu",
             "",
         }:
-            raise BattleError("目前支持宿傩猪、五条猪、撅撅猪、达妮娅猪和阿萨姆猪的战斗盘。")
+            raise BattleError("目前支持宿傩猪、五条猪、撅撅猪、达妮娅猪、阿萨姆猪和熠～噜猪的战斗盘。")
         return BattleRequest(
             "wheels",
             {
@@ -133,6 +136,7 @@ def parse_battle_request(
                     "撅撅猪": "juejue",
                     "达妮娅猪": "daniya",
                     "阿萨姆猪": "asamu",
+                    "熠～噜猪": "yilu",
                 }.get(tail, tail or "sukuna")
             },
         )
