@@ -138,8 +138,8 @@ def test_supplement_counts_and_reviewed_high_star_food_effects(definitions):
     from pig_catcher.domain.round9_food_rules import reviewed_food_revisions
 
     revisions = reviewed_food_revisions()
-    assert len(definitions) == 328
-    assert Counter(row["kind"] for row in definitions) == {"pig": 223, "food": 105}
+    assert len(definitions) == 344
+    assert Counter(row["kind"] for row in definitions) == {"pig": 231, "food": 113}
     new_names = {PurePosixPath(path).stem for path in EXPECTED_SOURCES}
     new_rows = [row for row in definitions if row["display_name"] in new_names]
     assert Counter(row["kind"] for row in new_rows) == {"pig": 18, "food": 12}
@@ -300,7 +300,7 @@ async def test_full_catalog_visibility_and_collection_denominator_in_four_scopes
             identity = _identity(scope)
             pigs = await game.catalog(identity, rarity=None, undiscovered_only=False)
             foods = await economy.food_catalog(identity, rarity=None, undiscovered_only=False)
-            assert pigs.total_count == 187 and foods.total_count == 69
+            assert pigs.total_count == 189 and foods.total_count == 71
             group = next(c for c in pigs.collections if c.collection_id == "bandori-yumemita")
             assert (group.total_count, group.available_count, group.collected_count) == (5, 5, 0)
             target = _entry(manifest, SIX_PIG, scope)

@@ -9,7 +9,7 @@ from .special_content import GOJO_PIG_TEMPLATE_ID, SUKUNA_PIG_TEMPLATE_ID
 
 # 对战规则版本与活动成就事实版本分离：新版对战会改变随机命名空间，
 # 但新增字段仍是 activity_progress v1 可以向后兼容读取的事实载荷。
-BATTLE_RULE_VERSION = 11
+BATTLE_RULE_VERSION = 12
 BATTLE_FACT_VERSION = 1
 BATTLE_VERSION = BATTLE_RULE_VERSION
 INVITE_TTL_MS = 5 * 60 * 1000
@@ -145,10 +145,18 @@ YILU_PIG_TEMPLATE_IDS = (
     "pig-qo5e5854406d0297d6feae696a13e3a339-yilu-green-core",
     "pig-qo9ea2810f378fbd7dc3219c56ceab3520-yilu-green-core",
 )
+FIREFLY_PIG_TEMPLATE_IDS = (
+    "pig-g1092931381-firefly-embrace",
+    "pig-g237716658-firefly-embrace",
+    "pig-qo5e5854406d0297d6feae696a13e3a339-firefly-embrace",
+    "pig-qo9ea2810f378fbd7dc3219c56ceab3520-firefly-embrace",
+)
 JUEJUE_FORM_TIME = "time-sand"
 JUEJUE_FORM_VIRTUAL = "virtual-sound"
 DANIYA_FORM_STAGING = "staging"
 DANIYA_FORM_DISILLUSION = "disillusion"
+FIREFLY_FORM_FIREFLY = "firefly"
+FIREFLY_FORM_SAM = "sam"
 JUEJUE_ACCELERATION_TIERS = (
     JuejueAccelerationTier(1, 100, 15, 1, 0),
     JuejueAccelerationTier(2, 75, 20, 2, 2),
@@ -548,6 +556,75 @@ YILU_MOVES = (
     ),
 )
 
+FIREFLY_MOVES = (
+    Move(
+        "firefly-crimson-cocoon",
+        "流萤·我曾安眠，赤染之茧",
+        8,
+        tags=("firefly", "firefly-skill", "firefly-crimson-cocoon"),
+        description="胜率+8，燃芯+1；下一次萨姆技能+6。若本回合没有进入萨姆形态，下回合萨姆招式出现权重+0.2。萨姆形态下改为残梦回声。",
+    ),
+    Move(
+        "firefly-dream-destination",
+        "流萤·梦应归于何处",
+        tags=("firefly", "firefly-skill", "firefly-dream-destination"),
+        description="对手胜率-12，自身本回合力竭权重-0.15，燃芯+1；若对手本回合已获得胜率，再额外-5。萨姆形态下改为残梦回声。",
+        opponent_reduction=12,
+    ),
+    Move(
+        "firefly-firefly-flame",
+        "流萤·我会看见，飞萤之火",
+        tags=("firefly", "firefly-skill", "firefly-choice"),
+        description="燃芯+1；确定抽取两个候选并自动选择收益更高的一招。选流萤技时本回合领域战权重+0.2；选萨姆技时立即变身且该招胜率+10。",
+        draw_weight_units=850,
+    ),
+    Move(
+        "sam-skyfire-bombardment",
+        "萨姆·指令-天火轰击",
+        20,
+        tags=("firefly", "sam-skill", "sam-skyfire-bombardment"),
+        description="胜率+20、对手胜率-8，命中使对手溃败+1；流萤形态抽到时立即切换萨姆形态。",
+        opponent_reduction=8,
+    ),
+    Move(
+        "sam-bottom-fire-slash",
+        "萨姆·火萤Ⅳ型-底火斩击",
+        22,
+        tags=("firefly", "sam-skill", "sam-bottom-fire-slash"),
+        description="胜率+22，并按对手现有溃败每层再+4；萨姆本回合第一招额外使对手胜率-8，命中后溃败+1。",
+    ),
+    Move(
+        "sam-deathstar-overload",
+        "萨姆·火萤Ⅳ型-死星过载",
+        26,
+        tags=("firefly", "sam-skill", "sam-deathstar-overload"),
+        description="胜率+26、对手胜率-14，命中后溃败+1；命中前已有2层溃败时，对手下回合出招数-1。",
+        opponent_reduction=14,
+        draw_weight_units=900,
+    ),
+    Move(
+        "sam-ignite-star-sea",
+        "萨姆·火萤Ⅳ型-点燃星海",
+        28,
+        tags=("firefly", "sam-skill", "sam-ignite-star-sea"),
+        description="进入萨姆形态2回合、对手溃败+2、自己下回合+1招；每层燃芯再+5并提高本招出现权重0.1，随后清空燃芯。萨姆形态下改为+20、对手-10、延长1回合并追加1层溃败。",
+        draw_weight_units=900,
+    ),
+    Move(
+        "firefly-falling-sky",
+        "流萤/萨姆·自破碎的天空坠落",
+        36,
+        tags=("domain", "firefly", "firefly-domain"),
+        description="胜率+36、对手-20；领域命中或领域战获胜后胜率翻倍，并追加焦土陨击+12与对手力竭权重+0.15。对手3层溃败时再-15。",
+        opponent_reduction=20,
+        draw_weight_units=750,
+    ),
+)
+FIREFLY_FORMS = (
+    FighterForm(FIREFLY_FORM_FIREFLY, "流萤", FIREFLY_MOVES),
+    FighterForm(FIREFLY_FORM_SAM, "萨姆", FIREFLY_MOVES),
+)
+
 
 FIGHTERS = (
     FighterDefinition(
@@ -627,6 +704,15 @@ FIGHTERS = (
         YILU_MOVES,
         template_aliases=YILU_PIG_TEMPLATE_IDS[1:],
     ),
+    FighterDefinition(
+        "firefly",
+        FIREFLY_PIG_TEMPLATE_IDS[0],
+        "栖夜流萤抱抱猪",
+        FIREFLY_MOVES,
+        template_aliases=FIREFLY_PIG_TEMPLATE_IDS[1:],
+        forms=FIREFLY_FORMS,
+        initial_form_id=FIREFLY_FORM_FIREFLY,
+    ),
 )
 FIGHTERS_BY_ID = {item.fighter_id: item for item in FIGHTERS}
 FIGHTERS_BY_TEMPLATE = {
@@ -652,6 +738,8 @@ def fighter_moves(fighter_id: str, rule_version: int = BATTLE_RULE_VERSION) -> t
     if fighter_id in {"daniya", "asamu"} and rule_version < 5:
         return ()
     if fighter_id == "yilu" and rule_version < 7:
+        return ()
+    if fighter_id == "firefly" and rule_version < 12:
         return ()
     if fighter_id == "juejue" and rule_version < 4:
         return ()

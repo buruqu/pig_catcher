@@ -10,6 +10,8 @@ from ..domain.battle_catalog import (
     DANIYA_FORM_DISILLUSION,
     DANIYA_FORM_STAGING,
     FIGHTERS_BY_ID,
+    FIREFLY_FORM_FIREFLY,
+    FIREFLY_FORM_SAM,
     HEAVY_COUNT_WHEEL,
     INJURY_NAMES,
     INJURY_WEIGHT_SCALE,
@@ -53,6 +55,11 @@ JUEJUE_FORM_NAMES = {
 DANIYA_FORM_NAMES = {
     DANIYA_FORM_STAGING: "布景",
     DANIYA_FORM_DISILLUSION: "幻灭",
+}
+
+FIREFLY_FORM_NAMES = {
+    FIREFLY_FORM_FIREFLY: "流萤",
+    FIREFLY_FORM_SAM: "萨姆",
 }
 
 # 塑型、苍赫和布景招式在状态里按“十分之一抽取权重”保存；
@@ -226,6 +233,11 @@ def _fighter_form_name(fighter_id: str, form_id: str) -> str:
             return DANIYA_FORM_NAMES[form_id]
         except KeyError as exc:
             raise ValueError(f"未知达妮娅猪形态：{form_id}") from exc
+    if fighter_id == "firefly":
+        try:
+            return FIREFLY_FORM_NAMES[form_id]
+        except KeyError as exc:
+            raise ValueError(f"未知流萤抱抱猪形态：{form_id}") from exc
     return form_id
 
 
@@ -544,6 +556,51 @@ def move_line(
             note += "；下一抽限定干员且效果生效2次；下回合-1招"
         if event.get("yilu_future_gain"):
             note += f"；先锋/明日成长额外+{weight_label(event['yilu_future_gain'])}"
+    elif fighter_id == "firefly":
+        form_before = _fighter_form_name(
+            "firefly",
+            str(event.get("form_before") or FIREFLY_FORM_FIREFLY),
+        )
+        form_after = _fighter_form_name(
+            "firefly",
+            str(event.get("form_after") or FIREFLY_FORM_FIREFLY),
+        )
+        note += f"；形态：{form_before} → {form_after}"
+        note += (
+            f"；燃芯 {event.get('firefly_fuel_before', 0)} → "
+            f"{event.get('firefly_fuel_after', 0)}"
+        )
+        if event.get("firefly_echo"):
+            note += "；本招按残梦回声结算"
+            if Fraction(event.get("firefly_echo_scale", 1)) != 1:
+                note += "（本次效果50%）"
+        if event.get("firefly_collapse_passive_gain"):
+            note += (
+                f"；溃败联动额外+{weight_label(event['firefly_collapse_passive_gain'])}"
+            )
+        if event.get("firefly_collapse_to_add"):
+            note += (
+                f"；对手溃败+{event['firefly_collapse_to_add']}"
+                f"（待结算至{event.get('firefly_target_collapse_after_pending', 0)}/3）"
+            )
+        if event.get("firefly_next_sam_bonus_used"):
+            note += f"；赤染之茧储备+{event['firefly_next_sam_bonus_used']}已消耗"
+        if event.get("firefly_first_sam_reduction"):
+            note += f"；萨姆本回合第一招令对手额外-{event['firefly_first_sam_reduction']}"
+        if event.get("firefly_collapse_debt_triggered"):
+            note += "；命中前已有2层溃败，对手下回合-1招"
+        if event.get("firefly_conditional_reduction_applied"):
+            note += f"；对手本回合已有增益，额外-{event['firefly_conditional_reduction_applied']}"
+        if event.get("firefly_choice"):
+            choice = event["firefly_choice"]
+            options = " / ".join(str(item.get("name")) for item in choice.get("options", ()))
+            note += f"；候选：{options}；自动选定“{choice.get('selected_name', '未知')}”"
+        if event.get("firefly_forced_choice"):
+            note += f"；承接第{event.get('firefly_choice_source_ordinal')}招的确定选择"
+        if event.get("firefly_domain_choice") == "extend-sam":
+            note += "；领域结算选择延长萨姆形态1回合"
+        elif event.get("firefly_domain_choice") == "return-firefly":
+            note += "；领域结算选择流萤形态，并使下回合+1招"
     if event["loan"]:
         note += f"；下回合扣招累计{weight_label(event['next_debt'])}，仅保留一份×2"
     if event.get("extra_draws"):
@@ -616,7 +673,7 @@ def _event_move_wheel(event: dict, definition_version: int) -> BattleWheelCard:
     exact_moves = tuple(moves_by_id.get(move_id) for move_id in wheel_move_ids)
     if wheel_move_ids and all(move is not None for move in exact_moves):
         moves = exact_moves
-    elif source_fighter_id in {"juejue", "daniya"} and not generated_copy and not generated_mimic:
+    elif source_fighter_id in {"juejue", "daniya", "firefly"} and not generated_copy and not generated_mimic:
         moves = fighter_form_moves(source_fighter_id, str(event.get("form_before") or ""))
     else:
         moves = fighter_moves(source_fighter_id, definition_version)
@@ -858,6 +915,44 @@ def _yilu_state_projection(side: dict) -> tuple[str, str, str]:
     return "罗德岛干员编队", "指示物持续整场", " · ".join(facts)
 
 
+def _firefly_state_projection(side: dict) -> tuple[str, str, str]:
+    form_id = str(side.get("firefly_form") or FIREFLY_FORM_FIREFLY)
+    current = _fighter_form_name("firefly", form_id)
+    turn = side.get("turn", {})
+    track: list[str] = []
+    for event in turn.get("events", ()):
+        before = _fighter_form_name(
+            "firefly",
+            str(event.get("form_before") or form_id),
+        )
+        after = _fighter_form_name(
+            "firefly",
+            str(event.get("form_after") or form_id),
+        )
+        if not track:
+            track.append(before)
+        if after != track[-1]:
+            track.append(after)
+    if not track:
+        track.append(current)
+    elif current != track[-1]:
+        track.append(current)
+    facts = [
+        f"燃芯{side.get('firefly_fuel', 0)}/3",
+        f"溃败{side.get('firefly_collapse', 0)}/3",
+    ]
+    if form_id == FIREFLY_FORM_SAM:
+        facts.append(f"萨姆剩余{side.get('firefly_sam_rounds_remaining', 0)}回合")
+    if side.get("firefly_next_sam_gain_bonus"):
+        facts.append(f"下一次萨姆技能+{side['firefly_next_sam_gain_bonus']}")
+    sam_draw = int(turn.get("firefly_sam_draw_bonus_units", 0))
+    if sam_draw:
+        facts.append(f"本回合萨姆招式出现权重+{sam_draw / MOVE_WEIGHT_SCALE:g}")
+    if turn.get("firefly_forced_choices"):
+        facts.append(f"飞萤之火待选择招式×{len(turn['firefly_forced_choices'])}")
+    return f"当前形态 · {current}", " → ".join(track), " · ".join(facts)
+
+
 def _v4_interaction_panels(interactions: dict, names: list[str]) -> tuple[Panel, ...]:
     _required(
         interactions,
@@ -1091,6 +1186,14 @@ def _v4_interaction_panels(interactions: dict, names: list[str]) -> tuple[Panel,
                 f"本回合胜率连续翻倍{fact['layers']}次。",
             )
         )
+    for fact in interactions.get("firefly_collapse_updates", ()):
+        v5_lines.append(
+            Line(
+                names[int(fact["source_side"])] + " · 溃败烙印",
+                f"{names[int(fact['target_side'])]}：{fact['before']} → {fact['after']}/3",
+                f"本回合命中累计{fact['added']}层；超过3层的部分不会继续增加。",
+            )
+        )
     if v5_lines:
         panels.append(
             Panel(
@@ -1283,6 +1386,8 @@ def matchup(
             form, form_track, mechanic_summary = _asamu_state_projection(side)
         elif snap.get("fighter_id") == "yilu":
             form, form_track, mechanic_summary = _yilu_state_projection(side)
+        elif snap.get("fighter_id") == "firefly":
+            form, form_track, mechanic_summary = _firefly_state_projection(side)
         cards.append(
             FighterCard(
                 player_name=snap["player_name"],
@@ -1471,6 +1576,7 @@ def matchup(
             panels.extend(_v4_interaction_panels(interactions, names))
         modifiers = round_result.get("injury_modifiers")
         if modifiers:
+            firefly_delta = Fraction(modifiers.get("firefly_current_delta_units", 0))
             lines = [
                 Line(
                     "力竭权重倍率",
@@ -1483,6 +1589,12 @@ def matchup(
                     "永久力竭加权",
                     f"+{_scaled_weight(modifiers.get('permanent_exhaust_bonus_units', 0), INJURY_WEIGHT_SCALE)}",
                     "达妮娅幻灭招式累积，直接加入本次伤势盘。",
+                ),
+                Line(
+                    "溃败 / 本回合修正",
+                    f"+{_scaled_weight(modifiers.get('firefly_collapse_bonus_units', 0), INJURY_WEIGHT_SCALE)} / "
+                    f"{_signed_weight(firefly_delta / INJURY_WEIGHT_SCALE)}",
+                    "溃败每层令力竭权重+0.1；流萤技能与焦土陨击的即时修正只作用于本回合。",
                 ),
             ]
             for rebound in round_result.get("collapse_rebounds", ()):
@@ -1964,6 +2076,63 @@ def _yilu_wheels(identity: CommandIdentity, level: int) -> BattleView:
     )
 
 
+def _firefly_wheels(identity: CommandIdentity, level: int) -> BattleView:
+    definition = FIGHTERS_BY_ID["firefly"]
+    firefly_options = []
+    sam_options = []
+    lines = []
+    for move in definition.moves:
+        base_units = move.resolved_draw_weight_units
+        firefly_units = base_units - 100 if "sam-skill" in move.tags else base_units
+        firefly_options.append((move.name, max(1, firefly_units) / MOVE_WEIGHT_SCALE))
+        sam_options.append((move.name, base_units / MOVE_WEIGHT_SCALE))
+        training = f"；强化后基础正数+{level}" if move.resolved_gain_tenths > 0 else ""
+        lines.append(
+            Line(
+                move.name,
+                move.description + training,
+                f"基础抽取权重 {_move_weight(move)}",
+            )
+        )
+    return view(
+        identity,
+        "栖夜流萤抱抱猪 · 双形态共鸣战斗盘",
+        banner=f"展示强化+{level}的规则。燃芯、溃败、形态与剩余回合均写入战斗状态，可断线恢复。",
+        wheels=(
+            wheel_card(
+                "move",
+                "流萤形态 · 基础招式盘（0层燃芯）",
+                tuple(firefly_options),
+                note="流萤形态的萨姆招式基础出现权重-0.1；每层燃芯再为所有萨姆招式+0.1。",
+            ),
+            wheel_card(
+                "move",
+                "萨姆形态 · 基础招式盘（0层燃芯）",
+                tuple(sam_options),
+                note="萨姆形态抽到流萤技能时触发残梦回声，不退出萨姆形态。",
+            ),
+            *_common_battle_wheels(),
+        ),
+        panels=(
+            Panel("流萤 / 萨姆招式", tuple(lines)),
+            Panel(
+                "双形态共鸣",
+                (
+                    Line("燃芯", "最多3层", "每层令萨姆技能胜率+5、出现权重+0.1；点燃星海按技能规则结算后清空。"),
+                    Line("溃败", "最多3层", "每层令萨姆技能额外+4，并令对手伤势盘的力竭权重+0.1。"),
+                    Line("流萤 → 萨姆", "抽到萨姆技能立即切换", "萨姆形态持续2回合；流萤形态的该招基础出现权重-0.1。"),
+                    Line("萨姆中的流萤技能", "残梦回声", "不退出萨姆；飞萤之火缺省值按+10并保存候选与自动选择事实。"),
+                ),
+                "飞萤之火与领域后的二选一由规则引擎按固定收益策略自动完成，不新增容易超时的中途指令。",
+            ),
+        ),
+        hints=(
+            "领域命中或领域战获胜时，领域自身有效胜率翻倍；焦土陨击的+12不重复翻倍。",
+            "对手3层溃败时，领域额外令其本回合胜率-15。",
+        ),
+    )
+
+
 def wheels(identity: CommandIdentity, fighter_id: str, level: int = 0) -> BattleView:
     if fighter_id == "juejue":
         return _juejue_wheels(identity, level)
@@ -1973,6 +2142,8 @@ def wheels(identity: CommandIdentity, fighter_id: str, level: int = 0) -> Battle
         return _asamu_wheels(identity, level)
     if fighter_id == "yilu":
         return _yilu_wheels(identity, level)
+    if fighter_id == "firefly":
+        return _firefly_wheels(identity, level)
     definition = FIGHTERS_BY_ID[fighter_id]
     moves = []
     for move in definition.moves:

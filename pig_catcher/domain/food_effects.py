@@ -62,6 +62,8 @@ CATCH_REWARD_BONUS = "catch-reward-bonus"
 COOK_SERVING_BONUS = "cook-serving-bonus"
 FOOD_SUPPLY_PACK = "food-supply-pack"
 WEEK_END_WINDOW_CATCHES = "week-end-window-catches"
+CATCH_WINDOW_TRANSFER = "catch-window-transfer"
+WINDOW_SIX_STAR_RESONANCE = "window-six-star-resonance"
 
 # 独占效果：六星菜效果独立作用，不与任何其他菜品效果或道具叠加。
 # 激活独占效果时，本次动作忽略装备道具（道具保留、不消耗）。
@@ -132,6 +134,8 @@ IMMEDIATE_EFFECT_IDS = frozenset(
         ROULETTE_CHANCES,
         FOOD_SUPPLY_PACK,
         YILU_LOTTERY,
+        CATCH_WINDOW_TRANSFER,
+        WINDOW_SIX_STAR_RESONANCE,
     }
 )
 GROUP_EFFECT_IDS = frozenset(
@@ -393,6 +397,54 @@ def resolve_food_effect(
         if raw:
             raise FoodEffectError("绿芯派奖池使用固定已审核概率，不接受额外参数。")
         return FoodEffectGrant(normalized_id, {}, 1, LOTTERY_DESCRIPTION)
+    if normalized_id == CATCH_WINDOW_TRANSFER:
+        weights = raw.get("fixed_weights")
+        if not isinstance(weights, (list, tuple)) or len(weights) != 6:
+            raise FoodEffectError("月栖萤光卷的 fixed_weights 必须包含六个品质概率。")
+        fixed = tuple(float(value) for value in weights)
+        if any(value < 0 for value in fixed) or abs(sum(fixed) - 100.0) > 1e-6:
+            raise FoodEffectError("月栖萤光卷的固定品质概率必须非负且合计100%。")
+        if any(fixed[index] for index in range(3)) or fixed[3:] != (42.0, 40.0, 18.0):
+            raise FoodEffectError("月栖萤光卷只接受0/0/0/42/40/18的审核分布。")
+        return FoodEffectGrant(
+            normalized_id,
+            {"fixed_weights": list(fixed)},
+            1,
+            (
+                "摧毁下一个抓猪时段的全部基础额度并平移到下下个时段；封锁期间新获得的额度也随之平移。"
+                "下下个时段的平移抓猪固定为4星42%、5星40%、6星18%，其他临时概率效果保留。"
+            ),
+        )
+    if normalized_id == WINDOW_SIX_STAR_RESONANCE:
+        base = _number(raw, "base_bonus_percent", lower=0.01, upper=10.0)
+        cook_per_star = _number(raw, "cook_bonus_per_caught_star", lower=0.1, upper=5.0)
+        reward_catches = _integer(raw, "six_star_cook_reward_catches", lower=1, upper=10)
+        reward_foods = _integer(raw, "six_star_catch_reward_food_count", lower=1, upper=20)
+        if abs(base - 3.07) > 1e-9 or abs(cook_per_star - 1.0) > 1e-9:
+            raise FoodEffectError("粉蓝四叶草冰糕的基础共鸣参数必须为3.07%与每星1%。")
+        bonuses = raw.get("catch_bonus_by_food_rarity")
+        if not isinstance(bonuses, Mapping):
+            raise FoodEffectError("粉蓝四叶草冰糕缺少高星菜共鸣表。")
+        parsed = {str(key): float(value) for key, value in bonuses.items()}
+        if parsed != {"4": 10.0, "5": 30.0, "6": 50.0}:
+            raise FoodEffectError("粉蓝四叶草冰糕的高星菜共鸣必须为4星10%、5星30%、6星50%。")
+        params = {
+            "base_bonus_percent": base,
+            "cook_bonus_per_caught_star": cook_per_star,
+            "catch_bonus_by_food_rarity": parsed,
+            "six_star_cook_reward_catches": reward_catches,
+            "six_star_catch_reward_food_count": reward_foods,
+        }
+        return FoodEffectGrant(
+            normalized_id,
+            params,
+            1,
+            (
+                "本时段抓猪与六星猪做菜的6星概率各+3.07个百分点；每抓到1只猪，按其星级为本时段六星做菜"
+                "累计同数值百分点，成功做出六星菜后清零并获得3次抓猪；每做出4/5/6星菜，为本时段六星猪"
+                "分别累计+10/+30/+50个百分点，成功抓到六星猪后清零并获得7道随机三星菜。"
+            ),
+        )
     if normalized_id == SHUFFLED_CATCH_DISTRIBUTION:
         uses = _integer(raw, "uses", lower=1, upper=10)
         return FoodEffectGrant(
@@ -1304,6 +1356,43 @@ def apply_six_star_progress(
     donor_end = 3 if action == "catch" else 5
     adjusted[:donor_end] = [value * donor_scale for value in adjusted[:donor_end]]
     adjusted[5] += funded
+    return normalize_weights(adjusted)
+
+
+def add_six_star_probability_points(
+    weights: Sequence[float],
+    *,
+    bonus_points: float,
+    action: str,
+) -> tuple[float, ...]:
+    """Move exact percentage points into six-star, capped only by 100 percent.
+
+    Catching spends 1-3 star probability first so the resonance normally preserves
+    the valuable 4/5-star bands.  Very large accumulated bonuses then spend 4/5-star
+    probability as a fallback; this is necessary for the advertised +30/+50 point
+    grants to stay exact even when permanent progression has already compressed the
+    low-star pool.  Cooking has no protected lower band and funds the bonus from all
+    non-six-star outcomes proportionally.
+    """
+
+    adjusted = list(normalize_weights(weights))
+    if adjusted[5] <= 0.0 or bonus_points <= 0.0:
+        return tuple(adjusted)
+    requested = min(float(bonus_points), 100.0 - adjusted[5])
+    remaining = requested
+    donor_groups = ((0, 1, 2), (3, 4)) if action == "catch" else ((0, 1, 2, 3, 4),)
+    for indexes in donor_groups:
+        donor_total = sum(adjusted[index] for index in indexes)
+        funded = min(donor_total, remaining)
+        if funded <= 0.0:
+            continue
+        donor_scale = (donor_total - funded) / donor_total
+        for index in indexes:
+            adjusted[index] *= donor_scale
+        adjusted[5] += funded
+        remaining -= funded
+        if remaining <= 1e-12:
+            break
     return normalize_weights(adjusted)
 
 

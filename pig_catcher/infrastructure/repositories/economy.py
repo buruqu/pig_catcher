@@ -111,6 +111,216 @@ class EconomyRepository:
             return 0, 0
         return int(row["permanent_bonus"]), int(row["active_weekly_bonus"])
 
+    async def active_catch_window_transfer(
+        self,
+        session: DatabaseSession,
+        *,
+        player_id: str,
+        now: str,
+    ) -> dict[str, object] | None:
+        """Return the player's not-yet-expired transfer schedule, if any."""
+
+        row = await session.fetch_one(
+            """
+            SELECT *
+            FROM player_catch_window_transfers
+            WHERE player_id = ? AND target_window_end > ?
+            """,
+            (player_id, now),
+        )
+        return dict(row) if row is not None else None
+
+    async def create_catch_window_transfer(
+        self,
+        session: DatabaseSession,
+        *,
+        player_id: str,
+        scope_id: str,
+        source_food_instance_id: str,
+        blocked_window_start: str,
+        blocked_window_end: str,
+        target_window_start: str,
+        target_window_end: str,
+        transferred_uses: int,
+        fixed_weights_json: str,
+        now: str,
+    ) -> None:
+        """Replace only an expired schedule with one auditable two-window transfer."""
+
+        cursor = await session.execute(
+            """
+            INSERT INTO player_catch_window_transfers(
+                player_id, scope_id, source_food_instance_id,
+                blocked_window_start, blocked_window_end,
+                target_window_start, target_window_end,
+                transferred_uses, fixed_weights_json, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(player_id) DO UPDATE SET
+                scope_id=excluded.scope_id,
+                source_food_instance_id=excluded.source_food_instance_id,
+                blocked_window_start=excluded.blocked_window_start,
+                blocked_window_end=excluded.blocked_window_end,
+                target_window_start=excluded.target_window_start,
+                target_window_end=excluded.target_window_end,
+                transferred_uses=excluded.transferred_uses,
+                fixed_weights_json=excluded.fixed_weights_json,
+                created_at=excluded.created_at,
+                updated_at=excluded.updated_at
+            WHERE player_catch_window_transfers.target_window_end <= ?
+            """,
+            (
+                player_id,
+                scope_id,
+                source_food_instance_id,
+                blocked_window_start,
+                blocked_window_end,
+                target_window_start,
+                target_window_end,
+                max(0, int(transferred_uses)),
+                fixed_weights_json,
+                now,
+                now,
+                now,
+            ),
+        )
+        if cursor.rowcount != 1:
+            raise RuntimeError("已有尚未结束的抓猪时段平移计划。")
+
+    async def add_transferred_catch_uses(
+        self,
+        session: DatabaseSession,
+        *,
+        player_id: str,
+        count: int,
+        now: str,
+    ) -> int | None:
+        """Move a grant received in the blocked window into the target window."""
+
+        cursor = await session.execute(
+            """
+            UPDATE player_catch_window_transfers
+            SET transferred_uses = transferred_uses + ?, updated_at = ?
+            WHERE player_id = ?
+              AND blocked_window_start <= ?
+              AND blocked_window_end > ?
+              AND target_window_end > ?
+            """,
+            (max(0, int(count)), now, player_id, now, now, now),
+        )
+        if cursor.rowcount != 1:
+            return None
+        row = await session.fetch_one(
+            "SELECT transferred_uses FROM player_catch_window_transfers WHERE player_id = ?",
+            (player_id,),
+        )
+        return int(row["transferred_uses"]) if row is not None else None
+
+    async def active_window_resonance(
+        self,
+        session: DatabaseSession,
+        *,
+        player_id: str,
+        now: str,
+    ) -> dict[str, object] | None:
+        row = await session.fetch_one(
+            """
+            SELECT * FROM player_window_resonance
+            WHERE player_id = ? AND window_start <= ? AND window_end > ?
+            """,
+            (player_id, now, now),
+        )
+        return dict(row) if row is not None else None
+
+    async def create_window_resonance(
+        self,
+        session: DatabaseSession,
+        *,
+        player_id: str,
+        scope_id: str,
+        source_food_instance_id: str,
+        window_start: str,
+        window_end: str,
+        now: str,
+    ) -> None:
+        cursor = await session.execute(
+            """
+            INSERT INTO player_window_resonance(
+                player_id, scope_id, source_food_instance_id,
+                window_start, window_end, cook_bonus_basis_points,
+                catch_bonus_basis_points, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, 0, 0, ?, ?)
+            ON CONFLICT(player_id) DO UPDATE SET
+                scope_id=excluded.scope_id,
+                source_food_instance_id=excluded.source_food_instance_id,
+                window_start=excluded.window_start,
+                window_end=excluded.window_end,
+                cook_bonus_basis_points=0,
+                catch_bonus_basis_points=0,
+                created_at=excluded.created_at,
+                updated_at=excluded.updated_at
+            WHERE player_window_resonance.window_end <= ?
+            """,
+            (player_id, scope_id, source_food_instance_id, window_start, window_end, now, now, now),
+        )
+        if cursor.rowcount != 1:
+            raise RuntimeError("本抓猪时段的粉蓝四叶草共鸣已经生效。")
+
+    async def add_window_resonance_cook_bonus(
+        self,
+        session: DatabaseSession,
+        *,
+        player_id: str,
+        basis_points: int,
+        now: str,
+    ) -> int:
+        await session.execute(
+            """
+            UPDATE player_window_resonance
+            SET cook_bonus_basis_points=cook_bonus_basis_points+?, updated_at=?
+            WHERE player_id=? AND window_start<=? AND window_end>?
+            """,
+            (max(0, int(basis_points)), now, player_id, now, now),
+        )
+        row = await self.active_window_resonance(session, player_id=player_id, now=now)
+        return int(row["cook_bonus_basis_points"]) if row is not None else 0
+
+    async def add_window_resonance_catch_bonus(
+        self,
+        session: DatabaseSession,
+        *,
+        player_id: str,
+        basis_points: int,
+        now: str,
+    ) -> int:
+        await session.execute(
+            """
+            UPDATE player_window_resonance
+            SET catch_bonus_basis_points=catch_bonus_basis_points+?, updated_at=?
+            WHERE player_id=? AND window_start<=? AND window_end>?
+            """,
+            (max(0, int(basis_points)), now, player_id, now, now),
+        )
+        row = await self.active_window_resonance(session, player_id=player_id, now=now)
+        return int(row["catch_bonus_basis_points"]) if row is not None else 0
+
+    async def reset_window_resonance_bonus(
+        self,
+        session: DatabaseSession,
+        *,
+        player_id: str,
+        column: str,
+        now: str,
+    ) -> None:
+        if column not in {"cook_bonus_basis_points", "catch_bonus_basis_points"}:
+            raise ValueError("Unknown resonance bonus column.")
+        await session.execute(
+            f"""
+            UPDATE player_window_resonance SET {column}=0, updated_at=?
+            WHERE player_id=? AND window_start<=? AND window_end>?
+            """,
+            (now, player_id, now, now),
+        )
+
     async def grant_weekly_catch_bonus(
         self,
         session: DatabaseSession,

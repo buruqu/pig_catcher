@@ -220,6 +220,8 @@ class PigCatcherDatabase:
         from .migrations.v0056_launch_campaign_and_social_limits import GUARDS as LAUNCH_GUARDS
         from .migrations.v0056_launch_campaign_and_social_limits import TABLES as LAUNCH_TABLES
         from .migrations.v0060_battle_rule_v11 import GUARDS as BATTLE_LOOT_TOTAL_GUARDS
+        from .migrations.v0061_window_mechanics_battle_v12 import GUARDS as WINDOW_MECHANIC_GUARDS
+        from .migrations.v0061_window_mechanics_battle_v12 import TABLES as WINDOW_MECHANIC_TABLES
 
         required_tables = {
             "player_food_effects",
@@ -276,6 +278,7 @@ class PigCatcherDatabase:
         required_tables.update(FEATURE_STORE_TABLES)
         required_tables.update(BATTLE_QUOTA_TABLES)
         required_tables.update(LAUNCH_TABLES)
+        required_tables.update(WINDOW_MECHANIC_TABLES)
         required_tables.add("achievement_badge_slots")
         table_rows = await (
             await connection.execute(
@@ -355,6 +358,7 @@ class PigCatcherDatabase:
         required_guards.update(BATTLE_QUOTA_GUARDS)
         required_guards.update(BATTLE_LOOT_TOTAL_GUARDS)
         required_guards.update(LAUNCH_GUARDS)
+        required_guards.update(WINDOW_MECHANIC_GUARDS)
         required_guards.update({"achievement_badge_slot_insert_guard", "achievement_badge_slot_update_guard"})
         guard_rows = await (
             await connection.execute("SELECT name FROM sqlite_master WHERE type IN ('trigger','index')")

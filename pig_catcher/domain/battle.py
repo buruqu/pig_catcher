@@ -18,6 +18,9 @@ from .battle_catalog import (
     DANIYA_FORM_STAGING,
     FIGHTERS,
     FIGHTERS_BY_ID,
+    FIREFLY_FORM_FIREFLY,
+    FIREFLY_FORM_SAM,
+    FIREFLY_MOVES,
     HEAVY_COUNT_WHEEL,
     INJURY_WHEELS,
     JUEJUE_ACCELERATION_TIERS,
@@ -172,6 +175,13 @@ def fresh_turn() -> dict:
         "yilu_true_damage_layers": 0,
         "yilu_force_end": False,
         "yilu_round_base_bonus": 0,
+        "firefly_sam_draw_bonus_units": 0,
+        "firefly_no_transform_bonus_units": 0,
+        "firefly_entered_sam": False,
+        "firefly_sam_skills_used": 0,
+        "firefly_outgoing_collapse": 0,
+        "firefly_forced_choices": [],
+        "firefly_self_exhaust_delta_units": Fraction(0),
     }
 
 
@@ -263,6 +273,11 @@ def new_state(fighters: list[dict], *, seed: str = "") -> dict:
                 "yilu_markers_total": 0,
                 "yilu_future_base_bonus": 0,
                 "yilu_next_round_base_bonus": 0,
+                "firefly_form": FIREFLY_FORM_FIREFLY if fighter_id == "firefly" else "",
+                "firefly_sam_rounds_remaining": 0,
+                "firefly_fuel": 0,
+                "firefly_collapse": 0,
+                "firefly_next_sam_gain_bonus": 0,
                 "turn": fresh_turn(),
             }
         )
@@ -311,6 +326,14 @@ def _side(state: dict, side: int) -> dict:
     player.setdefault("yilu_markers_total", 0)
     player.setdefault("yilu_future_base_bonus", 0)
     player.setdefault("yilu_next_round_base_bonus", 0)
+    player.setdefault(
+        "firefly_form",
+        FIREFLY_FORM_FIREFLY if player.get("snapshot", {}).get("fighter_id") == "firefly" else "",
+    )
+    player.setdefault("firefly_sam_rounds_remaining", 0)
+    player.setdefault("firefly_fuel", 0)
+    player.setdefault("firefly_collapse", 0)
+    player.setdefault("firefly_next_sam_gain_bonus", 0)
     for key, value in fresh_turn().items():
         player["turn"].setdefault(key, deepcopy(value))
     return player
@@ -458,6 +481,79 @@ def _yilu_add_markers(player: dict, amount: int) -> dict:
     }
 
 
+def _firefly_move_family(move: Move, form_id: str) -> str:
+    if "sam-skill" in move.tags:
+        return "sam"
+    if "firefly-skill" in move.tags:
+        return "firefly"
+    return "sam" if form_id == FIREFLY_FORM_SAM else "firefly"
+
+
+def _firefly_choice_score(move: Move, *, family: str) -> Fraction:
+    """Stable auto-choice heuristic for a prompt-free QQ battle chain."""
+
+    score = abs(_move_base(move)) + abs(_opponent_reduction_base(move))
+    score += Fraction(max(0, int(move.draws)) * 8)
+    if "domain" in move.tags:
+        score += 12
+    if family == "sam":
+        score += 10
+    return score
+
+
+def _queue_firefly_choice(
+    player: dict,
+    *,
+    seed: str,
+    key: str,
+    version: int,
+    option_count: int,
+    echo_choice: bool,
+    source_ordinal: int,
+) -> dict:
+    """Freeze candidate rolls and queue exactly one selected skill for the next draw."""
+
+    moves = FIREFLY_MOVES
+    wheel = tuple((index, move_weight_units(player, move)) for index, move in enumerate(moves))
+    options: list[dict] = []
+    form_id = str(player.get("firefly_form") or FIREFLY_FORM_FIREFLY)
+    for option in range(1, option_count + 1):
+        index, roll = choose(
+            seed,
+            f"{key}:firefly-choice:{option}",
+            wheel,
+            version=version,
+        )
+        move = moves[index]
+        family = _firefly_move_family(move, form_id)
+        options.append(
+            {
+                "slot": option,
+                "move_id": move.move_id,
+                "name": move.name,
+                "family": family,
+                "roll": roll,
+                "score": _firefly_choice_score(move, family=family),
+            }
+        )
+    selected = max(options, key=lambda item: (Fraction(item["score"]), -int(item["slot"])))
+    queued = {
+        "source_ordinal": source_ordinal,
+        "echo_choice": echo_choice,
+        "options": deepcopy(options),
+        "selected_slot": int(selected["slot"]),
+        "selected_move_id": str(selected["move_id"]),
+        "selected_name": str(selected["name"]),
+        "selected_family": str(selected["family"]),
+        "forced_gain_bonus": 10 if selected["family"] == "sam" else 0,
+        "echo_scale": Fraction(1, 2) if echo_choice and selected["family"] == "firefly" else Fraction(1),
+        "draw_wheel_move_ids": [move.move_id for move in moves],
+        "draw_wheel_units": [weight for _index, weight in wheel],
+    }
+    player["turn"].setdefault("firefly_forced_choices", []).append(deepcopy(queued))
+    return queued
+
+
 def apply_move(
     player: dict,
     move: Move,
@@ -473,6 +569,9 @@ def apply_move(
     mimic_override: dict | None = None,
     copy_context: bool = False,
     effect_repeats: int = 1,
+    forced_gain_bonus: int | Fraction = 0,
+    firefly_echo_scale: int | Fraction = 1,
+    firefly_choice_context: dict | None = None,
 ) -> dict:
     """应用一个确定招式。
 
@@ -497,10 +596,13 @@ def apply_move(
     effect_loan = bool(move.loan)
     is_juejue = fighter_id == "juejue"
     is_daniya = fighter_id == "daniya"
+    is_firefly = snapshot.get("fighter_id") == "firefly"
     if is_juejue:
         form_before = player.get("juejue_form", "")
     elif is_daniya:
         form_before = player.get("daniya_form", DANIYA_FORM_STAGING)
+    elif is_firefly:
+        form_before = player.get("firefly_form", FIREFLY_FORM_FIREFLY)
     else:
         form_before = ""
     music_was_active = bool(turn.get("juejue_music"))
@@ -560,6 +662,130 @@ def apply_move(
         turn.get("yilu_round_base_bonus", 0)
     )
     asamu_future_gain_before = int(player.get("asamu_future_gain_bonus", 0))
+    firefly_fuel_before = int(player.get("firefly_fuel", 0))
+    firefly_collapse_to_add = 0
+    firefly_conditional_reduction = 0
+    firefly_self_exhaust_delta_units = Fraction(0)
+    firefly_choice = None
+    firefly_echo = bool(
+        is_firefly
+        and form_before == FIREFLY_FORM_SAM
+        and "firefly-skill" in effect_tags
+    )
+    firefly_echo_scale = Fraction(firefly_echo_scale)
+    firefly_sam_skill = bool(is_firefly and "sam-skill" in effect_tags)
+    firefly_sam_skill_index_before = int(turn.get("firefly_sam_skills_used", 0))
+    firefly_entered_sam = False
+    firefly_next_sam_bonus_used = 0
+
+    if is_firefly and "firefly-skill" in effect_tags:
+        if firefly_echo:
+            if "firefly-crimson-cocoon" in effect_tags:
+                special_base = Fraction(6) * firefly_echo_scale
+                opponent_reduction = Fraction(6) * firefly_echo_scale
+                firefly_collapse_to_add = 1
+            elif "firefly-dream-destination" in effect_tags:
+                special_base = Fraction(0)
+                opponent_reduction = Fraction(10) * firefly_echo_scale
+                firefly_self_exhaust_delta_units = Fraction(-1) * firefly_echo_scale
+            elif "firefly-choice" in effect_tags:
+                special_base = Fraction(0)
+                firefly_choice = _queue_firefly_choice(
+                    player,
+                    seed=seed,
+                    key=key,
+                    version=version,
+                    option_count=1,
+                    echo_choice=True,
+                    source_ordinal=ordinal,
+                )
+                special_extra_draws += 1
+        else:
+            player["firefly_fuel"] = min(3, firefly_fuel_before + 1)
+            if "firefly-crimson-cocoon" in effect_tags:
+                player["firefly_next_sam_gain_bonus"] = int(
+                    player.get("firefly_next_sam_gain_bonus", 0)
+                ) + 6
+                turn["firefly_no_transform_bonus_units"] = int(
+                    turn.get("firefly_no_transform_bonus_units", 0)
+                ) + 200
+            elif "firefly-dream-destination" in effect_tags:
+                firefly_self_exhaust_delta_units = Fraction(-3, 2)
+                firefly_conditional_reduction = 5
+            elif "firefly-choice" in effect_tags:
+                firefly_choice = _queue_firefly_choice(
+                    player,
+                    seed=seed,
+                    key=key,
+                    version=version,
+                    option_count=2,
+                    echo_choice=False,
+                    source_ordinal=ordinal,
+                )
+                special_extra_draws += 1
+                if firefly_choice["selected_family"] == "firefly":
+                    turn["domain_clash_bonus_units"] = int(
+                        turn.get("domain_clash_bonus_units", 0)
+                    ) + 2
+
+    if firefly_sam_skill:
+        if form_before == FIREFLY_FORM_FIREFLY:
+            player["firefly_form"] = FIREFLY_FORM_SAM
+            player["firefly_sam_rounds_remaining"] = max(
+                2,
+                int(player.get("firefly_sam_rounds_remaining", 0)),
+            )
+            turn["firefly_entered_sam"] = True
+            firefly_entered_sam = True
+        turn["firefly_sam_skills_used"] = firefly_sam_skill_index_before + 1
+        fuel_gain = firefly_fuel_before * 5
+        special_base += fuel_gain
+        queued_bonus = int(player.get("firefly_next_sam_gain_bonus", 0))
+        if queued_bonus:
+            special_base += queued_bonus
+            firefly_next_sam_bonus_used = queued_bonus
+            player["firefly_next_sam_gain_bonus"] = 0
+        if "sam-bottom-fire-slash" in effect_tags:
+            firefly_collapse_to_add = 1
+        elif "sam-skyfire-bombardment" in effect_tags:
+            firefly_collapse_to_add = 1
+        elif "sam-deathstar-overload" in effect_tags:
+            firefly_collapse_to_add = 1
+        elif "sam-ignite-star-sea" in effect_tags:
+            if form_before == FIREFLY_FORM_SAM:
+                special_base = Fraction(20 + fuel_gain + queued_bonus)
+                opponent_reduction = Fraction(10)
+                player["firefly_sam_rounds_remaining"] = max(
+                    1,
+                    int(player.get("firefly_sam_rounds_remaining", 0)),
+                ) + 1
+                firefly_collapse_to_add = 1
+            else:
+                player["firefly_sam_rounds_remaining"] = 2
+                player["next_action_bonus"] += 1
+                firefly_collapse_to_add = 2
+            player["firefly_fuel"] = 0
+        special_base += Fraction(forced_gain_bonus)
+
+    if is_firefly and "firefly-domain" in effect_tags:
+        # QQ链式指令不插入额外的中途交互：萨姆形态优先延长，否则回到流萤并获得下回合+1招。
+        if form_before == FIREFLY_FORM_SAM:
+            player["firefly_sam_rounds_remaining"] = max(
+                1,
+                int(player.get("firefly_sam_rounds_remaining", 0)),
+            ) + 1
+            firefly_domain_choice = "extend-sam"
+        else:
+            player["firefly_form"] = FIREFLY_FORM_FIREFLY
+            player["next_action_bonus"] += 1
+            firefly_domain_choice = "return-firefly"
+    else:
+        firefly_domain_choice = ""
+
+    if firefly_self_exhaust_delta_units:
+        turn["firefly_self_exhaust_delta_units"] = Fraction(
+            turn.get("firefly_self_exhaust_delta_units", 0)
+        ) + firefly_self_exhaust_delta_units
 
     if is_juejue and "juejue-accelerate" in move.tags:
         tier, subwheel = _juejue_subwheel(player, "acceleration", seed, key, version)
@@ -991,6 +1217,9 @@ def apply_move(
             "gain": zero_bonus,
         }
 
+    if is_firefly and forced_gain_bonus and not firefly_sam_skill:
+        special_base += Fraction(forced_gain_bonus)
+
     positive_numeric = special_base > 0
     signed_numeric = special_base != 0
     tool = snapshot.get("tool_id", "") if not player["tool_used"] else ""
@@ -1152,7 +1381,11 @@ def apply_move(
         "form_after": (
             player.get("juejue_form", "")
             if is_juejue
-            else player.get("daniya_form", DANIYA_FORM_STAGING) if is_daniya else ""
+            else player.get("daniya_form", DANIYA_FORM_STAGING)
+            if is_daniya
+            else player.get("firefly_form", FIREFLY_FORM_FIREFLY)
+            if is_firefly
+            else ""
         ),
         "daniya_domain_steps_before": daniya_domain_before,
         "daniya_domain_steps_after": int(player.get("daniya_domain_steps", 0)),
@@ -1209,6 +1442,20 @@ def apply_move(
         "copied_domain_effect": copied_domain_effect,
         "copied_domain_effect_suppressed": copied_domain_effect_suppressed,
         "suppressed_source_local_effects": list(suppressed_source_local_effects),
+        "firefly_echo": firefly_echo,
+        "firefly_echo_scale": firefly_echo_scale,
+        "firefly_fuel_before": firefly_fuel_before,
+        "firefly_fuel_after": int(player.get("firefly_fuel", 0)),
+        "firefly_sam_skill": firefly_sam_skill,
+        "firefly_sam_skill_index_before": firefly_sam_skill_index_before,
+        "firefly_entered_sam": firefly_entered_sam,
+        "firefly_sam_rounds_remaining": int(player.get("firefly_sam_rounds_remaining", 0)),
+        "firefly_next_sam_bonus_used": firefly_next_sam_bonus_used,
+        "firefly_collapse_to_add": firefly_collapse_to_add,
+        "firefly_conditional_reduction": firefly_conditional_reduction,
+        "firefly_self_exhaust_delta_units": firefly_self_exhaust_delta_units,
+        "firefly_choice": deepcopy(firefly_choice or firefly_choice_context),
+        "firefly_domain_choice": firefly_domain_choice,
     }
 
 
@@ -1239,7 +1486,55 @@ def move_weight_units(player: dict, move: Move) -> int:
         elif "asamu-tit-for-tat" in move.tags:
             injury = player.get("injury_state", "none")
             units = 749 if injury == "light" else 947 if injury == "heavy" else 400
+    if player.get("snapshot", {}).get("fighter_id") == "firefly" and "sam-skill" in move.tags:
+        units += int(player.get("firefly_fuel", 0)) * (MOVE_WEIGHT_SCALE // 10)
+        units += int(player.get("turn", {}).get("firefly_sam_draw_bonus_units", 0))
+        if player.get("firefly_form") == FIREFLY_FORM_FIREFLY:
+            units -= MOVE_WEIGHT_SCALE // 10
     return max(1, units)
+
+
+def _apply_firefly_event_context(state: dict, side: int, event: dict) -> None:
+    """Apply opponent-aware Firefly/Sam facts without making command order observable."""
+
+    player = state["sides"][side]
+    if player.get("snapshot", {}).get("fighter_id") != "firefly":
+        return
+    target = state["sides"][1 - side]
+    turn = player["turn"]
+    collapse_before = int(target.get("firefly_collapse", 0)) + int(
+        turn.get("firefly_outgoing_collapse", 0)
+    )
+    event["firefly_target_collapse_before"] = collapse_before
+    extra_gain = Fraction(0)
+    if event.get("firefly_sam_skill"):
+        extra_gain += collapse_before * 4
+        if event.get("move_id") == "sam-bottom-fire-slash":
+            extra_gain += collapse_before * 4
+            if int(event.get("firefly_sam_skill_index_before", 0)) == 0:
+                event["opponent_reduction"] = Fraction(event.get("opponent_reduction", 0)) + 8
+                event["firefly_first_sam_reduction"] = 8
+        if event.get("move_id") == "sam-deathstar-overload" and collapse_before >= 2:
+            event["opponent_next_debt"] = int(event.get("opponent_next_debt", 0)) + 1
+            event["firefly_collapse_debt_triggered"] = True
+    if event.get("firefly_echo") and event.get("move_id") == "firefly-dream-destination" and collapse_before >= 2:
+        event["opponent_exhaust_bonus_units"] = Fraction(
+            event.get("opponent_exhaust_bonus_units", 0)
+        ) + 1
+        event["firefly_echo_collapse_risk_triggered"] = True
+    if event.get("move_id") == "firefly-falling-sky" and collapse_before >= 3:
+        event["opponent_reduction"] = Fraction(event.get("opponent_reduction", 0)) + 15
+        event["firefly_domain_collapse_reduction"] = 15
+    if extra_gain:
+        player["weight"] += extra_gain
+        event["gain"] = Fraction(event.get("gain", 0)) + extra_gain
+        event["has_numeric_contribution"] = True
+    event["firefly_collapse_passive_gain"] = extra_gain
+    added = int(event.get("firefly_collapse_to_add", 0))
+    if added:
+        turn["firefly_outgoing_collapse"] = int(turn.get("firefly_outgoing_collapse", 0)) + added
+    event["firefly_target_collapse_after_pending"] = collapse_before + added
+    event["total"] = player["weight"]
 
 
 def play_chunk(state: dict, side: int, seed: str, *, chunk_size: int = MOVE_CHUNK_SIZE) -> list[dict]:
@@ -1264,9 +1559,14 @@ def play_chunk(state: dict, side: int, seed: str, *, chunk_size: int = MOVE_CHUN
             and not forced_yilu_operator
             and int(player["turn"].get("yilu_specialist_operator_draws", 0)) > 0
         )
+        firefly_choice = None
+        if not forced_milk and player["turn"].get("firefly_forced_choices"):
+            firefly_choice = player["turn"]["firefly_forced_choices"].pop(0)
         # 每次抽取都重新读取当前形态。切换招式增加的 pending 会在同一
         # play_chunk 内立刻从新轮盘抽取，不会继续使用分片开始时的旧盘。
-        if forced_yilu_operator:
+        if firefly_choice is not None:
+            moves = FIREFLY_MOVES
+        elif forced_yilu_operator:
             moves = tuple(move for move in YILU_MOVES if "yilu-operator" in move.tags)
         elif forced_yilu_specialist:
             moves = tuple(
@@ -1280,16 +1580,31 @@ def play_chunk(state: dict, side: int, seed: str, *, chunk_size: int = MOVE_CHUN
             moves = fighter_form_moves(fighter_id, player["juejue_form"])
         elif fighter_id == "daniya":
             moves = fighter_form_moves(fighter_id, player["daniya_form"])
+        elif fighter_id == "firefly":
+            moves = fighter_form_moves(fighter_id, player["firefly_form"])
         else:
             moves = FIGHTERS_BY_ID[fighter_id].moves
         ordinal = player["turn"]["draws"] + 1
         wheel = tuple((index, move_weight_units(player, move)) for index, move in enumerate(moves))
-        index, roll = choose(
-            seed,
-            f"{state['round']}:{side}:move:{ordinal}",
-            wheel,
-            version=state["version"],
-        )
+        if firefly_choice is None:
+            index, roll = choose(
+                seed,
+                f"{state['round']}:{side}:move:{ordinal}",
+                wheel,
+                version=state["version"],
+            )
+        else:
+            index = next(
+                index
+                for index, candidate in enumerate(moves)
+                if candidate.move_id == firefly_choice["selected_move_id"]
+            )
+            selected_option = next(
+                option
+                for option in firefly_choice["options"]
+                if int(option["slot"]) == int(firefly_choice["selected_slot"])
+            )
+            roll = int(selected_option["roll"])
         original_move = moves[index]
         selected_move = ASAMU_MOVES[7] if forced_milk else original_move
         if forced_milk:
@@ -1307,6 +1622,13 @@ def play_chunk(state: dict, side: int, seed: str, *, chunk_size: int = MOVE_CHUN
             version=state["version"],
             forced=forced_milk,
             effect_repeats=2 if forced_yilu_operator else 1,
+            forced_gain_bonus=(
+                int(firefly_choice.get("forced_gain_bonus", 0)) if firefly_choice is not None else 0
+            ),
+            firefly_echo_scale=(
+                firefly_choice.get("echo_scale", 1) if firefly_choice is not None else 1
+            ),
+            firefly_choice_context=firefly_choice,
         )
         event.update(
             roll=roll,
@@ -1320,7 +1642,12 @@ def play_chunk(state: dict, side: int, seed: str, *, chunk_size: int = MOVE_CHUN
             original_move_name=original_move.name if forced_milk else "",
             yilu_babel_redeploy=forced_yilu_operator,
             yilu_specialist_redeploy=forced_yilu_specialist,
+            firefly_forced_choice=firefly_choice is not None,
+            firefly_choice_source_ordinal=(
+                int(firefly_choice["source_ordinal"]) if firefly_choice is not None else None
+            ),
         )
+        _apply_firefly_event_context(state, side, event)
         player["turn"]["events"].append(deepcopy(event))
         events.append(event)
     return events
@@ -1489,6 +1816,8 @@ def _available_moves(player: dict) -> tuple[Move, ...]:
         return fighter_form_moves(fighter_id, player["juejue_form"])
     if fighter_id == "daniya":
         return fighter_form_moves(fighter_id, player["daniya_form"])
+    if fighter_id == "firefly":
+        return fighter_form_moves(fighter_id, player["firefly_form"])
     return FIGHTERS_BY_ID[fighter_id].moves
 
 
@@ -2049,6 +2378,20 @@ def _settle_interactions(state: dict, seed: str) -> dict:
             domain_effects.append(
                 f"末日方舟{trigger}：获得明日，下回合+1招且该回合所有招式基础胜率+1"
             )
+        if fighter_id == "firefly" and "firefly-falling-sky" in hit_ids:
+            player = state["sides"][hit_side]
+            player["weight"] += 12
+            player["turn"]["firefly_self_exhaust_delta_units"] = Fraction(
+                player["turn"].get("firefly_self_exhaust_delta_units", 0)
+            )
+            target_turn = state["sides"][target]["turn"]
+            target_turn["firefly_self_exhaust_delta_units"] = Fraction(
+                target_turn.get("firefly_self_exhaust_delta_units", 0)
+            ) + Fraction(3, 2)
+            trigger = "领域战获胜" if domain.get("mode") == "clash" else "领域命中"
+            domain_effects.append(
+                f"自破碎的天空坠落{trigger}：追加Δ指令-焦土陨击，自己胜率+12、对手本回合力竭权重+0.15"
+            )
 
     if domain is not None:
         domain["effects"] = domain_effects
@@ -2065,6 +2408,13 @@ def _settle_interactions(state: dict, seed: str) -> dict:
         target = 1 - attacker
         for event in state["sides"][attacker]["turn"].get("events", ()):
             original_requested = Fraction(event.get("opponent_reduction", 0))
+            conditional_reduction = int(event.get("firefly_conditional_reduction", 0))
+            target_has_round_gain = Fraction(state["sides"][target]["weight"]) > Fraction(
+                state["sides"][target].get("round_start_weight", 5)
+            )
+            if conditional_reduction and target_has_round_gain:
+                original_requested += conditional_reduction
+                event["firefly_conditional_reduction_applied"] = conditional_reduction
             debt = int(event.get("opponent_next_debt", 0))
             bonus = int(event.get("opponent_next_bonus", 0))
             milk_dragons = int(event.get("opponent_next_milk_dragons", 0))
@@ -2174,6 +2524,28 @@ def _settle_interactions(state: dict, seed: str) -> dict:
             }
         )
 
+    firefly_collapse_updates = []
+    for attacker, player in enumerate(state["sides"]):
+        added = sum(
+            int(event.get("firefly_collapse_to_add", 0))
+            for event in player["turn"].get("events", ())
+        )
+        if not added:
+            continue
+        target = 1 - attacker
+        before_collapse = int(state["sides"][target].get("firefly_collapse", 0))
+        after_collapse = min(3, before_collapse + added)
+        state["sides"][target]["firefly_collapse"] = after_collapse
+        firefly_collapse_updates.append(
+            {
+                "source_side": attacker,
+                "target_side": target,
+                "added": added,
+                "before": before_collapse,
+                "after": after_collapse,
+            }
+        )
+
     return {
         "domain": domain,
         "daniya_transition": daniya_transition,
@@ -2186,6 +2558,7 @@ def _settle_interactions(state: dict, seed: str) -> dict:
         "pressure_checks": tuple(pressure_checks),
         "yilu_defender_results": tuple(yilu_defender_results),
         "yilu_true_damage": tuple(yilu_true_damage),
+        "firefly_collapse_updates": tuple(firefly_collapse_updates),
         "zeroes": tuple(zeroes),
         "round_reductions": tuple(round_reductions),
         "cross_effects": tuple(cross_effects),
@@ -2200,7 +2573,8 @@ def _dynamic_injury_wheel(state: dict, loser: int) -> tuple[tuple, dict]:
     base = INJURY_WHEELS[int(player["risk"])]
     weights = {name: int(weight) for name, weight in base}
     permanent_bonus = int(player.get("injury_exhaust_bonus_units", 0))
-    weights["exhausted"] += permanent_bonus
+    collapse_bonus = int(player.get("firefly_collapse", 0))
+    weights["exhausted"] += permanent_bonus + collapse_bonus
     misfortune_count = sum(int(side["turn"].get("asamu_misfortune_count", 0)) for side in state["sides"])
     current_collapse = any(
         side_index != loser and int(side["turn"].get("daniya_collapse_count", 0))
@@ -2217,6 +2591,13 @@ def _dynamic_injury_wheel(state: dict, loser: int) -> tuple[tuple, dict]:
     worsen_layers = int(player["turn"].get("yilu_injury_worsen_layers", 0))
     injury_factor = Fraction(1, 2) ** recovery_layers * Fraction(3, 2) ** worsen_layers
     exact_weights = {name: Fraction(value) for name, value in weights.items()}
+    current_firefly_delta = Fraction(
+        player.get("turn", {}).get("firefly_self_exhaust_delta_units", 0)
+    )
+    exact_weights["exhausted"] = max(
+        Fraction(1, 10),
+        exact_weights["exhausted"] + current_firefly_delta,
+    )
     for name in ("heavy", "exhausted"):
         exact_weights[name] *= injury_factor
     weight_scale = 1
@@ -2226,6 +2607,8 @@ def _dynamic_injury_wheel(state: dict, loser: int) -> tuple[tuple, dict]:
     return wheel, {
         "base_wheel": base,
         "permanent_exhaust_bonus_units": permanent_bonus,
+        "firefly_collapse_bonus_units": collapse_bonus,
+        "firefly_current_delta_units": current_firefly_delta,
         "misfortune_count": misfortune_count,
         "current_collapse_multiplier": 5 if current_collapse else 1,
         "rebound_multiplier": rebound,
@@ -2323,20 +2706,47 @@ def resolve_round(state: dict, seed: str) -> dict | None:
         "before": before,
         "after": deepcopy(state["sides"]),
         "natural_end": natural_end,
+        "firefly_transitions": (),
     }
     if natural_end:
         state.update(status="completed", winner=winner)
     else:
         state["round"] += 1
+        firefly_transitions = []
         for index, player in enumerate(state["sides"]):
             player.setdefault("round_gains", []).append(carryover[index]["round_gain"])
             player["weight"] = carryover[index]["next_round_weight"]
             player["round_start_weight"] = carryover[index]["next_round_weight"]
+            next_sam_draw_bonus_units = 0
+            if player.get("snapshot", {}).get("fighter_id") == "firefly":
+                if not player["turn"].get("firefly_entered_sam"):
+                    next_sam_draw_bonus_units = int(
+                        player["turn"].get("firefly_no_transform_bonus_units", 0)
+                    )
+                before_form = str(player.get("firefly_form") or FIREFLY_FORM_FIREFLY)
+                before_remaining = int(player.get("firefly_sam_rounds_remaining", 0))
+                if before_form == FIREFLY_FORM_SAM:
+                    after_remaining = max(0, before_remaining - 1)
+                    player["firefly_sam_rounds_remaining"] = after_remaining
+                    if after_remaining == 0:
+                        player["firefly_form"] = FIREFLY_FORM_FIREFLY
+                firefly_transitions.append(
+                    {
+                        "side": index,
+                        "before_form": before_form,
+                        "after_form": str(player.get("firefly_form") or FIREFLY_FORM_FIREFLY),
+                        "before_remaining": before_remaining,
+                        "after_remaining": int(player.get("firefly_sam_rounds_remaining", 0)),
+                        "next_sam_draw_bonus_units": next_sam_draw_bonus_units,
+                    }
+                )
             player["turn"] = fresh_turn()
+            player["turn"]["firefly_sam_draw_bonus_units"] = next_sam_draw_bonus_units
             player["turn"]["yilu_round_base_bonus"] = int(
                 player.get("yilu_next_round_base_bonus", 0)
             )
             player["yilu_next_round_base_bonus"] = 0
+        result["firefly_transitions"] = tuple(firefly_transitions)
     return result
 
 

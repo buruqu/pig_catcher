@@ -1,9 +1,9 @@
 {
   "source_root": "asset_library/current/media",
   "definitions": "catalogs/formal/pig-and-food-definitions.json",
-  "entry_count": 328,
-  "unique_binary_count": 257,
-  "stored_binary_count": 332,
+  "entry_count": 344,
+  "unique_binary_count": 261,
+  "stored_binary_count": 348,
   "duplicate_aliases": [
     {
       "source_path": "猪猪素材库/紫色品质/翻滚猪.jpg",
@@ -2307,6 +2307,118 @@
       "media_path": "media/定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/熠～噜猪绿芯小猪派.png",
       "sha256": "76ce0235d4c48e5f35015052ad1e619ed7a82e7fe99291530865223fd0539b01",
       "bytes": 2645037
+    },
+    {
+      "template_id": "pig-g1092931381-firefly-embrace",
+      "source_path": "定制猪群友库/1092931381/栖夜流萤抱抱猪.png",
+      "media_path": "media/定制猪群友库/1092931381/栖夜流萤抱抱猪.png",
+      "sha256": "d982c7c76cf8c343125c108055fcddaee0192ef532783c6f856484b7d9bd9c0a",
+      "bytes": 2815671
+    },
+    {
+      "template_id": "food-g1092931381-firefly-moonlight-roll",
+      "source_path": "定制美食库/1092931381/月栖萤光卷.png",
+      "media_path": "media/定制美食库/1092931381/月栖萤光卷.png",
+      "sha256": "5927b2b4898ad16f0dd6645bec82684b967a2fe267b766e96340654ab6c1537c",
+      "bytes": 2730445
+    },
+    {
+      "template_id": "pig-g1092931381-march-seven",
+      "source_path": "定制猪群友库/1092931381/三月七猪.png",
+      "media_path": "media/定制猪群友库/1092931381/三月七猪.png",
+      "sha256": "19f2ab4a2db9d208218d74fd8ec0ee2e0bf3dfd1172167dbcb5287bc465c15af",
+      "bytes": 2204617
+    },
+    {
+      "template_id": "food-g1092931381-march-seven-clover-ice-cake",
+      "source_path": "定制美食库/1092931381/粉蓝四叶草冰糕.png",
+      "media_path": "media/定制美食库/1092931381/粉蓝四叶草冰糕.png",
+      "sha256": "cfa4115b7e4899b56a16095ebcd05849ffef678fda86c69259b2167ace894b2f",
+      "bytes": 2476054
+    },
+    {
+      "template_id": "pig-g237716658-firefly-embrace",
+      "source_path": "定制猪群友库/237716658/栖夜流萤抱抱猪.png",
+      "media_path": "media/定制猪群友库/237716658/栖夜流萤抱抱猪.png",
+      "sha256": "d982c7c76cf8c343125c108055fcddaee0192ef532783c6f856484b7d9bd9c0a",
+      "bytes": 2815671
+    },
+    {
+      "template_id": "food-g237716658-firefly-moonlight-roll",
+      "source_path": "定制美食库/237716658/月栖萤光卷.png",
+      "media_path": "media/定制美食库/237716658/月栖萤光卷.png",
+      "sha256": "5927b2b4898ad16f0dd6645bec82684b967a2fe267b766e96340654ab6c1537c",
+      "bytes": 2730445
+    },
+    {
+      "template_id": "pig-g237716658-march-seven",
+      "source_path": "定制猪群友库/237716658/三月七猪.png",
+      "media_path": "media/定制猪群友库/237716658/三月七猪.png",
+      "sha256": "19f2ab4a2db9d208218d74fd8ec0ee2e0bf3dfd1172167dbcb5287bc465c15af",
+      "bytes": 2204617
+    },
+    {
+      "template_id": "food-g237716658-march-seven-clover-ice-cake",
+      "source_path": "定制美食库/237716658/粉蓝四叶草冰糕.png",
+      "media_path": "media/定制美食库/237716658/粉蓝四叶草冰糕.png",
+      "sha256": "cfa4115b7e4899b56a16095ebcd05849ffef678fda86c69259b2167ace894b2f",
+      "bytes": 2476054
+    },
+    {
+      "template_id": "pig-qo5e5854406d0297d6feae696a13e3a339-firefly-embrace",
+      "source_path": "定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/栖夜流萤抱抱猪.png",
+      "media_path": "media/定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/栖夜流萤抱抱猪.png",
+      "sha256": "d982c7c76cf8c343125c108055fcddaee0192ef532783c6f856484b7d9bd9c0a",
+      "bytes": 2815671
+    },
+    {
+      "template_id": "food-qo5e5854406d0297d6feae696a13e3a339-firefly-moonlight-roll",
+      "source_path": "定制美食库/5E5854406D0297D6FEAE696A13E3A339/月栖萤光卷.png",
+      "media_path": "media/定制美食库/5E5854406D0297D6FEAE696A13E3A339/月栖萤光卷.png",
+      "sha256": "5927b2b4898ad16f0dd6645bec82684b967a2fe267b766e96340654ab6c1537c",
+      "bytes": 2730445
+    },
+    {
+      "template_id": "pig-qo5e5854406d0297d6feae696a13e3a339-march-seven",
+      "source_path": "定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/三月七猪.png",
+      "media_path": "media/定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/三月七猪.png",
+      "sha256": "19f2ab4a2db9d208218d74fd8ec0ee2e0bf3dfd1172167dbcb5287bc465c15af",
+      "bytes": 2204617
+    },
+    {
+      "template_id": "food-qo5e5854406d0297d6feae696a13e3a339-march-seven-clover-ice-cake",
+      "source_path": "定制美食库/5E5854406D0297D6FEAE696A13E3A339/粉蓝四叶草冰糕.png",
+      "media_path": "media/定制美食库/5E5854406D0297D6FEAE696A13E3A339/粉蓝四叶草冰糕.png",
+      "sha256": "cfa4115b7e4899b56a16095ebcd05849ffef678fda86c69259b2167ace894b2f",
+      "bytes": 2476054
+    },
+    {
+      "template_id": "pig-qo9ea2810f378fbd7dc3219c56ceab3520-firefly-embrace",
+      "source_path": "定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/栖夜流萤抱抱猪.png",
+      "media_path": "media/定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/栖夜流萤抱抱猪.png",
+      "sha256": "d982c7c76cf8c343125c108055fcddaee0192ef532783c6f856484b7d9bd9c0a",
+      "bytes": 2815671
+    },
+    {
+      "template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-firefly-moonlight-roll",
+      "source_path": "定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/月栖萤光卷.png",
+      "media_path": "media/定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/月栖萤光卷.png",
+      "sha256": "5927b2b4898ad16f0dd6645bec82684b967a2fe267b766e96340654ab6c1537c",
+      "bytes": 2730445
+    },
+    {
+      "template_id": "pig-qo9ea2810f378fbd7dc3219c56ceab3520-march-seven",
+      "source_path": "定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/三月七猪.png",
+      "media_path": "media/定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/三月七猪.png",
+      "sha256": "19f2ab4a2db9d208218d74fd8ec0ee2e0bf3dfd1172167dbcb5287bc465c15af",
+      "bytes": 2204617
+    },
+    {
+      "template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-march-seven-clover-ice-cake",
+      "source_path": "定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/粉蓝四叶草冰糕.png",
+      "media_path": "media/定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/粉蓝四叶草冰糕.png",
+      "sha256": "cfa4115b7e4899b56a16095ebcd05849ffef678fda86c69259b2167ace894b2f",
+      "bytes": 2476054
     }
   ]
 }

@@ -449,6 +449,7 @@ class PigCatcherPlugin(MaiBotPlugin):
                 catch_base_weights=settings.catching.weights(),
                 quota_refresh_hours=settings.catching.quota_refresh_hours,
                 quota_timezone_name=settings.catching.daily_reset_timezone,
+                catch_daily_limit=settings.catching.daily_limit,
             )
             regulation_service = RegulationService(
                 database,

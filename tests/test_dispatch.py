@@ -172,11 +172,11 @@ async def world(tmp_path: Path):
     await db.close()
 
 
-def test_formal_specialties_cover_all_223_pigs_and_91_low_star_templates():
+def test_formal_specialties_cover_all_231_pigs_and_91_low_star_templates():
     path = Path(__file__).resolve().parents[1] / "catalogs/formal/pig-and-food-definitions.json"
     pigs = [entry for entry in json.loads(path.read_text(encoding="utf-8"))["entries"] if entry["kind"] == "pig"]
     assert set(SPECIALTIES) == {entry["template_id"] for entry in pigs}
-    assert len(pigs) == 223 and sum(entry["rarity"] <= 3 for entry in pigs) == 91
+    assert len(pigs) == 231 and sum(entry["rarity"] <= 3 for entry in pigs) == 91
     assert specialties("future-unknown-template") == ("后勤",)
 
 

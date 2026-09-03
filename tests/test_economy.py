@@ -37,6 +37,7 @@ from pig_catcher.domain.errors import (
     FoodEffectError,
     InsufficientBalanceError,
 )
+from pig_catcher.domain.food_effects import add_six_star_probability_points
 from pig_catcher.domain.models import CommandIdentity, ScopeKey
 from pig_catcher.domain.special_content import (
     GOJO_BLUE_FOOD_TEMPLATE_ID,
@@ -61,6 +62,7 @@ from pig_catcher.infrastructure.repositories import (
     TechniqueRepository,
 )
 from pig_catcher.rendering import food_card_view, group_event_eat_view, store_view
+from pig_catcher.rendering.food_rewards import food_reward_view
 from pig_catcher.services import (
     AssetCatalogService,
     CatchQuotaResetService,
@@ -498,6 +500,303 @@ async def test_cooking_commits_once_and_rehydrates_after_restart(
     assert pig is not None and pig["state"] == "consumed-for-cooking"
     assert food_count is not None and food_count["count"] == 1
     assert cook_receipts is not None and cook_receipts["count"] == 1
+    await database.close()
+
+
+def test_window_resonance_probability_points_are_exact_and_spend_low_stars_first() -> None:
+    catch = add_six_star_probability_points(
+        (1.0, 2.0, 3.0, 42.0, 40.0, 12.0),
+        bonus_points=50.0,
+        action="catch",
+    )
+    assert catch[5] == pytest.approx(62.0)
+    assert catch[:3] == pytest.approx((0.0, 0.0, 0.0))
+    assert sum(catch[3:5]) == pytest.approx(38.0)
+    cooking = add_six_star_probability_points(
+        (0.0, 0.0, 0.0, 0.0, 90.0, 10.0),
+        bonus_points=4.07,
+        action="cook",
+    )
+    assert cooking == pytest.approx((0.0, 0.0, 0.0, 0.0, 85.93, 14.07))
+
+
+@pytest.mark.asyncio
+async def test_moonlight_roll_blocks_next_window_moves_new_grants_and_restores_fixed_distribution(
+    tmp_path: Path,
+) -> None:
+    database = await _database_with_catalog(
+        tmp_path,
+        pig_rarities=(4, 5, 6),
+        food_rarities=(3, 4, 5, 6),
+        manifest_version=4,
+    )
+    clock = FixedClock()
+    owner = _identity(message_id="moon-seed")
+    await FrameworkService(database).touch_identity(owner)
+    await _insert_food(
+        database,
+        player_id=owner.player_id,
+        scope_id=owner.scope.value,
+        template_id="food-6-group",
+        display_name="月栖萤光卷",
+        official_value=25_000,
+        short_code="MOONROLL",
+        instance_id="moonlight-roll",
+        rarity=6,
+        effect_id="catch-window-transfer",
+        effect_params={"fixed_weights": [0, 0, 0, 42, 40, 18]},
+    )
+    economy = EconomyService(
+        database,
+        CookingSection(cook_cooldown_seconds=0),
+        EconomySection(),
+        clock=clock,
+        catch_daily_limit=5,
+    )
+    eaten = await economy.eat(
+        _identity(message_id="moon-eat"),
+        "月栖萤光卷#MOONROLL",
+    )
+    assert eaten.reward_payload["transferred_uses"] == 5
+    reward_view = food_reward_view(eaten)
+    assert reward_view.title == "月光迁时已生效"
+    assert "07-28 19:00–07-29 00:00" in reward_view.prize_label
+    assert "07-29 00:00–07-29 09:00" in reward_view.prize_label
+    transfer = await database.fetch_one(
+        "SELECT * FROM player_catch_window_transfers WHERE player_id=?",
+        (owner.player_id,),
+    )
+    assert transfer is not None
+    assert transfer["blocked_window_start"] == "2026-07-28T11:00:00.000Z"
+    assert transfer["target_window_start"] == "2026-07-28T16:00:00.000Z"
+
+    clock.value = datetime(2026, 7, 28, 12, 0, tzinfo=UTC)
+    blocked_catching = GameplayService(
+        database,
+        CatchingSection(cooldown_seconds=0),
+        random_source=SequenceRandom(),
+        clock=clock,
+    )
+    with pytest.raises(DailyCatchLimitError, match="封存本时段"):
+        await blocked_catching.catch(_identity(message_id="moon-blocked"))
+
+    await _insert_food(
+        database,
+        player_id=owner.player_id,
+        scope_id=owner.scope.value,
+        template_id="food-3-common",
+        display_name="封锁期额度菜",
+        official_value=300,
+        short_code="MOVEPLUS",
+        instance_id="moon-extra-catches",
+        rarity=3,
+        effect_id="extra-catches",
+        effect_params={"count": 2},
+        now="2026-07-28T12:00:00.000Z",
+    )
+    moved = await economy.eat(
+        _identity(message_id="moon-extra-eat"),
+        "封锁期额度菜#MOVEPLUS",
+    )
+    assert "累计平移 7 次" in moved.effect.summary
+    transfer = await database.fetch_one(
+        "SELECT transferred_uses FROM player_catch_window_transfers WHERE player_id=?",
+        (owner.player_id,),
+    )
+    assert transfer is not None and transfer["transferred_uses"] == 7
+    queued = await database.fetch_one(
+        "SELECT 1 FROM player_food_effects WHERE source_food_instance_id=?",
+        ("moon-extra-catches",),
+    )
+    assert queued is None
+
+    await _insert_food(
+        database,
+        player_id=owner.player_id,
+        scope_id=owner.scope.value,
+        template_id="food-3-common",
+        display_name="封锁期专属轮盘菜",
+        official_value=301,
+        short_code="MOVEWHEL",
+        instance_id="moon-dedicated-catches",
+        rarity=3,
+        effect_id="even-catch-distribution",
+        effect_params={"uses": 2},
+        now="2026-07-28T12:00:00.000Z",
+    )
+    dedicated = await economy.eat(
+        _identity(message_id="moon-dedicated-eat"),
+        "封锁期专属轮盘菜#MOVEWHEL",
+    )
+    assert "累计平移 9 次" in dedicated.effect.summary
+    queued = await database.fetch_one(
+        "SELECT 1 FROM player_food_effects WHERE source_food_instance_id=?",
+        ("moon-dedicated-catches",),
+    )
+    assert queued is None
+
+    clock.value = datetime(2026, 7, 28, 16, 0, tzinfo=UTC)
+    target_catching = GameplayService(
+        database,
+        CatchingSection(cooldown_seconds=0),
+        random_source=SequenceRandom(0.0, 0.0, 0.5, 0.5, 0.5, 0.5, 0.5),
+        clock=clock,
+        id_factory=iter(("moon-target-pig", "moon-target-ledger")).__next__,
+        short_code_factory=lambda: "MOONTARG",
+    )
+    caught = await target_catching.catch(_identity(message_id="moon-target"))
+    assert caught.pig.rarity == 4
+    assert caught.weights == pytest.approx((0, 0, 0, 42, 40, 18))
+    assert caught.daily_limit == 14
+    assert caught.exclusive_effect_active
+    assert any("额外返还 9 次" in line for line in caught.effect_summaries)
+    await database.close()
+
+
+@pytest.mark.asyncio
+async def test_march_seven_resonance_accumulates_resets_and_grants_both_rewards(
+    tmp_path: Path,
+) -> None:
+    database = await _database_with_catalog(
+        tmp_path,
+        pig_rarities=(1, 6),
+        food_rarities=(3, 5, 6),
+        manifest_version=4,
+    )
+    clock = FixedClock()
+    owner = _identity(message_id="march-seed")
+    await FrameworkService(database).touch_identity(owner)
+    resonance_params = {
+        "base_bonus_percent": 3.07,
+        "cook_bonus_per_caught_star": 1,
+        "catch_bonus_by_food_rarity": {"4": 10, "5": 30, "6": 50},
+        "six_star_cook_reward_catches": 3,
+        "six_star_catch_reward_food_count": 7,
+    }
+    await _insert_food(
+        database,
+        player_id=owner.player_id,
+        scope_id=owner.scope.value,
+        template_id="food-6-group",
+        display_name="粉蓝四叶草冰糕",
+        official_value=25_000,
+        short_code="MARCHICE",
+        instance_id="march-ice-cake",
+        rarity=6,
+        effect_id="window-six-star-resonance",
+        effect_params=resonance_params,
+    )
+    economy = EconomyService(
+        database,
+        CookingSection(cook_cooldown_seconds=0),
+        EconomySection(),
+        clock=clock,
+    )
+    eaten = await economy.eat(
+        _identity(message_id="march-eat"),
+        "粉蓝四叶草冰糕#MARCHICE",
+    )
+    assert eaten.reward_payload["kind"] == "window-six-star-resonance"
+    reward_view = food_reward_view(eaten)
+    assert reward_view.title == "粉蓝共鸣已点亮"
+    assert "07-28 12:00–07-28 19:00" in reward_view.prize_label
+    assert "实时累积" in reward_view.hint
+
+    first_catching = GameplayService(
+        database,
+        CatchingSection(cooldown_seconds=0),
+        random_source=SequenceRandom(0.0, 0.0, 0.5, 0.5, 0.5, 0.5, 0.5),
+        clock=clock,
+        id_factory=iter(("march-one-star-pig", "march-one-star-ledger")).__next__,
+        short_code_factory=lambda: "MARCHONE",
+    )
+    first = await first_catching.catch(_identity(message_id="march-first-catch"))
+    assert first.pig.rarity == 1
+    row = await database.fetch_one(
+        "SELECT cook_bonus_basis_points, catch_bonus_basis_points FROM player_window_resonance WHERE player_id=?",
+        (owner.player_id,),
+    )
+    assert row is not None and tuple(row) == (100, 0)
+
+    await _insert_pig(
+        database,
+        player_id=owner.player_id,
+        scope_id=owner.scope.value,
+        template_id="pig-6-group",
+        rarity=6,
+        display_name="六星共鸣原料猪",
+        official_value=25_000,
+        short_code="MARCHPIG",
+        instance_id="march-six-star-source",
+    )
+    cook_ids = iter(("march-six-star-food", "march-reward-catches", "march-cook-ledger"))
+    cook_codes = iter(("MARCHFOD",))
+    cook_service = EconomyService(
+        database,
+        CookingSection(cook_cooldown_seconds=0),
+        EconomySection(),
+        random_source=SequenceRandom(0.999, 0.0, 0.5),
+        clock=clock,
+        id_factory=cook_ids.__next__,
+        short_code_factory=cook_codes.__next__,
+    )
+    cooked = await cook_service.cook(
+        _identity(message_id="march-six-star-cook"),
+        "六星共鸣原料猪#MARCHPIG",
+    )
+    assert cooked.foods[0].rarity == 6
+    assert cooked.weights[5] == pytest.approx(14.07)
+    assert any("获得3次额外抓猪机会" in line for line in cooked.effect_summaries)
+    row = await database.fetch_one(
+        "SELECT cook_bonus_basis_points, catch_bonus_basis_points FROM player_window_resonance WHERE player_id=?",
+        (owner.player_id,),
+    )
+    assert row is not None and tuple(row) == (0, 5_000)
+    extra = await database.fetch_one(
+        "SELECT granted_uses, consumed_uses FROM player_food_effects WHERE effect_entry_id=?",
+        ("march-reward-catches",),
+    )
+    assert extra is not None and tuple(extra) == (3, 0)
+
+    catch_ids = iter(
+        ("march-six-star-catch",)
+        + tuple(f"march-three-star-reward-{index}" for index in range(1, 8))
+        + ("march-six-star-ledger",)
+    )
+    catch_codes = iter(("MARCHSIX",) + tuple(f"MARCH3{index:02d}" for index in range(1, 8)))
+    reward_draws = tuple(value for _ in range(7) for value in (0.0, 0.5))
+    six_star_catching = GameplayService(
+        database,
+        CatchingSection(cooldown_seconds=0),
+        random_source=SequenceRandom(
+            0.999,
+            0.0,
+            0.5,
+            0.5,
+            0.5,
+            0.5,
+            0.5,
+            *reward_draws,
+        ),
+        clock=clock,
+        id_factory=catch_ids.__next__,
+        short_code_factory=catch_codes.__next__,
+    )
+    sixth = await six_star_catching.catch(_identity(message_id="march-six-star-catch"))
+    assert sixth.pig.rarity == 6
+    assert sixth.weights[5] > 50
+    assert any("获得7道随机三星菜" in line for line in sixth.effect_summaries)
+    row = await database.fetch_one(
+        "SELECT cook_bonus_basis_points, catch_bonus_basis_points FROM player_window_resonance WHERE player_id=?",
+        (owner.player_id,),
+    )
+    assert row is not None and tuple(row) == (600, 0)
+    rewards = await database.fetch_all(
+        "SELECT rarity, state FROM food_instances WHERE source_pig_instance_id=? ORDER BY food_instance_id",
+        ("march-six-star-catch",),
+    )
+    assert len(rewards) == 7
+    assert all(tuple(item) == (3, "active") for item in rewards)
     await database.close()
 
 

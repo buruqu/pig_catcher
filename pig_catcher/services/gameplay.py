@@ -35,6 +35,7 @@ from ..domain.food_effects import (
     active_effect_from_row,
     active_group_effect_from_row,
     active_quota_effect_bonuses,
+    add_six_star_probability_points,
     apply_catch_effects,
     apply_group_catch_effects,
     apply_group_hidden_boost,
@@ -1042,6 +1043,24 @@ class GameplayService:
                     now=now,
                 )
             )
+            window_transfer = await self.economy_repository.active_catch_window_transfer(
+                session,
+                player_id=identity.player_id,
+                now=now,
+            )
+            transfer_blocked = bool(
+                window_transfer is not None
+                and str(window_transfer["blocked_window_start"]) <= now < str(window_transfer["blocked_window_end"])
+            )
+            transfer_target_active = bool(
+                window_transfer is not None
+                and str(window_transfer["target_window_start"]) <= now < str(window_transfer["target_window_end"])
+            )
+            if transfer_blocked:
+                raise DailyCatchLimitError(
+                    "月栖萤光卷正在封存本时段抓猪额度；本时段不能抓猪，"
+                    f"全部额度将在 {str(window_transfer['target_window_start'])} 开始的下个时段返还。"
+                )
             current_window_bonus, today_window_bonus = active_quota_effect_bonuses(active_effects)
             extra_granted, extra_consumed = await self.economy_repository.extra_catch_grants(
                 session,
@@ -1099,6 +1118,10 @@ class GameplayService:
                 )
             base_window_limit = quota_layers.base_window_limit
             normal_daily_limit = quota_layers.effective_limit(used_count=daily_count)
+            if transfer_target_active:
+                transferred_uses = int(window_transfer["transferred_uses"])
+                base_window_limit += transferred_uses
+                normal_daily_limit += transferred_uses
             daily_limit = self._restricted_daily_limit(
                 normal_limit=normal_daily_limit,
                 restriction=catch_restriction,
@@ -1145,16 +1168,25 @@ class GameplayService:
             )
             armed_item, armed_uses = self._armed_item(armed_row, "catching")
             equipped_item = armed_item
-            group_exclusive_effect_active = has_compatible_exclusive_group_catch_effect(active_group_effects)
+            group_exclusive_effect_active = (
+                False
+                if transfer_target_active
+                else has_compatible_exclusive_group_catch_effect(active_group_effects)
+            )
             personal_exclusive_effect_active = (
-                not group_exclusive_effect_active
+                not transfer_target_active
+                and not group_exclusive_effect_active
                 and has_compatible_exclusive_catch_effect(
                     applicable_active_effects,
                     six_star_available=bool(buckets[Rarity.SIX]),
                 )
             )
             # 六星菜独占效果：回到未受等级、饲料、道具和普通菜影响的基础层。
-            exclusive_effect_active = group_exclusive_effect_active or personal_exclusive_effect_active
+            exclusive_effect_active = (
+                transfer_target_active
+                or group_exclusive_effect_active
+                or personal_exclusive_effect_active
+            )
             deferred_achievement_tickets = bool(
                 exclusive_effect_active and (achievement_catch_tickets or achievement_visual_tickets)
             )
@@ -1168,7 +1200,27 @@ class GameplayService:
                 player_level=1 if exclusive_effect_active else probability_level,
                 item_id=armed_item.item_id if armed_item is not None else "",
             )
-            if group_exclusive_effect_active:
+            if transfer_target_active:
+                effect_application = apply_catch_effects(weights, ())
+                group_effect_application = apply_group_catch_effects(weights, ())
+                weights = normalize_weights(json.loads(str(window_transfer["fixed_weights_json"])))
+                effect_summaries = (
+                    "月栖萤光卷平移时段：本时段额外返还 "
+                    f"{int(window_transfer['transferred_uses'])} 次额度，品质固定为4星42% / 5星40% / 6星18%。",
+                )
+                excluded_summaries = tuple(
+                    resolve_food_effect(effect.effect_id, effect.params).summary
+                    + "（本次由月栖萤光卷固定分布接管，保留且未消耗）"
+                    for effect in active_effects
+                    if effect.effect_id in CATCH_EFFECT_IDS
+                )
+                if active_group_effects:
+                    excluded_summaries += ("当前全群六星菜概率效果在平移时段保留且未消耗。",)
+                if equipped_item is not None:
+                    excluded_summaries += (
+                        f"已装备的“{equipped_item.display_name}”在平移时段保留且未消耗。",
+                    )
+            elif group_exclusive_effect_active:
                 effect_application = apply_catch_effects(weights, ())
                 group_effect_application = apply_group_catch_effects(
                     weights,
@@ -1233,6 +1285,11 @@ class GameplayService:
                     + "（当前由群体术式接管猪猪归属，复制效果保留未消耗）"
                     for effect in deferred_duplication_effects
                 )
+            window_resonance = await self.economy_repository.active_window_resonance(
+                session,
+                player_id=identity.player_id,
+                now=now,
+            )
             candidate_buckets = buckets
             if effect_application.collaboration_only:
                 collaboration_templates = [
@@ -1328,6 +1385,19 @@ class GameplayService:
                     )
             elif six_star_progress_stacks:
                 excluded_summaries += ("达妮娅泡泡云冻永久概率加成本次受六星菜独占规则影响，未参与结算。",)
+            if window_resonance is not None and not exclusive_effect_active:
+                resonance_bonus = 3.07 + int(window_resonance["catch_bonus_basis_points"]) / 100.0
+                weights = add_six_star_probability_points(
+                    weights,
+                    bonus_points=resonance_bonus,
+                    action="catch",
+                )
+                effect_summaries += (
+                    f"粉蓝四叶草共鸣：本次6星概率额外+{resonance_bonus:g}个百分点"
+                    f"（基础3.07，做菜累计{int(window_resonance['catch_bonus_basis_points']) / 100:g}）。",
+                )
+            elif window_resonance is not None:
+                excluded_summaries += ("粉蓝四叶草共鸣本次受六星独占固定分布影响，累计状态保留。",)
             campaign_probability_active = bool(
                 first_day_active(self.launch_campaign, now_datetime)
                 and not exclusive_effect_active
@@ -1455,6 +1525,25 @@ class GameplayService:
                 else:
                     effect_summaries += ("美食加成本次未触发复制。",)
             auto_gift_target_player_id = ""
+            resonance_reward_foods: tuple[str, ...] = ()
+            if window_resonance is not None:
+                cook_bonus_after = await self.economy_repository.add_window_resonance_cook_bonus(
+                    session,
+                    player_id=identity.player_id,
+                    basis_points=int(rarity) * 100,
+                    now=now,
+                )
+                effect_summaries += (
+                    f"粉蓝四叶草共鸣：本次{int(rarity)}星猪令六星做菜累计加成增至"
+                    f"+{cook_bonus_after / 100:g}个百分点。",
+                )
+                if rarity is Rarity.SIX:
+                    await self.economy_repository.reset_window_resonance_bonus(
+                        session,
+                        player_id=identity.player_id,
+                        column="catch_bonus_basis_points",
+                        now=now,
+                    )
             random_snapshot = {
                 "ruleset_version": RULESET_VERSION,
                 "base_weights": list(self.catching.weights()),
@@ -1533,6 +1622,29 @@ class GameplayService:
                     "updated_at": now,
                 },
             )
+            if window_resonance is not None and rarity is Rarity.SIX:
+                resonance_reward_foods = await self._grant_random_three_star_foods(
+                    session,
+                    identity=identity,
+                    source_pig_instance_id=pig_instance_id,
+                    source_weight=attributes.weight_value,
+                    source_weight_percentile=attributes.weight_percentile,
+                    source_fat_category=attributes.fat_category,
+                    count=7,
+                    now=now,
+                    source_key=idempotency_key,
+                )
+                effect_summaries += (
+                    "粉蓝四叶草共鸣命中六星：六星猪概率累计已清零，并获得7道随机三星菜："
+                    + "、".join(resonance_reward_foods)
+                    + "。",
+                )
+                random_snapshot["food_effect_summaries"] = list(effect_summaries)
+                random_snapshot["window_resonance_reward_foods"] = list(resonance_reward_foods)
+                await session.execute(
+                    "UPDATE pig_instances SET random_snapshot_json=?, updated_at=? WHERE pig_instance_id=?",
+                    (self.repository.random_snapshot_json(random_snapshot), now, pig_instance_id),
+                )
             if duplication_triggered:
                 duplicate_snapshot = {
                     **random_snapshot,
@@ -1864,6 +1976,7 @@ class GameplayService:
                     if technique_resolution is not None
                     else None
                 ),
+                "window_resonance_reward_foods": list(resonance_reward_foods),
             }
             provisional_receipt = CommandReceipt(
                 receipt_id="",
@@ -3563,6 +3676,87 @@ class GameplayService:
         except ValueError:
             return value
         return parsed.astimezone(timezone(timedelta(hours=8))).strftime("北京时间 %Y-%m-%d %H:%M:%S")
+
+    async def _grant_random_three_star_foods(
+        self,
+        session: DatabaseSession,
+        *,
+        identity: CommandIdentity,
+        source_pig_instance_id: str,
+        source_weight: float,
+        source_weight_percentile: float,
+        source_fat_category: str,
+        count: int,
+        now: str,
+        source_key: str,
+    ) -> tuple[str, ...]:
+        """Grant auditable random 3-star dishes without replaying cooking rewards."""
+
+        templates = await self.economy_repository.list_drawable_food_templates(
+            session,
+            scope_id=identity.scope.value,
+            rarity=3,
+        )
+        if not templates:
+            raise NoDrawableTemplateError("粉蓝四叶草奖励找不到当前群可用的三星菜模板。")
+        labels: list[str] = []
+        reserved_codes: list[str] = []
+        for index in range(max(0, int(count))):
+            template_roll = self.random_source.random()
+            template = templates[min(int(template_roll * len(templates)), len(templates) - 1)]
+            portion_roll = self.random_source.random()
+            attributes = generate_food_attributes(
+                rarity=Rarity.THREE,
+                template_id=str(template["template_id"]),
+                source_weight=source_weight,
+                source_weight_percentile=source_weight_percentile,
+                portion_roll=portion_roll,
+            )
+            food_instance_id = self._new_identifier()
+            short_code = await self._new_unique_short_code(session, reserved=reserved_codes)
+            reserved_codes.append(short_code)
+            await self.economy_repository.insert_food_instance(
+                session,
+                values={
+                    "food_instance_id": food_instance_id,
+                    "short_code": short_code,
+                    "scope_id": identity.scope.value,
+                    "owner_player_id": identity.player_id,
+                    "template_id": str(template["template_id"]),
+                    "template_version": int(template["template_version"]),
+                    "source_pig_instance_id": source_pig_instance_id,
+                    "rarity": 3,
+                    "display_name_snapshot": str(template["display_name"]),
+                    "portion_weight": attributes.portion_weight,
+                    "fat_category": source_fat_category,
+                    "official_value": attributes.official_value,
+                    "effect_id": str(template.get("effect_id") or ""),
+                    "effect_params_json": str(template.get("effect_params_json") or "{}"),
+                    "ruleset_version": RULESET_VERSION,
+                    "random_snapshot_json": self.repository.random_snapshot_json(
+                        {
+                            "ruleset_version": RULESET_VERSION,
+                            "source": "window-six-star-resonance",
+                            "source_key": source_key,
+                            "reward_index": index + 1,
+                            "template_roll": template_roll,
+                            "portion_roll": portion_roll,
+                            "source_pig_instance_id": source_pig_instance_id,
+                        }
+                    ),
+                    "acquired_at": now,
+                    "updated_at": now,
+                },
+            )
+            await self.economy_repository.upsert_food_catalog(
+                session,
+                player_id=identity.player_id,
+                template_id=str(template["template_id"]),
+                portion_weight=attributes.portion_weight,
+                now=now,
+            )
+            labels.append(f"{template['display_name']}#{short_code}")
+        return tuple(labels)
 
     def _new_identifier(self) -> str:
         candidate = str(self.id_factory() or "").strip()

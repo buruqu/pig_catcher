@@ -11081,6 +11081,582 @@
       "effect_params": {},
       "paired_food_template_id": "",
       "collection": null
+    },
+    {
+      "template_id": "pig-g1092931381-firefly-embrace",
+      "kind": "pig",
+      "display_name": "栖夜流萤抱抱猪",
+      "rarity": 6,
+      "scope": "group",
+      "group_scope_id": "qq:1092931381",
+      "description": "萤火与月色织成柔软的夜幕，银白发梢、青绿缎带和星形挂饰都在轻轻发亮。它把小小的流萤护在怀里，安静得像一枚尚未点燃的茧，认真起来却仿佛能披上炽焰装甲冲破长夜。",
+      "image": "media/定制猪群友库/1092931381/栖夜流萤抱抱猪.png",
+      "alternate_image": "",
+      "fit": "contain",
+      "source": "用户于 2026-07-28 至 2026-08-28 提供的抓猪素材库，本地授权使用",
+      "license": "user-provided-local-use",
+      "consent_status": "granted",
+      "recipe_tags": [
+        "群友定制",
+        "崩坏：星穹铁道",
+        "流萤",
+        "萤火"
+      ],
+      "effect_id": "",
+      "effect_params": {},
+      "paired_food_template_id": "food-g1092931381-firefly-moonlight-roll",
+      "collection": null,
+      "length_min_cm": 45,
+      "length_max_cm": 160,
+      "weight_min_kg": 60,
+      "weight_max_kg": 650,
+      "fat_profile": "balanced",
+      "stature_profile": "standard",
+      "display_tags": [
+        "群友定制",
+        "双形态战斗猪",
+        "银白长发",
+        "月夜萤光",
+        "温柔抱抱"
+      ]
+    },
+    {
+      "template_id": "food-g1092931381-firefly-moonlight-roll",
+      "kind": "food",
+      "display_name": "月栖萤光卷",
+      "rarity": 6,
+      "scope": "group",
+      "group_scope_id": "qq:1092931381",
+      "description": "月牙、星屑与淡青萤光绕着柔软蛋糕卷缓缓流动，切面藏着一颗澄亮的绿芯。它会先把下一段旅程折进梦里，再把积攒的光一次送往更远的时刻。",
+      "image": "media/定制美食库/1092931381/月栖萤光卷.png",
+      "alternate_image": "",
+      "fit": "contain",
+      "source": "用户于 2026-07-28 至 2026-08-28 提供的抓猪素材库，本地授权使用",
+      "license": "user-provided-local-use",
+      "consent_status": "granted",
+      "recipe_tags": [
+        "群友定制",
+        "崩坏：星穹铁道",
+        "月夜",
+        "甜香"
+      ],
+      "effect_id": "catch-window-transfer",
+      "effect_params": {
+        "fixed_weights": [
+          0,
+          0,
+          0,
+          42,
+          40,
+          18
+        ]
+      },
+      "paired_food_template_id": "",
+      "collection": null
+    },
+    {
+      "template_id": "pig-g1092931381-march-seven",
+      "kind": "pig",
+      "display_name": "三月七猪",
+      "rarity": 6,
+      "scope": "group",
+      "group_scope_id": "qq:1092931381",
+      "description": "粉蓝色云霞铺满相框，三月七猪举着小相机把每一次奇遇都拍进四叶草里。它相信好运值得被记录，也相信下一张照片里一定会有更闪亮的猪猪。",
+      "image": "media/定制猪群友库/1092931381/三月七猪.png",
+      "alternate_image": "",
+      "fit": "contain",
+      "source": "用户于 2026-07-28 至 2026-08-28 提供的抓猪素材库，本地授权使用",
+      "license": "user-provided-local-use",
+      "consent_status": "granted",
+      "recipe_tags": [
+        "群友定制",
+        "崩坏：星穹铁道",
+        "三月七",
+        "冰甜"
+      ],
+      "effect_id": "",
+      "effect_params": {},
+      "paired_food_template_id": "food-g1092931381-march-seven-clover-ice-cake",
+      "collection": null,
+      "length_min_cm": 36,
+      "length_max_cm": 138,
+      "weight_min_kg": 34,
+      "weight_max_kg": 450,
+      "fat_profile": "balanced",
+      "stature_profile": "standard",
+      "display_tags": [
+        "群友定制",
+        "粉蓝相机",
+        "四叶草",
+        "旅途留影"
+      ]
+    },
+    {
+      "template_id": "food-g1092931381-march-seven-clover-ice-cake",
+      "kind": "food",
+      "display_name": "粉蓝四叶草冰糕",
+      "rarity": 6,
+      "scope": "group",
+      "group_scope_id": "qq:1092931381",
+      "description": "粉蓝双色四叶草凝在晶莹冰糕里，像一张刚洗出的幸运照片。清甜凉意会记住本时段每一次抓猪与做菜的星光，让两条好运轨迹彼此追逐。",
+      "image": "media/定制美食库/1092931381/粉蓝四叶草冰糕.png",
+      "alternate_image": "",
+      "fit": "contain",
+      "source": "用户于 2026-07-28 至 2026-08-28 提供的抓猪素材库，本地授权使用",
+      "license": "user-provided-local-use",
+      "consent_status": "granted",
+      "recipe_tags": [
+        "群友定制",
+        "崩坏：星穹铁道",
+        "四叶草",
+        "冰甜"
+      ],
+      "effect_id": "window-six-star-resonance",
+      "effect_params": {
+        "base_bonus_percent": 3.07,
+        "cook_bonus_per_caught_star": 1,
+        "catch_bonus_by_food_rarity": {
+          "4": 10,
+          "5": 30,
+          "6": 50
+        },
+        "six_star_cook_reward_catches": 3,
+        "six_star_catch_reward_food_count": 7
+      },
+      "paired_food_template_id": "",
+      "collection": null
+    },
+    {
+      "template_id": "pig-g237716658-firefly-embrace",
+      "kind": "pig",
+      "display_name": "栖夜流萤抱抱猪",
+      "rarity": 6,
+      "scope": "group",
+      "group_scope_id": "qq:237716658",
+      "description": "萤火与月色织成柔软的夜幕，银白发梢、青绿缎带和星形挂饰都在轻轻发亮。它把小小的流萤护在怀里，安静得像一枚尚未点燃的茧，认真起来却仿佛能披上炽焰装甲冲破长夜。",
+      "image": "media/定制猪群友库/237716658/栖夜流萤抱抱猪.png",
+      "alternate_image": "",
+      "fit": "contain",
+      "source": "用户于 2026-07-28 至 2026-08-28 提供的抓猪素材库，本地授权使用",
+      "license": "user-provided-local-use",
+      "consent_status": "granted",
+      "recipe_tags": [
+        "群友定制",
+        "崩坏：星穹铁道",
+        "流萤",
+        "萤火"
+      ],
+      "effect_id": "",
+      "effect_params": {},
+      "paired_food_template_id": "food-g237716658-firefly-moonlight-roll",
+      "collection": null,
+      "length_min_cm": 45,
+      "length_max_cm": 160,
+      "weight_min_kg": 60,
+      "weight_max_kg": 650,
+      "fat_profile": "balanced",
+      "stature_profile": "standard",
+      "display_tags": [
+        "群友定制",
+        "双形态战斗猪",
+        "银白长发",
+        "月夜萤光",
+        "温柔抱抱"
+      ]
+    },
+    {
+      "template_id": "food-g237716658-firefly-moonlight-roll",
+      "kind": "food",
+      "display_name": "月栖萤光卷",
+      "rarity": 6,
+      "scope": "group",
+      "group_scope_id": "qq:237716658",
+      "description": "月牙、星屑与淡青萤光绕着柔软蛋糕卷缓缓流动，切面藏着一颗澄亮的绿芯。它会先把下一段旅程折进梦里，再把积攒的光一次送往更远的时刻。",
+      "image": "media/定制美食库/237716658/月栖萤光卷.png",
+      "alternate_image": "",
+      "fit": "contain",
+      "source": "用户于 2026-07-28 至 2026-08-28 提供的抓猪素材库，本地授权使用",
+      "license": "user-provided-local-use",
+      "consent_status": "granted",
+      "recipe_tags": [
+        "群友定制",
+        "崩坏：星穹铁道",
+        "月夜",
+        "甜香"
+      ],
+      "effect_id": "catch-window-transfer",
+      "effect_params": {
+        "fixed_weights": [
+          0,
+          0,
+          0,
+          42,
+          40,
+          18
+        ]
+      },
+      "paired_food_template_id": "",
+      "collection": null
+    },
+    {
+      "template_id": "pig-g237716658-march-seven",
+      "kind": "pig",
+      "display_name": "三月七猪",
+      "rarity": 6,
+      "scope": "group",
+      "group_scope_id": "qq:237716658",
+      "description": "粉蓝色云霞铺满相框，三月七猪举着小相机把每一次奇遇都拍进四叶草里。它相信好运值得被记录，也相信下一张照片里一定会有更闪亮的猪猪。",
+      "image": "media/定制猪群友库/237716658/三月七猪.png",
+      "alternate_image": "",
+      "fit": "contain",
+      "source": "用户于 2026-07-28 至 2026-08-28 提供的抓猪素材库，本地授权使用",
+      "license": "user-provided-local-use",
+      "consent_status": "granted",
+      "recipe_tags": [
+        "群友定制",
+        "崩坏：星穹铁道",
+        "三月七",
+        "冰甜"
+      ],
+      "effect_id": "",
+      "effect_params": {},
+      "paired_food_template_id": "food-g237716658-march-seven-clover-ice-cake",
+      "collection": null,
+      "length_min_cm": 36,
+      "length_max_cm": 138,
+      "weight_min_kg": 34,
+      "weight_max_kg": 450,
+      "fat_profile": "balanced",
+      "stature_profile": "standard",
+      "display_tags": [
+        "群友定制",
+        "粉蓝相机",
+        "四叶草",
+        "旅途留影"
+      ]
+    },
+    {
+      "template_id": "food-g237716658-march-seven-clover-ice-cake",
+      "kind": "food",
+      "display_name": "粉蓝四叶草冰糕",
+      "rarity": 6,
+      "scope": "group",
+      "group_scope_id": "qq:237716658",
+      "description": "粉蓝双色四叶草凝在晶莹冰糕里，像一张刚洗出的幸运照片。清甜凉意会记住本时段每一次抓猪与做菜的星光，让两条好运轨迹彼此追逐。",
+      "image": "media/定制美食库/237716658/粉蓝四叶草冰糕.png",
+      "alternate_image": "",
+      "fit": "contain",
+      "source": "用户于 2026-07-28 至 2026-08-28 提供的抓猪素材库，本地授权使用",
+      "license": "user-provided-local-use",
+      "consent_status": "granted",
+      "recipe_tags": [
+        "群友定制",
+        "崩坏：星穹铁道",
+        "四叶草",
+        "冰甜"
+      ],
+      "effect_id": "window-six-star-resonance",
+      "effect_params": {
+        "base_bonus_percent": 3.07,
+        "cook_bonus_per_caught_star": 1,
+        "catch_bonus_by_food_rarity": {
+          "4": 10,
+          "5": 30,
+          "6": 50
+        },
+        "six_star_cook_reward_catches": 3,
+        "six_star_catch_reward_food_count": 7
+      },
+      "paired_food_template_id": "",
+      "collection": null
+    },
+    {
+      "template_id": "pig-qo5e5854406d0297d6feae696a13e3a339-firefly-embrace",
+      "kind": "pig",
+      "display_name": "栖夜流萤抱抱猪",
+      "rarity": 6,
+      "scope": "group",
+      "group_scope_id": "qq-official:5E5854406D0297D6FEAE696A13E3A339",
+      "description": "萤火与月色织成柔软的夜幕，银白发梢、青绿缎带和星形挂饰都在轻轻发亮。它把小小的流萤护在怀里，安静得像一枚尚未点燃的茧，认真起来却仿佛能披上炽焰装甲冲破长夜。",
+      "image": "media/定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/栖夜流萤抱抱猪.png",
+      "alternate_image": "",
+      "fit": "contain",
+      "source": "用户于 2026-07-28 至 2026-08-28 提供的抓猪素材库，本地授权使用",
+      "license": "user-provided-local-use",
+      "consent_status": "granted",
+      "recipe_tags": [
+        "群友定制",
+        "崩坏：星穹铁道",
+        "流萤",
+        "萤火"
+      ],
+      "effect_id": "",
+      "effect_params": {},
+      "paired_food_template_id": "food-qo5e5854406d0297d6feae696a13e3a339-firefly-moonlight-roll",
+      "collection": null,
+      "length_min_cm": 45,
+      "length_max_cm": 160,
+      "weight_min_kg": 60,
+      "weight_max_kg": 650,
+      "fat_profile": "balanced",
+      "stature_profile": "standard",
+      "display_tags": [
+        "群友定制",
+        "双形态战斗猪",
+        "银白长发",
+        "月夜萤光",
+        "温柔抱抱"
+      ]
+    },
+    {
+      "template_id": "food-qo5e5854406d0297d6feae696a13e3a339-firefly-moonlight-roll",
+      "kind": "food",
+      "display_name": "月栖萤光卷",
+      "rarity": 6,
+      "scope": "group",
+      "group_scope_id": "qq-official:5E5854406D0297D6FEAE696A13E3A339",
+      "description": "月牙、星屑与淡青萤光绕着柔软蛋糕卷缓缓流动，切面藏着一颗澄亮的绿芯。它会先把下一段旅程折进梦里，再把积攒的光一次送往更远的时刻。",
+      "image": "media/定制美食库/5E5854406D0297D6FEAE696A13E3A339/月栖萤光卷.png",
+      "alternate_image": "",
+      "fit": "contain",
+      "source": "用户于 2026-07-28 至 2026-08-28 提供的抓猪素材库，本地授权使用",
+      "license": "user-provided-local-use",
+      "consent_status": "granted",
+      "recipe_tags": [
+        "群友定制",
+        "崩坏：星穹铁道",
+        "月夜",
+        "甜香"
+      ],
+      "effect_id": "catch-window-transfer",
+      "effect_params": {
+        "fixed_weights": [
+          0,
+          0,
+          0,
+          42,
+          40,
+          18
+        ]
+      },
+      "paired_food_template_id": "",
+      "collection": null
+    },
+    {
+      "template_id": "pig-qo5e5854406d0297d6feae696a13e3a339-march-seven",
+      "kind": "pig",
+      "display_name": "三月七猪",
+      "rarity": 6,
+      "scope": "group",
+      "group_scope_id": "qq-official:5E5854406D0297D6FEAE696A13E3A339",
+      "description": "粉蓝色云霞铺满相框，三月七猪举着小相机把每一次奇遇都拍进四叶草里。它相信好运值得被记录，也相信下一张照片里一定会有更闪亮的猪猪。",
+      "image": "media/定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/三月七猪.png",
+      "alternate_image": "",
+      "fit": "contain",
+      "source": "用户于 2026-07-28 至 2026-08-28 提供的抓猪素材库，本地授权使用",
+      "license": "user-provided-local-use",
+      "consent_status": "granted",
+      "recipe_tags": [
+        "群友定制",
+        "崩坏：星穹铁道",
+        "三月七",
+        "冰甜"
+      ],
+      "effect_id": "",
+      "effect_params": {},
+      "paired_food_template_id": "food-qo5e5854406d0297d6feae696a13e3a339-march-seven-clover-ice-cake",
+      "collection": null,
+      "length_min_cm": 36,
+      "length_max_cm": 138,
+      "weight_min_kg": 34,
+      "weight_max_kg": 450,
+      "fat_profile": "balanced",
+      "stature_profile": "standard",
+      "display_tags": [
+        "群友定制",
+        "粉蓝相机",
+        "四叶草",
+        "旅途留影"
+      ]
+    },
+    {
+      "template_id": "food-qo5e5854406d0297d6feae696a13e3a339-march-seven-clover-ice-cake",
+      "kind": "food",
+      "display_name": "粉蓝四叶草冰糕",
+      "rarity": 6,
+      "scope": "group",
+      "group_scope_id": "qq-official:5E5854406D0297D6FEAE696A13E3A339",
+      "description": "粉蓝双色四叶草凝在晶莹冰糕里，像一张刚洗出的幸运照片。清甜凉意会记住本时段每一次抓猪与做菜的星光，让两条好运轨迹彼此追逐。",
+      "image": "media/定制美食库/5E5854406D0297D6FEAE696A13E3A339/粉蓝四叶草冰糕.png",
+      "alternate_image": "",
+      "fit": "contain",
+      "source": "用户于 2026-07-28 至 2026-08-28 提供的抓猪素材库，本地授权使用",
+      "license": "user-provided-local-use",
+      "consent_status": "granted",
+      "recipe_tags": [
+        "群友定制",
+        "崩坏：星穹铁道",
+        "四叶草",
+        "冰甜"
+      ],
+      "effect_id": "window-six-star-resonance",
+      "effect_params": {
+        "base_bonus_percent": 3.07,
+        "cook_bonus_per_caught_star": 1,
+        "catch_bonus_by_food_rarity": {
+          "4": 10,
+          "5": 30,
+          "6": 50
+        },
+        "six_star_cook_reward_catches": 3,
+        "six_star_catch_reward_food_count": 7
+      },
+      "paired_food_template_id": "",
+      "collection": null
+    },
+    {
+      "template_id": "pig-qo9ea2810f378fbd7dc3219c56ceab3520-firefly-embrace",
+      "kind": "pig",
+      "display_name": "栖夜流萤抱抱猪",
+      "rarity": 6,
+      "scope": "group",
+      "group_scope_id": "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
+      "description": "萤火与月色织成柔软的夜幕，银白发梢、青绿缎带和星形挂饰都在轻轻发亮。它把小小的流萤护在怀里，安静得像一枚尚未点燃的茧，认真起来却仿佛能披上炽焰装甲冲破长夜。",
+      "image": "media/定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/栖夜流萤抱抱猪.png",
+      "alternate_image": "",
+      "fit": "contain",
+      "source": "用户于 2026-07-28 至 2026-08-28 提供的抓猪素材库，本地授权使用",
+      "license": "user-provided-local-use",
+      "consent_status": "granted",
+      "recipe_tags": [
+        "群友定制",
+        "崩坏：星穹铁道",
+        "流萤",
+        "萤火"
+      ],
+      "effect_id": "",
+      "effect_params": {},
+      "paired_food_template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-firefly-moonlight-roll",
+      "collection": null,
+      "length_min_cm": 45,
+      "length_max_cm": 160,
+      "weight_min_kg": 60,
+      "weight_max_kg": 650,
+      "fat_profile": "balanced",
+      "stature_profile": "standard",
+      "display_tags": [
+        "群友定制",
+        "双形态战斗猪",
+        "银白长发",
+        "月夜萤光",
+        "温柔抱抱"
+      ]
+    },
+    {
+      "template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-firefly-moonlight-roll",
+      "kind": "food",
+      "display_name": "月栖萤光卷",
+      "rarity": 6,
+      "scope": "group",
+      "group_scope_id": "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
+      "description": "月牙、星屑与淡青萤光绕着柔软蛋糕卷缓缓流动，切面藏着一颗澄亮的绿芯。它会先把下一段旅程折进梦里，再把积攒的光一次送往更远的时刻。",
+      "image": "media/定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/月栖萤光卷.png",
+      "alternate_image": "",
+      "fit": "contain",
+      "source": "用户于 2026-07-28 至 2026-08-28 提供的抓猪素材库，本地授权使用",
+      "license": "user-provided-local-use",
+      "consent_status": "granted",
+      "recipe_tags": [
+        "群友定制",
+        "崩坏：星穹铁道",
+        "月夜",
+        "甜香"
+      ],
+      "effect_id": "catch-window-transfer",
+      "effect_params": {
+        "fixed_weights": [
+          0,
+          0,
+          0,
+          42,
+          40,
+          18
+        ]
+      },
+      "paired_food_template_id": "",
+      "collection": null
+    },
+    {
+      "template_id": "pig-qo9ea2810f378fbd7dc3219c56ceab3520-march-seven",
+      "kind": "pig",
+      "display_name": "三月七猪",
+      "rarity": 6,
+      "scope": "group",
+      "group_scope_id": "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
+      "description": "粉蓝色云霞铺满相框，三月七猪举着小相机把每一次奇遇都拍进四叶草里。它相信好运值得被记录，也相信下一张照片里一定会有更闪亮的猪猪。",
+      "image": "media/定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/三月七猪.png",
+      "alternate_image": "",
+      "fit": "contain",
+      "source": "用户于 2026-07-28 至 2026-08-28 提供的抓猪素材库，本地授权使用",
+      "license": "user-provided-local-use",
+      "consent_status": "granted",
+      "recipe_tags": [
+        "群友定制",
+        "崩坏：星穹铁道",
+        "三月七",
+        "冰甜"
+      ],
+      "effect_id": "",
+      "effect_params": {},
+      "paired_food_template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-march-seven-clover-ice-cake",
+      "collection": null,
+      "length_min_cm": 36,
+      "length_max_cm": 138,
+      "weight_min_kg": 34,
+      "weight_max_kg": 450,
+      "fat_profile": "balanced",
+      "stature_profile": "standard",
+      "display_tags": [
+        "群友定制",
+        "粉蓝相机",
+        "四叶草",
+        "旅途留影"
+      ]
+    },
+    {
+      "template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-march-seven-clover-ice-cake",
+      "kind": "food",
+      "display_name": "粉蓝四叶草冰糕",
+      "rarity": 6,
+      "scope": "group",
+      "group_scope_id": "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
+      "description": "粉蓝双色四叶草凝在晶莹冰糕里，像一张刚洗出的幸运照片。清甜凉意会记住本时段每一次抓猪与做菜的星光，让两条好运轨迹彼此追逐。",
+      "image": "media/定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/粉蓝四叶草冰糕.png",
+      "alternate_image": "",
+      "fit": "contain",
+      "source": "用户于 2026-07-28 至 2026-08-28 提供的抓猪素材库，本地授权使用",
+      "license": "user-provided-local-use",
+      "consent_status": "granted",
+      "recipe_tags": [
+        "群友定制",
+        "崩坏：星穹铁道",
+        "四叶草",
+        "冰甜"
+      ],
+      "effect_id": "window-six-star-resonance",
+      "effect_params": {
+        "base_bonus_percent": 3.07,
+        "cook_bonus_per_caught_star": 1,
+        "catch_bonus_by_food_rarity": {
+          "4": 10,
+          "5": 30,
+          "6": 50
+        },
+        "six_star_cook_reward_catches": 3,
+        "six_star_catch_reward_food_count": 7
+      },
+      "paired_food_template_id": "",
+      "collection": null
     }
   ]
 }

@@ -71,7 +71,10 @@ class AssetManifestEntry(BaseModel):
     recipe_tags: list[str] = Field(default_factory=list, max_length=20)
     display_tags: list[str] = Field(default_factory=list, max_length=5)
     effect_id: str = Field(default="", max_length=80)
-    effect_params: dict[str, str | int | float | bool | list[object]] = Field(
+    effect_params: dict[
+        str,
+        str | int | float | bool | list[object] | dict[str, int | float],
+    ] = Field(
         default_factory=dict,
         max_length=20,
     )

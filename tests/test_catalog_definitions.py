@@ -25,11 +25,11 @@ def _entries() -> list[dict[str, object]]:
     return list(payload["entries"])
 
 
-def test_formal_catalog_has_all_328_named_assets_and_stable_ids() -> None:
+def test_formal_catalog_has_all_344_named_assets_and_stable_ids() -> None:
     entries = _entries()
-    assert len(entries) == 328
-    assert len({entry["template_id"] for entry in entries}) == 328
-    assert len({entry["source_path"] for entry in entries}) == 328
+    assert len(entries) == 344
+    assert len({entry["template_id"] for entry in entries}) == 344
+    assert len({entry["source_path"] for entry in entries}) == 344
     assert all(str(entry["description"]).strip() for entry in entries)
     pig_counts = Counter(
         int(entry["rarity"])
@@ -41,8 +41,8 @@ def test_formal_catalog_has_all_328_named_assets_and_stable_ids() -> None:
         for entry in entries
         if entry["kind"] == "food"
     )
-    assert pig_counts == {1: 30, 2: 30, 3: 31, 4: 36, 5: 48, 6: 48}
-    assert food_counts == {1: 7, 2: 9, 3: 10, 4: 15, 5: 16, 6: 48}
+    assert pig_counts == {1: 30, 2: 30, 3: 31, 4: 36, 5: 48, 6: 56}
+    assert food_counts == {1: 7, 2: 9, 3: 10, 4: 15, 5: 16, 6: 56}
 
 
 def test_high_rarity_food_effects_cover_new_gameplay_families() -> None:
@@ -279,7 +279,7 @@ def test_group_custom_assets_are_confined_and_keep_user_text() -> None:
         for entry in entries
         if entry.get("group_scope_id")
     ]
-    assert len(group_entries) == 96
+    assert len(group_entries) == 112
     assert {entry["group_scope_id"] for entry in group_entries} == {
         "qq:1092931381",
         "qq:237716658",
@@ -309,6 +309,10 @@ def test_group_custom_assets_are_confined_and_keep_user_text() -> None:
         "神龙化猪七星云海锅",
         "熠～噜猪",
         "熠～噜猪绿芯小猪派",
+        "栖夜流萤抱抱猪",
+        "月栖萤光卷",
+        "三月七猪",
+        "粉蓝四叶草冰糕",
     } <= set(descriptions)
     assert "社区" in descriptions["彩彩修车猪"]
     assert "不是官方职业设定" in descriptions["彩彩修车猪"]
@@ -340,7 +344,7 @@ def test_group_custom_assets_are_confined_and_keep_user_text() -> None:
         for scope in {str(entry["group_scope_id"]) for entry in group_entries}
     }
     baseline = by_scope[PAIRED_GROUP_SCOPES[0][0]]
-    assert len(baseline) == 24
+    assert len(baseline) == 28
     assert all(scope_catalog == baseline for scope_catalog in by_scope.values())
     for qq_scope, official_scope in PAIRED_GROUP_SCOPES:
         assert by_scope[qq_scope] == by_scope[official_scope]
@@ -359,7 +363,7 @@ def test_every_custom_six_star_pig_has_one_same_group_food_pair() -> None:
         for entry in entries
         if entry["kind"] == "food" and entry["rarity"] == 6
     }
-    assert len(pigs) == len(foods) == 48
+    assert len(pigs) == len(foods) == 56
     paired = []
     for pig in pigs:
         paired_id = pig["paired_food_template_id"]

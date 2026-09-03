@@ -102,12 +102,29 @@ def food_reward_view(result: EatResult) -> FoodRewardView:
             )
         )
     is_lottery = bool(payload.get("prize_id"))
+    reward_kind = str(payload.get("kind") or "")
+    title_by_kind = {
+        "catch-window-transfer": "月光迁时已生效",
+        "window-six-star-resonance": "粉蓝共鸣已点亮",
+    }
+    hint_by_kind = {
+        "catch-window-transfer": "下一个时段将封存额度；再下一个时段按月栖分布集中返还。",
+        "window-six-star-resonance": "共鸣仅持续当前抓猪时段；抓猪与做菜会实时累积彼此的六星概率。",
+    }
+    prize_by_kind = {
+        "catch-window-transfer": (
+            f"{payload.get('blocked_window', '')} → {payload.get('target_window', '')}"
+        ).strip(" →"),
+        "window-six-star-resonance": str(payload.get("window") or ""),
+    }
     return FoodRewardView(
         title=(
             "绿芯幸运揭晓"
             if is_lottery
+            else title_by_kind[reward_kind]
+            if reward_kind in title_by_kind
             else "满层加餐已到账"
-            if payload.get("kind") == "permanent-overflow"
+            if reward_kind == "permanent-overflow"
             else "美食补给已到账"
         ),
         player_name=result.food.owner_display_name,
@@ -117,9 +134,17 @@ def food_reward_view(result: EatResult) -> FoodRewardView:
         coin_bonus=result.effect.coin_bonus,
         experience=result.base_experience + result.effect.experience_bonus,
         items=tuple(items),
-        prize_label=str(payload.get("prize_label") or payload.get("title") or ""),
+        prize_label=str(
+            payload.get("prize_label")
+            or payload.get("title")
+            or prize_by_kind.get(reward_kind, "")
+        ),
         animation=str(payload.get("animation") or ""),
-        hint=("奖励已加入你的猪猪／美食背包；重复查看不会再次发奖。" if is_lottery else _REWARD_HINT),
+        hint=(
+            "奖励已加入你的猪猪／美食背包；重复查看不会再次发奖。"
+            if is_lottery
+            else hint_by_kind.get(reward_kind, _REWARD_HINT)
+        ),
     )
 
 
