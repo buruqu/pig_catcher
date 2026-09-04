@@ -13,7 +13,6 @@ from pig_catcher.domain.battle import (
 )
 from pig_catcher.domain.battle_catalog import (
     BATTLE_RULE_VERSION,
-    DANIYA_COMMON_MOVES,
     DANIYA_DISILLUSION_MOVES,
     DANIYA_FORM_DISILLUSION,
     DANIYA_FORM_STAGING,
@@ -22,6 +21,9 @@ from pig_catcher.domain.battle_catalog import (
     MOVE_WEIGHT_SCALE,
     YILU_MOVES,
     fighter_form_moves,
+)
+from pig_catcher.domain.battle_catalog import (
+    DANIYA_COMMON_MOVES_V14 as DANIYA_COMMON_MOVES,
 )
 
 
@@ -51,7 +53,7 @@ def _record(state: dict, side: int, move, *, seed: str = "battle-v13") -> dict:
         seed=seed,
         round_number=state["round"],
         side=side,
-        version=BATTLE_RULE_VERSION,
+        version=14,
     )
     event.update(round=state["round"], side=side, fighter_id=player["snapshot"]["fighter_id"])
     player["turn"]["events"].append(deepcopy(event))
@@ -72,7 +74,7 @@ def _resolve_non_terminal(source: dict, prefix: str) -> tuple[dict, dict]:
 
 
 def test_v13_catalog_keeps_precise_world_and_operator_draw_weights() -> None:
-    assert BATTLE_RULE_VERSION == 14
+    assert BATTLE_RULE_VERSION == 15
     assert MOVE_WEIGHT_SCALE == 10000
     assert [move.gain for move in DANIYA_STAGING_MOVES] == [12, 16, 20, 40, 24]
     assert [move.opponent_reduction for move in DANIYA_DISILLUSION_MOVES] == [14, 9, 11, 22, 13]
@@ -107,14 +109,14 @@ def test_daniya_staging_and_world_work_feed_both_domain_weights_then_clear() -> 
     work = _move(DANIYA_COMMON_MOVES, "daniya-world-work")
     _ready(player, 4)
 
-    first = apply_move(player, DANIYA_STAGING_MOVES[0])
-    second = apply_move(player, DANIYA_STAGING_MOVES[1])
-    world = apply_move(player, work)
+    first = apply_move(player, DANIYA_STAGING_MOVES[0], version=14)
+    second = apply_move(player, DANIYA_STAGING_MOVES[1], version=14)
+    world = apply_move(player, work, version=14)
     assert [first["daniya_domain_steps_after"], second["daniya_domain_steps_after"]] == [3, 6]
     assert world["daniya_domain_steps_after"] == 26
     assert move_weight_units(player, domain) == 36000
 
-    domain_event = apply_move(player, domain)
+    domain_event = apply_move(player, domain, version=14)
     assert domain_event["daniya_domain_carried_units"] == 26
     assert player["turn"]["domain_clash_bonus_units"] == 26
     assert player["daniya_domain_steps"] == 0
@@ -122,7 +124,7 @@ def test_daniya_staging_and_world_work_feed_both_domain_weights_then_clear() -> 
 
     player["daniya_form"] = DANIYA_FORM_DISILLUSION
     player["turn"].update(pending=1, done=False)
-    disillusion_work = apply_move(player, work)
+    disillusion_work = apply_move(player, work, version=14)
     assert disillusion_work["opponent_exhaust_bonus_units"] == 20
 
 

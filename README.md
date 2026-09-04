@@ -1,8 +1,8 @@
 # MaiBot 抓猪插件
 
-这是“抓猪插件”的独立 MaiBot 插件仓库。当前仓库与线上正式版本均为 `2.0.22`
-（Schema63 / Ruleset61 / Battle v14 / Manifest4）；2026-09-04 已在四个既有 QQ／QQ 官方
-会话范围完成无删档升级。
+这是“抓猪插件”的独立 MaiBot 插件仓库。当前开发仓库为待发布的 `2.0.23`
+（Schema64 / Ruleset62 / Battle v15 / Manifest4）；线上正式版本仍为 `2.0.22`
+（Schema63 / Ruleset61 / Battle v14 / Manifest4）。
 四个既有 QQ/QQ 官方会话范围沿用统一目录定义；两组
 QQ 与 QQ 官方会话通过稳定作用域分别保存数据，不会在同一入口重复响应。2.0 已有数据驱动的
 PiG Dream! 成就系统和可扩展周冲榜，第一期活动为“抓猪冲刺！！！”；派遣、巡演、对战及
@@ -42,6 +42,10 @@ Battle v7基线见 [Battle v7 规则文档](docs/41-daniya-asamu-yilu-battle-v7.
 `2.0.22` 的Battle v14增强撅撅猪：塑型+15，成功加速／时延令下回合+1招，未来模拟+15，
 实时演算重复抽中改为+10并再抽2次，音乐首次再抽1次，乱序数虚时空+20。完整规则见
 [撅撅猪 Battle v14](docs/52-juejue-battle-v14.md)。
+`2.0.23` 候选的Battle v15移除容易污染其他战斗猪形态状态的“世界·114514”，并重做发龙图、
+上班与NMSL：发龙图自身+10并随机归零对方一招的胜率数值；上班再抽1次并按形态提供蚀域
+出现权重或力竭盘加成；NMSL改为落败时将伤势降低一级。旧Battle v13/v14事实仍可查看，
+不会进入新对局轮盘。精确规则见[达妮娅 Battle v15](docs/54-daniya-battle-v15.md)。
 此前版本还修复四道专属五星菜误入通用菜池的问题，并重做
 猪利猪、猪皮奶、珍猪奶茶、雾蓝键盘大福、猪保千猪排轮盘和彩彩修车猪慕斯。新增
 `/转轮盘`，轮盘次数、概率效果和失败返还均可跨重启保存。既有名称
@@ -566,6 +570,7 @@ uv run python .\tools\uat_production_recovery.py `
 - [2.0.20 双六星时段机制与栖夜流萤 Battle v12](docs/49-dual-six-star-window-resonance-and-firefly-battle-v12.md)
 - [2.0.21 达妮娅／熠～噜猪 Battle v13](docs/50-daniya-yilu-battle-v13.md)
 - [2.0.22 撅撅猪 Battle v14](docs/52-juejue-battle-v14.md)
+- [2.0.23 达妮娅猪 Battle v15（待发布）](docs/54-daniya-battle-v15.md)
 
 ## 不变原则
 

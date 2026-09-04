@@ -9,7 +9,7 @@ from .special_content import GOJO_PIG_TEMPLATE_ID, SUKUNA_PIG_TEMPLATE_ID
 
 # 对战规则版本与活动成就事实版本分离：新版对战会改变随机命名空间，
 # 但新增字段仍是 activity_progress v1 可以向后兼容读取的事实载荷。
-BATTLE_RULE_VERSION = 14
+BATTLE_RULE_VERSION = 15
 BATTLE_FACT_VERSION = 1
 BATTLE_VERSION = BATTLE_RULE_VERSION
 INVITE_TTL_MS = 5 * 60 * 1000
@@ -372,7 +372,7 @@ DANIYA_DISILLUSION_MOVES = (
         draw_weight_units=10000,
     ),
 )
-DANIYA_COMMON_MOVES = (
+DANIYA_CORE_MOVES = (
     Move(
         "daniya-flawless",
         "达妮娅·天衣无缝",
@@ -405,6 +405,11 @@ DANIYA_COMMON_MOVES = (
         description="领域对抗胜利或单方领域命中后翻倍一份有效领域胜率、切换幻灭形态，并使自身下回合出招数+1。",
         draw_weight_units=10000,
     ),
+)
+
+# Battle v13/v14 的世界招式定义只用于历史战报还原。Battle v15 不再
+# 抽取 114514，也不会把旧版跨回合控制效果带入新建对局。
+DANIYA_LEGACY_WORLD_MOVES = (
     Move(
         "daniya-world-dragon-image",
         "丸山大姐达妮娅-世界·发龙图",
@@ -434,6 +439,34 @@ DANIYA_COMMON_MOVES = (
         draw_weight_units=2000,
     ),
 )
+DANIYA_COMMON_MOVES_V14 = DANIYA_CORE_MOVES + DANIYA_LEGACY_WORLD_MOVES
+
+DANIYA_WORLD_MOVES = (
+    Move(
+        "daniya-world-dragon-image",
+        "丸山大姐达妮娅-世界·发龙图",
+        10,
+        tags=("daniya", "daniya-world-dragon-image"),
+        description="胜利权重+10；回合结算时随机令对方一招的全部胜利权重归零，招式功能保留。",
+        draw_weight_units=10000,
+    ),
+    Move(
+        "daniya-world-work",
+        "丸山大姐达妮娅-世界·上班",
+        draws=1,
+        tags=("daniya", "daniya-world-work"),
+        description="再抽一次；布景形态使下一次蚀域出现权重+1，幻灭形态使对方力竭盘永久+0.5。",
+        draw_weight_units=5000,
+    ),
+    Move(
+        "daniya-world-nmsl",
+        "丸山大姐达妮娅-世界·NMSL",
+        tags=("daniya", "daniya-world-injury-guard"),
+        description="本回合若落败：轻伤化解、重伤降为轻伤、力竭倒下降为重伤。",
+        draw_weight_units=1000,
+    ),
+)
+DANIYA_COMMON_MOVES = DANIYA_CORE_MOVES + DANIYA_WORLD_MOVES
 DANIYA_FORMS = (
     FighterForm(DANIYA_FORM_STAGING, "布景", DANIYA_STAGING_MOVES + DANIYA_COMMON_MOVES),
     FighterForm(DANIYA_FORM_DISILLUSION, "幻灭", DANIYA_DISILLUSION_MOVES + DANIYA_COMMON_MOVES),
@@ -772,12 +805,24 @@ def fighter_moves(fighter_id: str, rule_version: int = BATTLE_RULE_VERSION) -> t
         return ()
     if fighter_id == "juejue" and rule_version < 4:
         return ()
+    if fighter_id == "daniya" and rule_version < 15:
+        return DANIYA_STAGING_MOVES + DANIYA_DISILLUSION_MOVES + DANIYA_COMMON_MOVES_V14
     if rule_version == 1:
         return tuple(move for move in moves if move.move_id in LEGACY_MOVE_IDS[fighter_id])
     return moves
 
 
-def fighter_form_moves(fighter_id: str, form_id: str) -> tuple[Move, ...]:
+def fighter_form_moves(
+    fighter_id: str,
+    form_id: str,
+    rule_version: int = BATTLE_RULE_VERSION,
+) -> tuple[Move, ...]:
+    if fighter_id == "daniya" and rule_version < 15:
+        if form_id == DANIYA_FORM_STAGING:
+            return DANIYA_STAGING_MOVES + DANIYA_COMMON_MOVES_V14
+        if form_id == DANIYA_FORM_DISILLUSION:
+            return DANIYA_DISILLUSION_MOVES + DANIYA_COMMON_MOVES_V14
+        raise BattleError("未知战斗猪形态。")
     try:
         return FIGHTER_FORMS_BY_ID[(fighter_id, form_id)].moves
     except KeyError as exc:

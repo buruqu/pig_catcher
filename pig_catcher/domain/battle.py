@@ -161,6 +161,8 @@ def fresh_turn() -> dict:
         "juejue_acceleration_failures": [],
         "daniya_collapse_count": 0,
         "daniya_domain_carried_units": 0,
+        "daniya_dragon_image_ordinals": [],
+        "daniya_injury_guard": False,
         "daniya_world_damage_immunity": False,
         "daniya_world_effects_disabled": False,
         "daniya_world_forced_move_ids": [],
@@ -265,6 +267,7 @@ def new_state(fighters: list[dict], *, seed: str = "") -> dict:
                 "injury_state": "none",
                 "daniya_form": DANIYA_FORM_STAGING if fighter_id == "daniya" else "",
                 "daniya_domain_steps": 0,
+                "daniya_domain_draw_only_steps": 0,
                 "injury_exhaust_bonus_units": 0,
                 "daniya_world_disable_next": False,
                 "daniya_world_forced_move_ids_next": [],
@@ -319,6 +322,7 @@ def _side(state: dict, side: int) -> dict:
         DANIYA_FORM_STAGING if player.get("snapshot", {}).get("fighter_id") == "daniya" else "",
     )
     player.setdefault("daniya_domain_steps", 0)
+    player.setdefault("daniya_domain_draw_only_steps", 0)
     player.setdefault("injury_exhaust_bonus_units", 0)
     player.setdefault("daniya_world_disable_next", False)
     player.setdefault("daniya_world_forced_move_ids_next", [])
@@ -664,6 +668,7 @@ def apply_move(
     realization_before = int(player.get("juejue_realization_stacks", 0))
     guaranteed_before = bool(player.get("juejue_guaranteed", False))
     daniya_domain_before = int(player.get("daniya_domain_steps", 0))
+    daniya_domain_draw_only_before = int(player.get("daniya_domain_draw_only_steps", 0))
     daniya_domain_carried_units = 0
     asamu_big_before = int(player.get("asamu_big_stacks", 0))
     tea_bonus_before = int(player.get("asamu_tea_bonus_units", 0))
@@ -1152,7 +1157,8 @@ def apply_move(
             } else legacy_base)
 
     # 达妮娅：布景招式同时累积下一次蚀域的出现权重与领域战胜利权重；
-    # 蚀域被抽到时把同一份精确加成带入本回合领域战后再清空。
+    # “世界·上班”的布景效果只增加出现权重，因此使用独立账本，不能
+    # 被误带入领域战。蚀域抽到后同时清空两份一次性出现权重。
     if "daniya-staging" in effect_tags and not is_copy:
         player["daniya_domain_steps"] = int(player.get("daniya_domain_steps", 0)) + 3
     elif "daniya-staging" in effect_tags:
@@ -1170,6 +1176,7 @@ def apply_move(
             turn.get("daniya_domain_carried_units", 0)
         ) + daniya_domain_carried_units
         player["daniya_domain_steps"] = 0
+        player["daniya_domain_draw_only_steps"] = 0
     if "daniya-flawless" in effect_tags:
         turn["domain_clash_bonus_units"] = int(turn.get("domain_clash_bonus_units", 0)) + 2
     if "daniya-loan" in effect_tags:
@@ -1185,12 +1192,25 @@ def apply_move(
             for candidate in fighter_form_moves("daniya", opponent_next_forced_form)
         ]
     if "daniya-world-work" in effect_tags:
-        if form_before == DANIYA_FORM_DISILLUSION:
-            opponent_exhaust_bonus_units += 20
+        if version < 15:
+            if form_before == DANIYA_FORM_DISILLUSION:
+                opponent_exhaust_bonus_units += 20
+            elif not is_copy:
+                player["daniya_domain_steps"] = int(player.get("daniya_domain_steps", 0)) + 20
+            else:
+                suppressed_source_local_effects.append("daniya-world-work-domain-growth")
+        elif form_before == DANIYA_FORM_DISILLUSION:
+            opponent_exhaust_bonus_units += 5
         elif not is_copy:
-            player["daniya_domain_steps"] = int(player.get("daniya_domain_steps", 0)) + 20
+            player["daniya_domain_draw_only_steps"] = int(
+                player.get("daniya_domain_draw_only_steps", 0)
+            ) + 10
         else:
-            suppressed_source_local_effects.append("daniya-world-work-domain-growth")
+            suppressed_source_local_effects.append("daniya-world-work-domain-draw-growth")
+    if "daniya-world-dragon-image" in effect_tags:
+        turn.setdefault("daniya_dragon_image_ordinals", []).append(ordinal)
+    if "daniya-world-injury-guard" in effect_tags:
+        turn["daniya_injury_guard"] = True
     if "daniya-world-damage-immunity" in effect_tags:
         turn["daniya_world_damage_immunity"] = True
 
@@ -1491,7 +1511,13 @@ def apply_move(
         ),
         "daniya_domain_steps_before": daniya_domain_before,
         "daniya_domain_steps_after": int(player.get("daniya_domain_steps", 0)),
+        "daniya_domain_draw_only_steps_before": daniya_domain_draw_only_before,
+        "daniya_domain_draw_only_steps_after": int(
+            player.get("daniya_domain_draw_only_steps", 0)
+        ),
         "daniya_domain_carried_units": daniya_domain_carried_units,
+        "daniya_dragon_image_active": "daniya-world-dragon-image" in effect_tags,
+        "daniya_injury_guard": bool(turn.get("daniya_injury_guard")),
         "daniya_world_damage_immunity": bool(turn.get("daniya_world_damage_immunity")),
         "opponent_next_effects_disabled": opponent_next_effects_disabled,
         "opponent_next_forced_move_ids": list(opponent_next_forced_move_ids),
@@ -1590,6 +1616,9 @@ def move_weight_units(
             units += int(player.get("juejue_sand_domain_switch_units", 0)) * (MOVE_WEIGHT_SCALE // 10)
     if fighter_id == "daniya" and "daniya-domain" in move.tags:
         units += int(player.get("daniya_domain_steps", 0)) * (MOVE_WEIGHT_SCALE // 10)
+        units += int(player.get("daniya_domain_draw_only_steps", 0)) * (
+            MOVE_WEIGHT_SCALE // 10
+        )
     if fighter_id == "asamu":
         if "asamu-milk-tea" in move.tags:
             units += int(player.get("asamu_tea_bonus_units", 0))
@@ -2162,6 +2191,49 @@ def _settle_interactions(state: dict, seed: str) -> dict:
                 continue
             _cancel_event(cancelled, attacker, event, "无下限·防御")
             break
+
+    # 每次“世界·发龙图”都从对方尚未失效的正数招式中独立随机一招，
+    # 只归零该招式的全部自身胜率贡献，保留其再抽、贷款、领域与状态效果。
+    daniya_dragon_images = []
+    for source_side in (0, 1):
+        target_side = 1 - source_side
+        source_ordinals = tuple(
+            state["sides"][source_side]["turn"].get("daniya_dragon_image_ordinals", ())
+        )
+        for chance_ordinal, source_ordinal in enumerate(source_ordinals, start=1):
+            candidates = [
+                event
+                for event in state["sides"][target_side]["turn"].get("events", ())
+                if event.get("has_numeric_contribution")
+                and _remaining_event_gain(cancelled, target_side, event) > 0
+            ]
+            record = {
+                "side": source_side,
+                "source_ordinal": int(source_ordinal),
+                "chance_ordinal": chance_ordinal,
+                "target_side": target_side,
+                "candidate_ordinals": [int(event["ordinal"]) for event in candidates],
+                "selected_ordinal": None,
+                "roll": None,
+                "cancelled_gain": Fraction(0),
+            }
+            if candidates:
+                wheel = tuple((int(event["ordinal"]), 1) for event in candidates)
+                selected, roll = choose(
+                    seed,
+                    f"{round_number}:daniya:dragon-image:{source_side}:{source_ordinal}:target",
+                    wheel,
+                    version=version,
+                )
+                event = next(item for item in candidates if int(item["ordinal"]) == selected)
+                record.update(selected_ordinal=selected, roll=roll)
+                record["cancelled_gain"] = _cancel_event(
+                    cancelled,
+                    target_side,
+                    event,
+                    f"丸山大姐达妮娅-世界·发龙图#{chance_ordinal}",
+                )
+            daniya_dragon_images.append(record)
 
     # 每次未来模拟都独立随机一招归零；沙之形体仍每方每轮最多结算一次。
     # 两者都只改变数值贡献，保留再抽、贷款、切换形态等功能事实。
@@ -2784,6 +2856,7 @@ def _settle_interactions(state: dict, seed: str) -> dict:
         + ((chaos_auto_mimic_event,) if chaos_auto_mimic_event is not None else ()),
         "adjustments": tuple(adjustments),
         "future_simulations": tuple(future_simulations),
+        "daniya_dragon_images": tuple(daniya_dragon_images),
         "sand_bodies": tuple(sand_bodies),
         "pressure_checks": tuple(pressure_checks),
         "daniya_damage_immunity_sides": tuple(sorted(daniya_damage_immunity_sides)),
@@ -2879,14 +2952,24 @@ def resolve_round(state: dict, seed: str) -> dict | None:
     loser = 1 - winner
     wheel, injury_modifiers = _dynamic_injury_wheel(state, loser)
     injury, injury_roll = choose(seed, f"{state['round']}:{loser}:injury", wheel, version=state["version"])
+    injury_after_guard = injury
+    daniya_injury_guarded = bool(state["sides"][loser]["turn"].get("daniya_injury_guard"))
+    if daniya_injury_guarded:
+        injury_after_guard = {
+            "light": "none",
+            "heavy": "light",
+            "exhausted": "heavy",
+            "core": "core",
+        }[injury]
     injury_rewound = bool(
         state["sides"][loser]["snapshot"].get("fighter_id") == "juejue"
         and state["sides"][loser]["turn"].get("juejue_rewind")
-        and injury in {"light", "heavy"}
+        and injury_after_guard in {"light", "heavy"}
     )
-    if not injury_rewound:
-        apply_injury(state["sides"][loser], injury)
-    natural_end = injury == "exhausted"
+    injury_effective = "none" if injury_rewound else injury_after_guard
+    if injury_effective != "none":
+        apply_injury(state["sides"][loser], injury_effective)
+    natural_end = injury_effective == "exhausted"
 
     # Battle v13 的计时溃灭是当回合被动层，不再登记旧版跨回合反噬。
     collapse_rebounds: list[dict] = []
@@ -2915,7 +2998,9 @@ def resolve_round(state: dict, seed: str) -> dict | None:
         "winner_weight_units": tuple(winner_units),
         "injury": injury,
         "injury_rewound": injury_rewound,
-        "injury_effective": "none" if injury_rewound else injury,
+        "injury_effective": injury_effective,
+        "daniya_injury_guarded": daniya_injury_guarded,
+        "injury_after_daniya_guard": injury_after_guard,
         "injury_roll": injury_roll,
         "injury_wheel": wheel,
         "injury_modifiers": injury_modifiers,

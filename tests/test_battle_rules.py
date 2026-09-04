@@ -58,7 +58,7 @@ def ready(player, pending=1):
 
 
 def test_exact_catalog_and_growth_costs():
-    assert [len(f.moves) for f in FIGHTERS] == [10, 10, 16, 18, 10, 9, 8]
+    assert [len(f.moves) for f in FIGHTERS] == [10, 10, 16, 17, 10, 9, 8]
     assert all(move.draw_weight == 1 for fighter in FIGHTERS[:6] for move in fighter.moves)
     assert [m.gain for m in FIGHTERS[0].moves] == [10, 10, 15, 21, 35, 0, 14, 7, 12, 28]
     assert [m.gain for m in FIGHTERS[1].moves] == [13, 20, 14, 10, 10, 14, 24, 30, 14, 35]
@@ -503,7 +503,7 @@ def test_huge_odd_round_gain_uses_integer_ceiling_without_float_conversion():
 
 
 def test_juejue_catalog_aliases_forms_and_legacy_query_boundary():
-    assert BATTLE_RULE_VERSION == 14
+    assert BATTLE_RULE_VERSION == 15
     assert all(FIGHTERS_BY_TEMPLATE[template_id].fighter_id == "juejue" for template_id in JUEJUE_PIG_TEMPLATE_IDS)
     assert {move.move_id for move in JUEJUE_TIME_MOVES}.isdisjoint(
         {move.move_id for move in JUEJUE_VIRTUAL_MOVES}

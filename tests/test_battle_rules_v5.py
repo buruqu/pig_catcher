@@ -86,7 +86,7 @@ def finish_turn(player: dict) -> None:
 
 
 def test_v5_catalog_maps_daniya_and_asamu_in_all_four_scopes():
-    assert BATTLE_RULE_VERSION == 14
+    assert BATTLE_RULE_VERSION == 15
     assert MOVE_WEIGHT_SCALE == 10000
     assert VICTORY_WEIGHT_SCALE == INJURY_WEIGHT_SCALE == 10
     assert len(DANIYA_PIG_TEMPLATE_IDS) == len(ASAMU_PIG_TEMPLATE_IDS) == 4
@@ -119,13 +119,13 @@ def test_juejue_domain_draw_weight_stays_one_while_clash_strength_stays_two_poin
     assert summary["interactions"]["domain"]["weight_scale"] == 10
 
 
-def test_daniya_two_forms_share_eight_common_moves_and_keep_five_distinct_moves_each():
+def test_daniya_two_forms_share_seven_common_moves_and_keep_five_distinct_moves_each():
     staging = fighter_form_moves("daniya", DANIYA_FORM_STAGING)
     disillusion = fighter_form_moves("daniya", DANIYA_FORM_DISILLUSION)
     common_ids = {move.move_id for move in DANIYA_COMMON_MOVES}
     assert staging == DANIYA_STAGING_MOVES + DANIYA_COMMON_MOVES
     assert disillusion == DANIYA_DISILLUSION_MOVES + DANIYA_COMMON_MOVES
-    assert len(staging) == len(disillusion) == 13
+    assert len(staging) == len(disillusion) == 12
     assert {move.move_id for move in staging} & {move.move_id for move in disillusion} == common_ids
     assert state()["sides"][0]["daniya_form"] == DANIYA_FORM_STAGING
 
