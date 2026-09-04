@@ -1,7 +1,7 @@
 # 领域与数据模型
 
-> 仓库开发候选为 `2.0.22 / Schema63 / Ruleset61 / Battle v14 / Manifest4`，线上仍为
-> `2.0.21 / Schema62 / Ruleset60 / Battle v13 / Manifest4`；命令组件仍为85个 Command + 1个 HOME_CARD。
+> 仓库与线上均为 `2.0.22 / Schema63 / Ruleset61 / Battle v14 / Manifest4`；
+> 命令组件仍为85个 Command + 1个 HOME_CARD。
 > Schema61新增玩家级跨时段额度平移与本时段双向六星共鸣状态；完整字段与生命周期见
 > [2.0.20专项文档](49-dual-six-star-window-resonance-and-firefly-battle-v12.md)。
 > Schema62只把Battle v13加入自然终局3次战利品约束；新场次的达妮娅／熠～噜状态边界见
