@@ -1,7 +1,6 @@
 """Battle v5：达妮娅猪、阿萨姆猪与统一数值失效的纯规则验收。"""
 
 from copy import deepcopy
-from fractions import Fraction
 
 import pytest
 
@@ -42,6 +41,8 @@ from pig_catcher.services.battle_views import (
     _juejue_state_projection,
     move_line,
 )
+
+DANIYA_DOMAIN = next(move for move in DANIYA_COMMON_MOVES if move.move_id == "daniya-domain")
 
 
 def state(left="daniya", right="asamu", *, seed="v5", left_level=0, right_level=0):
@@ -85,8 +86,8 @@ def finish_turn(player: dict) -> None:
 
 
 def test_v5_catalog_maps_daniya_and_asamu_in_all_four_scopes():
-    assert BATTLE_RULE_VERSION == 12
-    assert MOVE_WEIGHT_SCALE == 1000
+    assert BATTLE_RULE_VERSION == 13
+    assert MOVE_WEIGHT_SCALE == 10000
     assert VICTORY_WEIGHT_SCALE == INJURY_WEIGHT_SCALE == 10
     assert len(DANIYA_PIG_TEMPLATE_IDS) == len(ASAMU_PIG_TEMPLATE_IDS) == 4
     assert all(FIGHTERS_BY_TEMPLATE[item].fighter_id == "daniya" for item in DANIYA_PIG_TEMPLATE_IDS)
@@ -111,38 +112,39 @@ def test_juejue_domain_draw_weight_stays_one_while_clash_strength_stays_two_poin
     finish_turn(player)
     opponent = current["sides"][1]
     ready(opponent)
-    record(opponent, DANIYA_COMMON_MOVES[-1], 1)
+    record(opponent, DANIYA_DOMAIN, 1)
     finish_turn(opponent)
     summary = resolve_round(current, "separate-juejue-domain-weights")
     assert summary["interactions"]["domain"]["strengths"] == [25, 30]
     assert summary["interactions"]["domain"]["weight_scale"] == 10
 
 
-def test_daniya_two_forms_share_four_common_moves_and_keep_four_distinct_moves_each():
+def test_daniya_two_forms_share_eight_common_moves_and_keep_five_distinct_moves_each():
     staging = fighter_form_moves("daniya", DANIYA_FORM_STAGING)
     disillusion = fighter_form_moves("daniya", DANIYA_FORM_DISILLUSION)
     common_ids = {move.move_id for move in DANIYA_COMMON_MOVES}
     assert staging == DANIYA_STAGING_MOVES + DANIYA_COMMON_MOVES
     assert disillusion == DANIYA_DISILLUSION_MOVES + DANIYA_COMMON_MOVES
-    assert len(staging) == len(disillusion) == 9
+    assert len(staging) == len(disillusion) == 13
     assert {move.move_id for move in staging} & {move.move_id for move in disillusion} == common_ids
     assert state()["sides"][0]["daniya_form"] == DANIYA_FORM_STAGING
 
 
 def test_daniya_staging_accumulates_domain_draw_weight_and_domain_draw_clears_it():
     player = state()["sides"][0]
-    domain = DANIYA_COMMON_MOVES[-1]
-    assert move_weight_units(player, domain) == 1000
+    domain = DANIYA_DOMAIN
+    assert move_weight_units(player, domain) == 10000
     ready(player, 3)
     first = apply_move(player, DANIYA_STAGING_MOVES[0])
     second = apply_move(player, DANIYA_STAGING_MOVES[1])
-    assert first["daniya_domain_steps_after"] == 1
-    assert second["daniya_domain_steps_after"] == 2
-    assert move_weight_units(player, domain) == 1200
+    assert first["daniya_domain_steps_after"] == 3
+    assert second["daniya_domain_steps_after"] == 6
+    assert move_weight_units(player, domain) == 16000
     domain_event = apply_move(player, domain)
-    assert domain_event["daniya_domain_steps_before"] == 2
+    assert domain_event["daniya_domain_steps_before"] == 6
+    assert domain_event["daniya_domain_carried_units"] == 6
     assert domain_event["daniya_domain_steps_after"] == 0
-    assert move_weight_units(player, domain) == 1000
+    assert move_weight_units(player, domain) == 10000
 
 
 def test_v5_move_cards_display_real_numeric_base_and_tenth_step_scales():
@@ -151,15 +153,15 @@ def test_v5_move_cards_display_real_numeric_base_and_tenth_step_scales():
     staging = apply_move(daniya, DANIYA_STAGING_MOVES[0])
     staging.update(fighter_id="daniya")
     staging_line = move_line(staging)
-    assert staging_line.value.startswith("+7")
-    assert "蚀域抽取加权 0 → 0.1" in staging_line.note
+    assert staging_line.value.startswith("+12")
+    assert "蚀域抽取加权 0 → 0.3" in staging_line.note
 
     collapse_player = state()["sides"][0]
     ready(collapse_player)
     collapse = apply_move(collapse_player, DANIYA_COMMON_MOVES[2])
     collapse.update(fighter_id="daniya")
     collapse_line = move_line(collapse)
-    assert collapse_line.value.startswith("对方-52.1")
+    assert "追加1层计时溃灭被动" in collapse_line.note
 
     juejue = state(left="juejue")["sides"][0]
     ready(juejue)
@@ -172,7 +174,7 @@ def test_v5_move_cards_display_real_numeric_base_and_tenth_step_scales():
 def test_daniya_rendered_form_track_keeps_staging_to_disillusion_order():
     player = state()["sides"][0]
     ready(player)
-    event = apply_move(player, DANIYA_COMMON_MOVES[-1])
+    event = apply_move(player, DANIYA_DOMAIN)
     event.update(fighter_id="daniya")
     player["turn"]["events"].append(event)
     player["daniya_form"] = DANIYA_FORM_DISILLUSION
@@ -182,7 +184,7 @@ def test_daniya_rendered_form_track_keeps_staging_to_disillusion_order():
 def _daniya_domain_state(*, opponent="sukuna") -> tuple[dict, tuple]:
     current = state(right=opponent)
     ready(current["sides"][0])
-    record(current["sides"][0], DANIYA_COMMON_MOVES[-1], 0)
+    record(current["sides"][0], DANIYA_DOMAIN, 0)
     ready(current["sides"][1])
     opponent_domain = next(move for move in FIGHTERS_BY_ID[opponent].moves if "domain" in move.tags)
     record(current["sides"][1], opponent_domain, 1)
@@ -209,7 +211,7 @@ def test_daniya_only_real_clash_win_switches_to_disillusion_and_grants_next_acti
 def test_daniya_solo_domain_hit_switches_form():
     current = state(right="sukuna")
     ready(current["sides"][0])
-    record(current["sides"][0], DANIYA_COMMON_MOVES[-1], 0)
+    record(current["sides"][0], DANIYA_DOMAIN, 0)
     current["sides"][1]["turn"]["done"] = True
     wheel = (("hit", 8), ("simple-domain", 2))
     seed = seed_for("1:domain:solo:0", wheel, "hit", prefix="daniya-solo")
@@ -224,18 +226,20 @@ def test_daniya_solo_domain_hit_switches_form():
     assert summary["before"][0]["weight"] == 65
 
 
-def test_daniya_minus_52_point_1_is_exact_and_loan_doubles_signed_value():
+def test_daniya_timed_collapse_does_not_consume_pending_loan_double():
     player = state()["sides"][0]
     ready(player, 2)
     loan = apply_move(player, DANIYA_COMMON_MOVES[1])
     collapse = apply_move(player, DANIYA_COMMON_MOVES[2])
     assert loan["loan"] and loan["gain"] == 0 and loan["double_pending"]
     assert collapse["special_base"] == 0
-    assert collapse["multiplier"] == 2
+    assert collapse["multiplier"] == 1
     assert collapse["gain"] == 0
-    assert collapse["opponent_reduction"] == Fraction(521, 5)
+    assert collapse["opponent_reduction"] == 0
+    assert collapse["daniya_domain_steps_after"] == 0
+    assert player["turn"]["daniya_collapse_count"] == 1
     assert player["weight"] == 5
-    assert not player["double"]
+    assert player["double"]
 
 
 def test_daniya_loan_doubles_both_own_gain_and_opponent_reduction():
@@ -244,9 +248,9 @@ def test_daniya_loan_doubles_both_own_gain_and_opponent_reduction():
     ready(player, 2)
     apply_move(player, DANIYA_COMMON_MOVES[1])
     event = apply_move(player, DANIYA_DISILLUSION_MOVES[1])
-    assert event["gain"] == 14
-    assert event["opponent_reduction"] == 14
-    assert event["opponent_exhaust_bonus_units"] == 1
+    assert event["gain"] == 18
+    assert event["opponent_reduction"] == 18
+    assert event["opponent_exhaust_bonus_units"] == 3
 
 
 def test_daniya_disillusion_reduces_opponent_and_adds_exact_point_one_exhaust_weight():
@@ -265,12 +269,18 @@ def test_daniya_disillusion_reduces_opponent_and_adds_exact_point_one_exhaust_we
         for item in summary["interactions"]["cross_effects"]
         if item["source_ordinal"] == event["ordinal"]
     )
-    assert cross["round_reduction"] == 7
-    assert cross["exhaust_bonus_units"] == 1
-    assert summary["before"][1]["injury_exhaust_bonus_units"] == 1
+    assert cross["round_reduction"] == 9
+    assert cross["exhaust_bonus_units"] == 3
+    assert summary["before"][1]["injury_exhaust_bonus_units"] == 3
     wheel, modifiers = _dynamic_injury_wheel(current, 1)
-    assert modifiers["permanent_exhaust_bonus_units"] == 1
-    assert dict(wheel)["exhausted"] in {6, 11, 61}
+    assert modifiers["permanent_exhaust_bonus_units"] == 3
+    assert modifiers["daniya_passive_layers"] == 1
+    base_exhausted = dict(modifiers["base_wheel"])["exhausted"]
+    assert dict(wheel)["exhausted"] == (
+        (base_exhausted + 3)
+        * modifiers["daniya_multiplier"]
+        * modifiers["weight_scale"]
+    )
 
 
 def test_unified_invalidation_zeroes_daniya_own_gain_but_keeps_directed_effects():
@@ -292,11 +302,11 @@ def test_unified_invalidation_zeroes_daniya_own_gain_but_keeps_directed_effects(
         if item["source_ordinal"] == event["ordinal"]
     )
     assert future["cancelled_gain"] == event["gain"]
-    assert cross["round_reduction"] == 7
-    assert cross["exhaust_bonus_units"] == 1
+    assert cross["round_reduction"] == 9
+    assert cross["exhaust_bonus_units"] == 3
 
 
-def test_daniya_timed_collapse_multiplies_target_exhaustion_and_schedules_one_round_rebound():
+def test_daniya_timed_collapse_stacks_with_passive_for_current_round_only():
     source = state()
     ready(source["sides"][0])
     record(source["sides"][0], DANIYA_COMMON_MOVES[2], 0)
@@ -304,8 +314,10 @@ def test_daniya_timed_collapse_multiplies_target_exhaustion_and_schedules_one_ro
     source["sides"][1]["weight"] = 100
     finish_turn(source["sides"][1])
     wheel, modifiers = _dynamic_injury_wheel(source, 1)
-    assert dict(wheel)["exhausted"] == 25
-    assert modifiers["current_collapse_multiplier"] == 5
+    assert dict(wheel)["exhausted"] == 125
+    assert modifiers["daniya_passive_layers"] == 1
+    assert modifiers["daniya_active_layers"] == 1
+    assert modifiers["current_collapse_multiplier"] == 25
 
     for index in range(100_000):
         current = deepcopy(source)
@@ -314,32 +326,25 @@ def test_daniya_timed_collapse_multiplies_target_exhaustion_and_schedules_one_ro
             break
     else:
         raise AssertionError("没有找到计时的溃灭未使对手力竭的固定种子")
-    assert summary["collapse_rebounds"] == ({
-        "caster_side": 0,
-        "target_side": 1,
-        "target_exhausted": False,
-        "rebound_round": 2,
-    },)
-    assert current["sides"][0]["next_exhaust_multiplier"] == 5
-    assert current["sides"][0]["next_exhaust_multiplier_round"] == 2
-    rebound_wheel, rebound = _dynamic_injury_wheel(current, 0)
-    assert rebound["rebound_multiplier"] == 5
-    assert dict(rebound_wheel)["exhausted"] == dict(rebound["base_wheel"])["exhausted"] * 5
+    assert summary["collapse_rebounds"] == ()
+    _rebound_wheel, rebound = _dynamic_injury_wheel(current, 0)
+    assert rebound["rebound_multiplier"] == 1
+    assert rebound["daniya_active_layers"] == 0
 
 
 def test_asamu_dynamic_move_weights_use_exact_thousandths_and_reset_at_use():
     player = state(left="asamu")["sides"][0]
     bathe, tea, sleep, prime = ASAMU_MOVES[:4]
-    assert [move_weight_units(player, move) for move in (bathe, tea, sleep, prime)] == [1000, 1000, 1000, 200]
+    assert [move_weight_units(player, move) for move in (bathe, tea, sleep, prime)] == [10000, 10000, 10000, 2000]
     ready(player, 3)
     apply_move(player, bathe)
-    assert move_weight_units(player, tea) == 1500
+    assert move_weight_units(player, tea) == 15000
     apply_move(player, tea)
-    assert move_weight_units(player, tea) == 1000
-    assert move_weight_units(player, prime) == 300
+    assert move_weight_units(player, tea) == 10000
+    assert move_weight_units(player, prime) == 3000
     apply_move(player, sleep)
-    assert move_weight_units(player, sleep) == 1000
-    assert move_weight_units(player, prime) == 300
+    assert move_weight_units(player, sleep) == 10000
+    assert move_weight_units(player, prime) == 3000
 
 
 def test_asamu_sleep_adds_five_to_later_moves_and_charge_only_buffs_prime_weight():
@@ -350,7 +355,7 @@ def test_asamu_sleep_adds_five_to_later_moves_and_charge_only_buffs_prime_weight
     second = apply_move(player, hit)
     third = apply_move(player, sleep)
     fourth = apply_move(player, hit)
-    assert first["gain"] == 0 and move_weight_units(player, ASAMU_MOVES[3]) == 1200
+    assert first["gain"] == 0 and move_weight_units(player, ASAMU_MOVES[3]) == 12000
     assert second["gain"] == 10
     assert third["gain"] == 1
     assert fourth["gain"] == 15 and fourth["asamu_future_gain"] == 5
@@ -516,7 +521,9 @@ def test_v5_fraction_state_and_random_results_are_json_deterministic():
     finish_turn(first["sides"][0])
     first["sides"][1]["turn"]["done"] = True
     assert event["gain"] == 0
-    assert event["opponent_reduction"] == Fraction(521, 10)
+    assert event["opponent_reduction"] == 0
+    assert event["numeric_base"] is False
+    assert event["daniya_domain_steps_after"] == 0
     payload = dumps(first)
     assert payload == dumps(first)
     assert loads(payload) == first

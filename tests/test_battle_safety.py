@@ -362,7 +362,20 @@ async def test_legacy_v1_loot_keeps_five_draw_random_sequence_and_distribution(w
 
 @pytest.mark.parametrize(
     "definition_version,total_uses",
-    ((1, 3), (2, 5), (3, 5), (4, 5), (5, 5), (6, 5), (7, 5), (8, 5), (9, 5), (10, 5), (11, 5)),
+    (
+        (1, 3),
+        (2, 5),
+        (3, 5),
+        (4, 5),
+        (5, 5),
+        (6, 5),
+        (7, 5),
+        (8, 5),
+        (9, 5),
+        (10, 5),
+        (11, 5),
+        (12, 5),
+    ),
 )
 async def test_loot_total_must_match_battle_rule_version(world, definition_version, total_uses):
     original = dict(await world.fight())

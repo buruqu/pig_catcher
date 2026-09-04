@@ -63,7 +63,7 @@ FIREFLY_FORM_NAMES = {
 }
 
 # 塑型、苍赫和布景招式在状态里按“十分之一抽取权重”保存；
-# 它们不是 MOVE_WEIGHT_SCALE=1000 的原始轮盘单位，展示时必须单独换算。
+# 它们不是 MOVE_WEIGHT_SCALE=10000 的主轮盘单位，展示时必须单独换算。
 DYNAMIC_DRAW_STEP_SCALE = 10
 
 
@@ -441,6 +441,12 @@ def move_line(
     domain_bonus: dict | None = None,
 ) -> Line:
     shown_total = Fraction(event["total"]) if effective_total is None else Fraction(effective_total)
+    if event.get("effects_disabled"):
+        return Line(
+            f"{event['ordinal']}. {event['name']}",
+            f"招式效果失效 → 累计{weight_label(shown_total)}",
+            "丸山大姐达妮娅-世界·发龙图：本招数值、功能、再抽、贷款与领域资格均不生效。",
+        )
     if event.get("fighter_id") == "juejue":
         return _juejue_event_line(
             event,
@@ -469,35 +475,63 @@ def move_line(
         value = f"对方-{weight_label(opponent_reduction)} → 累计{weight_label(shown_total)}"
         note = "定向减权招式；功能与伤势效果独立结算"
     else:
-        value = (
-            f"黑闪领悟+{weight_label(event['black_flash_bonus'])} → 累计{weight_label(shown_total)}"
-            if event.get("black_flash_bonus", 0)
-            else f"再抽{event['extra_draws']}次"
-        )
+        if event.get("black_flash_bonus", 0):
+            value = (
+                f"黑闪领悟+{weight_label(event['black_flash_bonus'])}"
+                f" → 累计{weight_label(shown_total)}"
+            )
+        elif event.get("extra_draws"):
+            value = f"再抽{event['extra_draws']}次"
+        else:
+            value = f"功能生效 → 累计{weight_label(shown_total)}"
         note = "功能招式不加战斗强化；待用×2保留" if event["double_pending"] else "功能招式不加战斗强化"
-    fighter_id = event.get("fighter_id")
+    fighter_id = (
+        event.get("functional_fighter_id")
+        if event.get("daniya_world_forced")
+        else event.get("fighter_id")
+    )
+    effect_tags = set(event.get("functional_tags", event.get("tags", ())))
     if fighter_id == "daniya":
         form = _fighter_form_name("daniya", str(event.get("form_before", DANIYA_FORM_STAGING)))
         note += f"；来源形态：{form}"
         if opponent_reduction:
             note += f"；同时令对方本回合-{weight_label(opponent_reduction)}"
-        if "daniya-staging" in event.get("tags", ()):
+        if event.get("daniya_world_forced"):
+            note += "；世界·114514强制使用达妮娅招式盘"
+        if "daniya-staging" in effect_tags:
             note += (
                 f"；蚀域抽取加权 "
                 f"{_scaled_weight(event.get('daniya_domain_steps_before', 0), DYNAMIC_DRAW_STEP_SCALE)}"
                 f" → {_scaled_weight(event.get('daniya_domain_steps_after', 0), DYNAMIC_DRAW_STEP_SCALE)}"
             )
-        if "daniya-disillusion" in event.get("tags", ()):
+        if "daniya-disillusion" in effect_tags:
             exhaust_bonus = _scaled_weight(event.get("opponent_exhaust_bonus_units", 0), INJURY_WEIGHT_SCALE)
             note += f"；对方力竭盘永久+{exhaust_bonus}"
-        if "daniya-timed-collapse" in event.get("tags", ()):
-            note += "；对方本回合力竭权重×5；若未力竭，自己下回合力竭权重×5"
-        if "daniya-domain" in event.get("tags", ()):
+        if "daniya-timed-collapse" in effect_tags:
+            note += "；本回合为对方追加1层计时溃灭被动"
+        if "daniya-domain" in effect_tags:
             note += "；领域战胜利或单方命中后切换幻灭形态，自己下回合出招数+1"
-        if "daniya-flawless" in event.get("tags", ()):
+            if event.get("daniya_domain_carried_units"):
+                note += (
+                    "；带入领域战加权+"
+                    f"{_scaled_weight(event['daniya_domain_carried_units'], DYNAMIC_DRAW_STEP_SCALE)}"
+                )
+        if "daniya-flawless" in effect_tags:
             note += "；本回合自身领域战胜利权重+0.2"
-        if "daniya-loan" in event.get("tags", ()):
+        if "daniya-loan" in effect_tags:
             note += "；对方本回合领域战胜利权重-0.2"
+        if "daniya-world-disable-next" in effect_tags:
+            note += "；对方下回合所有招式与领域效果失效"
+        if "daniya-world-force-next" in effect_tags:
+            note += f"；对方下回合强制使用{form}达妮娅招式盘"
+        if "daniya-world-work" in effect_tags:
+            note += (
+                "；蚀域出现/领域战权重各+2"
+                if str(event.get("form_before")) == DANIYA_FORM_STAGING
+                else "；对方力竭盘永久+2"
+            )
+        if "daniya-world-damage-immunity" in effect_tags:
+            note += "；对方本回合直接减权与重装伤害无效"
     elif fighter_id == "asamu":
         if event.get("forced"):
             note += f"；奶龙覆盖：原本将抽中“{event.get('original_move_name') or '未知招式'}”"
@@ -540,7 +574,11 @@ def move_line(
         if event.get("yilu_true_damage_added"):
             note += f"；真伤翻倍层数+{event['yilu_true_damage_added']}"
         if event.get("yilu_sniper_shots"):
-            note += f"；狙击连射{len(event['yilu_sniper_shots'])}次"
+            shots = event["yilu_sniper_shots"]
+            note += (
+                f"；狙击连射{len(shots)}次，逐枪基础加权合计+"
+                f"{sum(int(item.get('base_bonus', 0)) for item in shots)}"
+            )
         if event.get("yilu_medic_recoveries"):
             recoveries = event["yilu_medic_recoveries"]
             recovered = sum(int(item.get("recovered", False)) for item in recoveries)
@@ -660,7 +698,9 @@ def _event_move_wheel(event: dict, definition_version: int) -> BattleWheelCard:
     generated_copy = event.get("generated_by") == "asamu-domain-copy"
     generated_mimic = event.get("generated_by") == "chaos-domain-auto-mimic"
     source_fighter_id = str(
-        event.get("fighter_id")
+        event.get("functional_fighter_id")
+        if event.get("daniya_world_forced")
+        else event.get("fighter_id")
         if generated_mimic
         else event.get("source_fighter_id") or event.get("fighter_id") or ""
     )
@@ -837,7 +877,10 @@ def _juejue_state_projection(side: dict) -> tuple[str, str, str]:
 
 
 def _daniya_state_projection(side: dict) -> tuple[str, str, str]:
-    current = _fighter_form_name("daniya", str(side.get("daniya_form", DANIYA_FORM_STAGING)))
+    current = _fighter_form_name(
+        "daniya",
+        str(side.get("daniya_form") or DANIYA_FORM_STAGING),
+    )
     turn = side.get("turn", {})
     track: list[str] = []
     for event in turn.get("events", ()):
@@ -857,11 +900,17 @@ def _daniya_state_projection(side: dict) -> tuple[str, str, str]:
         f"{_scaled_weight(side.get('injury_exhaust_bonus_units', 0), INJURY_WEIGHT_SCALE)}",
     ]
     if turn.get("daniya_collapse_count"):
-        facts.append(f"本回合计时溃灭×{turn['daniya_collapse_count']}")
-    if side.get("next_exhaust_multiplier_round") is not None:
-        facts.append(
-            f"第{side['next_exhaust_multiplier_round']}回合自身力竭权重×{side.get('next_exhaust_multiplier', 1)}"
+        facts.append(f"本回合计时溃灭主动层×{turn['daniya_collapse_count']}")
+    if turn.get("daniya_world_damage_immunity"):
+        facts.append("本回合NMSL伤害免疫")
+    if turn.get("daniya_world_effects_disabled"):
+        facts.append("本回合全部招式效果失效")
+    if turn.get("daniya_world_forced_move_ids"):
+        forced_form = _fighter_form_name(
+            "daniya",
+            str(turn.get("daniya_world_forced_form") or DANIYA_FORM_STAGING),
         )
+        facts.append(f"本回合强制使用{forced_form}达妮娅招式盘")
     return f"当前形态 · {current}", " → ".join(track), " · ".join(facts)
 
 
@@ -870,15 +919,15 @@ def _asamu_state_projection(side: dict) -> tuple[str, str, str]:
     injury = {"none": "无伤", "light": "轻伤", "heavy": "重伤"}.get(
         str(side.get("injury_state", "none")), str(side.get("injury_state", "none"))
     )
-    tea = 1000 + int(side.get("asamu_tea_bonus_units", 0))
+    tea = MOVE_WEIGHT_SCALE + int(side.get("asamu_tea_bonus_units", 0))
     prime = (
-        200
+        MOVE_WEIGHT_SCALE // 5
         + int(side.get("asamu_prime_bonus_units", 0))
         + int(side.get("asamu_prime_temp_bonus_units", 0))
     )
     facts = [
         f"睡觉成长：后续每招+{side.get('asamu_future_gain_bonus', 0)}",
-        f"喝奶茶/全盛姿态权重 {tea / 1000:g}/{prime / 1000:g}",
+        f"喝奶茶/全盛姿态权重 {tea / MOVE_WEIGHT_SCALE:g}/{prime / MOVE_WEIGHT_SCALE:g}",
     ]
     milk = int(side.get("asamu_milk_dragon_next_count", 0))
     if milk:
@@ -1099,7 +1148,8 @@ def _v4_interaction_panels(interactions: dict, names: list[str]) -> tuple[Panel,
         if Fraction(fact["round_reduction"]):
             facts.append(f"本轮减权{weight_label(fact['round_reduction'])}")
         elif fact["round_reduction_suppressed"]:
-            facts.append("本轮减权被时空保护免疫")
+            reason = fact.get("round_reduction_suppression_reason") or "时空保护"
+            facts.append(f"本轮减权被{reason}免疫")
         if int(fact["next_debt"]):
             facts.append(f"下回合-{fact['next_debt']}招")
         elif fact["debt_suppressed"]:
@@ -1110,6 +1160,14 @@ def _v4_interaction_panels(interactions: dict, names: list[str]) -> tuple[Panel,
             facts.append(f"下回合前{fact['next_milk_dragons']}招覆盖为发奶龙")
         if int(fact.get("exhaust_bonus_units", 0)):
             facts.append(f"力竭盘永久+{_scaled_weight(fact['exhaust_bonus_units'], INJURY_WEIGHT_SCALE)}")
+        if fact.get("next_effects_disabled"):
+            facts.append("下回合所有招式与领域效果失效")
+        if fact.get("next_forced_move_ids"):
+            forced_form = _fighter_form_name(
+                "daniya",
+                str(fact.get("next_forced_form") or DANIYA_FORM_STAGING),
+            )
+            facts.append(f"下回合全部改抽{forced_form}达妮娅招式盘")
         if fact.get("directed_effect_suppressed"):
             facts.append("定向负面效果被时空保护免疫")
         if facts:
@@ -1143,7 +1201,9 @@ def _v4_interaction_panels(interactions: dict, names: list[str]) -> tuple[Panel,
         )
         v5_lines.append(Line(names[int(fact["side"])] + " · 传奇耐压王", value, note))
     for fact in interactions.get("yilu_defender_results", ()):
-        if fact.get("selected_ordinal") is not None:
+        if fact.get("suppressed_by_daniya_nmsl"):
+            value, note = "重装伤害被NMSL免疫", "不归零招式数值，也不追加-5胜率。"
+        elif fact.get("selected_ordinal") is not None:
             value = f"{names[int(fact['target_side'])]}第{fact['selected_ordinal']}招数值失效"
             note = (
                 f"70%判定命中；归零{weight_label(fact.get('cancelled_gain', 0))}，"
@@ -1388,6 +1448,19 @@ def matchup(
             form, form_track, mechanic_summary = _yilu_state_projection(side)
         elif snap.get("fighter_id") == "firefly":
             form, form_track, mechanic_summary = _firefly_state_projection(side)
+        world_notes = []
+        if turn.get("daniya_world_effects_disabled"):
+            world_notes.append("发龙图：本回合全部招式与领域效果失效")
+        if turn.get("daniya_world_forced_move_ids"):
+            forced_form = _fighter_form_name(
+                "daniya",
+                str(turn.get("daniya_world_forced_form") or DANIYA_FORM_STAGING),
+            )
+            world_notes.append(f"114514：本回合强制改抽{forced_form}达妮娅招式盘")
+        if world_notes:
+            mechanic_summary = " · ".join(
+                part for part in (mechanic_summary, *world_notes) if part
+            )
         cards.append(
             FighterCard(
                 player_name=snap["player_name"],
@@ -1582,8 +1655,9 @@ def matchup(
                     "力竭权重倍率",
                     f"×{modifiers.get('total_exhaust_multiplier', 1)}",
                     f"厄运传递×{modifiers.get('misfortune_count', 0)}；"
-                    f"计时溃灭×{modifiers.get('current_collapse_multiplier', 1)}；"
-                    f"反噬×{modifiers.get('rebound_multiplier', 1)}",
+                    f"计时溃灭常驻{modifiers.get('daniya_passive_layers', 0)}层 / "
+                    f"主动{modifiers.get('daniya_active_layers', 0)}层；"
+                    f"每层×{modifiers.get('daniya_layer_multiplier', 1)}",
                 ),
                 Line(
                     "永久力竭加权",
@@ -1597,14 +1671,6 @@ def matchup(
                     "溃败每层令力竭权重+0.1；流萤技能与焦土陨击的即时修正只作用于本回合。",
                 ),
             ]
-            for rebound in round_result.get("collapse_rebounds", ()):
-                lines.append(
-                    Line(
-                        names[int(rebound["caster_side"])] + " · 计时反噬",
-                        "目标本回合力竭" if rebound["target_exhausted"] else "反噬登记至下回合",
-                        f"反噬回合：{rebound.get('rebound_round') or '无'}",
-                    )
-                )
             panels.append(Panel("本回合伤势修正", tuple(lines), "轮盘扇区已经包含以上精确修正。"))
         panel_note = (
             f"整场结束，败者获得{loot_attempts}次额外战利品抓猪，全部归胜者。"
@@ -1900,20 +1966,24 @@ def _daniya_effect(move, level: int) -> str:
         numeric += f"、对方-{weight_label(Fraction(move.resolved_opponent_reduction_tenths, VICTORY_WEIGHT_SCALE))}"
     numeric = numeric.lstrip("、")
     mechanics = {
-        "daniya-staging-virtual-particle": "下一次蚀域主盘权重+0.1",
-        "daniya-staging-dream-feast": "下一次蚀域主盘权重+0.1",
-        "daniya-staging-mimic-bubble": "下一次蚀域主盘权重+0.1",
-        "daniya-staging-final-curtain": "下一次蚀域主盘权重+0.1",
-        "daniya-staging-greeting": "下一次蚀域主盘权重+0.1",
-        "daniya-disillusion-dark-core": "对方力竭盘永久+0.1",
-        "daniya-disillusion-dream-feast": "对方力竭盘永久+0.1",
-        "daniya-disillusion-banish": "对方力竭盘永久+0.1",
-        "daniya-disillusion-final-curtain": "对方力竭盘永久+0.1",
-        "daniya-disillusion-knock": "对方力竭盘永久+0.1",
+        "daniya-staging-virtual-particle": "下一次蚀域主盘权重和领域战胜利权重各+0.3",
+        "daniya-staging-dream-feast": "下一次蚀域主盘权重和领域战胜利权重各+0.3",
+        "daniya-staging-mimic-bubble": "下一次蚀域主盘权重和领域战胜利权重各+0.3",
+        "daniya-staging-final-curtain": "下一次蚀域主盘权重和领域战胜利权重各+0.3",
+        "daniya-staging-greeting": "下一次蚀域主盘权重和领域战胜利权重各+0.3",
+        "daniya-disillusion-dark-core": "对方力竭盘永久+0.3",
+        "daniya-disillusion-dream-feast": "对方力竭盘永久+0.3",
+        "daniya-disillusion-banish": "对方力竭盘永久+0.3",
+        "daniya-disillusion-final-curtain": "对方力竭盘永久+0.3",
+        "daniya-disillusion-knock": "对方力竭盘永久+0.3",
         "daniya-flawless": "再抽2次；自身本回合领域战胜利权重+0.2",
         "daniya-unfinished-lie": "再抽1次；下一次数值招式双方数值同步×2；对方本回合领域战权重-0.2；下回合-1招",
-        "daniya-timed-collapse": "对方本回合力竭权重×5；若对方未力竭，自己下回合力竭权重×5",
+        "daniya-timed-collapse": "常驻被动使对方力竭权重按回合数×5；抽中时本回合再追加1层",
         "daniya-domain": "领域战胜利或单方命中后切换幻灭形态，自己下回合+1招",
+        "daniya-world-dragon-image": "对方下回合所有招式效果失效，领域类效果同样失效",
+        "daniya-world-114514": "对方下回合禁止使用自己的招式，全部改抽当前形态达妮娅招式盘",
+        "daniya-world-work": "布景：蚀域出现/领域战权重各+2；幻灭：对方力竭盘永久+2",
+        "daniya-world-nmsl": "对方本回合对自己的直接减权与重装伤害无效",
     }[move.move_id]
     return "；".join(part for part in (numeric, mechanics) if part)
 
@@ -1926,7 +1996,7 @@ def _daniya_wheels(identity: CommandIdentity, level: int) -> BattleView:
             "move",
             f"达妮娅猪 · {DANIYA_FORM_NAMES[form_id]}",
             tuple((move.name, _move_weight(move)) for move in forms[form_id].moves),
-            note="形态专属5招与公共4招同盘；天衣无缝/未竟谎言0.8、计时溃灭0.2，其余基础权重1。",
+            note="形态专属5招与公共8招同盘；发龙图0.1、114514为0.8、上班0.4444、计时溃灭/NMSL为0.2，其余基础权重1。",
         )
         for form_id in (DANIYA_FORM_STAGING, DANIYA_FORM_DISILLUSION)
     )
@@ -1934,7 +2004,7 @@ def _daniya_wheels(identity: CommandIdentity, level: int) -> BattleView:
         Line(
             f"{DANIYA_FORM_NAMES[form_id]} · {move.name}",
             _daniya_effect(move, level),
-            f"抽取权重 {_move_weight(move)}；正数胜率受强化，-52.1与功能数值不受强化。",
+            f"抽取权重 {_move_weight(move)}；正数胜率受强化，定向减权与纯功能不受强化。",
         )
         for form_id in (DANIYA_FORM_STAGING, DANIYA_FORM_DISILLUSION)
         for move in forms[form_id].moves
@@ -1949,14 +2019,20 @@ def _daniya_wheels(identity: CommandIdentity, level: int) -> BattleView:
             Panel(
                 "形态与伤势机制",
                 (
-                    Line("布景", "每次布景招式令下次蚀域抽取权重+0.1", "蚀域实际使用后清除累计。"),
-                    Line("幻灭", "每次幻灭招式令对方力竭盘永久+0.1", "精确累积，不提前取整。"),
-                    Line("计时的溃灭", "对方-52.1", "若对手未在本回合力竭，×5反噬登记到自己下回合。"),
+                    Line("布景", "每次布景招式令下次蚀域出现/领域战权重各+0.3", "蚀域实际使用后同时清除累计。"),
+                    Line("幻灭", "每次幻灭招式令对方力竭盘永久+0.3", "精确累积，不提前取整。"),
+                    Line("计时的溃灭", "每层倍率=当前回合数×5", "达妮娅常驻1层；每次抽中主动效果，本回合再追加1层。"),
+                    Line(
+                        "世界·发龙图 / 114514",
+                        "控制对方下回合",
+                        "状态随回合持久化；若同时命中，强制抽到的达妮娅招式也全部失效。",
+                    ),
+                    Line("世界·NMSL", "保护本回合", "免疫敌方直接减权和干员重装的归零/-5伤害。"),
                 ),
             ),
         ),
         hints=(
-            "招式抽取权重按千分之一保存；胜利权重按十分之一保存，图中文字展示精确小数。",
+            "招式抽取权重按万分之一保存；胜利权重按十分之一保存，0.4444会被精确抽取。",
             "数值失效只归零胜率数值，贷款、形态与伤势功能仍保留。",
         ),
     )
@@ -2028,10 +2104,10 @@ def _asamu_wheels(identity: CommandIdentity, level: int) -> BattleView:
 def _yilu_effect(move, level: int) -> str:
     mechanics = {
         "yilu-vanguard": "胜率+5；再抽1次、指示物+2；此后所有招式基础胜率+2",
-        "yilu-guard": "指示物+1后全部融合；每点+5，消耗>5触发本回合胜率翻倍",
+        "yilu-guard": "指示物+1后全部融合；每点+5，消耗≥8触发本回合胜率翻倍",
         "yilu-defender": "胜率+2、指示物+1；70%令对方随机一招数值归零并额外-5",
         "yilu-caster": "指示物+3；每6点换+40，可连续；不足6再+1指示物",
-        "yilu-sniper": "等概率连射1至10枪；每枪+1，并独立执行两次50%指示物判定",
+        "yilu-sniper": "等概率连射1至10枪；每枪独立吃先锋/明日加成；消耗指示物令之后每枪累积+2",
         "yilu-medic": "权重0.2；清空指示物，重伤/力竭盘×0.5；重伤恢复轻伤，再+2指示物",
         "yilu-specialist": "权重0.5；清空指示物，再抽2次非医疗、非特种干员，并+1指示物",
         "yilu-domain": "胜率+32.5；领域战获胜或单方命中后，下回合+1招且该回合所有招式基础胜率+1",
@@ -2065,7 +2141,7 @@ def _yilu_wheels(identity: CommandIdentity, level: int) -> BattleView:
                     Line("指示物", "持有量可消费，累计量不倒退", "累计总量每达到9的倍数，再抽1次。"),
                     Line("巴别塔的恶灵", "下一名干员效果按顺序完整执行2次", "只占1个干员放置名额。"),
                     Line("特种再部署", "限定非医疗、非特种干员2次", "两次分别抽取并正常计算指示物与10名上限。"),
-                    Line("近卫真伤", "融合消耗超过5时本回合胜率翻倍", "多次触发按层连续翻倍。"),
+                    Line("近卫真伤", "融合消耗至少8时本回合胜率翻倍", "多次触发按层连续翻倍。"),
                 ),
             ),
         ),

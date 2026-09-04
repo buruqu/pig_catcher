@@ -1,12 +1,13 @@
 # 产品需求基线
 
-> 仓库当前开发候选为 `2.0.20 / Schema61 / Ruleset59 / Battle v12 / Manifest4`，尚未部署或推送；
+> 仓库当前开发候选为 `2.0.21 / Schema62 / Ruleset60 / Battle v13 / Manifest4`，尚未部署或推送；
 > 线上正式版本仍为 `2.0.19 / Schema60 / Ruleset58 / Battle v11 / Manifest4`。
 > 成就、周冲榜、派遣、巡演、对战、十层永久升级、独立器具商城和第九期内容均已上线；
 > 旧 dev 分轮编号与当时的“未上线”结论仅作为历史验收记录。现行发布概览见
 > [抓猪 2.0.19 发布总结](48-pig-catcher-2.0.19-release-summary.md)，菜品与道具规则见
-> [第九期效果表](30-round9-food-effects-and-item-bag.md)；2.0.20新增内容见
-> [双六星时段机制与栖夜流萤 Battle v12](49-dual-six-star-window-resonance-and-firefly-battle-v12.md)。
+> [第九期效果表](30-round9-food-effects-and-item-bag.md)；2.0.20双六星内容见
+> [双六星时段机制与栖夜流萤 Battle v12](49-dual-six-star-window-resonance-and-firefly-battle-v12.md)，
+> 现行战斗规则见[达妮娅／熠～噜猪 Battle v13](50-daniya-yilu-battle-v13.md)。
 
 ## 1. 产品定位
 

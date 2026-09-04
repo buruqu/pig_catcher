@@ -72,18 +72,18 @@ def _non_terminal_resolution(state: dict, *, prefix: str) -> tuple[dict, dict]:
 
 
 def test_firefly_catalog_aliases_weights_and_battle_v12_gate() -> None:
-    assert BATTLE_RULE_VERSION == 12
+    assert BATTLE_RULE_VERSION == 13
     assert len(FIREFLY_PIG_TEMPLATE_IDS) == 4
     assert {FIGHTERS_BY_TEMPLATE[item].fighter_id for item in FIREFLY_PIG_TEMPLATE_IDS} == {"firefly"}
     assert [move.resolved_draw_weight_units for move in FIREFLY_MOVES] == [
-        1000,
-        1000,
-        850,
-        1000,
-        1000,
-        900,
-        900,
-        750,
+        10000,
+        10000,
+        8500,
+        10000,
+        10000,
+        9000,
+        9000,
+        7500,
     ]
 
 
@@ -92,9 +92,9 @@ def test_fuel_changes_sam_gain_and_draw_weight_but_direct_transform_costs_point_
     player = state["sides"][0]
     player["firefly_fuel"] = 2
     sam_move = FIREFLY_MOVES[3]
-    assert move_weight_units(player, sam_move) == 1100
+    assert move_weight_units(player, sam_move) == 11000
     player["firefly_form"] = FIREFLY_FORM_SAM
-    assert move_weight_units(player, sam_move) == 1200
+    assert move_weight_units(player, sam_move) == 12000
 
     player["firefly_form"] = FIREFLY_FORM_FIREFLY
     player["firefly_fuel"] = 0

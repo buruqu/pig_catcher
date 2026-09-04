@@ -62,6 +62,7 @@ from .v0058_battle_rule_v9 import MIGRATION_0058
 from .v0059_battle_rule_v10 import MIGRATION_0059
 from .v0060_battle_rule_v11 import MIGRATION_0060
 from .v0061_window_mechanics_battle_v12 import MIGRATION_0061
+from .v0062_battle_rule_v13 import MIGRATION_0062
 
 MIGRATIONS: tuple[Migration, ...] = (
     MIGRATION_0001,
@@ -125,6 +126,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     MIGRATION_0059,
     MIGRATION_0060,
     MIGRATION_0061,
+    MIGRATION_0062,
 )
 
 __all__ = ["MIGRATIONS", "Migration"]

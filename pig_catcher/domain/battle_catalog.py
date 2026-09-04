@@ -9,7 +9,7 @@ from .special_content import GOJO_PIG_TEMPLATE_ID, SUKUNA_PIG_TEMPLATE_ID
 
 # 对战规则版本与活动成就事实版本分离：新版对战会改变随机命名空间，
 # 但新增字段仍是 activity_progress v1 可以向后兼容读取的事实载荷。
-BATTLE_RULE_VERSION = 12
+BATTLE_RULE_VERSION = 13
 BATTLE_FACT_VERSION = 1
 BATTLE_VERSION = BATTLE_RULE_VERSION
 INVITE_TTL_MS = 5 * 60 * 1000
@@ -29,7 +29,9 @@ INJURY_WHEELS = (
     (("light", 10), ("heavy", 25), ("exhausted", 60), ("core", 5)),
 )
 INJURY_NAMES = {"light": "轻伤", "heavy": "重伤", "exhausted": "力竭倒下", "core": "我掌握了抓猪的核心！"}
-MOVE_WEIGHT_SCALE = 1000
+# Battle v13 为“丸山大姐达妮娅·世界·上班”的精确 0.4444 抽取权重
+# 将主招式盘统一提升到万分整数刻度；所有旧权重按比例放大，概率不变。
+MOVE_WEIGHT_SCALE = 10000
 VICTORY_WEIGHT_SCALE = 10
 LEGACY_LOOT_WEIGHTS = (5, 10, 10, 25, 30, 20)
 LOOT_WEIGHTS = (5, 10, 10, 30, 30, 15)
@@ -60,7 +62,7 @@ class Move:
     direction: str = "self"
     description: str = ""
     # v5的精确字段均只存整数：gain_tenths以0.1自身胜利权重为一单位，
-    # opponent_reduction保留对方整数减权语义，draw_weight_units以1/1000抽取权重为一单位。
+    # opponent_reduction保留对方整数减权语义，draw_weight_units以1/10000抽取权重为一单位。
     # None 保留旧三猪的整数定义，不迫使旧数据改写或使用浮点数。
     gain_tenths: int | None = None
     opponent_reduction: int = 0
@@ -185,14 +187,14 @@ JUEJUE_TIME_MOVES = (
     Move(
         "sand-accelerate",
         "时之沙·加速",
-        draw_weight_units=1500,
+        draw_weight_units=15000,
         tags=("juejue-accelerate",),
         description="进入等权三档加速盘；成功增加胜利权重并在本回合追加1/2/3次抽取，失败产生下回合欠招。",
     ),
     Move(
         "sand-delay",
         "时之沙·时延",
-        draw_weight_units=1500,
+        draw_weight_units=15000,
         tags=("juejue-delay",),
         description="进入等权三档时延盘；成功削减对方本轮数值并可能扣对方下回合招数，失败可能令对方加招。",
     ),
@@ -286,42 +288,42 @@ DANIYA_STAGING_MOVES = (
     Move(
         "daniya-staging-virtual-particle",
         "达妮娅-布景·虚质粒子",
-        7,
+        12,
         tags=("daniya", "daniya-staging"),
-        description="胜利权重+7；下一次蚀域主盘抽取权重+0.1。",
-        draw_weight_units=1000,
+        description="胜利权重+12；下一次蚀域主盘抽取权重和领域战胜利权重各+0.3。",
+        draw_weight_units=10000,
     ),
     Move(
         "daniya-staging-dream-feast",
         "达妮娅-布景·织梦的飨宴",
-        12,
+        16,
         tags=("daniya", "daniya-staging"),
-        description="胜利权重+12；下一次蚀域主盘抽取权重+0.1。",
-        draw_weight_units=1000,
+        description="胜利权重+16；下一次蚀域主盘抽取权重和领域战胜利权重各+0.3。",
+        draw_weight_units=10000,
     ),
     Move(
         "daniya-staging-mimic-bubble",
         "达妮娅-布景·拟态泡泡",
-        18,
+        20,
         tags=("daniya", "daniya-staging"),
-        description="胜利权重+18；下一次蚀域主盘抽取权重+0.1。",
-        draw_weight_units=1000,
+        description="胜利权重+20；下一次蚀域主盘抽取权重和领域战胜利权重各+0.3。",
+        draw_weight_units=10000,
     ),
     Move(
         "daniya-staging-final-curtain",
         "达妮娅-布景·帷幕终景",
         40,
         tags=("daniya", "daniya-staging"),
-        description="胜利权重+40；下一次蚀域主盘抽取权重+0.1。",
-        draw_weight_units=1000,
+        description="胜利权重+40；下一次蚀域主盘抽取权重和领域战胜利权重各+0.3。",
+        draw_weight_units=10000,
     ),
     Move(
         "daniya-staging-greeting",
         "达妮娅-布景·久疏问候！",
         24,
         tags=("daniya", "daniya-staging"),
-        description="胜利权重+24；下一次蚀域主盘抽取权重+0.1。",
-        draw_weight_units=1000,
+        description="胜利权重+24；下一次蚀域主盘抽取权重和领域战胜利权重各+0.3。",
+        draw_weight_units=10000,
     ),
 )
 DANIYA_DISILLUSION_MOVES = (
@@ -329,45 +331,45 @@ DANIYA_DISILLUSION_MOVES = (
         "daniya-disillusion-dark-core",
         "达妮娅-幻灭·黯核",
         tags=("daniya", "daniya-disillusion"),
-        description="对方胜利权重-9；对方本场后续伤势盘的力竭权重永久+0.1。",
-        opponent_reduction=9,
-        draw_weight_units=1000,
+        description="对方胜利权重-14；对方本场后续伤势盘的力竭权重永久+0.3。",
+        opponent_reduction=14,
+        draw_weight_units=10000,
     ),
     Move(
         "daniya-disillusion-dream-feast",
         "达妮娅-幻灭·织梦的飨宴",
-        7,
+        9,
         tags=("daniya", "daniya-disillusion"),
-        description="自身胜利权重+7、对方胜利权重-7；对方本场后续伤势盘的力竭权重永久+0.1。",
-        opponent_reduction=7,
-        draw_weight_units=1000,
+        description="自身胜利权重+9、对方胜利权重-9；对方本场后续伤势盘的力竭权重永久+0.3。",
+        opponent_reduction=9,
+        draw_weight_units=10000,
     ),
     Move(
         "daniya-disillusion-banish",
         "达妮娅-幻灭·放逐",
-        10,
+        11,
         tags=("daniya", "daniya-disillusion"),
-        description="自身胜利权重+10、对方胜利权重-10；对方本场后续伤势盘的力竭权重永久+0.1。",
-        opponent_reduction=10,
-        draw_weight_units=1000,
+        description="自身胜利权重+11、对方胜利权重-11；对方本场后续伤势盘的力竭权重永久+0.3。",
+        opponent_reduction=11,
+        draw_weight_units=10000,
     ),
     Move(
         "daniya-disillusion-final-curtain",
         "达妮娅-幻灭·帷幕终景",
-        21,
+        22,
         tags=("daniya", "daniya-disillusion"),
-        description="自身胜利权重+21、对方胜利权重-21；对方本场后续伤势盘的力竭权重永久+0.1。",
-        opponent_reduction=21,
-        draw_weight_units=1000,
+        description="自身胜利权重+22、对方胜利权重-22；对方本场后续伤势盘的力竭权重永久+0.3。",
+        opponent_reduction=22,
+        draw_weight_units=10000,
     ),
     Move(
         "daniya-disillusion-knock",
         "达妮娅-幻灭·轻叩门扉",
         13,
         tags=("daniya", "daniya-disillusion"),
-        description="自身胜利权重+13、对方胜利权重-13；对方本场后续伤势盘的力竭权重永久+0.1。",
+        description="自身胜利权重+13、对方胜利权重-13；对方本场后续伤势盘的力竭权重永久+0.3。",
         opponent_reduction=13,
-        draw_weight_units=1000,
+        draw_weight_units=10000,
     ),
 )
 DANIYA_COMMON_MOVES = (
@@ -377,7 +379,7 @@ DANIYA_COMMON_MOVES = (
         draws=2,
         tags=("daniya", "daniya-flawless"),
         description="再抽两次；本回合自身领域战胜利权重+0.2。",
-        draw_weight_units=800,
+        draw_weight_units=10000,
     ),
     Move(
         "daniya-unfinished-lie",
@@ -386,15 +388,14 @@ DANIYA_COMMON_MOVES = (
         loan=True,
         tags=("daniya", "daniya-loan"),
         description="本回合再抽一次；下一个数值招式的双方数值同步翻倍；对方本回合领域战胜利权重-0.2；下回合-1招。",
-        draw_weight_units=800,
+        draw_weight_units=10000,
     ),
     Move(
         "daniya-timed-collapse",
         "达妮娅·计时的溃灭",
         tags=("daniya", "daniya-timed-collapse"),
-        description="对方胜利权重-52.1；对方本回合力竭权重×5，若未力竭，自身下回合力竭权重×5。",
-        opponent_reduction_tenths=521,
-        draw_weight_units=200,
+        description="被动使对方力竭权重按当前回合数×5增长；抽中主动效果时，本回合再触发一层同款被动。",
+        draw_weight_units=2000,
     ),
     Move(
         "daniya-domain",
@@ -402,7 +403,35 @@ DANIYA_COMMON_MOVES = (
         30,
         tags=("domain", "daniya", "daniya-domain"),
         description="领域对抗胜利或单方领域命中后翻倍一份有效领域胜率、切换幻灭形态，并使自身下回合出招数+1。",
+        draw_weight_units=10000,
+    ),
+    Move(
+        "daniya-world-dragon-image",
+        "丸山大姐达妮娅-世界·发龙图",
+        tags=("daniya", "daniya-world-disable-next"),
+        description="使对方下回合所有招式效果失效，领域类效果同样失效。",
         draw_weight_units=1000,
+    ),
+    Move(
+        "daniya-world-114514",
+        "丸山大姐达妮娅-世界·114514",
+        tags=("daniya", "daniya-world-force-next"),
+        description="使对方下回合禁止使用自己的招式，全部从本形态达妮娅招式盘抽取。",
+        draw_weight_units=8000,
+    ),
+    Move(
+        "daniya-world-work",
+        "丸山大姐达妮娅-世界·上班",
+        tags=("daniya", "daniya-world-work"),
+        description="布景：蚀域出现权重和领域战胜利权重各+2；幻灭：对方力竭盘权重永久+2。",
+        draw_weight_units=4444,
+    ),
+    Move(
+        "daniya-world-nmsl",
+        "丸山大姐达妮娅-世界·NMSL",
+        tags=("daniya", "daniya-world-damage-immunity"),
+        description="使对方本回合对自己造成的直接减权与重装伤害无效。",
+        draw_weight_units=2000,
     ),
 )
 DANIYA_FORMS = (
@@ -417,7 +446,7 @@ ASAMU_MOVES = (
         10,
         tags=("asamu", "asamu-bathe"),
         description="喝奶茶的抽取权重+0.5。",
-        draw_weight_units=1000,
+        draw_weight_units=10000,
     ),
     Move(
         "asamu-milk-tea",
@@ -425,7 +454,7 @@ ASAMU_MOVES = (
         20,
         tags=("asamu", "asamu-milk-tea"),
         description="本场永久使全盛姿态抽取权重+0.1，并重置喝奶茶当前抽取权重。",
-        draw_weight_units=1000,
+        draw_weight_units=10000,
     ),
     Move(
         "asamu-sleep",
@@ -433,7 +462,7 @@ ASAMU_MOVES = (
         1,
         tags=("asamu", "asamu-sleep"),
         description="胜利权重+1；本场之后所有招式胜利权重额外+5，可累加。",
-        draw_weight_units=1000,
+        draw_weight_units=10000,
     ),
     Move(
         "asamu-prime",
@@ -442,7 +471,7 @@ ASAMU_MOVES = (
         draws=2,
         tags=("asamu", "asamu-prime"),
         description="胜利权重+30，再抽两次；清空憋个大的临时出现权重。",
-        draw_weight_units=200,
+        draw_weight_units=2000,
     ),
     Move(
         "asamu-charge-up",
@@ -450,7 +479,7 @@ ASAMU_MOVES = (
         draws=1,
         tags=("asamu", "asamu-charge-up"),
         description="再抽一次；全盛姿态临时出现权重+1，打出全盛姿态后清空。",
-        draw_weight_units=1000,
+        draw_weight_units=10000,
     ),
     Move(
         "asamu-pressure-king",
@@ -458,7 +487,7 @@ ASAMU_MOVES = (
         7,
         tags=("asamu", "asamu-pressure-king"),
         description="对方本回合每个数值招式独立33%失效；每层独立判定，只归零数值而保留功能。",
-        draw_weight_units=500,
+        draw_weight_units=5000,
     ),
     Move(
         "asamu-misfortune-transfer",
@@ -466,7 +495,7 @@ ASAMU_MOVES = (
         13,
         tags=("asamu", "asamu-misfortune-transfer"),
         description="双方本回合力竭倒下权重均×5。",
-        draw_weight_units=500,
+        draw_weight_units=5000,
     ),
     Move(
         "asamu-milk-dragon",
@@ -474,7 +503,7 @@ ASAMU_MOVES = (
         9,
         tags=("asamu", "asamu-milk-dragon"),
         description="依次将对方下回合第一、第二…招替换为发奶龙；被替换的发奶龙不反向影响来源玩家。",
-        draw_weight_units=1000,
+        draw_weight_units=10000,
     ),
     Move(
         "asamu-tit-for-tat",
@@ -482,7 +511,7 @@ ASAMU_MOVES = (
         4,
         tags=("asamu", "asamu-tit-for-tat"),
         description="回合末若自身权重较低，交换双方权重并再+4；否则自身+40。抽取权重随无伤/轻伤/重伤为0.4/0.749/0.947。",
-        draw_weight_units=400,
+        draw_weight_units=4000,
     ),
     Move(
         "asamu-domain",
@@ -490,7 +519,7 @@ ASAMU_MOVES = (
         22,
         tags=("domain", "asamu", "asamu-domain"),
         description="领域对抗胜利或单方领域命中后翻倍一份有效领域胜率，并使用对方2个随机招式。",
-        draw_weight_units=1000,
+        draw_weight_units=10000,
     ),
 )
 
@@ -506,7 +535,7 @@ YILU_MOVES = (
         "yilu-guard",
         "干员放置·近卫",
         tags=("yilu", "yilu-operator", "yilu-guard"),
-        description="先累计1指示物，再消耗全部指示物，胜率+消耗数×5；消耗超过5时触发本回合真伤翻倍。",
+        description="先累计1指示物，再消耗全部指示物，胜率+消耗数×5；消耗至少8时触发本回合真伤翻倍。",
     ),
     Move(
         "yilu-defender",
@@ -525,21 +554,21 @@ YILU_MOVES = (
         "yilu-sniper",
         "干员放置·狙击",
         tags=("yilu", "yilu-operator", "yilu-sniper"),
-        description="等概率连射1至10次；每枪+1，独立50%累计指示物、50%消耗1指示物令该枪再+2。",
+        description="等概率连射1至10次；每枪视为独立招式并吃到先锋/明日基础加成。每枪独立50%累计指示物、50%消耗1指示物令之后每枪再+2。",
     ),
     Move(
         "yilu-medic",
         "干员放置·医疗·冥土追魂",
         tags=("yilu", "yilu-operator", "yilu-medic"),
         description="消耗全部指示物，使本回合重伤和力竭权重各减半；若处于重伤则恢复为轻伤，再累计2指示物。",
-        draw_weight_units=200,
+        draw_weight_units=2000,
     ),
     Move(
         "yilu-specialist",
         "干员放置·特种",
         tags=("yilu", "yilu-operator", "yilu-specialist"),
         description="消耗全部指示物，再抽两次非医疗、非特种的其他干员招式，并累计1指示物。",
-        draw_weight_units=500,
+        draw_weight_units=5000,
     ),
     Move(
         "yilu-domain",
@@ -576,7 +605,7 @@ FIREFLY_MOVES = (
         "流萤·我会看见，飞萤之火",
         tags=("firefly", "firefly-skill", "firefly-choice"),
         description="燃芯+1；确定抽取两个候选并自动选择收益更高的一招。选流萤技时本回合领域战权重+0.2；选萨姆技时立即变身且该招胜率+10。",
-        draw_weight_units=850,
+        draw_weight_units=8500,
     ),
     Move(
         "sam-skyfire-bombardment",
@@ -600,7 +629,7 @@ FIREFLY_MOVES = (
         tags=("firefly", "sam-skill", "sam-deathstar-overload"),
         description="胜率+26、对手胜率-14，命中后溃败+1；命中前已有2层溃败时，对手下回合出招数-1。",
         opponent_reduction=14,
-        draw_weight_units=900,
+        draw_weight_units=9000,
     ),
     Move(
         "sam-ignite-star-sea",
@@ -608,7 +637,7 @@ FIREFLY_MOVES = (
         28,
         tags=("firefly", "sam-skill", "sam-ignite-star-sea"),
         description="进入萨姆形态2回合、对手溃败+2、自己下回合+1招；每层燃芯再+5并提高本招出现权重0.1，随后清空燃芯。萨姆形态下改为+20、对手-10、延长1回合并追加1层溃败。",
-        draw_weight_units=900,
+        draw_weight_units=9000,
     ),
     Move(
         "firefly-falling-sky",
@@ -617,7 +646,7 @@ FIREFLY_MOVES = (
         tags=("domain", "firefly", "firefly-domain"),
         description="胜率+36、对手-20；领域命中或领域战获胜后胜率翻倍，并追加焦土陨击+12与对手力竭权重+0.15。对手3层溃败时再-15。",
         opponent_reduction=20,
-        draw_weight_units=750,
+        draw_weight_units=7500,
     ),
 )
 FIREFLY_FORMS = (

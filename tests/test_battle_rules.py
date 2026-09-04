@@ -58,7 +58,7 @@ def ready(player, pending=1):
 
 
 def test_exact_catalog_and_growth_costs():
-    assert [len(f.moves) for f in FIGHTERS] == [10, 10, 16, 14, 10, 9, 8]
+    assert [len(f.moves) for f in FIGHTERS] == [10, 10, 16, 18, 10, 9, 8]
     assert all(move.draw_weight == 1 for fighter in FIGHTERS[:6] for move in fighter.moves)
     assert [m.gain for m in FIGHTERS[0].moves] == [10, 10, 15, 21, 35, 0, 14, 7, 12, 28]
     assert [m.gain for m in FIGHTERS[1].moves] == [13, 20, 14, 10, 10, 14, 24, 30, 14, 35]
@@ -271,21 +271,21 @@ def test_cancelled_domain_updates_every_following_displayed_cumulative_total():
 def test_blue_and_red_raise_both_purple_moves_then_either_purple_resets_the_bonus():
     p = state()["sides"][1]
     moves = FIGHTERS[1].moves
-    assert move_weight_units(p, moves[6]) == move_weight_units(p, moves[9]) == 1000
+    assert move_weight_units(p, moves[6]) == move_weight_units(p, moves[9]) == 10000
     ready(p, 2)
     apply_move(p, moves[0])
-    assert move_weight_units(p, moves[6]) == move_weight_units(p, moves[9]) == 1100
+    assert move_weight_units(p, moves[6]) == move_weight_units(p, moves[9]) == 11000
     apply_move(p, moves[1])
-    assert move_weight_units(p, moves[6]) == move_weight_units(p, moves[9]) == 1200
-    assert all(move_weight_units(p, move) == 1000 for move in moves if "purple" not in move.tags)
+    assert move_weight_units(p, moves[6]) == move_weight_units(p, moves[9]) == 12000
+    assert all(move_weight_units(p, move) == 10000 for move in moves if "purple" not in move.tags)
     p["turn"].update(pending=1, done=False)
     purple = apply_move(p, moves[6])
     assert purple["purple_weight_steps_before"] == purple["purple_weight_steps_used"] == 2
     assert purple["purple_weight_steps"] == 0
-    assert move_weight_units(p, moves[6]) == move_weight_units(p, moves[9]) == 1000
+    assert move_weight_units(p, moves[6]) == move_weight_units(p, moves[9]) == 10000
     p["turn"].update(pending=2, done=False)
     apply_move(p, moves[2])
-    assert move_weight_units(p, moves[6]) == move_weight_units(p, moves[9]) == 1100
+    assert move_weight_units(p, moves[6]) == move_weight_units(p, moves[9]) == 11000
     unlimited = apply_move(p, moves[9])
     assert unlimited["purple_weight_steps_used"] == 1 and p["purple_weight_steps"] == 0
 
@@ -503,15 +503,15 @@ def test_huge_odd_round_gain_uses_integer_ceiling_without_float_conversion():
 
 
 def test_juejue_catalog_aliases_forms_and_legacy_query_boundary():
-    assert BATTLE_RULE_VERSION == 12
+    assert BATTLE_RULE_VERSION == 13
     assert all(FIGHTERS_BY_TEMPLATE[template_id].fighter_id == "juejue" for template_id in JUEJUE_PIG_TEMPLATE_IDS)
     assert {move.move_id for move in JUEJUE_TIME_MOVES}.isdisjoint(
         {move.move_id for move in JUEJUE_VIRTUAL_MOVES}
     )
     assert len(JUEJUE_TIME_MOVES) == len(JUEJUE_VIRTUAL_MOVES) == 8
     weights = {move.move_id: move.resolved_draw_weight_units for move in JUEJUE_TIME_MOVES}
-    assert weights["sand-accelerate"] == 1500
-    assert weights["sand-delay"] == 1500
+    assert weights["sand-accelerate"] == 15000
+    assert weights["sand-delay"] == 15000
     assert fighter_moves("juejue", 3) == ()
     assert fighter_moves("juejue", 4) == JUEJUE_TIME_MOVES + JUEJUE_VIRTUAL_MOVES
 
@@ -566,18 +566,18 @@ def test_juejue_domain_main_wheel_base_and_dynamic_draw_weights_are_exact():
     sand_domain = JUEJUE_TIME_MOVES[-1]
     chaos_domain = JUEJUE_VIRTUAL_MOVES[-1]
     assert sand_domain.draw_weight == chaos_domain.draw_weight == 1
-    assert move_weight_units(player, sand_domain) == move_weight_units(player, chaos_domain) == 1000
+    assert move_weight_units(player, sand_domain) == move_weight_units(player, chaos_domain) == 10000
     player["juejue_sand_domain_steps"] = 3
     player["juejue_sand_domain_switch_units"] = 5
     player["turn"]["juejue_realtime"] = True
-    assert move_weight_units(player, sand_domain) == 2800
-    assert move_weight_units(player, chaos_domain) == 2000
+    assert move_weight_units(player, sand_domain) == 28000
+    assert move_weight_units(player, chaos_domain) == 20000
     ready(player)
     event = apply_move(player, sand_domain)
     assert event["sand_domain_steps_before"] == 3
     assert event["sand_domain_steps_after"] == 0
     assert event["sand_domain_switch_units_after"] == 0
-    assert move_weight_units(player, sand_domain) == move_weight_units(player, chaos_domain) == 2000
+    assert move_weight_units(player, sand_domain) == move_weight_units(player, chaos_domain) == 20000
 
 
 def _zero_sequence(expected: bool) -> tuple[dict, dict, dict]:

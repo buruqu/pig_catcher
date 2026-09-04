@@ -1,11 +1,13 @@
 # 技术架构设计
 
 > 当前四个既有 QQ / QQ 官方范围线上统一运行 `2.0.19 / Schema60 / Ruleset58 / Manifest4`，战斗规则为Battle v11。
-> 仓库开发候选为 `2.0.20 / Schema61 / Ruleset59 / Battle v12 / Manifest4`，本轮未部署、未推送。
+> 仓库开发候选为 `2.0.21 / Schema62 / Ruleset60 / Battle v13 / Manifest4`，本轮未部署、未推送。
 > 所有战斗猪在单方8:2领域命中或领域战获胜时均触发领域效果并翻倍一份仍有效领域胜率；历史
 > Battle v1至v10场次事实不改写。Schema60只扩展Battle v11自然终局的3次战利品约束，不改玩家资产。
 > Schema61新增两张可审计状态表并把新建场次升级为Battle v12；实现边界见
 > [双六星时段机制与栖夜流萤专项文档](49-dual-six-star-window-resonance-and-firefly-battle-v12.md)。
+> Schema62只扩充Battle v13战利品约束；精确万分位抽取权重和新跨回合状态见
+> [达妮娅／熠～噜猪专项文档](50-daniya-yilu-battle-v13.md)。
 > 下文1.x兼容基线、内部灰度和迁移历史
 > 继续保留为历史记录，不再代表当前在线版本。
 

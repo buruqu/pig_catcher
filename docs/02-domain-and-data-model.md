@@ -1,9 +1,11 @@
 # 领域与数据模型
 
-> 仓库开发候选为 `2.0.20 / Schema61 / Ruleset59 / Battle v12 / Manifest4`，线上仍为
+> 仓库开发候选为 `2.0.21 / Schema62 / Ruleset60 / Battle v13 / Manifest4`，线上仍为
 > `2.0.19 / Schema60 / Ruleset58 / Battle v11 / Manifest4`；命令组件仍为85个 Command + 1个 HOME_CARD。
 > Schema61新增玩家级跨时段额度平移与本时段双向六星共鸣状态；完整字段与生命周期见
 > [2.0.20专项文档](49-dual-six-star-window-resonance-and-firefly-battle-v12.md)。
+> Schema62只把Battle v13加入自然终局3次战利品约束；新场次的达妮娅／熠～噜状态边界见
+> [2.0.21专项文档](50-daniya-yilu-battle-v13.md)。
 > 42将短编号唯一性收敛到活跃资产：同库猪/菜跨表NOCASE冲突保护，消费释放但UUID历史不删。
 > 43新增奖励券发放/使用及30秒自选单，复用原奖励库存；44同步28条食品规则并转换有效旧雾蓝剩余次数。
 > 45只把符合旧默认参数的猪趴柠檬茶模板更新为一次−0.50，不改已有实例和排队效果。

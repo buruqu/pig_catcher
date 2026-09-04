@@ -269,7 +269,10 @@ async def test_asamu_domain_copies_persist_two_moves_and_facts_with_exact_fracti
     assert [side["snapshot"]["fighter_id"] for side in state["sides"]] == ["asamu", "daniya"]
 
     setup_seed = "service-asamu-domain-setup"
-    for side, move in ((0, ASAMU_MOVES[-1]), (1, FIGHTERS_BY_ID["daniya"].moves[-1])):
+    daniya_domain = next(
+        move for move in FIGHTERS_BY_ID["daniya"].moves if move.move_id == "daniya-domain"
+    )
+    for side, move in ((0, ASAMU_MOVES[-1]), (1, daniya_domain)):
         player = state["sides"][side]
         player["turn"].update(raw=1, effective=1, pending=1, done=False)
         event = apply_move(
@@ -284,16 +287,16 @@ async def test_asamu_domain_copies_persist_two_moves_and_facts_with_exact_fracti
         player["turn"]["events"].append(deepcopy(event))
         player["turn"]["done"] = True
 
-    # 找出一份固定可重现的v7事实：阿萨姆赢得真实领域战，且两个复制位
-    # 至少一次命中达妮娅对手-52.1的分数招式，顺带验收分数序列化。
+    # 找出一份固定可重现的当前规则事实：阿萨姆赢得真实领域战，且两个复制位
+    # 至少一次命中达妮娅的布景·帷幕终景，顺带验收精确分数序列化。
     seed = None
     for index in range(1000):
         candidate = f"service-asamu-domain-copy-{index}"
         probe = resolve_round(deepcopy(state), candidate)
         copies = probe["interactions"]["generated_events"]
         if len(copies) == 2 and any(
-            event["source_move_id"] == "daniya-timed-collapse"
-            and event["opponent_reduction"] == Fraction(521, 10)
+            event["source_move_id"] == "daniya-staging-final-curtain"
+            and event["gain"] == Fraction(40, 1)
             for event in copies
         ):
             seed = candidate
@@ -329,16 +332,17 @@ async def test_asamu_domain_copies_persist_two_moves_and_facts_with_exact_fracti
     assert all(row["player_id"] == world.a.player_id for row in fact_rows)
     assert stored_facts == stored_moves
 
-    collapse = next(event for event in stored_moves if event["source_move_id"] == "daniya-timed-collapse")
-    assert collapse["gain"] == 0
-    assert collapse["opponent_reduction"] == Fraction(521, 10)
-    assert type(collapse["opponent_reduction"]) is Fraction
-    raw_collapse = next(
+    copied = next(
+        event for event in stored_moves if event["source_move_id"] == "daniya-staging-final-curtain"
+    )
+    assert copied["gain"] == Fraction(40, 1)
+    assert type(copied["gain"]) is Fraction
+    raw_copied = next(
         row["event_json"]
         for row, event in zip(move_rows, stored_moves, strict=True)
-        if event["source_move_id"] == "daniya-timed-collapse"
+        if event["source_move_id"] == "daniya-staging-final-curtain"
     )
-    assert '"$battle-fraction":["0x209","0xa"]' in raw_collapse
+    assert '"$battle-fraction":["0x28","0x1"]' in raw_copied
 
     replay = await world.send(section="move", actor=world.a, mid="asamu-domain-copy-persistence")
     assert replay.receipt.receipt_id == result.receipt.receipt_id

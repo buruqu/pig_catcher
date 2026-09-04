@@ -1,6 +1,5 @@
 """The offline battle art gate includes deterministic cards for every new interaction family."""
 
-from fractions import Fraction
 
 from pig_catcher.domain.battle import new_state
 from pig_catcher.domain.battle_catalog import (
@@ -132,18 +131,20 @@ def test_deterministic_mechanic_cards_cover_new_battle_rules() -> None:
     assert "加速盘抽中" in switch_text and "最终成功率" in switch_text
     assert evidence["13j-daniya-asamu-formal-art"]["daniya_initial_form"] == "staging"
     transition = evidence["13k-daniya-domain-transition"]
-    assert transition["staging_steps"] == [1, 2]
-    assert transition["domain_draw_weight_units"] == 1200
+    assert transition["staging_steps"] == [3, 6]
+    assert transition["domain_draw_weight_units"] == 16000
     assert transition["domain_steps_after_draw"] == 0
     invalidation = evidence["13l-unified-numeric-invalidation"]
     assert invalidation["cancelled_own_gain"] == invalidation["doubled_own_gain_before_invalidation"]
-    assert invalidation["doubled_opponent_reduction_preserved"] == 42
-    assert invalidation["permanent_opponent_exhaust_bonus_units"] == 1
-    assert evidence["13m-daniya-collapse-rebound"]["move_opponent_reduction"] == Fraction(521, 10)
+    assert invalidation["doubled_opponent_reduction_preserved"] == 44
+    assert invalidation["permanent_opponent_exhaust_bonus_units"] == 3
+    collapse = evidence["13m-daniya-collapse-rebound"]
+    assert collapse["move_opponent_reduction"] == 0
+    assert collapse["passive_layers"] == collapse["active_layers"] == 1
     dynamic = evidence["13n-asamu-dynamic-chain"]
-    assert dynamic["tea_weight_after_bathe"] == 1500
-    assert dynamic["sleep_weight_after_tea"] == 1000
-    assert dynamic["prime_weight_after_sleep"] == 300
+    assert dynamic["tea_weight_after_bathe"] == 15000
+    assert dynamic["sleep_weight_after_tea"] == 10000
+    assert dynamic["prime_weight_after_sleep"] == 3000
     copies = evidence["13o-asamu-domain-copies"]
     assert copies["copy_count"] == 2
     copy_card = dict(cases)["13o-asamu-domain-copies"].fighters[1].move_wheel

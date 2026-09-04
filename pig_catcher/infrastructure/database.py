@@ -219,9 +219,9 @@ class PigCatcherDatabase:
         from .migrations.v0049_battle_quota_reset import TABLES as BATTLE_QUOTA_TABLES
         from .migrations.v0056_launch_campaign_and_social_limits import GUARDS as LAUNCH_GUARDS
         from .migrations.v0056_launch_campaign_and_social_limits import TABLES as LAUNCH_TABLES
-        from .migrations.v0060_battle_rule_v11 import GUARDS as BATTLE_LOOT_TOTAL_GUARDS
         from .migrations.v0061_window_mechanics_battle_v12 import GUARDS as WINDOW_MECHANIC_GUARDS
         from .migrations.v0061_window_mechanics_battle_v12 import TABLES as WINDOW_MECHANIC_TABLES
+        from .migrations.v0062_battle_rule_v13 import GUARDS as BATTLE_LOOT_TOTAL_GUARDS
 
         required_tables = {
             "player_food_effects",

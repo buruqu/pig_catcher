@@ -515,7 +515,7 @@ def deterministic_mechanic_cases(
                 state,
                 now_ms,
                 title="达妮娅猪 · 布景蓄势与蚀域转幕",
-                banner="两次布景令蚀域主盘从1提升至1.2；蚀域抽中后清零，真实领域战获胜即切换幻灭并使下回合+1招。",
+                banner="两次布景令蚀域主盘从1提升至1.6，并把同一份+0.6带入领域战；蚀域抽中后清零，领域战获胜或单方命中即切换幻灭并使下回合+1招。",
                 events=_events(prepared),
                 round_result=result,
             ),
@@ -527,7 +527,8 @@ def deterministic_mechanic_cases(
             staging_a["daniya_domain_steps_after"],
             staging_b["daniya_domain_steps_after"],
         ],
-        "domain_draw_weight_units": daniya_domain["draw_wheel_units"][-1],
+        "domain_draw_weight_units": MOVE_WEIGHT_SCALE
+        + daniya_domain["daniya_domain_steps_before"] * (MOVE_WEIGHT_SCALE // 10),
         "domain_steps_after_draw": daniya_domain["daniya_domain_steps_after"],
         "domain_wheel": result["interactions"]["domain"]["wheel"],
         "transition": transition,
@@ -604,10 +605,12 @@ def deterministic_mechanic_cases(
     _record_move(prepared, 1, "asamu-bathe")
     state, result, seed = _resolve_matching(
         prepared,
-        "daniya-collapse-rebound",
+        "daniya-collapse-passive",
         lambda current: current["loser"] == 1,
     )
-    assert result["injury_modifiers"]["current_collapse_multiplier"] == 5
+    assert result["injury_modifiers"]["daniya_passive_layers"] == 1
+    assert result["injury_modifiers"]["daniya_active_layers"] == 1
+    assert result["injury_modifiers"]["current_collapse_multiplier"] == 25
     name = "13m-daniya-collapse-rebound"
     cases.append(
         (
@@ -618,7 +621,7 @@ def deterministic_mechanic_cases(
                 state,
                 now_ms,
                 title="达妮娅猪 · 计时的溃灭",
-                banner="自身先承受-52.1；本回合把对方力竭盘乘5。若对方仍未倒下，反噬会在达妮娅下一回合仅生效一次。",
+                banner="达妮娅常驻一层按当前回合数×5增长的计时被动；抽中本招后，本回合再叠一层同款力竭倍率，不再产生旧版跨回合反噬。",
                 events=_events(prepared),
                 round_result=result,
             ),
@@ -627,12 +630,14 @@ def deterministic_mechanic_cases(
     evidence[name] = {
         "seed": seed,
         "move_opponent_reduction": collapse["opponent_reduction"],
+        "passive_layers": result["injury_modifiers"]["daniya_passive_layers"],
+        "active_layers": result["injury_modifiers"]["daniya_active_layers"],
         "injury_wheel": result["injury_wheel"],
         "injury_modifiers": result["injury_modifiers"],
         "injury": result["injury"],
         "collapse_rebounds": result["collapse_rebounds"],
-        "daniya_rebound_round": state["sides"][0]["next_exhaust_multiplier_round"],
-        "daniya_rebound_multiplier": state["sides"][0]["next_exhaust_multiplier"],
+        "daniya_rebound_round": None,
+        "daniya_rebound_multiplier": 1,
     }
 
     prepared = deepcopy(v5_state)
@@ -983,20 +988,20 @@ async def run(args):
         if row["clippedText"] or row["outside"] or row["brokenImages"] or row.get("clippedMedia")
     ]
     report = {
-        "title": "Battle v11 · 战斗图片离线验收",
+        "title": "Battle v13 · 战斗图片离线验收",
         "status": "failed" if failures else "passed",
         "count": len(outputs),
         "diagnostics": capability.diagnostics,
         "failures": failures,
         "deterministic_mechanics": mechanic_evidence,
-        "battle_v5_visual_coverage": (
+        "battle_visual_coverage": (
             "达妮娅猪与阿萨姆猪正式立绘",
             "达妮娅布景/幻灭双形态轮盘",
             "阿萨姆动态抽取权重轮盘",
-            "熠～噜猪九招干员盘及医疗/特种新权重",
+            "熠～噜猪九招干员盘、近卫八枚门槛及狙击逐发加成",
             "蚀域蓄势、领域切形态与下回合加招",
             "未竟的谎言与统一数值失效",
-            "计时的溃灭与力竭反噬",
+            "计时的溃灭常驻/主动层与世界招式",
             "洗澡/喝奶茶/睡觉/全盛姿态连锁",
             "传奇耐压王独立失效判定",
             "阿萨姆领域胜利复制两招",
@@ -1019,7 +1024,7 @@ async def run(args):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Battle v11 战斗图片离线验收")
+    parser = argparse.ArgumentParser(description="Battle v13 战斗图片离线验收")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument(
         "--browser-executable", type=Path, default=Path("C:/Program Files/Google/Chrome/Application/chrome.exe")

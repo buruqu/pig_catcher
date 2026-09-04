@@ -124,7 +124,7 @@ def test_v6_catalog_gains_and_mimic_pool_exclude_zero_numeric_pure_functions():
     assert ("sukuna", "loan") not in ids
     assert ("daniya", "daniya-flawless") not in ids
     assert ("daniya", "daniya-unfinished-lie") not in ids
-    assert ("daniya", "daniya-timed-collapse") in ids
+    assert ("daniya", "daniya-timed-collapse") not in ids
     assert all(
         max(abs(Fraction(entry["base"])), abs(Fraction(entry["opponent_reduction"]))) > 0
         for entry in entries
