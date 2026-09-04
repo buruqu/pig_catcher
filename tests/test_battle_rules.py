@@ -503,7 +503,7 @@ def test_huge_odd_round_gain_uses_integer_ceiling_without_float_conversion():
 
 
 def test_juejue_catalog_aliases_forms_and_legacy_query_boundary():
-    assert BATTLE_RULE_VERSION == 13
+    assert BATTLE_RULE_VERSION == 14
     assert all(FIGHTERS_BY_TEMPLATE[template_id].fighter_id == "juejue" for template_id in JUEJUE_PIG_TEMPLATE_IDS)
     assert {move.move_id for move in JUEJUE_TIME_MOVES}.isdisjoint(
         {move.move_id for move in JUEJUE_VIRTUAL_MOVES}
@@ -799,10 +799,10 @@ def test_juejue_distinct_dual_domain_has_eleven_strength_and_only_winning_clash_
     domain = summary["interactions"]["domain"]
     assert domain["wheel"] == wheel and domain["dual_juejue"] == [True, False]
     assert domain["boosted_ordinals"] == [sand["ordinal"], chaos["ordinal"]]
-    assert domain["bonus_gain"] == sand["gain"] + chaos["gain"] == 40
+    assert domain["bonus_gain"] == sand["gain"] + chaos["gain"] == 45
     assert domain["nullified_side"] == 1
     assert domain["auto_mimic"] and domain["auto_mimic"]["available"]
-    assert summary["before"][0]["weight"] == 5 + 25 + 15 + 40 + domain["auto_mimic"]["gain"]
+    assert summary["before"][0]["weight"] == 5 + 25 + 20 + 45 + domain["auto_mimic"]["gain"]
     assert summary["before"][0]["next_action_bonus"] == 2
     assert summary["before"][0]["juejue_guaranteed"]
     assert summary["before"][1]["weight"] == 5

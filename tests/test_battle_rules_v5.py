@@ -86,7 +86,7 @@ def finish_turn(player: dict) -> None:
 
 
 def test_v5_catalog_maps_daniya_and_asamu_in_all_four_scopes():
-    assert BATTLE_RULE_VERSION == 13
+    assert BATTLE_RULE_VERSION == 14
     assert MOVE_WEIGHT_SCALE == 10000
     assert VICTORY_WEIGHT_SCALE == INJURY_WEIGHT_SCALE == 10
     assert len(DANIYA_PIG_TEMPLATE_IDS) == len(ASAMU_PIG_TEMPLATE_IDS) == 4

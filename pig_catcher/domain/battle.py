@@ -674,6 +674,8 @@ def apply_move(
     sand_body_activated = False
     music_activated = False
     music_repeated = False
+    realtime_repeated = False
+    juejue_success_next_action_bonus_added = 0
     rewind_debt_cleared = 0
     rewind_failure_ordinal = None
     rewind_pending_count = len(turn.get("juejue_rewind_pending_ordinals", ()))
@@ -831,6 +833,9 @@ def apply_move(
         if subwheel["success"]:
             special_base = Fraction(tier.gain)
             special_extra_draws = tier.extra_draws
+            if version >= 14:
+                player["next_action_bonus"] += 1
+                juejue_success_next_action_bonus_added = 1
             turn["juejue_acceleration_tier"] = max(turn["juejue_acceleration_tier"], tier.tier)
         else:
             acceleration_failure_debt = int(tier.failure_debt)
@@ -863,6 +868,9 @@ def apply_move(
             special_base = Fraction(tier.gain)
             opponent_reduction += Fraction(tier.opponent_reduction)
             opponent_next_debt = tier.opponent_debt
+            if version >= 14:
+                player["next_action_bonus"] += 1
+                juejue_success_next_action_bonus_added = 1
             turn["juejue_delay_tier"] = max(turn["juejue_delay_tier"], tier.tier)
         else:
             opponent_next_bonus = tier.failure_opponent_bonus
@@ -1095,9 +1103,16 @@ def apply_move(
             turn["juejue_future_simulation"] = True
             turn.setdefault("juejue_future_simulation_ordinals", []).append(ordinal)
             future_activated = True
-    if is_juejue and "juejue-realtime" in move.tags and not turn["juejue_realtime"]:
-        turn["juejue_realtime"] = True
-        realtime_activated = True
+    if is_juejue and "juejue-realtime" in move.tags:
+        if not turn["juejue_realtime"]:
+            turn["juejue_realtime"] = True
+            realtime_activated = True
+        elif version >= 14:
+            # Battle v14：实时演算首次仍是+5/再抽1次，重复抽中则本招
+            # 改为+10/再抽2次；领域出现权重仍只在首次建立一层。
+            special_base = Fraction(10)
+            special_extra_draws += 1
+            realtime_repeated = True
     if is_juejue and "juejue-virtual-realm" in move.tags:
         player["juejue_guaranteed"] = True
     if is_juejue and "juejue-music" in move.tags:
@@ -1108,6 +1123,8 @@ def apply_move(
         elif not turn["juejue_music"]:
             turn["juejue_music"] = True
             music_activated = True
+            if version >= 14:
+                special_extra_draws += 1
     if is_juejue and "juejue-switch-virtual" in move.tags:
         player["juejue_form"] = JUEJUE_FORM_VIRTUAL
     if is_juejue and "juejue-switch-sand" in move.tags:
@@ -1118,6 +1135,21 @@ def apply_move(
     if is_juejue and "juejue-sand-domain" in move.tags:
         player["juejue_sand_domain_steps"] = 0
         player["juejue_sand_domain_switch_units"] = 0
+
+    # Battle v14的目录数值只属于新建场次。显式调用旧规则引擎时恢复
+    # Battle v13数值，避免热更新目录追改历史事件或离线复盘。
+    if is_juejue and version < 14:
+        legacy_base = {
+            "sand-sculpt": 5,
+            "future-simulation": 5,
+            "realtime-compute": 5,
+            "chaos-domain": 15,
+        }.get(drawn_move.move_id)
+        if legacy_base is not None:
+            special_base = Fraction(0 if version < 6 and drawn_move.move_id in {
+                "future-simulation",
+                "realtime-compute",
+            } else legacy_base)
 
     # 达妮娅：布景招式同时累积下一次蚀域的出现权重与领域战胜利权重；
     # 蚀域被抽到时把同一份精确加成带入本回合领域战后再清空。
@@ -1475,6 +1507,7 @@ def apply_move(
         "guaranteed_before": guaranteed_before,
         "guaranteed_after": bool(player.get("juejue_guaranteed", False)),
         "realtime_activated": realtime_activated,
+        "realtime_repeated": realtime_repeated,
         "future_simulation_activated": future_activated,
         "future_simulation_source_ordinal": ordinal if future_activated else None,
         "sand_body_activated": sand_body_activated,
@@ -1488,6 +1521,7 @@ def apply_move(
         "acceleration_rewind_source_ordinal": acceleration_rewind_source_ordinal,
         "music_activated": music_activated,
         "music_repeated": music_repeated,
+        "juejue_success_next_action_bonus_added": juejue_success_next_action_bonus_added,
         "tool_used": snapshot.get("tool_id", "") if used_tool else "",
         "gain": gain,
         "total": player["weight"],

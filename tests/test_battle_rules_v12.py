@@ -72,7 +72,7 @@ def _non_terminal_resolution(state: dict, *, prefix: str) -> tuple[dict, dict]:
 
 
 def test_firefly_catalog_aliases_weights_and_battle_v12_gate() -> None:
-    assert BATTLE_RULE_VERSION == 13
+    assert BATTLE_RULE_VERSION == 14
     assert len(FIREFLY_PIG_TEMPLATE_IDS) == 4
     assert {FIGHTERS_BY_TEMPLATE[item].fighter_id for item in FIREFLY_PIG_TEMPLATE_IDS} == {"firefly"}
     assert [move.resolved_draw_weight_units for move in FIREFLY_MOVES] == [

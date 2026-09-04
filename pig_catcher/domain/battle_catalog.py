@@ -9,7 +9,7 @@ from .special_content import GOJO_PIG_TEMPLATE_ID, SUKUNA_PIG_TEMPLATE_ID
 
 # 对战规则版本与活动成就事实版本分离：新版对战会改变随机命名空间，
 # 但新增字段仍是 activity_progress v1 可以向后兼容读取的事实载荷。
-BATTLE_RULE_VERSION = 13
+BATTLE_RULE_VERSION = 14
 BATTLE_FACT_VERSION = 1
 BATTLE_VERSION = BATTLE_RULE_VERSION
 INVITE_TTL_MS = 5 * 60 * 1000
@@ -173,9 +173,9 @@ JUEJUE_TIME_MOVES = (
     Move(
         "sand-sculpt",
         "时之沙·塑型",
-        5,
+        15,
         tags=("juejue-sculpt",),
-        description="荒时之沙出现权重+0.1；下一次加速或时延成功率+5个百分点，累计最多20。",
+        description="胜利权重+15；荒时之沙出现权重+0.1；下一次加速或时延成功率+5个百分点，累计最多20。",
     ),
     Move(
         "sand-rewind",
@@ -189,14 +189,14 @@ JUEJUE_TIME_MOVES = (
         "时之沙·加速",
         draw_weight_units=15000,
         tags=("juejue-accelerate",),
-        description="进入等权三档加速盘；成功增加胜利权重并在本回合追加1/2/3次抽取，失败产生下回合欠招。",
+        description="进入等权三档加速盘；成功增加胜利权重、本回合追加1/2/3次抽取，并令自己下回合+1招；失败产生下回合欠招。",
     ),
     Move(
         "sand-delay",
         "时之沙·时延",
         draw_weight_units=15000,
         tags=("juejue-delay",),
-        description="进入等权三档时延盘；成功削减对方本轮数值并可能扣对方下回合招数，失败可能令对方加招。",
+        description="进入等权三档时延盘；成功削减对方本轮数值、令自己下回合+1招并可能扣对方下回合招数，失败可能令对方加招。",
     ),
     Move(
         "sand-body",
@@ -233,9 +233,9 @@ JUEJUE_VIRTUAL_MOVES = (
     Move(
         "future-simulation",
         "虚拟声·未来模拟",
-        5,
+        15,
         tags=("juejue-future-simulation",),
-        description="胜利权重+5；每次抽中都独立随机令对方一招仍有效的数值贡献归零，功能部分保留。",
+        description="胜利权重+15；每次抽中都独立随机令对方一招仍有效的数值贡献归零，功能部分保留。",
     ),
     Move(
         "realtime-compute",
@@ -243,7 +243,7 @@ JUEJUE_VIRTUAL_MOVES = (
         5,
         draws=1,
         tags=("juejue-realtime",),
-        description="胜利权重+5；再抽一次；本回合首次令两种领域的出现权重各+1。",
+        description="首次胜利权重+5、再抽一次并令两种领域出现权重各+1；重复抽中改为胜利权重+10并再抽两次。",
     ),
     Move(
         "virtual-mimic",
@@ -262,7 +262,7 @@ JUEJUE_VIRTUAL_MOVES = (
         "louder",
         "虚拟声·把音乐开大声点！",
         tags=("juejue-music",),
-        description="首次令本回合随后每招胜利权重+5；重复抽中不叠层，本招额外再抽两次。",
+        description="首次令本回合随后每招胜利权重+5并再抽一次；重复抽中不叠层，本招额外再抽两次。",
     ),
     Move(
         "switch-sand",
@@ -274,9 +274,9 @@ JUEJUE_VIRTUAL_MOVES = (
     Move(
         "chaos-domain",
         "领域展开·乱序数虚时空",
-        15,
+        20,
         tags=("domain", "juejue-chaos-domain"),
-        description="胜利权重+15；单方命中或领域战获胜后翻倍一份有效领域胜率，并自动模仿、自己下回合+1招、保证下一次加速或时延成功；主招式盘基础权重1，领域战单领域权重2.5。",
+        description="胜利权重+20；单方命中或领域战获胜后翻倍一份有效领域胜率，并自动模仿、自己下回合+1招、保证下一次加速或时延成功；主招式盘基础权重1，领域战单领域权重2.5。",
     ),
 )
 JUEJUE_FORMS = (

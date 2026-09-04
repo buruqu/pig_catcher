@@ -112,8 +112,8 @@ def frozen_entry(
     }
 
 
-def test_v6_catalog_gains_and_mimic_pool_exclude_zero_numeric_pure_functions():
-    assert [move.gain for move in JUEJUE_VIRTUAL_MOVES[:3]] == [5, 5, 5]
+def test_current_catalog_gains_and_mimic_pool_exclude_zero_numeric_pure_functions():
+    assert [move.gain for move in JUEJUE_VIRTUAL_MOVES[:3]] == [5, 15, 5]
     current = state()
     entries = [
         entry

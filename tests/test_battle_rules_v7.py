@@ -1,4 +1,4 @@
-"""达妮娅、阿萨姆、熠～噜猪及当前Battle v13的聚焦规则验收。"""
+"""达妮娅、阿萨姆、熠～噜猪及当前Battle v14的聚焦规则验收。"""
 
 from copy import deepcopy
 from fractions import Fraction
@@ -63,7 +63,7 @@ def finish(player: dict) -> None:
 
 
 def test_v8_catalog_has_exact_new_daniya_asamu_and_yilu_definitions():
-    assert BATTLE_RULE_VERSION == 13
+    assert BATTLE_RULE_VERSION == 14
     assert [move.gain for move in DANIYA_STAGING_MOVES] == [12, 16, 20, 40, 24]
     assert [move.opponent_reduction for move in DANIYA_DISILLUSION_MOVES] == [14, 9, 11, 22, 13]
     assert [move.resolved_draw_weight_units for move in DANIYA_COMMON_MOVES] == [

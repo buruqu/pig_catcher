@@ -988,7 +988,7 @@ async def run(args):
         if row["clippedText"] or row["outside"] or row["brokenImages"] or row.get("clippedMedia")
     ]
     report = {
-        "title": "Battle v13 · 战斗图片离线验收",
+        "title": "Battle v14 · 战斗图片离线验收",
         "status": "failed" if failures else "passed",
         "count": len(outputs),
         "diagnostics": capability.diagnostics,
@@ -1024,7 +1024,7 @@ async def run(args):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Battle v13 战斗图片离线验收")
+    parser = argparse.ArgumentParser(description="Battle v14 战斗图片离线验收")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument(
         "--browser-executable", type=Path, default=Path("C:/Program Files/Google/Chrome/Application/chrome.exe")

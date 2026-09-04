@@ -375,6 +375,7 @@ async def test_legacy_v1_loot_keeps_five_draw_random_sequence_and_distribution(w
         (10, 5),
         (11, 5),
         (12, 5),
+        (13, 5),
     ),
 )
 async def test_loot_total_must_match_battle_rule_version(world, definition_version, total_uses):

@@ -72,7 +72,7 @@ def _resolve_non_terminal(source: dict, prefix: str) -> tuple[dict, dict]:
 
 
 def test_v13_catalog_keeps_precise_world_and_operator_draw_weights() -> None:
-    assert BATTLE_RULE_VERSION == 13
+    assert BATTLE_RULE_VERSION == 14
     assert MOVE_WEIGHT_SCALE == 10000
     assert [move.gain for move in DANIYA_STAGING_MOVES] == [12, 16, 20, 40, 24]
     assert [move.opponent_reduction for move in DANIYA_DISILLUSION_MOVES] == [14, 9, 11, 22, 13]

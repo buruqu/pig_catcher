@@ -381,6 +381,8 @@ def _juejue_event_line(
         note_parts.append("下一次加速或时延必定成功")
     if event["realtime_activated"]:
         note_parts.append("实时演算首次生效：本回合两种领域出现权重各+1")
+    if event.get("realtime_repeated"):
+        note_parts.append("实时演算重复抽中：本次胜利权重基底改为+10并再抽2次")
     if event["future_simulation_activated"]:
         note_parts.append("未来模拟独立挂起1次：回合末随机取消对方一个有效数值招式")
     if event["sand_body_activated"]:
@@ -400,13 +402,22 @@ def _juejue_event_line(
         note_parts.append(f"尚有{event['rewind_pending_count']}次回溯等待本回合后续加速失败")
     if event.get("music_repeated"):
         note_parts.append("音乐状态不叠层；本次重复抽中改为再抽2次")
+    elif event.get("music_activated") and int(event.get("extra_draws", 0)):
+        note_parts.append("音乐状态首次开启；本次再抽1次")
+    if int(event.get("juejue_success_next_action_bonus_added", 0)):
+        note_parts.append("子盘判定成功：自己下回合出招数+1")
     if Fraction(event["opponent_reduction"]):
         note_parts.append(f"请求削减对方本回合权重{weight_label(event['opponent_reduction'])}")
     if int(event["opponent_next_debt"]):
         note_parts.append(f"请求令对方下回合出招数-{event['opponent_next_debt']}")
     if int(event["opponent_next_bonus"]):
         note_parts.append(f"本次失败令对方下回合出招数+{event['opponent_next_bonus']}")
-    if event.get("extra_draws") and not event.get("music_repeated"):
+    if (
+        event.get("extra_draws")
+        and not event.get("music_repeated")
+        and not event.get("realtime_repeated")
+        and not (event.get("music_activated") and int(event.get("extra_draws", 0)))
+    ):
         note_parts.append(f"本回合再抽{event['extra_draws']}次")
     if adjustment:
         deducted = Fraction(adjustment["gain"])
@@ -1776,21 +1787,21 @@ def _juejue_move_effect(move, level: int) -> str:
             "消除本回合一次加速失败产生的整笔下回合欠招；当前没有待消除失败时可先挂起；"
             "本回合若落败且新抽中轻伤或重伤，仍撤销本轮新伤势；不能挽救力竭或回溯旧风险"
         ),
-        "sand-accelerate": "进入加速盘；成功后增加胜利权重并按档位追加抽取",
-        "sand-delay": "进入时延盘；成功后压低对方本回合权重并影响对方下回合出招数",
+        "sand-accelerate": "进入加速盘；成功后增加胜利权重、按档位追加抽取，并令自己下回合+1招",
+        "sand-delay": "进入时延盘；成功后压低对方本回合权重、令自己下回合+1招，并影响对方下回合出招数",
         "sand-body": "对方本回合第一个仍有效的数值招式胜利权重减半（向下取整；同回合不叠）",
         "sand-seal": "纯数值招式",
         "switch-virtual": "即时切换至虚拟声，并从虚拟声轮盘再抽2次",
         "sand-domain": "主盘抽取权重1、单领域战权重2.5；单方领域命中或领域战获胜后，对方下回合-1招、自己下回合+1招",
         "virtual-realm": "再抽1次；下一次加速或时延判定必定成功",
         "future-simulation": "每次抽中都独立随机令对方本回合一个带胜利权重的招式无效",
-        "realtime-compute": "再抽1次；本回合荒时之沙与乱序数虚时空的抽取权重各+1（不叠）",
+        "realtime-compute": "首次再抽1次并令两种领域抽取权重各+1；重复抽中改为胜利权重+10并再抽2次",
         "virtual-mimic": (
             "大/小轮盘各50%；复制其他战斗猪可模仿招式的数值、一般功能与定向效果；"
             "复制领域不重开领域战，复制招式的追加抽数不递归"
         ),
         "make-real": "下次再次使用时额外+5，逐次累加",
-        "louder": "首次进入本回合音乐状态，之后每招固定+5；重复抽中不叠层，改为再抽2次",
+        "louder": "首次进入本回合音乐状态，之后每招固定+5并再抽1次；重复抽中不叠层，改为再抽2次",
         "switch-sand": (
             "即时切换至时之沙并再抽1次；下一次荒时之沙+0.5抽取权重；"
             "下一次加速与下一次时延成功率各+5个百分点"
@@ -1826,7 +1837,7 @@ def _juejue_wheels(identity: CommandIdentity, level: int) -> BattleView:
     acceleration_lines = tuple(
         Line(
             f"{tier.tier}档 · 基础成功率{tier.success_chance}%",
-            f"成功+{tier.gain + level}并再抽{tier.extra_draws}次",
+            f"成功+{tier.gain + level}、再抽{tier.extra_draws}次，并令自己下回合+1招",
             "失败无额外惩罚"
             if not tier.failure_debt
             else f"失败后自己下回合出招数-{tier.failure_debt}",
@@ -1836,7 +1847,7 @@ def _juejue_wheels(identity: CommandIdentity, level: int) -> BattleView:
     delay_lines = tuple(
         Line(
             f"{tier.tier}档 · 基础成功率{tier.success_chance}%",
-            f"成功自身+{tier.gain + level}、对方本回合-{tier.opponent_reduction}",
+            f"成功自身+{tier.gain + level}、对方本回合-{tier.opponent_reduction}，自己下回合+1招",
             (
                 f"成功后对方下回合-{tier.opponent_debt}招；" if tier.opponent_debt else ""
             )
@@ -1930,7 +1941,7 @@ def _juejue_wheels(identity: CommandIdentity, level: int) -> BattleView:
         ),
         hints=(
             "当前形态与完整切换轨迹会显示在参战猪猪下方；长连锁不省略事实。",
-            "实时演算本回合不重复叠层；音乐重复抽中改为再抽2次，不增加音乐层数。",
+            "实时演算重复抽中改为+10并再抽2次，但领域权重不重复叠层；音乐首次再抽1次，重复再抽2次且不增加音乐层数。",
             "回溯还能消除一笔加速失败产生的整笔欠招；不能取消力竭，也不降低历史风险。",
             "未来模拟每次抽中独立结算；虚拟模仿候选池随对战规则版本冻结。",
             "领域招式主盘基础抽取权重为1；领域战另算：普通3、宿傩4、撅撅猪单领域2.5、双领域5.5、平手3。",
