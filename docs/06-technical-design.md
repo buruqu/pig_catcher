@@ -1,9 +1,8 @@
 # 技术架构设计
 
-> 当前四个既有 QQ / QQ 官方范围线上统一运行 `2.0.19 / Schema60 / Ruleset58 / Manifest4`，战斗规则为Battle v11。
-> 仓库开发候选为 `2.0.21 / Schema62 / Ruleset60 / Battle v13 / Manifest4`，本轮未部署、未推送。
+> 当前四个既有 QQ / QQ 官方范围与仓库统一运行 `2.0.21 / Schema62 / Ruleset60 / Battle v13 / Manifest4`。
 > 所有战斗猪在单方8:2领域命中或领域战获胜时均触发领域效果并翻倍一份仍有效领域胜率；历史
-> Battle v1至v10场次事实不改写。Schema60只扩展Battle v11自然终局的3次战利品约束，不改玩家资产。
+> Battle v1至v12场次事实不改写。Schema60只扩展Battle v11自然终局的3次战利品约束，不改玩家资产。
 > Schema61新增两张可审计状态表并把新建场次升级为Battle v12；实现边界见
 > [双六星时段机制与栖夜流萤专项文档](49-dual-six-star-window-resonance-and-firefly-battle-v12.md)。
 > Schema62只扩充Battle v13战利品约束；精确万分位抽取权重和新跨回合状态见
@@ -21,8 +20,8 @@
 
 正式版沿用已验证的 SDK 2.7.x 公共接口和宿主加载器；若后续版本变化，先更新兼容设计再写代码。
 
-当前线上正式插件为 `2.0.19`；仓库开发候选标识为 `schema_version=61`、`asset_manifest_version=4`、
-`ruleset_version=58` 和 `battle_definition_version=11`。四者独立递增，不能用插件版本代替数据、
+当前线上正式插件与仓库版本均为 `2.0.21`；标识为 `schema_version=62`、`asset_manifest_version=4`、
+`ruleset_version=60` 和 `battle_definition_version=13`。四者独立递增，不能用插件版本代替数据、
 素材、数值或战斗规则版本。以下 Schema18 起的记录是逐级迁移历史。
 Schema 18 为抓猪收据增加普通额度成本，Ruleset 16 增加六星菜专属抓猪、滚动七天到期、
 多次六星效果与普通六星做菜平衡；Schema 19 修复存量“一猪六吃”效果类型与新参数不匹配；
