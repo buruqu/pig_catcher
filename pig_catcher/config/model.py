@@ -121,6 +121,11 @@ class FeaturesSection(PluginConfigBase):
     __ui_icon__ = "sliders-horizontal"
     __ui_order__ = 10
 
+    red_packets_enabled: bool = Field(
+        default=True, description="是否允许普通玩家发送、抢领和查看猪币红包",
+        json_schema_extra=_ui("猪币红包", "普通红包扣发起者猪币；猪管可独立发放系统福利红包"),
+    )
+
     help_enabled: bool = Field(
         default=True,
         description="是否允许查看抓猪指令帮助",

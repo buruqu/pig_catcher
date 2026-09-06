@@ -236,9 +236,9 @@ async def test_group_reset_command_rejects_unconfigured_user_before_backup(
 def test_plugin_registers_only_explicit_production_commands() -> None:
     plugin = create_plugin()
     components = plugin.get_components()
-    assert len(components) == 87
+    assert len(components) == 91
     commands = {component["name"] for component in components if component["type"] == "COMMAND"}
-    assert len(commands) == 86
+    assert len(commands) == 90
     assert commands == {
         "pig_catcher_achievement_badges",
         "pig_catcher_item_bag",
@@ -269,6 +269,10 @@ def test_plugin_registers_only_explicit_production_commands() -> None:
         "pig_catcher_admin_deduct_coins_all",
         "pig_catcher_admin_grant_asset",
         "pig_catcher_admin_grant_resource",
+        "pig_catcher_red_packet",
+        "pig_catcher_admin_red_packet",
+        "pig_catcher_claim_red_packet",
+        "pig_catcher_red_packet_detail",
         "pig_catcher_admin_remove_asset",
         "pig_catcher_admin_blacklist",
         "pig_catcher_admin_regulation",

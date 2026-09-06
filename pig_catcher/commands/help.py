@@ -138,6 +138,22 @@ _TOPICS: dict[str, HelpTopic] = {
         ),
         ("奖励", "商城", "叠加"),
     ),
+    "红包": HelpTopic(
+        (
+            HelpLine("/发红包 <总猪币数> <红包个数> [祝福语]", "packets"),
+            HelpLine("/抢红包 [红包编号]", "packets"),
+            HelpLine("/红包 [红包编号]", "packets"),
+        ),
+        (
+            "例如 /发红包 1000 10 祝大家猪运亨通！：从自己的余额拿出1000币，随机分给10人。",
+            "每人对同一个红包限领一次；省略编号指向本群最新的未结束红包，可带编号抢较早红包。",
+            "总额1～1000万猪币，拆成1～100份，每份至少1币；同时最多保留10个未领完红包。",
+            "24小时未领完，剩余猪币自动退回发包人；猪管系统红包未领部分到期作废。",
+            "红包不收交易税，也不占猪猪/美食赠送的每日次数；只是猪币分享，不是押注。",
+            "红包只能在本群领取，原有插件访问黑名单仍生效。",
+        ),
+        ("商城", "交易"), "packets",
+    ),
     "交易": HelpTopic(
         (
             HelpLine("/猪猪赠送 <猪名[#短编号]> @成员", "gift"),
@@ -388,6 +404,7 @@ def _gates(settings: PigCatcherConfig) -> dict[str, bool]:
         "sell": features.selling_enabled,
         "ledger": features.ledger_enabled,
         "gift": settings.trading.gift_enabled,
+        "packets": features.red_packets_enabled,
         "trade": settings.trading.trade_enabled,
         "showcase": features.showcase_enabled,
         "ranking": features.ranking_enabled,

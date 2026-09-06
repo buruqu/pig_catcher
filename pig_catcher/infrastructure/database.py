@@ -224,6 +224,11 @@ class PigCatcherDatabase:
         from .migrations.v0062_battle_rule_v13 import GUARDS as BATTLE_LOOT_TOTAL_GUARDS
 
         required_tables = {
+            "red_packets",
+            "red_packet_claims",
+            "scheduled_reward_campaigns",
+            "scheduled_reward_scopes",
+            "scheduled_reward_grants",
             "player_food_effects",
             "player_roulette_state",
             "achievement_definition_snapshots",
@@ -296,6 +301,9 @@ class PigCatcherDatabase:
         pig_columns = await (await connection.execute("PRAGMA table_info(pig_templates)")).fetchall()
         if not any(str(row[1]) == "display_tags_json" and bool(row[3]) for row in pig_columns):
             raise MigrationError("数据库缺少猪猪展示标签字段，请先完成 Schema 41 迁移。")
+        instance_columns = await (await connection.execute("PRAGMA table_info(pig_instances)")).fetchall()
+        if not any(str(row[1]) == "commemorative_code" and bool(row[3]) for row in instance_columns):
+            raise MigrationError("数据库缺少猪猪纪念编号字段，请先完成 Schema 65 迁移。")
 
         upgrade_definition = await (
             await connection.execute(

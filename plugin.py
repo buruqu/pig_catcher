@@ -74,6 +74,7 @@ from .pig_catcher.domain.models import (
     CommandReceipt,
     ScopeKey,
 )
+from .pig_catcher.domain.red_packets import parse_packet_request
 from .pig_catcher.domain.special_content import (
     TECHNIQUE_LAPSE_BLUE,
     TECHNIQUE_MALEVOLENT_KITCHEN,
@@ -195,6 +196,9 @@ from .pig_catcher.services import (
 from .pig_catcher.services.battle import BattleResult, BattleService
 from .pig_catcher.services.dispatch import DispatchResult, DispatchService
 from .pig_catcher.services.item_bag import ItemBagService
+from .pig_catcher.services.red_packets import RedPacketService
+from .pig_catcher.services.scheduled_rewards import ScheduledRewardService
+from .pig_catcher.services.social_rewards_runner import SocialRewardsRunner
 from .pig_catcher.services.tour import TourService
 from .pig_catcher.version import PLUGIN_VERSION
 
@@ -245,6 +249,9 @@ class PigCatcherPlugin(MaiBotPlugin):
         self._animation_composer: AnimatedCardComposer | None = None
         self._delivery: RenderDelivery | None = None
         self._maintenance: MaintenanceRunner | None = None
+        self._red_packet_service: RedPacketService | None = None
+        self._scheduled_reward_service: ScheduledRewardService | None = None
+        self._social_rewards_runner: SocialRewardsRunner | None = None
         self._config_update_lock = asyncio.Lock()
 
     def get_components(self) -> list[dict[str, Any]]:
@@ -508,9 +515,18 @@ class PigCatcherPlugin(MaiBotPlugin):
                 text_send_timeout_ms=settings.rendering.text_send_timeout_ms,
             )
             self._maintenance = maintenance
+            self._red_packet_service = RedPacketService(database)
+            self._scheduled_reward_service = ScheduledRewardService(database)
+            self._social_rewards_runner = SocialRewardsRunner(
+                self._red_packet_service, self._scheduled_reward_service, logger=self.ctx.logger,
+                deliver=self._deliver_social_reward,
+            )
+            self._social_rewards_runner.start()
             if settings.maintenance.enabled:
                 maintenance.start()
         except BaseException:
+            if self._social_rewards_runner is not None:
+                await self._social_rewards_runner.stop()
             await database.close()
             self._clear_runtime_references()
             raise
@@ -518,6 +534,8 @@ class PigCatcherPlugin(MaiBotPlugin):
     async def _close_runtime(self) -> None:
         maintenance = self._maintenance
         database = self._database
+        if self._social_rewards_runner is not None:
+            await self._social_rewards_runner.stop()
         if maintenance is not None:
             await maintenance.stop()
         if database is not None:
@@ -528,6 +546,9 @@ class PigCatcherPlugin(MaiBotPlugin):
         if isinstance(getattr(self, "_renderer", None), PigCatcherRenderer):
             self._renderer.clear_art_cache()
         self._maintenance = None
+        self._social_rewards_runner = None
+        self._red_packet_service = None
+        self._scheduled_reward_service = None
         self._delivery = None
         self._animation_composer = None
         self._renderer = None
@@ -1716,6 +1737,7 @@ class PigCatcherPlugin(MaiBotPlugin):
                 "/猪管发放 <@玩家|用户ID|全员> <名称> [每人数量]",
                 "/猪管全员发放 <名称> [每人数量]",
                 "/猪管发放 列表 [页码]：可发道具、券、器具和材料",
+                "/猪管发红包 <总猪币数> <红包个数> [祝福语]：系统发放、不扣猪管余额；/抢红包 领取",
                 "/猪管发道具、/猪管发券：目标和数量同上；也可 /猪管全员发道具、/猪管全员发券",
                 "/猪管发猪、/猪管发菜 <@玩家|用户ID|全员> <名称> [x数量]",
                 "旧发猪/发菜仍支持末尾手动编号；新统一发放用 名称#编号，仅限单人单件。",
@@ -4847,6 +4869,61 @@ class PigCatcherPlugin(MaiBotPlugin):
                 fallback_text=result.receipt.text_summary,
             )
         return await self._deliver_query(stream_id=identity.stream_id, render=render, fallback_text=result.view.text())
+
+    async def _deliver_social_reward(self, stream_id: str, result: DispatchResult) -> tuple[bool, str, int]:
+        renderer = cast(PigCatcherRenderer, self._renderer)
+        if result.receipt:
+            return await self._deliver_receipt(
+                stream_id=stream_id, receipt=result.receipt,
+                render=lambda: renderer.render_dispatch(result.view, {}),
+                fallback_text=result.view.text(), track_progress=False,
+            )
+        return await self._deliver_query(stream_id=stream_id,
+                                         render=lambda: renderer.render_dispatch(result.view, {}),
+                                         fallback_text=result.view.text())
+
+    async def _red_packet_command(self, stream_id: str, kwargs: dict[str, Any], action: str) -> tuple[bool, str, int]:
+        if action == "admin-send":
+            identity, rejected = await self._prepare_admin_command(stream_id, kwargs)
+        else:
+            identity, rejected = await self._prepare_command(
+                stream_id, kwargs, feature_enabled=self.settings.features.red_packets_enabled, feature_label="猪币红包")
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            service = self._red_packet_service
+            if service is None:
+                raise RuntimeError("红包服务尚未就绪。")
+            text = matched_group(kwargs, "arguments")
+            if action in {"send", "admin-send"}:
+                result = await service.send(identity, parse_packet_request(text), admin=action == "admin-send")
+            elif action == "claim":
+                result = await service.claim(identity, text)
+            else:
+                result = await service.detail(identity, text)
+            return await self._deliver_social_reward(identity.stream_id, result)
+        except Exception as exc:
+            return await self._command_error(stream_id=identity.stream_id, operation="猪币红包", error=exc)
+
+    @Command("pig_catcher_red_packet", description="从自己的猪币发出拼手气红包",
+             pattern=rf"^{_COMMAND_LEADING_MENTION_PATTERN}/发红包(?:\s+(?P<arguments>.*?))?\s*$")
+    async def handle_red_packet(self, stream_id: str = "", **kwargs: Any) -> tuple[bool, str, int]:
+        return await self._red_packet_command(stream_id, kwargs, "send")
+
+    @Command("pig_catcher_admin_red_packet", description="猪管发放不扣余额的系统福利红包",
+             pattern=rf"^{_COMMAND_LEADING_MENTION_PATTERN}/猪管发红包(?:\s+(?P<arguments>.*?))?\s*$")
+    async def handle_admin_red_packet(self, stream_id: str = "", **kwargs: Any) -> tuple[bool, str, int]:
+        return await self._red_packet_command(stream_id, kwargs, "admin-send")
+
+    @Command("pig_catcher_claim_red_packet", description="领取本群最新或指定的拼手气红包",
+             pattern=rf"^{_COMMAND_LEADING_MENTION_PATTERN}/抢红包(?:\s+(?P<arguments>.*?))?\s*$")
+    async def handle_claim_red_packet(self, stream_id: str = "", **kwargs: Any) -> tuple[bool, str, int]:
+        return await self._red_packet_command(stream_id, kwargs, "claim")
+
+    @Command("pig_catcher_red_packet_detail", description="查看本群红包领取记录与手气最佳",
+             pattern=rf"^{_COMMAND_LEADING_MENTION_PATTERN}/红包(?:\s+(?P<arguments>.*?))?\s*$")
+    async def handle_red_packet_detail(self, stream_id: str = "", **kwargs: Any) -> tuple[bool, str, int]:
+        return await self._red_packet_command(stream_id, kwargs, "detail")
 
     async def _activity_reward_command(self, identity: CommandIdentity, text: str) -> tuple[bool, str, int]:
         from pig_catcher.services.achievement_rewards import AchievementRewardService

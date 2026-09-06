@@ -1,6 +1,7 @@
 # 2.0.23 达妮娅猪 Battle v15
 
-> 状态：开发候选，尚未上线。协议：`2.0.23 / Schema64 / Ruleset62 / Battle v15 / Manifest4`。
+> 此变更已纳入2.0.25发布批次，运行核验见[本轮发布文档](56-red-packets-and-birthday-20260906.md)。
+> 初始开发协议：`2.0.23 / Schema64 / Ruleset62 / Battle v15 / Manifest4`。
 
 ## 1. 轮盘变更
 

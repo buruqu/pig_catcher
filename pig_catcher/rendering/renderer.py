@@ -509,7 +509,9 @@ class PigCatcherRenderer:
             media_paths,
         )
         template = (
-            "cosmetic_receipt.html"
+            "red_packet.html"
+            if view.presentation in {"red-packet", "birthday"}
+            else "cosmetic_receipt.html"
             if view.presentation == "cosmetics"
             else "item_bag.html"
             if view.presentation == "item-bag"

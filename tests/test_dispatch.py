@@ -672,6 +672,9 @@ async def test_schema_36_migrates_to_dispatch_without_changing_existing_tables(t
     }
     for name, value in old_schema.items():
         actual = current[name].replace(", display_tags_json TEXT NOT NULL DEFAULT '[]'", "")
+        if name == "pig_instances":
+            actual = actual.replace(", commemorative_code TEXT NOT NULL DEFAULT ''", "")
+            assert not await db.fetch_all("SELECT 1 FROM pig_instances WHERE commemorative_code<>''")
         if name in {"pig_instances", "food_instances"}:
             # Schema42 only replaces historical code uniqueness with live-code
             # uniqueness; every column, CHECK and foreign key must still match.

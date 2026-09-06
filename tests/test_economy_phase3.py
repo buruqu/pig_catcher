@@ -268,6 +268,9 @@ async def test_schema45_changes_only_new_lemon_template_and_preserves_all_other_
             ]
             if name == "upgrades":
                 rows = [(row[0], row[1], int(row[2]) * 2, row[3]) for row in rows]
+            if name == "pig_instances":
+                # Schema65 appends only an empty anniversary label to old pigs.
+                rows = [(*row, "") for row in rows]
             assert actual_rows == rows
         assert await database.integrity_check() == ("ok",)
         assert await database.fetch_all("PRAGMA foreign_key_check") == []

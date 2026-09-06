@@ -812,6 +812,9 @@ async def test_schema_37_migration_preserves_existing_assets_materials_and_econo
         }
         for name, sql in original_schema.items():
             actual = schema[name].replace(", display_tags_json TEXT NOT NULL DEFAULT '[]'", "")
+            if name == "pig_instances":
+                actual = actual.replace(", commemorative_code TEXT NOT NULL DEFAULT ''", "")
+                assert not await migrated.fetch_all("SELECT 1 FROM pig_instances WHERE commemorative_code<>''")
             if name in {"pig_instances", "food_instances"}:
                 # Do not skip asset schema verification: only the reviewed
                 # Schema42 short-code UNIQUE change is allowed.

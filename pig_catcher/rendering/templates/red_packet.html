@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><style>
+:root{--font-family:{{ font_family }};}{{ theme_css|safe }}
+.party-top{padding:30px 38px;background:linear-gradient(120deg,#9f284e,#e84d71);color:#fff4df;display:flex;justify-content:space-between;gap:24px;align-items:center}
+.party-top h1{font-size:42px;margin:5px 0 10px;color:#fff8e6}.party-top p{margin:4px 0;overflow-wrap:anywhere}
+.party-seal{width:88px;height:88px;border:3px solid #ffe4a5;border-radius:50%;display:grid;place-items:center;font-size:44px;flex-shrink:0;color:#ffe4a5;box-shadow:0 0 0 7px #ffffff18}
+.party-code{background:#fff7e8;border:1px solid #efd6a1;padding:16px 22px;border-radius:12px;font-size:22px;color:#a16331;margin-bottom:20px}
+</style></head><body>
+{% from 'feature_components.html' import stats, panels, hints %}
+<main class="game-sheet" data-pig-catcher-root data-render-ready="true">
+<header class="party-top"><div><p>PiG Dream! · {% if view.presentation == 'birthday' %}生日派对{% else %}猪币拼手气{% endif %}</p><h1>{{ view.title }}</h1><p>{{ view.subtitle }}</p><p>{{ view.player_name }}</p></div><div class="party-seal">{% if view.presentation == 'birthday' %}寿{% else %}福{% endif %}</div></header>
+<div class="feature-body"><div class="party-code">{% if view.presentation == 'birthday' %}生日纪念 · {% else %}红包编号 · {% endif %}{{ view.scene_key }}</div>
+{% if view.banner %}<div class="feature-banner">{{ view.banner }}</div>{% endif %}
+{{ stats(view.stats) }}{{ panels(view.panels, 'collection', false) }}{{ hints(view.hints) }}</div>
+<footer class="game-footer"><span>猪币已到账 · 不重复领取</span><strong>{% if view.presentation == 'birthday' %}生日快乐{% else %}一起沾沾好运{% endif %}</strong></footer>
+</main></body></html>

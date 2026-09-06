@@ -578,7 +578,8 @@ def pig_view_from_row(
         display_variant=display_variant,
         alternate_image_relpath=alternate_image_relpath,
         display_tags=(
-            display_tags_from_json(row.get("display_tags_json")) if bool(row.get("media_visible", True)) else ()
+            ((f"生日纪念 {row['commemorative_code']}",) if row.get("commemorative_code") else ())
+            + display_tags_from_json(row.get("display_tags_json")) if bool(row.get("media_visible", True)) else ()
         ),
         is_favorite=bool(row.get("is_favorite") or False),
         activity_label={"dispatch": "派遣中", "tour": "巡演中", "battle": "对战中"}.get(

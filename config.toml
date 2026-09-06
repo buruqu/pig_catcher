@@ -1,9 +1,10 @@
 [plugin]
 enabled = true
-config_version = "2.0.24"
+config_version = "2.0.25"
 framework_phase = "6"
 
 [features]
+red_packets_enabled = true
 help_enabled = true
 catching_enabled = true
 profile_enabled = true
