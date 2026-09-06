@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Any
 from uuid import uuid4
 
+from ..domain.admin_grants import MAX_GRANT_ASSETS, grant_resource_candidates, validate_grant_quantity
 from ..domain.economy import generate_food_attributes, recipe_affinity
 from ..domain.enums import AssetKind
 from ..domain.errors import DomainValidationError
@@ -34,6 +35,7 @@ from ..infrastructure.repositories import (
     SocialRepository,
 )
 from ..infrastructure.repositories.activity_locks import require_unoccupied
+from ..infrastructure.repositories.admin_grants import AdminGrantRepository
 from ..infrastructure.repositories.battle import BattleRepository, beijing_day
 from ..infrastructure.repositories.dispatch import DispatchRepository
 from ..infrastructure.repositories.restrictions import (
@@ -96,6 +98,7 @@ class AdministrationService:
         self.restriction_repository = restriction_repository or RestrictionRepository()
         self.social_repository = social_repository or SocialRepository()
         self.battle_repository = battle_repository or BattleRepository()
+        self.grant_repository = AdminGrantRepository()
         self.clock = clock or SystemClock()
         self.random_source = random_source or SystemRandomSource()
         self.id_factory = id_factory or (lambda: uuid4().hex)
@@ -313,97 +316,14 @@ class AdministrationService:
                 choices = "、".join(str(row["template_id"]) for row in templates)
                 raise DomainValidationError(f"素材名称不唯一，请改用模板 ID：{choices}")
             template = templates[0]
-            short_code = await self._unique_short_code(session, requested=normalized_code)
-            instance_id = self.id_factory()
-            if asset_kind is AssetKind.PIG:
-                attributes, snapshot = self._generate_admin_pig(template, identity)
-                await self.gameplay_repository.insert_pig_instance(
-                    session,
-                    values={
-                        "pig_instance_id": instance_id,
-                        "short_code": short_code,
-                        "scope_id": identity.scope.value,
-                        "owner_player_id": str(target["player_id"]),
-                        "template_id": str(template["template_id"]),
-                        "template_version": int(template["template_version"]),
-                        "rarity": int(template["rarity"]),
-                        "display_name_snapshot": str(template["display_name"]),
-                        "size_value": attributes.size_value,
-                        "size_percentile": attributes.size_percentile,
-                        "weight_value": attributes.weight_value,
-                        "weight_percentile": attributes.weight_percentile,
-                        "fat_ratio": attributes.fat_ratio,
-                        "official_value": attributes.official_value,
-                        "ruleset_version": RULESET_VERSION,
-                        "random_snapshot_json": self._json(snapshot),
-                        "acquired_at": now,
-                        "updated_at": now,
-                    },
-                )
-                await self.gameplay_repository.upsert_pig_catalog(
-                    session,
-                    player_id=str(target["player_id"]),
-                    template_id=str(template["template_id"]),
-                    size_value=attributes.size_value,
-                    weight_value=attributes.weight_value,
-                    now=now,
-                )
-                attribute_detail = {
-                    "size_value": attributes.size_value,
-                    "weight_value": attributes.weight_value,
-                    "fat_ratio": attributes.fat_ratio,
-                    "official_value": attributes.official_value,
-                }
-            else:
-                attributes, fat_category, snapshot = self._generate_admin_food(template, identity)
-                await self.economy_repository.insert_food_instance(
-                    session,
-                    values={
-                        "food_instance_id": instance_id,
-                        "short_code": short_code,
-                        "scope_id": identity.scope.value,
-                        "owner_player_id": str(target["player_id"]),
-                        "template_id": str(template["template_id"]),
-                        "template_version": int(template["template_version"]),
-                        "source_pig_instance_id": None,
-                        "rarity": int(template["rarity"]),
-                        "display_name_snapshot": str(template["display_name"]),
-                        "portion_weight": attributes.portion_weight,
-                        "fat_category": fat_category,
-                        "official_value": attributes.official_value,
-                        "effect_id": str(template.get("effect_id") or ""),
-                        "effect_params_json": str(template.get("effect_params_json") or "{}"),
-                        "ruleset_version": RULESET_VERSION,
-                        "random_snapshot_json": self._json(snapshot),
-                        "acquired_at": now,
-                        "updated_at": now,
-                    },
-                )
-                await self.economy_repository.upsert_food_catalog(
-                    session,
-                    player_id=str(target["player_id"]),
-                    template_id=str(template["template_id"]),
-                    portion_weight=attributes.portion_weight,
-                    now=now,
-                )
-                attribute_detail = {
-                    "portion_weight": attributes.portion_weight,
-                    "fat_category": fat_category,
-                    "official_value": attributes.official_value,
-                }
-            detail = {
-                "asset_kind": asset_kind.value,
-                "instance_id": instance_id,
-                "short_code": short_code,
-                "template_id": str(template["template_id"]),
-                "display_name": str(template["display_name"]),
-                "rarity": int(template["rarity"]),
-                "target_player_id": str(target["player_id"]),
-                "target_platform_user_id": str(target["platform_user_id"]),
-                "manual_short_code": bool(normalized_code),
-                **attribute_detail,
-            }
+            detail = await self._insert_granted_asset(
+                session, identity=identity, target=target, asset_kind=asset_kind,
+                template=template, requested_short_code=normalized_code, now=now,
+            )
+            instance_id = str(detail["instance_id"])
+            short_code = str(detail["short_code"])
             kind_label = "猪猪" if asset_kind is AssetKind.PIG else "美食"
+            detail["target_display_name"] = str(target["display_name"]) or "未命名群友"
             summary = (
                 f"【猪管·发放{kind_label}完成】\n"
                 f"玩家：{target['display_name']}（{target['platform_user_id']}）\n"
@@ -441,6 +361,278 @@ class AdministrationService:
             action="asset-grant",
             affected_players=1,
         )
+
+    async def grant_resource(
+        self,
+        identity: CommandIdentity,
+        *,
+        command_name: str,
+        selector: str,
+        quantity: int = 1,
+        kind: str = "",
+        target_user_id: str = "",
+        all_players: bool = False,
+        requested_short_code: str | None = None,
+    ) -> AdminCommandResult:
+        """一条消息给单人或全群发放同种奖励，全部写入成功才提交。"""
+
+        quantity = validate_grant_quantity(quantity)
+        selector = str(selector or "").strip()
+        if not selector:
+            raise DomainValidationError("请填写发放物品名称。")
+        normalized_target = "" if all_players else self._normalize_target_user_id(identity, target_user_id)
+        code = self._normalize_optional_short_code(requested_short_code)
+        if code and (all_players or quantity != 1):
+            raise DomainValidationError("手动编号只用于单人单件发猪或发菜；批量发放会自动生成独立编号。")
+        resources = grant_resource_candidates(selector, kind)
+        request = {
+            "command_version": 1,
+            "selector": selector,
+            "quantity": quantity,
+            "kind": kind,
+            "target_user_id": normalized_target,
+            "all_players": all_players,
+            "short_code": code or "",
+        }
+        idempotency_key = MessageKeyFactory.build(identity, command_name)
+        now_datetime = self.clock.now()
+        now, now_ms = iso_timestamp(now_datetime), int(now_datetime.timestamp() * 1000)
+        async with self.database.transaction() as session:
+            existing = await self.receipt_repository.get_by_key(session, idempotency_key)
+            if existing is not None:
+                return self._existing_result(
+                    existing, identity=identity, command_name=command_name, request_payload=request
+                )
+            await self.framework_repository.touch_identity(session, identity=identity, now=now)
+            players = (
+                await self.repository.players_in_scope(session, scope_id=identity.scope.value)
+                if all_players
+                else [await self._require_target_player(session, identity=identity, platform_user_id=normalized_target)]
+            )
+            if not players:
+                raise DomainValidationError("当前群没有已登记玩家。")
+            candidates = [(resource.storage, resource) for resource in resources]
+            for asset_kind, label in ((AssetKind.PIG, "猪猪"), (AssetKind.FOOD, "美食")):
+                if kind not in {"", label}:
+                    continue
+                templates = await self.repository.eligible_templates(
+                    session,
+                    scope_id=identity.scope.value,
+                    asset_kind=asset_kind,
+                    selector=selector,
+                )
+                candidates.extend((asset_kind.value, template) for template in templates)
+            if not candidates:
+                raise DomainValidationError(
+                    "找不到当前群可发放的同名资源；请使用完整名称或ID，/猪管发放 列表 查看道具和券。"
+                )
+            if len(candidates) != 1:
+                raise DomainValidationError("名称对应多种资源，请在名称前写明猪猪、美食、道具或券，或使用唯一ID。")
+            storage, selected = candidates[0]
+            is_asset = storage in {"pig", "food"}
+            if code and not is_asset:
+                raise DomainValidationError("只有猪猪或美食可指定资产编号。")
+            if is_asset and len(players) * quantity > MAX_GRANT_ASSETS:
+                raise DomainValidationError(f"单次最多生成{MAX_GRANT_ASSETS}件猪猪或美食，请减少每人数量或分批发放。")
+            audit_event_id = self.id_factory()
+            plans: list[dict[str, object]] = []
+            for player in players:
+                plan = {
+                    "player_id": str(player["player_id"]),
+                    "platform_user_id": str(player["platform_user_id"]),
+                    "display_name": str(player["display_name"]) or "未命名群友",
+                }
+                if is_asset:
+                    assets = [
+                        await self._insert_granted_asset(
+                            session,
+                            identity=identity,
+                            target=player,
+                            asset_kind=AssetKind(storage),
+                            template=selected,
+                            requested_short_code=code,
+                            now=now,
+                        )
+                        for _ in range(quantity)
+                    ]
+                    plan.update({"granted_quantity": quantity, "assets": assets})
+                else:
+                    plan.update(
+                        await self.grant_repository.grant(
+                            session,
+                            resource=selected,
+                            player_id=str(player["player_id"]),
+                            scope_id=identity.scope.value,
+                            quantity=quantity,
+                            source_id=audit_event_id,
+                            now=now,
+                            now_ms=now_ms,
+                        )
+                    )
+                plans.append(plan)
+            name = str(selected["display_name"]) if is_asset else selected.name
+            label = {"pig": "猪猪", "food": "美食"}.get(storage, "") if is_asset else selected.category
+            usage = {"pig": "/猪猪背包", "food": "/美食背包"}.get(storage, "") if is_asset else selected.usage
+            total = sum(int(plan["granted_quantity"]) for plan in plans)
+            detail = {
+                "resource_id": str(selected["template_id"]) if is_asset else selected.resource_id,
+                "display_name": name,
+                "category": label,
+                "storage": storage,
+                "quantity": quantity,
+                "all_players": all_players,
+                "affected_players": len(plans),
+                "granted_total": total,
+                "players": plans,
+                "usage": usage,
+                "audit_event_id": audit_event_id,
+            }
+            target_label = f"当前群全体已登记玩家（{len(plans)}人）" if all_players else str(plans[0]["display_name"])
+            unit = "级" if storage == "upgrade" else "份"
+            summary = (
+                f"【猪管·发放完成】\n对象：{target_label}\n奖励：{name}\n"
+                f"每人：{quantity}{unit}；实际发放合计：{total}{unit}\n"
+            )
+            if storage == "upgrade":
+                capped = sum(int(plan["granted_quantity"]) < quantity for plan in plans)
+                summary += f"永久等级上限10级；{capped}人达到上限，超出部分不再增加。\n"
+            if not all_players:
+                if is_asset:
+                    codes = [str(asset["short_code"]) for asset in plans[0]["assets"]]
+                    summary += (
+                        "资产编号：" + "、".join(codes[:8]) + (f" 等{len(codes)}件" if len(codes) > 8 else "") + "\n"
+                    )
+                else:
+                    summary += f"发放后{'等级' if storage == 'upgrade' else '库存'}：{plans[0]['quantity_after']}\n"
+            summary += f"查看：{usage}\n审计号：{audit_event_id}"
+            await self.repository.insert_audit_event(
+                session,
+                audit_event_id=audit_event_id,
+                scope_id=identity.scope.value,
+                actor_user_id=identity.user_id,
+                action="admin-resource-granted",
+                object_type="player-batch" if all_players else "player",
+                object_id=identity.scope.value if all_players else str(plans[0]["player_id"]),
+                detail_json=self._json(detail),
+                now=now,
+            )
+            receipt = await self._reserve_receipt(
+                session,
+                identity=identity,
+                idempotency_key=idempotency_key,
+                command_name=command_name,
+                request_payload=request,
+                result_type="admin-resource-grant",
+                result_object_id=audit_event_id,
+                result_payload=detail,
+                text_summary=summary,
+                now=now,
+            )
+        return AdminCommandResult(receipt, True, "resource-grant", len(plans))
+
+    async def _insert_granted_asset(
+        self,
+        session: DatabaseSession,
+        *,
+        identity: CommandIdentity,
+        target: Mapping[str, object],
+        asset_kind: AssetKind,
+        template: Mapping[str, object],
+        requested_short_code: str | None,
+        now: str,
+    ) -> dict[str, object]:
+        """复用单件管理员资产生成；调用方统一拥有批次事务与回执。"""
+
+        short_code = await self._unique_short_code(session, requested=requested_short_code)
+        instance_id = self.id_factory()
+        if asset_kind is AssetKind.PIG:
+            attributes, snapshot = self._generate_admin_pig(template, identity)
+            await self.gameplay_repository.insert_pig_instance(
+                session,
+                values={
+                    "pig_instance_id": instance_id,
+                    "short_code": short_code,
+                    "scope_id": identity.scope.value,
+                    "owner_player_id": str(target["player_id"]),
+                    "template_id": str(template["template_id"]),
+                    "template_version": int(template["template_version"]),
+                    "rarity": int(template["rarity"]),
+                    "display_name_snapshot": str(template["display_name"]),
+                    "size_value": attributes.size_value,
+                    "size_percentile": attributes.size_percentile,
+                    "weight_value": attributes.weight_value,
+                    "weight_percentile": attributes.weight_percentile,
+                    "fat_ratio": attributes.fat_ratio,
+                    "official_value": attributes.official_value,
+                    "ruleset_version": RULESET_VERSION,
+                    "random_snapshot_json": self._json(snapshot),
+                    "acquired_at": now,
+                    "updated_at": now,
+                },
+            )
+            await self.gameplay_repository.upsert_pig_catalog(
+                session,
+                player_id=str(target["player_id"]),
+                template_id=str(template["template_id"]),
+                size_value=attributes.size_value,
+                weight_value=attributes.weight_value,
+                now=now,
+            )
+            attribute_detail = {
+                "size_value": attributes.size_value,
+                "weight_value": attributes.weight_value,
+                "fat_ratio": attributes.fat_ratio,
+                "official_value": attributes.official_value,
+            }
+        else:
+            attributes, fat_category, snapshot = self._generate_admin_food(template, identity)
+            await self.economy_repository.insert_food_instance(
+                session,
+                values={
+                    "food_instance_id": instance_id,
+                    "short_code": short_code,
+                    "scope_id": identity.scope.value,
+                    "owner_player_id": str(target["player_id"]),
+                    "template_id": str(template["template_id"]),
+                    "template_version": int(template["template_version"]),
+                    "source_pig_instance_id": None,
+                    "rarity": int(template["rarity"]),
+                    "display_name_snapshot": str(template["display_name"]),
+                    "portion_weight": attributes.portion_weight,
+                    "fat_category": fat_category,
+                    "official_value": attributes.official_value,
+                    "effect_id": str(template.get("effect_id") or ""),
+                    "effect_params_json": str(template.get("effect_params_json") or "{}"),
+                    "ruleset_version": RULESET_VERSION,
+                    "random_snapshot_json": self._json(snapshot),
+                    "acquired_at": now,
+                    "updated_at": now,
+                },
+            )
+            await self.economy_repository.upsert_food_catalog(
+                session,
+                player_id=str(target["player_id"]),
+                template_id=str(template["template_id"]),
+                portion_weight=attributes.portion_weight,
+                now=now,
+            )
+            attribute_detail = {
+                "portion_weight": attributes.portion_weight,
+                "fat_category": fat_category,
+                "official_value": attributes.official_value,
+            }
+        return {
+            "asset_kind": asset_kind.value,
+            "instance_id": instance_id,
+            "short_code": short_code,
+            "template_id": str(template["template_id"]),
+            "display_name": str(template["display_name"]),
+            "rarity": int(template["rarity"]),
+            "target_player_id": str(target["player_id"]),
+            "target_platform_user_id": str(target["platform_user_id"]),
+            "manual_short_code": bool(requested_short_code),
+            **attribute_detail,
+        }
 
     async def remove_asset(
         self,

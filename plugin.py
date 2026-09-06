@@ -23,7 +23,6 @@ from .pig_catcher.commands import (
     format_help,
     matched_group,
     parse_action_type,
-    parse_admin_asset_grant,
     parse_admin_asset_selector,
     parse_admin_blacklist_query,
     parse_admin_coin_amount,
@@ -46,6 +45,7 @@ from .pig_catcher.commands import (
     parse_trade_offer_query,
     parse_upgrade_name,
 )
+from .pig_catcher.commands.admin_grants import parse_grant_query, parse_grant_target
 from .pig_catcher.commands.battle import BATTLE_HELP, parse_battle_request
 from .pig_catcher.commands.dispatch import DISPATCH_HELP, parse_dispatch_request
 from .pig_catcher.commands.item_bag import ITEM_BAG_PATTERN, REWARD_COUPON_PATTERN, parse_item_bag_request
@@ -53,6 +53,7 @@ from .pig_catcher.commands.tour import TOUR_HELP, parse_tour_request
 from .pig_catcher.config import AccessPolicy, PigCatcherConfig
 from .pig_catcher.domain.achievements import AchievementReward
 from .pig_catcher.domain.activity_achievements import ACTIVITY_REWARDS
+from .pig_catcher.domain.admin_grants import GRANT_RESOURCES
 from .pig_catcher.domain.battle_views import BattleView
 from .pig_catcher.domain.dispatch_views import DispatchLine, DispatchView
 from .pig_catcher.domain.enums import AssetKind
@@ -135,6 +136,7 @@ from .pig_catcher.rendering import (
     weekly_competition_award_view,
     weekly_competition_view,
 )
+from .pig_catcher.rendering.admin_grants import admin_grant_view
 from .pig_catcher.rendering.cosmetics import COSMETIC_DEFINITIONS
 from .pig_catcher.services import (
     AchievementService,
@@ -1694,7 +1696,7 @@ class PigCatcherPlugin(MaiBotPlugin):
     @Command(
         "pig_catcher_admin_help",
         description="查看仅限插件管理员使用的猪管命令",
-        pattern=r"^/猪管帮助\s*$",
+        pattern=rf"^{_COMMAND_LEADING_MENTION_PATTERN}/猪管帮助\s*$",
     )
     async def handle_admin_help(
         self,
@@ -1711,8 +1713,13 @@ class PigCatcherPlugin(MaiBotPlugin):
                 "/猪管全员发币 <数量>",
                 "/猪管扣币 <@玩家|用户ID> <数量>（余额可为负）",
                 "/猪管全员扣币 <数量>（余额可为负）",
-                "/猪管发猪 <@玩家|用户ID> <猪名或模板ID> [4-16位字母数字编号]",
-                "/猪管发菜 <@玩家|用户ID> <美食名或模板ID> [4-16位字母数字编号]",
+                "/猪管发放 <@玩家|用户ID|全员> <名称> [每人数量]",
+                "/猪管全员发放 <名称> [每人数量]",
+                "/猪管发放 列表 [页码]：可发道具、券、器具和材料",
+                "/猪管发道具、/猪管发券：目标和数量同上；也可 /猪管全员发道具、/猪管全员发券",
+                "/猪管发猪、/猪管发菜 <@玩家|用户ID|全员> <名称> [x数量]",
+                "旧发猪/发菜仍支持末尾手动编号；新统一发放用 名称#编号，仅限单人单件。",
+                "例：/猪管发放 全员 编号修改券 3；/猪管发放 全员 一猪六吃 6",
                 "/猪管删猪 <@玩家|用户ID> <猪名#编号>",
                 "/猪管删菜 <@玩家|用户ID> <美食名#编号>",
                 "/猪管黑名单",
@@ -1723,6 +1730,7 @@ class PigCatcherPlugin(MaiBotPlugin):
                 "/猪管重置比划 <@玩家|用户ID|全员>（主动与被挑战机会一起重置）",
                 "",
                 "所有操作只作用于当前群；全员指当前群已登记玩家。",
+                "支持主商城、派遣/巡演/对战器具、奖励券/成就券/礼盒、材料；饲料/厨具每份升1级，最高10级。",
                 "管理员发放资产不增加抓猪/做菜统计；删除保留历史实例与图鉴。",
             )
         )
@@ -1995,9 +2003,9 @@ class PigCatcherPlugin(MaiBotPlugin):
 
     @Command(
         "pig_catcher_admin_grant_asset",
-        description="插件管理员为当前群玩家生成并发放一只指定猪猪或美食",
+        description="插件管理员为指定玩家或本群全员批量发放猪猪或美食",
         pattern=(
-            r"^/猪管(?:发放|发)(?P<kind>猪猪|猪|美食|菜)"
+            rf"^{_COMMAND_LEADING_MENTION_PATTERN}/猪管(?P<all_players>全员)?(?:发放|发)(?P<kind>猪猪|猪|美食|菜)"
             r"(?:\s+(?P<arguments>.*?))?\s*$"
         ),
     )
@@ -2011,33 +2019,105 @@ class PigCatcherPlugin(MaiBotPlugin):
             return rejected or (False, "", 0)
         try:
             mention = self._optional_mention_target(kwargs)
-            target = parse_admin_target_arguments(
+            target = parse_grant_target(
                 matched_group(kwargs, "arguments"),
-                mentioned_user_id=mention.user_id if mention is not None else "",
-                mentioned_display_name=(mention.display_name if mention is not None else ""),
+                mention=mention,
+                all_players=matched_group(kwargs, "all_players") == "全员",
             )
-            query = parse_admin_asset_grant(target.remaining)
-            result = await cast(
-                AdministrationService,
-                self._administration_service,
-            ).grant_asset(
-                identity,
-                command_name="pig-catcher.admin-grant-asset",
-                target_user_id=target.user_id,
-                asset_kind=self._admin_kind(matched_group(kwargs, "kind")),
-                template_selector=query.template_selector,
-                requested_short_code=query.short_code,
+            query = parse_grant_query(
+                target.remaining, kind=matched_group(kwargs, "kind"), legacy_asset=not target.all_players,
             )
-            return await self._deliver_text_receipt(
-                stream_id=identity.stream_id,
-                receipt=result.receipt,
-            )
+            service = cast(AdministrationService, self._administration_service)
+            if query.quantity == 1 and not target.all_players:
+                result = await service.grant_asset(
+                    identity,
+                    command_name="pig-catcher.admin-grant-asset",
+                    target_user_id=target.user_id,
+                    asset_kind=self._admin_kind(query.kind),
+                    template_selector=query.selector,
+                    requested_short_code=query.short_code,
+                )
+            else:
+                result = await service.grant_resource(
+                    identity,
+                    command_name="pig-catcher.admin-grant-resource",
+                    selector=query.selector,
+                    quantity=query.quantity,
+                    kind=query.kind,
+                    target_user_id=target.user_id,
+                    all_players=target.all_players,
+                    requested_short_code=query.short_code,
+                )
+            return await self._deliver_admin_grant(identity, result.receipt)
         except Exception as exc:
             return await self._command_error(
                 stream_id=identity.stream_id,
                 operation="管理员发放资产",
                 error=exc,
             )
+
+    @Command(
+        "pig_catcher_admin_grant_resource",
+        description="插件管理员向单人或本群全员发放任意猪菜、商城道具和奖励券",
+        pattern=(
+            rf"^{_COMMAND_LEADING_MENTION_PATTERN}/猪管(?P<all_players>全员)?(?:发放|发)"
+            r"(?P<resource_kind>商城道具|道具|券|材料)?"
+            r"(?:\s+(?P<arguments>.*?))?\s*$"
+        ),
+    )
+    async def handle_admin_grant_resource(self, stream_id: str = "", **kwargs: Any) -> tuple[bool, str, int]:
+        identity, rejected = await self._prepare_admin_command(stream_id, kwargs)
+        if rejected is not None or identity is None:
+            return rejected or (False, "", 0)
+        try:
+            arguments = matched_group(kwargs, "arguments")
+            words = arguments.split()
+            if words and words[0] == "列表":
+                if (
+                    len(words) > 2
+                    or (len(words) == 2 and not words[1].isascii())
+                    or (len(words) == 2 and not words[1].isdigit())
+                ):
+                    raise DomainValidationError("格式：/猪管发放 列表 [页码]。")
+                page = int(words[1]) if len(words) == 2 else 1
+                pages = (len(GRANT_RESOURCES) + 11) // 12
+                if not 1 <= page <= pages:
+                    raise DomainValidationError(f"列表页码应为1至{pages}。")
+                lines = [f"【猪管可发资源 {page}/{pages}】"]
+                lines.extend(f"{item.category} · {item.name}" for item in GRANT_RESOURCES[(page - 1) * 12 : page * 12])
+                lines.append("猪猪和美食可直接填写本群图鉴中的名称。/猪管发放 全员 名称 数量")
+                return await self._reply_text(identity.stream_id, "\n".join(lines), success=True)
+            target = parse_grant_target(
+                arguments,
+                mention=self._optional_mention_target(kwargs),
+                all_players=matched_group(kwargs, "all_players") == "全员",
+            )
+            query = parse_grant_query(target.remaining, kind=matched_group(kwargs, "resource_kind"))
+            result = await cast(AdministrationService, self._administration_service).grant_resource(
+                identity,
+                command_name="pig-catcher.admin-grant-resource",
+                selector=query.selector,
+                quantity=query.quantity,
+                kind=query.kind,
+                target_user_id=target.user_id,
+                all_players=target.all_players,
+                requested_short_code=query.short_code,
+            )
+            return await self._deliver_admin_grant(identity, result.receipt)
+        except Exception as exc:
+            return await self._command_error(stream_id=identity.stream_id, operation="管理员发放奖励", error=exc)
+
+    async def _deliver_admin_grant(self, identity: CommandIdentity, receipt: CommandReceipt) -> tuple[bool, str, int]:
+        async def render() -> RenderedImage:
+            return await cast(PigCatcherRenderer, self._renderer).render_economy_receipt(admin_grant_view(receipt))
+
+        return await self._deliver_receipt(
+            stream_id=identity.stream_id,
+            receipt=receipt,
+            render=render,
+            fallback_text=receipt.text_summary,
+            track_progress=False,
+        )
 
     @Command(
         "pig_catcher_admin_remove_asset",
