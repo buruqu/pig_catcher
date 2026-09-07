@@ -253,6 +253,7 @@ def test_stacking_help_keeps_latest_mist_rule_and_exclusive_resources() -> None:
     text = format_help("叠加")
     assert "雾蓝" in text
     mist = next(line for line in text.splitlines() if "雾蓝" in line)
+    assert "4/5/6星权重×5" in mist
     assert re.search(r"10\s*次", mist)
     assert "随机" in mist or "洗牌" in mist or "反转" in mist
     assert "不叠加" in mist or "独占" in mist

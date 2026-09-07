@@ -58,6 +58,7 @@ GROUP_WINDOW_HIGH_STAR_BOOST = "group-window-high-star-boost"
 # Schema 18 前糖醋排骨使用的历史独占加权；保留解析能力以兼容旧审计快照。
 EXCLUSIVE_CATCH_QUALITY = "exclusive-catch-quality"
 SHUFFLED_CATCH_DISTRIBUTION = "shuffled-catch-distribution"
+MIST_HIGH_STAR_MULTIPLIER = 5.0
 CATCH_REWARD_BONUS = "catch-reward-bonus"
 COOK_SERVING_BONUS = "cook-serving-bonus"
 FOOD_SUPPLY_PACK = "food-supply-pack"
@@ -451,7 +452,8 @@ def resolve_food_effect(
             normalized_id,
             {"uses": uses},
             uses,
-            f"获得{uses}次额外抓猪机会：每次随机换位六档基础概率；"
+            f"获得{uses}次额外抓猪机会：每次随机换位六档基础概率，再将4/5/6星权重"
+            f"×{MIST_HIGH_STAR_MULTIPLIER:g}，重新归一化为最终概率；"
             "不消耗正常额度，不叠加等级、道具或其他菜品加成，其他临时效果保留。",
         )
     if normalized_id == CATCH_REWARD_BONUS:
@@ -1467,8 +1469,14 @@ def apply_catch_effects(
             shuffled, shuffle_permutation, shuffle_rolls = shuffled_catch_distribution(
                 shuffle_base_weights if shuffle_base_weights is not None else weights, random_value
             )
-            adjusted = list(shuffled)
-            exclusive_summary += " 本次洗牌：" + " / ".join(f"{value:g}%" for value in shuffled) + "。"
+            # 倍率属于雾蓝自身：先换位，再增强目标高星档，不能在换位前乘回原档。
+            adjusted = [
+                value * (MIST_HIGH_STAR_MULTIPLIER if index >= 3 else 1.0)
+                for index, value in enumerate(shuffled)
+            ]
+            exclusive_summary += (
+                " 本次换位原始比例（倍率前）：" + " / ".join(f"{value:g}%" for value in shuffled) + "。"
+            )
         elif exclusive.effect_id == NEXT_SIX_STAR_CATCH:
             target = float(grant.params["six_star_percent"])
             lower_total = sum(adjusted[:5])

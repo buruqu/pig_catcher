@@ -22,7 +22,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from pig_catcher.assets import AssetCatalogStorage  # noqa: E402
-from pig_catcher.config.model import CookingSection, EconomySection  # noqa: E402
+from pig_catcher.config.model import CatchingSection, CookingSection, EconomySection  # noqa: E402
 from pig_catcher.domain.economy import generate_food_attributes  # noqa: E402
 from pig_catcher.domain.food_lottery import HINA_PIG_TEMPLATE_ID, choose_lottery_prize  # noqa: E402
 from pig_catcher.domain.food_supplies import FOOD_SUPPLY_PACKS  # noqa: E402
@@ -30,9 +30,15 @@ from pig_catcher.domain.models import CommandIdentity, ScopeKey  # noqa: E402
 from pig_catcher.infrastructure.database import PigCatcherDatabase  # noqa: E402
 from pig_catcher.infrastructure.repositories.economy import EconomyRepository  # noqa: E402
 from pig_catcher.infrastructure.repositories.framework import FrameworkRepository  # noqa: E402
-from pig_catcher.rendering import PigCatcherRenderer, eat_receipt_view, food_card_view, media_path  # noqa: E402
+from pig_catcher.rendering import (  # noqa: E402
+    PigCatcherRenderer,
+    eat_receipt_view,
+    food_card_view,
+    media_path,
+    pig_card_view,
+)
 from pig_catcher.rendering.food_rewards import FoodRewardView, food_reward_view  # noqa: E402
-from pig_catcher.services import AssetCatalogService, EconomyService  # noqa: E402
+from pig_catcher.services import AssetCatalogService, EconomyService, GameplayService  # noqa: E402
 from pig_catcher.version import RULESET_VERSION  # noqa: E402
 from tools.accept_catching_and_collection_views import (  # noqa: E402
     PlaywrightRenderCapability,
@@ -128,6 +134,10 @@ async def scenarios(root: Path):
     package = PROJECT_ROOT / "asset_library/current"
     manifest = json.loads((package / "assets.json").read_text(encoding="utf-8"))
     entries = manifest["entries"]
+    catch_fixture_ids = {
+        next(entry["template_id"] for entry in entries if entry["kind"] == "pig" and entry["rarity"] == rarity)
+        for rarity in range(1, 5)
+    }
     selected = [
         entry
         for entry in entries
@@ -135,6 +145,7 @@ async def scenarios(root: Path):
         or (entry["kind"] == "food" and entry.get("effect_id") == "food-supply-pack")
         or entry.get("group_scope_id") == FIXTURE_SCOPE
         or entry["template_id"] == HINA_PIG_TEMPLATE_ID
+        or entry["template_id"] in catch_fixture_ids
     ]
     relative_paths = {str(entry[key]) for entry in selected for key in ("image", "alternate_image") if entry.get(key)}
     paths = {package / relative for relative in relative_paths}
@@ -233,6 +244,23 @@ async def scenarios(root: Path):
                 result, _, _ = await eat(name)
             cases.append(Scenario(f"03-overflow-{label}", food_reward_view(result)))
         mist, _, _ = await eat("雾蓝键盘大福")
+        gameplay = GameplayService(
+            db,
+            CatchingSection(cooldown_seconds=0),
+            clock=FixtureClock(),
+            random_source=FixtureRandom([0.0] * 5 + [0.8, 0.0] + [0.5] * 5),
+        )
+        caught = await gameplay.catch(replace(actor, message_id="mist-render-catch"))
+        if not caught.quota_exempt_catch or "4/5/6星权重×5" not in " ".join(caught.effect_summaries):
+            raise AssertionError("雾蓝抓猪未使用新版专属概率规则。")
+        cases.append(
+            Scenario(
+                "05b-mist-catch-result",
+                pig_card_view(caught.pig, mode_label="抓猪成功", catch=caught),
+                "pig",
+                caught.pig.image_relpath,
+            )
+        )
         cases.extend(
             (
                 Scenario("04-mist-eat-receipt", eat_receipt_view(mist), "receipt"),
@@ -298,6 +326,8 @@ async def run(args) -> dict:
                     rendered = await renderer.render_economy_receipt(case.view)
                 elif case.kind == "food":
                     rendered = await renderer.render_static_food_card(case.view, media_path(data, case.source_image))
+                elif case.kind == "pig":
+                    rendered = await renderer.render_static_pig_card(case.view, media_path(data, case.source_image))
                 else:
                     paths = {
                         item.key: media_path(data, item.image_relpath) for item in case.view.items if item.image_relpath

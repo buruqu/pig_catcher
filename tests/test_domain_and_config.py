@@ -844,7 +844,7 @@ def test_six_star_exclusive_effects_override_weights_with_multi_uses() -> None:
         "even-catch-distribution",
         "shuffled-catch-distribution",
     }
-    # 雾蓝键盘大福：固定高星分布 4/5/6 = 60/30/10，uses=10
+    # 历史固定高星效果协议仍可读取（现行雾蓝已改用独立洗牌协议）。
     high_star = _active_effect(
         "high-star",
         "next-high-star-catch",

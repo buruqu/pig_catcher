@@ -146,14 +146,18 @@ async def _effects(db, player_id):
     }
 
 
-async def test_mist_ten_independent_shuffles_ignore_all_modifiers_and_keep_queues(db):
-    """最新规则：等级、饲料、达妮娅也不叠加，只有洗牌后的六档基础概率。"""
-    clock, identity = _clock(), actor()
+@pytest.mark.parametrize("scope", SCOPES)
+@pytest.mark.parametrize("has_six", [True, False])
+async def test_mist_ten_independent_shuffles_ignore_all_modifiers_and_keep_queues(db, scope, has_six):
+    """四个入口统一先洗牌再高星×5；等级、饲料、达妮娅仍不叠加。"""
+    clock, identity = _clock(), actor(scope)
     economy = _economy(db, clock)
     _, reward_id, _, _ = await _eat(db, economy, identity, clock, "food-r4-hot-pig")
     _, stature_id, _, _ = await _eat(db, economy, identity, clock, "food-r4-souffle")
-    _, mist_id, _, _ = await _eat(db, economy, identity, clock, _key(SCOPES[0], "mist-blue-keyboard-daifuku"))
+    _, mist_id, _, _ = await _eat(db, economy, identity, clock, _key(scope, "mist-blue-keyboard-daifuku"))
     async with db.transaction() as session:
+        if not has_six:
+            await session.execute("UPDATE pig_templates SET enabled=0 WHERE rarity=6")
         await session.execute("UPDATE players SET experience=20000 WHERE player_id=?", (identity.player_id,))
         await session.execute(
             "INSERT INTO upgrades(player_id,upgrade_type,level,updated_at) VALUES(?,'feed',5,?)",
@@ -207,7 +211,13 @@ async def test_mist_ten_independent_shuffles_ignore_all_modifiers_and_keep_queue
         )
         order = snapshot["shuffle_permutation"]
         permutations.append(order)
-        assert result.weights == pytest.approx(tuple(snapshot["base_weights"][n - 1] for n in order))
+        raw = [snapshot["base_weights"][n - 1] * (5 if i >= 3 else 1) for i, n in enumerate(order)]
+        if not has_six:
+            raw[4] += raw[5]
+            raw[5] = 0
+        expected = tuple(value * 100 / sum(raw) for value in raw)
+        assert result.weights == pytest.approx(expected)
+        assert snapshot["normalized_weights"] == pytest.approx(expected)
         assert result.daily_count == 0 and result.quota_exempt_catch
         assert result.exclusive_effect_active and not result.item_id
         assert len(snapshot["shuffle_rolls"]) == 5
@@ -215,6 +225,9 @@ async def test_mist_ten_independent_shuffles_ignore_all_modifiers_and_keep_queue
             (await _effects(db, identity.player_id))[mist_id]["effect_entry_id"]
         ]
         assert f"剩余 {9 - index}/10 次" in " ".join(result.effect_summaries)
+        assert "4/5/6星权重×5" in " ".join(result.effect_summaries)
+        replay = await gameplay.catch(replace(identity, message_id=f"mist-{index}"))
+        assert not replay.receipt_created and replay.weights == tuple(round(value, 8) for value in result.weights)
     assert permutations[0] != permutations[1] and not random.values
     rows = await _effects(db, identity.player_id)
     assert rows[mist_id]["consumed_uses"] == rows[mist_id]["granted_uses"] == 10

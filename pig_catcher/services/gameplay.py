@@ -1249,7 +1249,7 @@ class GameplayService:
                 )
                 weights = effect_application.weights
                 if effect_application.shuffle_permutation:
-                    # 纯概率换位，不叠加任何成长；无六星授权时才转入五星。
+                    # 概率换位及雾蓝自身高星倍率，不叠加任何成长；无六星授权时转入五星。
                     if not buckets[Rarity.SIX]:
                         available_weights = list(weights)
                         available_weights[4] += available_weights[5]
