@@ -1,5 +1,6 @@
 <!doctype html>
 {% from 'cosmetic_components.html' import cosmetic_plate, cosmetic_preview %}
+{% set event_art = weekly_event_art(view.season_number) %}
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
@@ -17,23 +18,28 @@
     .award-caption{font-size:17px;color:#896472;margin:10px 0 0;line-height:1.5}
     .award-future-note{margin:15px 0 0;color:#806b77;font-size:16px;line-height:1.6}
     .award-reward,.award-hint{overflow-wrap:anywhere;line-height:1.6}
+    .award-owned{display:grid;grid-template-columns:minmax(0,1fr) 200px 180px;gap:24px}
+    .award-owned .cosmetic-plate{width:100%;max-width:100%}
+    .award-owned .cosmetic-frame-preview,.award-owned .cosmetic-badge{display:flex;flex-direction:column;text-align:center;gap:10px}
+    .award-owned .cosmetic-frame-preview img{width:144px;height:180px;flex-basis:auto}
+    .award-owned .cosmetic-badge img{width:110px;height:110px;flex-basis:auto}
   </style>
 </head>
 <body>
 <main class="game-sheet" data-pig-catcher-root data-render-ready="true">
   <header class="game-header"><div class="game-header__copy"><p class="game-header__eyebrow">PiG Dream! · 第 {{ view.season_number }} 期周冲榜结算</p><h1>{{ view.competition_name }}</h1></div><div class="game-header__meta"><span>奖励已入账</span><strong>TOP {{ view.final_rank }}</strong></div></header>
   <section class="award-stage">
-    {% if view.season_number == 1 and view.final_rank >= 1 and view.final_rank <= 10 %}
+    {% if event_art and view.final_rank >= 1 and view.final_rank <= 10 %}
       {% set badge_rank = view.final_rank if view.final_rank <= 3 else 10 %}
-      {{ cosmetic_plate('weekly-001-catch-value-rank-' ~ badge_rank, compact=False) }}
+      {{ cosmetic_plate(event_art.ranks[badge_rank], compact=False) }}
     {% else %}<div class="award-medal">{{ view.final_rank }}</div>{% endif %}
     <h2>{{ view.display_name }}</h2><p class="award-score">最终成绩 {{ view.score_text }}</p>
     <p class="award-caption">最终第 {{ view.final_rank }} 名 · 本期奖励已入库</p>
-    {% if view.season_number != 1 %}<p class="award-future-note">本期展示实际结算信息，不借用其他期的活动牌。</p>{% endif %}
+    {% if not event_art %}<p class="award-future-note">本期展示实际结算信息，不借用其他期的活动牌。</p>{% endif %}
   </section>
   <section class="award-rewards">{% for line in view.reward_lines %}<div class="award-reward">{{ line }}</div>{% endfor %}</section>
-  {% if view.season_number == 1 and view.final_rank >= 1 and view.final_rank <= 10 %}
-  <section class="award-owned" aria-label="已入库称号与整卡边框">{{ cosmetic_plate('weekly-001-catch-value-title', compact=False) }}{{ cosmetic_preview('weekly-001-catch-value-frame') }}</section>
+  {% if event_art and view.final_rank >= 1 and view.final_rank <= 10 %}
+  <section class="award-owned" aria-label="已入库称号与整卡边框">{{ cosmetic_plate(event_art.title, compact=False) }}{{ cosmetic_preview(event_art.frame) }}{% if event_art.medal is defined %}{{ cosmetic_preview(event_art.medal) }}{% endif %}</section>
   {% endif %}
   <div class="award-hint">输入 /佩戴成就 {{ view.competition_name }}，即可佩戴本期称号、边框与牌子。</div>
   <footer class="game-footer"><span>周榜奖励已完成原子结算，不会重复发放</span><strong>PiG Dream!</strong></footer>

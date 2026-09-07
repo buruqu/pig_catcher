@@ -77,6 +77,12 @@ class WeeklyCompetitionDefinition:
     reward_tiers: tuple[WeeklyRewardTier, ...]
     fixed_starts_at: str = ""
     fixed_ends_at: str = ""
+    source_template_ids: tuple[str, ...] = ()
+    tie_breaker: str = "best-single"
+
+    @property
+    def receipt_result_types(self) -> tuple[str, ...]:
+        return ("cooking", "batch-cooking") if self.source_result_type == "cooking" else (self.source_result_type,)
 
     def __post_init__(self) -> None:
         if not self.definition_key.strip() or not self.name.strip():
@@ -95,6 +101,10 @@ class WeeklyCompetitionDefinition:
             seen.update(tier.ranks)
         if bool(self.fixed_starts_at) != bool(self.fixed_ends_at):
             raise ValueError("Fixed weekly window needs both start and end")
+        if self.tie_breaker not in {"best-single", "earliest-score"}:
+            raise ValueError("Unsupported weekly tie breaker")
+        if self.source_result_type == "cooking" and not self.source_template_ids:
+            raise ValueError("Cooking competition requires exact food template filters")
 
     def rewards_for_rank(self, rank: int) -> tuple[WeeklyReward, ...]:
         """Resolve one deterministic final-rank reward bundle."""
@@ -113,6 +123,23 @@ WEEKLY_SPRINT_BADGE_IDS = {
     3: "weekly-001-catch-value-rank-3",
     10: "weekly-001-catch-value-rank-10",
 }
+
+WEEKLY_SUSHI_TITLE_ID = "weekly-002-sushi-title"
+WEEKLY_SUSHI_FRAME_ID = "weekly-002-sushi-frame"
+WEEKLY_SUSHI_MEDAL_ID = "weekly-002-sushi-medal"
+WEEKLY_SUSHI_BADGE_IDS = {rank: f"weekly-002-sushi-rank-{rank}" for rank in (1, 2, 3, 10)}
+
+
+def _sushi_rewards(rank: int, *, coins: int, catch_tickets: int, fireworks: int) -> tuple[WeeklyReward, ...]:
+    return (
+        WeeklyReward("coin", "pig-coin", coins),
+        WeeklyReward("ticket", "achievement-catch", catch_tickets),
+        WeeklyReward("ticket", "achievement-firework", fireworks),
+        WeeklyReward("title", WEEKLY_SUSHI_TITLE_ID),
+        WeeklyReward("frame", WEEKLY_SUSHI_FRAME_ID),
+        WeeklyReward("badge", WEEKLY_SUSHI_BADGE_IDS[rank if rank <= 3 else 10]),
+        WeeklyReward("badge", WEEKLY_SUSHI_MEDAL_ID),
+    )
 
 
 def _sprint_rewards(rank: int, *, coins: int, catch_tickets: int, fireworks: int) -> tuple[WeeklyReward, ...]:
@@ -151,17 +178,39 @@ WEEKLY_COMPETITION_DEFINITIONS: tuple[WeeklyCompetitionDefinition, ...] = (
         fixed_starts_at="2026-09-01T00:00:00+08:00",
         fixed_ends_at="2026-09-08T00:00:00+08:00",
     ),
+    WeeklyCompetitionDefinition(
+        definition_key="weekly-002-sushi-king",
+        season_number=2,
+        name="寿司拼盘大王",
+        source_result_type="cooking",
+        source_command_names=("pig-catcher.cook", "pig-catcher.batch-cook"),
+        source_field="quantity",
+        source_template_ids=("food-r5-pig-sushi-platter",),
+        aggregation=WeeklyAggregation.SUM,
+        sort_direction=WeeklySortDirection.DESCENDING,
+        tie_breaker="earliest-score",
+        metric_label="本期亲手做出的猪寿司拼盘",
+        metric_unit="份",
+        reward_tiers=(
+            WeeklyRewardTier((1,), _sushi_rewards(1, coins=10_000, catch_tickets=5, fireworks=2)),
+            WeeklyRewardTier((2,), _sushi_rewards(2, coins=8_000, catch_tickets=4, fireworks=2)),
+            WeeklyRewardTier((3,), _sushi_rewards(3, coins=6_000, catch_tickets=3, fireworks=1)),
+            WeeklyRewardTier(tuple(range(4, 11)), _sushi_rewards(10, coins=3_000, catch_tickets=2, fireworks=1)),
+        ),
+        fixed_starts_at="2026-09-08T00:00:00+08:00",
+        fixed_ends_at="2026-09-15T00:00:00+08:00",
+    ),
 )
 
-WEEKLY_COMPETITIONS_BY_KEY = {
-    definition.definition_key: definition for definition in WEEKLY_COMPETITION_DEFINITIONS
-}
-WEEKLY_COMPETITIONS_BY_SEASON = {
-    definition.season_number: definition for definition in WEEKLY_COMPETITION_DEFINITIONS
-}
+WEEKLY_COMPETITIONS_BY_KEY = {definition.definition_key: definition for definition in WEEKLY_COMPETITION_DEFINITIONS}
+WEEKLY_COMPETITIONS_BY_SEASON = {definition.season_number: definition for definition in WEEKLY_COMPETITION_DEFINITIONS}
 
 
 WEEKLY_REWARD_NAMES = {
+    WEEKLY_SUSHI_TITLE_ID: "寿司拼盘大王",
+    WEEKLY_SUSHI_FRAME_ID: "寿司拼盘大王·寿司宴台边框",
+    WEEKLY_SUSHI_MEDAL_ID: "寿司拼盘大王·匠心寿司徽章",
+    **{key: f"寿司拼盘大王·{rank}牌" for rank, key in WEEKLY_SUSHI_BADGE_IDS.items()},
     WEEKLY_SPRINT_TITLE_ID: "抓猪冲刺者",
     WEEKLY_SPRINT_FRAME_ID: "抓猪冲刺！！！·赛道边框",
     WEEKLY_SPRINT_BADGE_IDS[1]: "抓猪冲刺！！！·1牌",
@@ -179,6 +228,10 @@ __all__ = [
     "WEEKLY_SPRINT_BADGE_IDS",
     "WEEKLY_SPRINT_FRAME_ID",
     "WEEKLY_SPRINT_TITLE_ID",
+    "WEEKLY_SUSHI_BADGE_IDS",
+    "WEEKLY_SUSHI_FRAME_ID",
+    "WEEKLY_SUSHI_MEDAL_ID",
+    "WEEKLY_SUSHI_TITLE_ID",
     "WeeklyAggregation",
     "WeeklyCompetitionDefinition",
     "WeeklyReward",

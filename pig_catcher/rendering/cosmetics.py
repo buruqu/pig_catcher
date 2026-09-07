@@ -214,6 +214,21 @@ def cosmetic_detail(
     }
 
 
+def weekly_event_art(season_number: int) -> dict[str, Any]:
+    """Resolve only explicitly registered art from this season, never another season."""
+    result: dict[str, Any] = {"ranks": {}}
+    for item in COSMETIC_DEFINITIONS.values():
+        if item.get("season") != season_number:
+            continue
+        if item.get("rank"):
+            result["ranks"][int(item["rank"])] = item["id"]
+        elif item["kind"] in {"title", "frame"}:
+            result[item["kind"]] = item["id"]
+        elif item["kind"] == "badge":
+            result["medal"] = item["id"]
+    return result if "title" in result else {}
+
+
 def cosmetic_cards(rewards: Iterable[object], *, revealed: bool = True) -> tuple[dict[str, Any], ...]:
     """全量旧/新成就、里程碑、宝箱、周榜外观；隐藏条目不访问图像。"""
     if not revealed:
@@ -239,4 +254,5 @@ __all__ = [
     "cosmetic_cards",
     "cosmetic_detail",
     "load_cosmetic_definitions",
+    "weekly_event_art",
 ]

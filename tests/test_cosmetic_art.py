@@ -45,7 +45,7 @@ def test_all_real_reward_sources_are_covered_without_placeholder_rewards():
     actual = _actual_rewards()
     registered = {(key, item["kind"]) for key, item in cosmetics.COSMETIC_DEFINITIONS.items()}
     assert registered == actual
-    assert Counter(kind for _, kind in registered) == {"title": 31, "frame": 16, "badge": 35, "cosmetic": 1}
+    assert Counter(kind for _, kind in registered) == {"title": 32, "frame": 17, "badge": 40, "cosmetic": 1}
 
 
 @pytest.mark.parametrize("key", tuple(cosmetics.COSMETIC_DEFINITIONS))
@@ -95,9 +95,9 @@ def test_legacy_names_and_kind_disambiguation():
 def test_cosmetic_cards_support_base_milestone_chest_activity_and_weekly():
     rewards = [AchievementReward(kind, key) for key, kind in sorted(_actual_rewards())]
     cards = cosmetics.cosmetic_cards(rewards)
-    assert len(cards) == 83
+    assert len(cards) == 90
     assert {card["id"] for card in cards} == set(cosmetics.COSMETIC_DEFINITIONS)
-    assert sum(card["is_plate"] for card in cards) == 35
+    assert sum(card["is_plate"] for card in cards) == 40
     assert cosmetics.cosmetic_cards([AchievementReward("coin", "pig-coin", 100)]) == ()
 
 
@@ -148,7 +148,7 @@ def test_all_titles_and_weekly_plates_have_distinct_generated_art(art_manifest):
         if cosmetics.COSMETIC_DEFINITIONS[item["id"]]["kind"] == "title"
         or cosmetics.COSMETIC_DEFINITIONS[item["id"]].get("rank")
     ]
-    assert len({item["files"]["png"]["sha256"] for item in plates}) == 35
+    assert len({item["files"]["png"]["sha256"] for item in plates}) == 40
     for item in plates:
         with Image.open(ART_ROOT / item["files"]["png"]["path"]) as picture:
             assert picture.mode == "RGBA"
@@ -242,6 +242,7 @@ def test_frame_css_is_decorative_and_does_not_shift_media_slot():
 def _weekly_environment() -> Environment:
     env = Environment(loader=FileSystemLoader(TEMPLATES), autoescape=select_autoescape(), undefined=StrictUndefined)
     env.globals["cosmetic_detail"] = cosmetics.cosmetic_detail
+    env.globals["weekly_event_art"] = cosmetics.weekly_event_art
     return env
 
 
@@ -270,7 +271,7 @@ def test_first_season_board_displays_all_four_art_previews_without_claiming_owne
         assert f'alt="抓猪冲刺！！！·{rank}牌"' in html
 
 
-@pytest.mark.parametrize("season", (0, 2, 99))
+@pytest.mark.parametrize("season", (0, 3, 99))
 def test_unregistered_season_never_reads_or_reuses_first_season_art(season):
     env = _weekly_environment()
 
@@ -286,3 +287,30 @@ def test_unregistered_season_never_reads_or_reuses_first_season_art(season):
         assert "data:image" not in html
         assert "weekly-001" not in html
         assert "其他期" in html
+
+
+@pytest.mark.parametrize("rank,badge_rank", ((1, 1), (2, 2), (3, 3), (4, 10), (7, 10), (10, 10)))
+def test_sushi_season_displays_its_own_award_plate_medal_frame(rank, badge_rank):
+    view = replace(award(2), final_rank=rank)
+    html = (
+        _weekly_environment()
+        .get_template("weekly_competition_award.html")
+        .render(view=view, font_family="sans-serif", theme_css="")
+    )
+    assert f'alt="寿司拼盘大王·{badge_rank}牌"' in html
+    assert "寿司宴台边框" in html and "匠心寿司徽章" in html
+    assert "抓猪冲刺" not in html and "weekly-001" not in html
+    assert f"最终第 {rank} 名" in html
+
+
+def test_sushi_board_does_not_display_pig_value_metrics():
+    html = (
+        _weekly_environment()
+        .get_template("weekly_competition.html")
+        .render(view=leaderboard(status="进行中", season=2), font_family="sans-serif", theme_css="")
+    )
+    assert "本期亲手做出的猪寿司拼盘" in html
+    assert "单只最高" not in html and "抓到 " not in html
+    assert "份" in html and "同分先达成者优先" in html
+    for rank in (1, 2, 3, 10):
+        assert f'alt="寿司拼盘大王·{rank}牌"' in html

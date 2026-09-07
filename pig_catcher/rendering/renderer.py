@@ -24,7 +24,7 @@ from ..domain.display import format_length, format_measurement, format_weight
 from ..domain.errors import RenderError
 from ..domain.tour_views import TourView
 from .asset_icons import asset_icon
-from .cosmetics import clear_cosmetic_cache, cosmetic_detail
+from .cosmetics import clear_cosmetic_cache, cosmetic_detail, weekly_event_art
 from .feature_art import clear_feature_art_cache, feature_backdrop, feature_icon, feature_scene, feature_wheel
 from .models import (
     AchievementBackfillSummaryViewModel,
@@ -105,6 +105,7 @@ class PigCatcherRenderer:
         self._environment.globals.update(
             asset_icon=asset_icon,
             cosmetic_detail=cosmetic_detail,
+            weekly_event_art=weekly_event_art,
             feature_icon=feature_icon,
             feature_scene=feature_scene,
             feature_wheel=feature_wheel,

@@ -134,7 +134,7 @@ async def _seed_catch(
 
 
 def test_first_weekly_definition_is_data_driven_and_complete() -> None:
-    assert len(WEEKLY_COMPETITION_DEFINITIONS) == 1
+    assert len(WEEKLY_COMPETITION_DEFINITIONS) == 2
     definition = WEEKLY_COMPETITION_DEFINITIONS[0]
     assert definition.season_number == 1
     assert definition.name == "抓猪冲刺！！！"
@@ -212,7 +212,9 @@ async def test_settlement_rewards_top_ten_once_and_event_cosmetics_can_be_equipp
 
     clock.value = datetime(2026, 9, 7, 16, 1, tzinfo=UTC)
     settled = await service.leaderboard(players[0])
-    assert settled.status == "settled"
+    assert settled.status == "active" and settled.season_number == 2
+    first = await database.fetch_one("SELECT status FROM weekly_competitions WHERE season_number=1")
+    assert first["status"] == "settled"
     awards = await database.fetch_all(
         "SELECT final_rank, player_id FROM weekly_competition_awards ORDER BY final_rank"
     )

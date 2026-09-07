@@ -6,6 +6,7 @@ import argparse
 import asyncio
 import json
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont, ImageOps
@@ -31,6 +32,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--browser-executable", type=Path)
+    parser.add_argument("--season", type=int, choices=(1, 2), default=1)
     return parser.parse_args()
 
 
@@ -61,25 +63,51 @@ def ranking_rows() -> tuple[WeeklyCompetitionRowViewModel, ...]:
     )
 
 
-def leaderboard(*, status: str, empty: bool = False) -> WeeklyCompetitionViewModel:
+def leaderboard(*, status: str, empty: bool = False, season: int = 1) -> WeeklyCompetitionViewModel:
     entries = () if empty else ranking_rows()
+    if season == 2:
+        entries = tuple(
+            replace(
+                item,
+                score_text=f"{70 - index * 4} 份",
+                catch_count=30 - index,
+                last_update_at=f"09-10 1{index // 2}:18",
+            )
+            for index, item in enumerate(entries)
+        )
     return WeeklyCompetitionViewModel(
-        season_number=1,
-        name="抓猪冲刺！！！",
+        season_number=season,
+        name="寿司拼盘大王" if season == 2 else "抓猪冲刺！！！",
         status_label=status,
         group_name="官方群-CEAB3520",
-        metric_label="本周抓猪累计官方价值",
-        period_text="2026-08-24 00:00 — 2026-08-31 00:00",
+        metric_label="本期亲手做出的猪寿司拼盘" if season == 2 else "本周抓猪累计官方价值",
+        period_text="2026-09-08 00:00 — 2026-09-15 00:00" if season == 2 else "2026-09-01 00:00 — 2026-09-08 00:00",
         countdown_text="已完成结算" if status == "已结算" else "距离结算 4 天 12 小时",
         page=1,
         page_count=1,
         total_count=len(entries),
-        player_position_text="我的名次：第 3 名 · 68,520 价值" if entries else "我的名次：尚未上榜",
+        player_position_text=("我的名次：第 3 名 · 62 份" if season == 2 else "我的名次：第 3 名 · 68,520 价值")
+        if entries
+        else "我的名次：尚未上榜",
         entries=entries,
+        cooking_metric=season == 2,
     )
 
 
-def award() -> WeeklyCompetitionAwardViewModel:
+def award(season: int = 1) -> WeeklyCompetitionAwardViewModel:
+    if season == 2:
+        from pig_catcher.domain.weekly_competitions import WEEKLY_COMPETITIONS_BY_SEASON
+        from pig_catcher.services.weekly_competitions import weekly_reward_label
+
+        definition = WEEKLY_COMPETITIONS_BY_SEASON[season]
+        return WeeklyCompetitionAwardViewModel(
+            season_number=season,
+            competition_name=definition.name,
+            display_name="寿司主厨·团子",
+            final_rank=1,
+            score_text="70 份",
+            reward_lines=tuple(weekly_reward_label(item) for item in definition.rewards_for_rank(1)),
+        )
     return WeeklyCompetitionAwardViewModel(
         season_number=1,
         competition_name="抓猪冲刺！！！",
@@ -139,10 +167,16 @@ async def run(args: argparse.Namespace) -> dict[str, object]:
         renderer = PigCatcherRenderer(capability, render_options())
 
         jobs = (
-            ("weekly-active-full", renderer.render_weekly_competition(leaderboard(status="进行中"))),
-            ("weekly-empty", renderer.render_weekly_competition(leaderboard(status="进行中", empty=True))),
-            ("weekly-settled", renderer.render_weekly_competition(leaderboard(status="已结算"))),
-            ("weekly-award-first", renderer.render_weekly_competition_award(award())),
+            (
+                "weekly-active-full",
+                renderer.render_weekly_competition(leaderboard(status="进行中", season=args.season)),
+            ),
+            (
+                "weekly-empty",
+                renderer.render_weekly_competition(leaderboard(status="进行中", empty=True, season=args.season)),
+            ),
+            ("weekly-settled", renderer.render_weekly_competition(leaderboard(status="已结算", season=args.season))),
+            ("weekly-award-first", renderer.render_weekly_competition_award(award(args.season))),
         )
         for label, job in jobs:
             capability.label = label
@@ -155,9 +189,7 @@ async def run(args: argparse.Namespace) -> dict[str, object]:
         await browser.close()
 
     failures = [
-        item
-        for item in capability.diagnostics
-        if item["clippedText"] or item["outside"] or item["brokenImages"]
+        item for item in capability.diagnostics if item["clippedText"] or item["outside"] or item["brokenImages"]
     ]
     if failures:
         raise RuntimeError("Chromium DOM diagnostics failed:\n" + json.dumps(failures, ensure_ascii=False, indent=2))

@@ -1,5 +1,6 @@
 <!doctype html>
-{% from 'cosmetic_components.html' import cosmetic_plate %}
+{% from 'cosmetic_components.html' import cosmetic_plate, cosmetic_preview %}
+{% set event_art = weekly_event_art(view.season_number) %}
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
@@ -24,6 +25,11 @@
     .weekly-art-note{padding:16px 38px;margin:0;background:#fffafd;color:#806b77;font-size:16px;line-height:1.6}
     .weekly-player strong{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;line-height:1.35}
     .weekly-score,.weekly-best,.weekly-meta strong{overflow-wrap:anywhere}
+    .weekly-prizes{display:flex;align-items:center;gap:24px;margin-top:14px;color:#315b4d;font-size:16px;line-height:1.8}
+    .weekly-prizes .cosmetic-badge{width:170px;height:auto;flex-shrink:0}.weekly-prizes .cosmetic-badge img{width:96px;height:96px}.weekly-prizes .cosmetic-frame-preview{width:130px}
+    .weekly-row.cooking-row{grid-template-columns:72px minmax(0,1fr) 210px 210px}
+    .weekly-prizes .cosmetic-frame-preview,.weekly-prizes .cosmetic-badge{display:flex;flex-direction:column;text-align:center}
+    .weekly-prizes .cosmetic-frame-preview figcaption{font-size:14px}.weekly-prizes .cosmetic-badge img{flex-basis:auto}
   </style>
 </head>
 <body>
@@ -32,14 +38,15 @@
     <div class="game-header__copy"><p class="game-header__eyebrow">PiG Dream! · 第 {{ view.season_number }} 期周冲榜</p><h1>{{ view.name }}</h1></div>
     <div class="game-header__meta"><span>{{ view.group_name }}</span><strong>{{ view.status_label }}</strong></div>
   </header>
-  {% if view.season_number == 1 %}
+  {% if event_art %}
   <section class="weekly-event-art" aria-label="本期收藏外观预览">
-    <div class="weekly-identity">{{ cosmetic_plate('weekly-001-catch-value-title', compact=False) }}<p>本期专属收藏外观<br>前三名获得对应色段<br>第4–10名共享10牌<br>预览不代表已经获奖</p></div>
+    <div class="weekly-identity">{{ cosmetic_plate(event_art.title, compact=False) }}<p>本期专属收藏外观<br>前三名获得对应色段<br>第4–10名共享10牌<br>预览不代表已经获奖</p></div>
     <div class="weekly-reward-gallery">
       {% for rank, label in [(1,'第1名 · 冠军色段'),(2,'第2名 · 亚军色段'),(3,'第3名 · 季军色段'),(10,'第4–10名 · TOP 10')] %}
-      <article>{{ cosmetic_plate('weekly-001-catch-value-rank-' ~ rank) }}<span>{{ label }}</span></article>
+      <article>{{ cosmetic_plate(event_art.ranks[rank]) }}<span>{{ label }}</span></article>
       {% endfor %}
     </div>
+    {% if event_art.medal is defined %}<div class="weekly-prizes">{{ cosmetic_preview(event_art.medal) }}{{ cosmetic_preview(event_art.frame) }}<span>本期专属徽章与整卡边框<br>前十另有猪币、成就抓猪券与成就礼花券<br>活动结束后按最终名次发放</span></div>{% endif %}
   </section>
   {% else %}<p class="weekly-art-note">本期使用独立赛事信息；其他期的活动牌不会混用。名次与奖励以本期结算规则为准。</p>{% endif %}
   <section class="weekly-meta">
@@ -49,17 +56,18 @@
   </section>
   <section class="weekly-ranks">
     {% for item in view.entries %}
-    <div class="weekly-row{% if item.rank <= 3 %} rank-{{ item.rank }}{% endif %}">
+    <div class="weekly-row{% if view.cooking_metric %} cooking-row{% endif %}{% if item.rank <= 3 %} rank-{{ item.rank }}{% endif %}">
       <div class="weekly-rank">{{ item.rank }}</div>
       <div class="weekly-player"><strong>{{ item.display_name }}</strong><span>最后计分 {{ item.last_update_at }}</span></div>
       <div class="weekly-score">{{ item.score_text }}</div>
-      <div class="weekly-catches">抓到 {{ item.catch_count }} 只</div>
+      {% if view.cooking_metric %}<div class="weekly-catches">寿司有效出餐 {{ item.catch_count }} 次</div>{% else %}<div class="weekly-catches">抓到 {{ item.catch_count }} 只</div>
       <div class="weekly-best">单只最高<strong>{{ item.highest_single_text }}</strong></div>
+      {% endif %}
     </div>
-    {% else %}<div class="empty-state">本群本期还没有有效抓猪记录<br>成功抓到第一只猪即可上榜</div>{% endfor %}
+    {% else %}<div class="empty-state">{% if view.cooking_metric %}本群本期还没有寿司出餐记录<br>亲手做出猪寿司拼盘，即可上榜{% else %}本群本期还没有有效抓猪记录<br>成功抓到第一只猪即可上榜{% endif %}</div>{% endfor %}
   </section>
   <div class="weekly-self">{{ view.player_position_text }}</div>
-  <footer class="game-footer"><span>同分依次比较单只最高价值、抓取数量、达成时间</span><strong>{{ view.page }}/{{ view.page_count }} · {{ view.total_count }} 人</strong></footer>
+  <footer class="game-footer"><span>{% if view.cooking_metric %}仅计本人做菜出餐份数 · 同分先达成者优先{% else %}同分依次比较单只最高价值、抓取数量、达成时间{% endif %}</span><strong>{{ view.page }}/{{ view.page_count }} · {{ view.total_count }} 人</strong></footer>
 </main>
 </body>
 </html>

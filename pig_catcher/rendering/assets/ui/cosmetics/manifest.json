@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "art_version": "pig-dream-cosmetics-v1",
+  "art_version": "pig-dream-cosmetics-v2-weekly002",
   "origin": "原创无字AI插画母版 + 原生SVG徽记 + 本地Chromium精确文字；没有官方队标素材",
   "source_policy": "母版按实际PNG模式保留；白底不冒充透明插画。成品外轮廓和徽章/边框有alpha。",
   "build": {
-    "browser": "151.0.7922.174",
+    "browser": "152.0.7977.77",
     "font_filename": "msyhbd.ttc",
     "font_sha256": "4508821b3dffe01f0ef5e5326a3e60df705a44633858811f67b6982dce3f6ee6"
   },
@@ -38,18 +38,22 @@
       "sha256": "84a11cd36cb9ba41cfa26464046fb95e637087b439e3a34482a0fe7d556bf204"
     },
     {
+      "path": "pig_catcher/rendering/assets/ui/masters/weekly-002.png",
+      "sha256": "00c4a5bc6506c43becd33f141abff53df24d937cbbec0c41cabf8803a3cf6cc5"
+    },
+    {
       "path": "pig_catcher/rendering/assets/ui/cosmetics/definitions.json",
-      "sha256": "90ecce43ece0e05174fca1387f8e546a748fcf3885dfb2876b2b5e7ad78fabc7"
+      "sha256": "34837d538af081a818eec5993560f9cfaa131cd7f69439e5b89ad67f86d4e72d"
     },
     {
       "path": "tools/build_cosmetic_art.py",
-      "sha256": "4dc77fd031746eb70421d754b5a958b1bf58d167e0ae51d755ac9d359407674f"
+      "sha256": "ae648f70a8c8548f30b78db34a84fb6d42fa4f3f7fb2edf766f1f7ea5ac1d64f"
     }
   ],
   "counts": {
-    "badge": 35,
-    "title": 31,
-    "frame": 16,
+    "badge": 40,
+    "title": 32,
+    "frame": 17,
     "cosmetic": 1
   },
   "entries": [
@@ -2858,6 +2862,238 @@
           "path": "achievement-choice/compact.webp",
           "sha256": "a9667fbbb9c6b87e3ff8d6f7220300af1c6d3ae0b891e8f60c7ff1cf5342202a",
           "bytes": 4550,
+          "width": 128,
+          "height": 128,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "weekly-002-sushi-title",
+      "kind": "title",
+      "files": {
+        "emblem": {
+          "path": "weekly-002-sushi-title/emblem.svg",
+          "sha256": "8a2a5c4aaefe0fb0cbd242a752b1268701815deca44c210528d2835d2d8daa78",
+          "bytes": 724
+        },
+        "png": {
+          "path": "weekly-002-sushi-title/art.png",
+          "sha256": "a3dcd15d1d02effd4e0605fcd00a46d6cf8793de7f45c13a501884583e7cf2b0",
+          "bytes": 521894,
+          "width": 1200,
+          "height": 360,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "weekly-002-sushi-title/compact.webp",
+          "sha256": "8cd3913891731ddca928f7e2e2916c4f8fc7630782590ac315aff3b6930e76d0",
+          "bytes": 28198,
+          "width": 600,
+          "height": 180,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "weekly-002-sushi-frame",
+      "kind": "frame",
+      "files": {
+        "emblem": {
+          "path": "weekly-002-sushi-frame/emblem.svg",
+          "sha256": "8a2a5c4aaefe0fb0cbd242a752b1268701815deca44c210528d2835d2d8daa78",
+          "bytes": 724
+        },
+        "border": {
+          "path": "weekly-002-sushi-frame/border.png",
+          "sha256": "2c7cf45c3e1d12cdbfe5b24fb8c52f33ea0d186fd8728980be5b92870bc32651",
+          "bytes": 10870,
+          "width": 192,
+          "height": 192,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "border_source": {
+          "path": "weekly-002-sushi-frame/border.svg",
+          "sha256": "e0d8ec74108061e6a02fb17965d4eafe803be1bf024b988c5a307eb72657c4f2",
+          "bytes": 3752
+        },
+        "png": {
+          "path": "weekly-002-sushi-frame/art.png",
+          "sha256": "7a22ecd28bbbac56a989844d04905303107289ce52779c4c137d543b326c3261",
+          "bytes": 27233,
+          "width": 480,
+          "height": 600,
+          "format": "PNG",
+          "alpha": false,
+          "transparent": false
+        },
+        "compact": {
+          "path": "weekly-002-sushi-frame/compact.webp",
+          "sha256": "f67f630b2e951f2d1691bf4e6903c6fe71882073dd3088057dfee94d498edd02",
+          "bytes": 7156,
+          "width": 240,
+          "height": 300,
+          "format": "WEBP",
+          "alpha": false,
+          "transparent": false
+        }
+      }
+    },
+    {
+      "id": "weekly-002-sushi-rank-1",
+      "kind": "badge",
+      "files": {
+        "emblem": {
+          "path": "weekly-002-sushi-rank-1/emblem.svg",
+          "sha256": "08876a2e26941f1c5f8892980fa61e400c43043fefd6051d204b8fa490fa58fb",
+          "bytes": 724
+        },
+        "png": {
+          "path": "weekly-002-sushi-rank-1/art.png",
+          "sha256": "eface0fa9cff79e69f7b18bda513c4256ebf2f5d5c2382ed7926e46f53ed39d8",
+          "bytes": 510270,
+          "width": 1200,
+          "height": 360,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "weekly-002-sushi-rank-1/compact.webp",
+          "sha256": "48c989a3b438597546afc4dac76569bf4a469c575b2397d1b64e64e0423a2e36",
+          "bytes": 27308,
+          "width": 600,
+          "height": 180,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "weekly-002-sushi-rank-2",
+      "kind": "badge",
+      "files": {
+        "emblem": {
+          "path": "weekly-002-sushi-rank-2/emblem.svg",
+          "sha256": "cc41257c34877c57218427e08d4d2d7dc700a4b54147b51fe473ceafbbc6cc20",
+          "bytes": 724
+        },
+        "png": {
+          "path": "weekly-002-sushi-rank-2/art.png",
+          "sha256": "37162a124a0eea55d9151ac56173372b49d3ead131be071320d3eae1cc743466",
+          "bytes": 519994,
+          "width": 1200,
+          "height": 360,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "weekly-002-sushi-rank-2/compact.webp",
+          "sha256": "5859a0faf58be378ef50e28618c8c15e6aa4f162c4fecf4e94673bcc5de98b4d",
+          "bytes": 27938,
+          "width": 600,
+          "height": 180,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "weekly-002-sushi-rank-3",
+      "kind": "badge",
+      "files": {
+        "emblem": {
+          "path": "weekly-002-sushi-rank-3/emblem.svg",
+          "sha256": "3c484eab0aaec4c5146e7895fd5b66f9cc2e454d34affe758c83b68a3e0b82a4",
+          "bytes": 724
+        },
+        "png": {
+          "path": "weekly-002-sushi-rank-3/art.png",
+          "sha256": "9d07ac2a5bc54434929fa0bfdb8331b1e434284cea59997bcfa89a956958856c",
+          "bytes": 528204,
+          "width": 1200,
+          "height": 360,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "weekly-002-sushi-rank-3/compact.webp",
+          "sha256": "cd71954f14a6b013f6890f67d965d6400f581c5edd6903db129d66664ea9bd05",
+          "bytes": 29060,
+          "width": 600,
+          "height": 180,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "weekly-002-sushi-rank-10",
+      "kind": "badge",
+      "files": {
+        "emblem": {
+          "path": "weekly-002-sushi-rank-10/emblem.svg",
+          "sha256": "8a2a5c4aaefe0fb0cbd242a752b1268701815deca44c210528d2835d2d8daa78",
+          "bytes": 724
+        },
+        "png": {
+          "path": "weekly-002-sushi-rank-10/art.png",
+          "sha256": "4dce47c5e6d4624df516ba2d6adc1fc62b0f6bc47af424c76f56c2b4a5d8fdf6",
+          "bytes": 515495,
+          "width": 1200,
+          "height": 360,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "weekly-002-sushi-rank-10/compact.webp",
+          "sha256": "ddcb354f8e969cf9eb754b9ebad759506498931efd228465332422d229b9cdf1",
+          "bytes": 27662,
+          "width": 600,
+          "height": 180,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "weekly-002-sushi-medal",
+      "kind": "badge",
+      "files": {
+        "emblem": {
+          "path": "weekly-002-sushi-medal/emblem.svg",
+          "sha256": "8a2a5c4aaefe0fb0cbd242a752b1268701815deca44c210528d2835d2d8daa78",
+          "bytes": 724
+        },
+        "png": {
+          "path": "weekly-002-sushi-medal/art.png",
+          "sha256": "d1c7ddb6fe3198e0ae4cc51ef5d2f29f843d5a7ea02949f9207cf81b7a3093c8",
+          "bytes": 22803,
+          "width": 256,
+          "height": 256,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "weekly-002-sushi-medal/compact.webp",
+          "sha256": "2c2f2a20f91f82a86c82fee5ca991b421b6805de77aa9094ceab9ad990a86600",
+          "bytes": 5310,
           "width": 128,
           "height": 128,
           "format": "WEBP",

@@ -835,6 +835,7 @@ class WeeklyCompetitionViewModel:
     total_count: int
     player_position_text: str
     entries: tuple[WeeklyCompetitionRowViewModel, ...]
+    cooking_metric: bool = False
 
 
 @dataclass(frozen=True, slots=True)

@@ -49,14 +49,18 @@ class WeeklyCompetitionRepository:
         )
         return dict(row) if row is not None else None
 
-    async def latest_competition(self, session: DatabaseSession) -> dict[str, object] | None:
+    async def latest_competition(self, session: DatabaseSession, *, now: str) -> dict[str, object] | None:
         row = await session.fetch_one(
             """
             SELECT * FROM weekly_competitions
             WHERE status <> 'cancelled'
-            ORDER BY season_number DESC
+            ORDER BY CASE WHEN starts_at <= ? AND ends_at > ? THEN 0
+                          WHEN starts_at <= ? THEN 1 ELSE 2 END,
+                     CASE WHEN starts_at <= ? THEN season_number END DESC,
+                     season_number ASC
             LIMIT 1
-            """
+            """,
+            (now, now, now, now),
         )
         return dict(row) if row is not None else None
 
@@ -126,7 +130,19 @@ class WeeklyCompetitionRepository:
         starts_at: str,
         ends_at: str,
         receipt_id: str | None = None,
+        source_template_ids: Sequence[str] = (),
     ) -> list[dict[str, object]]:
+        if source_result_type == "cooking":
+            if source_field != "quantity" or not source_template_ids:
+                raise ValueError("Cooking score requires quantity and exact food template ids")
+            return await self._cooked_food_rows(
+                session,
+                command_names=command_names,
+                starts_at=starts_at,
+                ends_at=ends_at,
+                template_ids=source_template_ids,
+                receipt_id=receipt_id,
+            )
         source_config = _SOURCE_TABLES.get(source_result_type)
         if source_config is None:
             raise ValueError(f"Unsupported weekly source result type: {source_result_type}")
@@ -174,6 +190,46 @@ class WeeklyCompetitionRepository:
             ORDER BY receipt.created_at, receipt.receipt_id
             """,
             parameters,
+        )
+        return [dict(row) for row in rows]
+
+    async def _cooked_food_rows(
+        self,
+        session: DatabaseSession,
+        *,
+        command_names: Sequence[str],
+        starts_at: str,
+        ends_at: str,
+        template_ids: Sequence[str],
+        receipt_id: str | None,
+    ) -> list[dict[str, object]]:
+        """只数已提交做菜回执列出的实际产物；一张批量回执汇总一条，不看现持有者。"""
+        commands = tuple(name for name in command_names if name in {"pig-catcher.cook", "pig-catcher.batch-cook"})
+        if not commands:
+            return []
+        command_slots = ",".join("?" for _ in commands)
+        template_slots = ",".join("?" for _ in template_ids)
+        receipt_filter = " AND receipt.receipt_id = ?" if receipt_id else ""
+        rows = await session.fetch_all(
+            f"""
+            SELECT receipt.receipt_id, receipt.scope_id, receipt.player_id,
+                   receipt.created_at AS occurred_at, MIN(food.food_instance_id) AS source_object_id,
+                   MIN(food.display_name_snapshot) AS display_name_snapshot, MAX(food.rarity) AS rarity,
+                   MAX(food.official_value) AS official_value, COUNT(DISTINCT food.food_instance_id) AS metric_value,
+                   json_group_array(DISTINCT food.food_instance_id) AS matched_food_ids
+            FROM command_receipts AS receipt
+            JOIN json_each(receipt.result_json, '$.food_instance_ids') AS produced
+            JOIN food_instances AS food ON food.food_instance_id = produced.value AND food.scope_id = receipt.scope_id
+            WHERE receipt.business_status = 'committed' AND receipt.player_id IS NOT NULL
+              AND ((receipt.command_name='pig-catcher.cook' AND receipt.result_type='cooking')
+                OR (receipt.command_name='pig-catcher.batch-cook' AND receipt.result_type='batch-cooking'))
+              AND receipt.command_name IN ({command_slots}) AND food.template_id IN ({template_slots})
+              AND food.source_pig_instance_id IS NOT NULL
+              AND receipt.created_at >= ? AND receipt.created_at < ? {receipt_filter}
+            GROUP BY receipt.receipt_id
+            ORDER BY receipt.created_at, receipt.receipt_id
+            """,
+            (*commands, *template_ids, starts_at, ends_at, *((receipt_id,) if receipt_id else ())),
         )
         return [dict(row) for row in rows]
 

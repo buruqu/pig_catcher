@@ -72,6 +72,13 @@ def _note(x: int = 50, y: int = 28) -> str:
 def emblem_svg(name: str, color: str, gold: str) -> str:
     """逐项登记的原创图案；不能用默认字符冒充遗漏的外观。"""
     shared = {
+        "sushi-crown": '<path d="m28 29-6-17 16 8 12-17 12 17 16-8-6 17z" fill="#e6bc68"/>'
+        + '<path d="M10 80h80l-7 10H17z" fill="#fff3dc"/>'
+        + '<rect x="17" y="47" width="66" height="31" rx="12" fill="#fffdf5"/>'
+        + '<path d="M16 49q3-16 20-16h29q17 1 20 16v7H16z" fill="#f49b99"/>'
+        + '<path d="m26 36 13 17m2-18 13 18m2-17 13 17" stroke="#ffe9dc" fill="none"/>'
+        + '<path d="M44 34h12v44H44z" fill="#315b4d"/>'
+        + _snout(50, 64, 0.48),
         "gift": '<path d="M19 45h62v39H19zM15 33h70v16H15zM50 32v53"/><path d="M49 33C19 33 24 8 39 18zM51 33C81 33 76 8 61 18z"/>',
         "exchange": '<path d="M20 34h56l-12-12m12 12L64 46M80 65H24l12 12M24 65l12-12" fill="none"/><circle cx="50" cy="50" r="10"/>',
         "star-guitar": _star(30, 33, 23) + '<path d="M49 65 75 26l8 5-24 41C69 88 41 93 35 79c-7-15 1-23 14-14z"/>',
@@ -208,6 +215,14 @@ def _border_svg(item: dict[str, Any], color: str, gold: str) -> str:
         f'fill="none" stroke="{color}" stroke-width="5"/>',
         f'<rect x="18" y="18" width="156" height="156" rx="3" fill="none" stroke="{gold}" stroke-width="2"/>',
     ]
+    if item.get("family") == "weekly-002-banquet":
+        pieces.extend(
+            [
+                '<path d="M54 8h84M54 184h84M8 54v84M184 54v84" stroke="#315b4d" stroke-width="10" fill="none"/>',
+                '<path d="M55 8h82M55 184h82M8 55v82M184 55v82" stroke="#f5b4ad" stroke-width="3" stroke-dasharray="9 7" fill="none"/>',
+                '<path d="M51 24h90M51 168h90M24 51v90M168 51v90" stroke="#c89549" stroke-width="2" stroke-dasharray="2 6" fill="none"/>',
+            ]
+        )
     for x, y, rotation in ((3, 3, 0), (141, 3, 90), (141, 141, 180), (3, 141, 270)):
         pieces.append(f'<g transform="translate({x} {y}) rotate({rotation} 24 24)">{corner}</g>')
     pieces.append("</svg>")
@@ -217,7 +232,9 @@ def _border_svg(item: dict[str, Any], color: str, gold: str) -> str:
 def _plate_html(item: dict[str, Any], theme: dict[str, str], master: str) -> str:
     color, gold = item.get("color", theme["color"]), theme["gold"]
     rank = int(item.get("rank", 0))
-    variant = f" rank-{rank}" if rank else f" theme-{item['theme']}"
+    variant = (f" rank-{rank}" if rank else f" theme-{item['theme']}") + (
+        " sushi-plate" if item["theme"] == "weekly-002" else ""
+    )
     emblem = _data_url(emblem_svg(item["emblem"], color, gold).encode(), "image/svg+xml")
     title = theme["label"] if rank else item["name"]
     kicker = (
@@ -310,6 +327,10 @@ border:4px double var(--gold);color:var(--ink)}.rank-seal b{font-size:98px;line-
 .frame-emblem{width:170px;height:170px;display:block;margin:0 auto 25px}.frame-preview p{font-size:20px;letter-spacing:2px;color:var(--ink)}
 .frame-preview h2{font-size:29px;line-height:1.6;margin:22px 0;color:var(--ink)}.frame-preview span{font-size:17px;color:#81707d}
 .border-export{width:192px;height:192px}.border-export img{width:192px;height:192px;display:block}
+.sushi-plate .rank-seal{left:130px;top:75px;width:176px;height:176px}
+.sushi-plate .title-copy{left:470px;right:82px;top:65px}
+.sushi-plate .plate-emblem{display:none}.sushi-plate .rank-seal b{font-size:82px}
+.sushi-plate.rank-10 .rank-seal b{font-size:43px}
 """
 
 
@@ -351,8 +372,24 @@ async def _shot(page, html: str, width: int, height: int, target: Path) -> dict[
     return diagnostics
 
 
-async def build(browser_path: Path, font_path: Path) -> None:
+async def build(browser_path: Path, font_path: Path, *, selected_theme: str | None = None) -> None:
     data = load_cosmetic_definitions()
+    if selected_theme and selected_theme not in data["themes"]:
+        raise ValueError(f"未知外观主题：{selected_theme}")
+    selected = [item for item in data["entries"] if not selected_theme or item["theme"] == selected_theme]
+    retained = []
+    if selected_theme:
+        old = json.loads((ART_ROOT / "manifest.json").read_text(encoding="utf-8"))
+        old_entries = {item["id"]: item for item in old["entries"]}
+        for item in data["entries"]:
+            if item["theme"] == selected_theme:
+                continue
+            entry = old_entries[item["id"]]
+            for record in entry["files"].values():
+                source = (ART_ROOT / record["path"]).resolve()
+                if not source.is_relative_to(ART_ROOT.resolve()) or _sha(source) != record["sha256"]:
+                    raise ValueError(f"既有外观文件不完整：{item['id']}")
+            retained.append(entry)
     ART_ROOT.mkdir(parents=True, exist_ok=True)
     QA_ROOT.mkdir(parents=True, exist_ok=True)
     source_hashes: dict[Path, str] = {}
@@ -394,7 +431,7 @@ async def build(browser_path: Path, font_path: Path) -> None:
         '</style></head><body><div id="canvas"></div></body></html>',
         encoding="utf-8",
     )
-    exported, checks = [], []
+    exported, checks = retained, []
     async with async_playwright() as pw:
         browser = await pw.chromium.launch(headless=True, executable_path=str(browser_path))
         try:
@@ -403,7 +440,7 @@ async def build(browser_path: Path, font_path: Path) -> None:
             await page.route("https://**/*", lambda route: route.abort())
             await page.goto(page_path.as_uri(), wait_until="load")
             browser_version = browser.version
-            for index, item in enumerate(data["entries"], 1):
+            for index, item in enumerate(selected, 1):
                 theme = data["themes"][item["theme"]]
                 color, gold = item.get("color", theme["color"]), theme["gold"]
                 directory = ART_ROOT / item["id"]
@@ -441,7 +478,7 @@ async def build(browser_path: Path, font_path: Path) -> None:
                 files.update(png=_file_record(png), compact=_file_record(compact))
                 exported.append({"id": item["id"], "kind": item["kind"], "files": files})
                 checks.append({"id": item["id"], **diagnostic})
-                print(f"{index:02}/{len(data['entries'])} {item['id']}", flush=True)
+                print(f"{index:02}/{len(selected)} {item['id']}", flush=True)
         finally:
             await browser.close()
     if not all(_sha(path) == digest for path, digest in source_hashes.items()):
@@ -484,5 +521,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--browser", type=Path, default=DEFAULT_BROWSER)
     parser.add_argument("--font", type=Path, default=DEFAULT_FONT)
+    parser.add_argument("--theme", help="只生成指定主题；验证并原样保留其他主题素材")
     arguments = parser.parse_args()
-    asyncio.run(build(arguments.browser, arguments.font))
+    asyncio.run(build(arguments.browser, arguments.font, selected_theme=arguments.theme))

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "art_version": "pig-dream-cosmetics-v1",
+  "art_version": "pig-dream-cosmetics-v2-weekly002",
   "note": "原创主题收藏牌；只登记奖励身份和美术，不存触发条件。未来周榜必须另建经过审核的独立主题包。",
   "themes": {
     "collection": {"label": "收藏册", "color": "#ab537d", "gold": "#bb8f46", "master": "collection.png"},
@@ -9,7 +9,8 @@
     "battle": {"label": "比划战记", "color": "#516da3", "gold": "#9a78b4", "master": "battle.png"},
     "rain": {"label": "雨幕纪念", "color": "#62649d", "gold": "#b2a178", "master": "rain.png", "crop": [0,110,1774,610]},
     "ultimate": {"label": "终极收藏", "color": "#8d6137", "gold": "#cba244", "master": "ultimate.png"},
-    "weekly-001": {"label": "抓猪冲刺！！！", "metric": "本周抓猪价值榜", "color": "#b54e73", "gold": "#c6953e", "master": "weekly-001.png"}
+    "weekly-001": {"label": "抓猪冲刺！！！", "metric": "本周抓猪价值榜", "color": "#b54e73", "gold": "#c6953e", "master": "weekly-001.png"},
+    "weekly-002": {"label": "寿司拼盘大王", "metric": "寿司出餐榜", "color": "#315b4d", "gold": "#c89549", "master": "weekly-002.png"}
   },
   "entries": [
     {"id":"three-gift-partners","kind":"badge","name":"礼物走过三双手","theme":"collection","emblem":"gift","origin":"legacy"},
@@ -93,6 +94,13 @@
     {"id":"weekly-001-catch-value-rank-2","kind":"badge","name":"抓猪冲刺！！！·2牌","theme":"weekly-001","emblem":"diamond-wings","season":1,"rank":2,"color":"#536c8e","origin":"weekly-001"},
     {"id":"weekly-001-catch-value-rank-3","kind":"badge","name":"抓猪冲刺！！！·3牌","theme":"weekly-001","emblem":"laurel","season":1,"rank":3,"color":"#986544","origin":"weekly-001"},
     {"id":"weekly-001-catch-value-rank-10","kind":"badge","name":"抓猪冲刺！！！·10牌","theme":"weekly-001","emblem":"finish-flag","season":1,"rank":10,"color":"#9a557a","origin":"weekly-001"},
+    {"id":"weekly-002-sushi-title","kind":"title","name":"寿司拼盘大王","theme":"weekly-002","emblem":"sushi-crown","season":2,"origin":"weekly-002"},
+    {"id":"weekly-002-sushi-frame","kind":"frame","name":"寿司拼盘大王·寿司宴台边框","theme":"weekly-002","emblem":"sushi-crown","family":"weekly-002-banquet","season":2,"origin":"weekly-002"},
+    {"id":"weekly-002-sushi-rank-1","kind":"badge","name":"寿司拼盘大王·1牌","theme":"weekly-002","emblem":"sushi-crown","season":2,"rank":1,"color":"#986923","origin":"weekly-002"},
+    {"id":"weekly-002-sushi-rank-2","kind":"badge","name":"寿司拼盘大王·2牌","theme":"weekly-002","emblem":"sushi-crown","season":2,"rank":2,"color":"#516c88","origin":"weekly-002"},
+    {"id":"weekly-002-sushi-rank-3","kind":"badge","name":"寿司拼盘大王·3牌","theme":"weekly-002","emblem":"sushi-crown","season":2,"rank":3,"color":"#9c6549","origin":"weekly-002"},
+    {"id":"weekly-002-sushi-rank-10","kind":"badge","name":"寿司拼盘大王·10牌","theme":"weekly-002","emblem":"sushi-crown","season":2,"rank":10,"color":"#315b4d","origin":"weekly-002"},
+    {"id":"weekly-002-sushi-medal","kind":"badge","name":"寿司拼盘大王·匠心寿司徽章","theme":"weekly-002","emblem":"sushi-crown","season":2,"origin":"weekly-002"},
     {"id":"achievement-choice-pink","kind":"frame","name":"自选粉金边框","theme":"collection","emblem":"gift-ribbon","family":"choice-pink","origin":"choice"},
     {"id":"achievement-choice","kind":"badge","name":"成就自选徽章","theme":"collection","emblem":"gift-ribbon","origin":"choice"}
   ]

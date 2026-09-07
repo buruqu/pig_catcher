@@ -121,6 +121,7 @@ class WeeklyCompetitionPage:
     player_rank: int | None
     player_score_text: str
     entries: tuple[WeeklyCompetitionRankingEntry, ...]
+    cooking_metric: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -154,12 +155,15 @@ def format_weekly_competition_summary(page: WeeklyCompetitionPage) -> str:
         f"第 {page.page}/{page.page_count} 页｜参榜 {page.total_count} 人",
     ]
     for entry in page.entries:
+        if page.cooking_metric:
+            lines.append(f"{entry.rank}. {entry.display_name}｜{entry.score_text}｜最后计分 {entry.last_update_at}")
+            continue
         lines.append(
             f"{entry.rank}. {entry.display_name}｜{entry.score_text}｜"
             f"抓到 {entry.catch_count} 只｜单只最高 {entry.highest_single_text}"
         )
     if not page.entries:
-        lines.append("本群本期还没有有效抓猪记录。")
+        lines.append("本群本期还没有有效做菜成绩。" if page.cooking_metric else "本群本期还没有有效抓猪记录。")
     if page.player_rank is None:
         lines.append("我的名次：尚未上榜")
     else:
@@ -198,7 +202,7 @@ class WeeklyCompetitionService:
         self.clock = clock or SystemClock()
 
     async def initialize(self) -> None:
-        """Create the first season and recover every eligible committed catch."""
+        """Register seasons and recover eligible committed receipts within their windows."""
 
         now_value = _aware_utc(self.clock.now())
         now = _iso_utc(now_value)
@@ -220,13 +224,11 @@ class WeeklyCompetitionService:
             competitions = await self.repository.competitions_for_refresh(session)
             for competition in competitions:
                 definition = self._definition_for_row(competition)
-                if receipt.result_type != definition.source_result_type:
+                if receipt.result_type not in definition.receipt_result_types:
                     continue
                 if receipt.command_name not in definition.source_command_names:
                     continue
-                if not (
-                    str(competition["starts_at"]) <= receipt.created_at < str(competition["ends_at"])
-                ):
+                if not (str(competition["starts_at"]) <= receipt.created_at < str(competition["ends_at"])):
                     continue
                 rows = await self.repository.source_receipt_rows(
                     session,
@@ -236,15 +238,19 @@ class WeeklyCompetitionService:
                     starts_at=str(competition["starts_at"]),
                     ends_at=str(competition["ends_at"]),
                     receipt_id=receipt.receipt_id,
+                    source_template_ids=definition.source_template_ids,
                 )
                 for row in rows:
-                    inserted = await self._insert_entry(
-                        session,
-                        competition=competition,
-                        definition=definition,
-                        row=row,
-                        now=now,
-                    ) or inserted
+                    inserted = (
+                        await self._insert_entry(
+                            session,
+                            competition=competition,
+                            definition=definition,
+                            row=row,
+                            now=now,
+                        )
+                        or inserted
+                    )
         return inserted
 
     async def leaderboard(self, identity: CommandIdentity, *, page: int = 1) -> WeeklyCompetitionPage:
@@ -254,7 +260,7 @@ class WeeklyCompetitionService:
             await self.framework_repository.touch_identity(session, identity=identity, now=now)
             await self._sync_definitions(session, now_value=now_value, now=now)
             await self._refresh(session, now_value=now_value, now=now, backfill_active=True)
-            competition = await self.repository.latest_competition(session)
+            competition = await self.repository.latest_competition(session, now=now)
             if competition is None:
                 raise RuntimeError("本周冲榜活动尚未发布。")
             definition = self._definition_for_row(competition)
@@ -287,10 +293,14 @@ class WeeklyCompetitionService:
             group_name=identity.group_name or identity.scope.group_id,
             metric_label=str(competition["metric_label"]),
             metric_unit=str(competition["metric_unit"]),
-            period_text=(
-                f"{start_local:%m月%d日 %H:%M} — {end_local:%m月%d日 %H:%M}（北京时间）"
+            cooking_metric=definition.source_result_type == "cooking",
+            period_text=(f"{start_local:%m月%d日 %H:%M} — {end_local:%m月%d日 %H:%M}（北京时间）"),
+            countdown_text=(
+                "距开始 "
+                + self._countdown_text(now_value, start_local.astimezone(UTC), "active").removeprefix("距结算 ")
+                if status == "scheduled"
+                else self._countdown_text(now_value, end_local.astimezone(UTC), status)
             ),
-            countdown_text=self._countdown_text(now_value, end_local.astimezone(UTC), status),
             page=selected_page,
             page_count=page_count,
             total_count=total,
@@ -417,10 +427,13 @@ class WeeklyCompetitionService:
 
     async def _sync_definitions(self, session: DatabaseSession, *, now_value: datetime, now: str) -> None:
         for definition in WEEKLY_COMPETITION_DEFINITIONS:
-            if await self.repository.competition_by_definition(
-                session,
-                definition_key=definition.definition_key,
-            ) is not None:
+            if (
+                await self.repository.competition_by_definition(
+                    session,
+                    definition_key=definition.definition_key,
+                )
+                is not None
+            ):
                 continue
             if definition.fixed_starts_at and definition.fixed_ends_at:
                 start = datetime.fromisoformat(definition.fixed_starts_at.replace("Z", "+00:00"))
@@ -429,6 +442,8 @@ class WeeklyCompetitionService:
                 start, end = beijing_week_window(now_value)
             definition_snapshot = {
                 "source_command_names": list(definition.source_command_names),
+                "source_template_ids": list(definition.source_template_ids),
+                "tie_breaker": definition.tie_breaker,
                 "reward_tiers": [
                     {
                         "ranks": list(tier.ranks),
@@ -462,7 +477,7 @@ class WeeklyCompetitionService:
                     "definition_json": _json(definition_snapshot),
                     "starts_at": _iso_utc(start),
                     "ends_at": _iso_utc(end),
-                    "status": "active",
+                    "status": "scheduled" if now_value < start else "active",
                     "ruleset_version": RULESET_VERSION,
                     "created_at": now,
                     "updated_at": now,
@@ -513,6 +528,7 @@ class WeeklyCompetitionService:
             command_names=definition.source_command_names,
             starts_at=str(competition["starts_at"]),
             ends_at=str(competition["ends_at"]),
+            source_template_ids=definition.source_template_ids,
         )
         inserted = 0
         for row in rows:
@@ -542,6 +558,7 @@ class WeeklyCompetitionService:
             "official_value": int(row.get("official_value") or 0),
             "metric_field": definition.source_field,
             "metric_value": float(row.get("metric_value") or 0),
+            "matched_food_ids": json.loads(str(row.get("matched_food_ids") or "[]")),
         }
         return await self.repository.insert_entry(
             session,
@@ -571,11 +588,14 @@ class WeeklyCompetitionService:
     ) -> None:
         competition_id = str(competition["competition_id"])
         for scope_id in await self.repository.entry_scope_ids(session, competition_id=competition_id):
-            if await self.repository.settlement_row(
-                session,
-                competition_id=competition_id,
-                scope_id=scope_id,
-            ) is not None:
+            if (
+                await self.repository.settlement_row(
+                    session,
+                    competition_id=competition_id,
+                    scope_id=scope_id,
+                )
+                is not None
+            ):
                 continue
             standings = self._rank_rows(
                 await self.repository.entry_rows(
@@ -586,9 +606,7 @@ class WeeklyCompetitionService:
                 definition,
             )
             winners = [
-                (index, item)
-                for index, item in enumerate(standings, start=1)
-                if definition.rewards_for_rank(index)
+                (index, item) for index, item in enumerate(standings, start=1) if definition.rewards_for_rank(index)
             ]
             settlement_id = str(uuid4())
             created = await self.repository.insert_settlement(
@@ -723,8 +741,8 @@ class WeeklyCompetitionService:
             grouped.values(),
             key=lambda item: (
                 direction * item.score,
-                -item.highest_single_value,
-                -item.catch_count,
+                -item.highest_single_value if definition.tie_breaker == "best-single" else 0,
+                -item.catch_count if definition.tie_breaker == "best-single" else 0,
                 item.last_update_at,
                 item.player_id,
             ),
