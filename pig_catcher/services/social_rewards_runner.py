@@ -18,12 +18,14 @@ class SocialRewardsRunner:
         logger: Logger,
         deliver: Callable[[str, DispatchResult], Awaitable[object]],
         interval: float = 15,
+        weekly_tick: Callable[[], Awaitable[None]] | None = None,
     ) -> None:
         self.packets = packets
         self.campaigns = campaigns
         self.logger = logger
         self.deliver = deliver
         self.interval = interval
+        self.weekly_tick = weekly_tick
         self._stop = asyncio.Event()
         self.task: asyncio.Task | None = None
 
@@ -39,6 +41,14 @@ class SocialRewardsRunner:
             self.task = None
 
     async def tick(self) -> None:
+        errors = []
+        # 独立运营任务互不阻塞：一项故障仍需让其他已提交的公告得到发送机会。
+        if self.weekly_tick is not None:
+            try:
+                await self.weekly_tick()
+            except Exception as exc:
+                self.logger.exception("抓猪周榜交接失败；已提交奖励不会重复发放")
+                errors.append(exc)
         await self.packets.expire()
         try:
             count = await self.campaigns.process_due()
@@ -48,6 +58,8 @@ class SocialRewardsRunner:
             # A failed scope cannot suppress already committed notices in other scopes.
             for stream, result in await self.campaigns.pending_notices():
                 await self.deliver(stream, result)
+        if errors:
+            raise errors[0]
 
     async def _run(self) -> None:
         while not self._stop.is_set():

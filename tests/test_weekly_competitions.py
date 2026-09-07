@@ -210,7 +210,7 @@ async def test_settlement_rewards_top_ten_once_and_event_cosmetics_can_be_equipp
     service = WeeklyCompetitionService(database, clock=clock)
     await service.initialize()
 
-    clock.value = datetime(2026, 9, 7, 16, 1, tzinfo=UTC)
+    clock.value = datetime(2026, 9, 7, 16, 2, tzinfo=UTC)
     settled = await service.leaderboard(players[0])
     assert settled.status == "active" and settled.season_number == 2
     first = await database.fetch_one("SELECT status FROM weekly_competitions WHERE season_number=1")

@@ -223,6 +223,8 @@ class WeeklyCompetitionService:
             await self._refresh(session, now_value=now_value, now=now, backfill_active=False)
             competitions = await self.repository.competitions_for_refresh(session)
             for competition in competitions:
+                if competition["status"] != "active":
+                    continue
                 definition = self._definition_for_row(competition)
                 if receipt.result_type not in definition.receipt_result_types:
                     continue
@@ -252,6 +254,12 @@ class WeeklyCompetitionService:
                         or inserted
                     )
         return inserted
+
+    async def advance(self) -> None:
+        """定时推进活动；只在结活时全量补录，不在每轮轮询扫描全库回执。"""
+        now_value = _aware_utc(self.clock.now())
+        async with self.database.transaction() as session:
+            await self._refresh(session, now_value=now_value, now=_iso_utc(now_value), backfill_active=False)
 
     async def leaderboard(self, identity: CommandIdentity, *, page: int = 1) -> WeeklyCompetitionPage:
         now_value = _aware_utc(self.clock.now())
@@ -493,6 +501,12 @@ class WeeklyCompetitionService:
         backfill_active: bool,
     ) -> None:
         for competition in await self.repository.competitions_for_refresh(session):
+            if await session.fetch_one(
+                "SELECT 1 FROM weekly_transitions WHERE next_id=? AND activated_at IS NULL",
+                (competition["competition_id"],),
+            ):
+                # 公告失败/结果不确定时保持封盘，运营确认前不得按旧预计时间补录。
+                continue
             start = _parse_utc(str(competition["starts_at"]))
             end = _parse_utc(str(competition["ends_at"]))
             if now_value < start:

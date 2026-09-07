@@ -23,7 +23,7 @@ from .test_economy import _database_with_catalog, _food_entry
 from .test_weekly_competitions import MutableClock, _identity, _seed_catch
 
 SUSHI = "food-r5-pig-sushi-platter"
-START = datetime(2026, 9, 7, 16, tzinfo=UTC)
+START = datetime(2026, 9, 7, 16, 2, tzinfo=UTC)
 
 
 class SushiRoll:

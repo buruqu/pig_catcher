@@ -54,7 +54,7 @@ async def run(args):
     .sample{{width:100%;display:block}}.note{{font-size:15px;color:#87745f;text-align:center;margin:20px 0 0}}
     </style><main data-preview><div class="kicker">PiG Dream! · 第{args.season}期活动 · 美术预览</div>
     <h1>{escape(definition.name)}</h1><p>卷起热爱，端出你的王冠！</p>
-    <p>2026年9月8日00:00—9月15日00:00 · 北京时间<br>亲手做出的猪寿司拼盘越多，排名越靠前。</p>
+    <p>2026年9月8日00:02起开幕—9月15日00:00 · 北京时间<br>以群内正式开幕公告为准。亲手做出的猪寿司拼盘越多，排名越靠前。</p>
     {picture(art["title"], "hero")}<div class="plates">{plates}</div>
     <div class="bottom"><section><h2>匠心寿司徽章</h2>{picture(art["medal"], "medal")}
     <h2>寿司宴台边框</h2>{picture(art["frame"], "frame")}<p>前十专属纪念<br>获奖后可自由佩戴</p></section>

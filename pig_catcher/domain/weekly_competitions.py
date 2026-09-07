@@ -197,7 +197,7 @@ WEEKLY_COMPETITION_DEFINITIONS: tuple[WeeklyCompetitionDefinition, ...] = (
             WeeklyRewardTier((3,), _sushi_rewards(3, coins=6_000, catch_tickets=3, fireworks=1)),
             WeeklyRewardTier(tuple(range(4, 11)), _sushi_rewards(10, coins=3_000, catch_tickets=2, fireworks=1)),
         ),
-        fixed_starts_at="2026-09-08T00:00:00+08:00",
+        fixed_starts_at="2026-09-08T00:02:00+08:00",
         fixed_ends_at="2026-09-15T00:00:00+08:00",
     ),
 )

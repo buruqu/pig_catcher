@@ -1,0 +1,28 @@
+<!doctype html>
+{% from 'cosmetic_components.html' import cosmetic_plate, cosmetic_preview %}
+{% set art = weekly_event_art(view.scene_key|int) %}
+<html lang="zh-CN"><head><meta charset="utf-8"><style>
+:root{--font-family:{{ font_family }};}{{ theme_css|safe }}
+.event-body{padding:28px 38px;background:#fffafd}.event-hero{display:flex;align-items:center;gap:22px;margin-bottom:24px}
+.event-hero .cosmetic-plate{width:750px;margin:0;flex-shrink:0}.event-hero .cosmetic-badge{width:150px;height:auto;flex-shrink:0;display:flex;justify-content:center}
+.event-hero .cosmetic-badge>span{display:none}
+.event-hero .cosmetic-badge img{width:110px;height:110px;flex-basis:auto}.event-hero figcaption{display:none}
+.event-banner{font-size:23px;line-height:1.7;color:#864d63;padding:22px 26px;background:#fff1df;border-left:5px solid #daa14d}
+.event-panel{margin-top:20px;border:1px solid #edd3dd;border-radius:8px;background:white;padding:20px 24px}
+.event-panel h2{font-size:23px;color:#a34068;margin:0 0 14px}.event-row{padding:13px 0;border-top:1px solid #f0dce5;overflow-wrap:anywhere}
+.event-row strong{font-size:21px;display:block;color:#302b34}.event-row span{font-size:20px;line-height:1.6;color:#92516b;display:block}
+.event-row p,.event-panel>p{font-size:17px;color:#76636e;line-height:1.6;margin:6px 0 0}.event-time{font-size:18px;line-height:1.6;color:#856e7c;margin:18px 0}
+.event-hints{font-size:18px;line-height:1.7;color:#73515f;margin:22px 0 0}.event-gallery{display:flex;gap:12px;margin-top:20px}.event-gallery .cosmetic-plate{width:230px;margin:0}
+.event-frame{display:flex;align-items:center;gap:25px;color:#886a79;font-size:18px}.event-frame .cosmetic-frame-preview{width:115px;display:block;flex-shrink:0}
+.event-frame .cosmetic-frame-preview img{width:115px;height:auto}.event-frame figcaption{display:none}
+</style></head><body><main class="game-sheet" data-pig-catcher-root data-render-ready="true">
+<header class="game-header"><div class="game-header__copy"><p class="game-header__eyebrow">{{ view.subtitle }}</p><h1>{{ view.title }}</h1></div><div class="game-header__meta"><span>{{ view.player_name }}</span><strong>周冲榜</strong></div></header>
+<section class="event-body">
+{% if art %}<div class="event-hero">{{ cosmetic_plate(art.title, compact=False) }}{% if art.medal is defined %}{{ cosmetic_preview(art.medal) }}{% endif %}</div>{% endif %}
+<div class="event-banner">{{ view.banner }}</div>
+{% for line in view.stats %}<div class="event-time">{{ line.label }}：{{ line.value }} {{ line.note }}</div>{% endfor %}
+{% for panel in view.panels %}<section class="event-panel"><h2>{{ panel.title }}</h2>{% for line in panel.rows %}<div class="event-row"><strong>{{ line.label }}</strong><span>{{ line.value }}</span>{% if line.note %}<p>{{ line.note }}</p>{% endif %}</div>{% endfor %}{% if panel.caption %}<p>{{ panel.caption }}</p>{% endif %}</section>{% endfor %}
+{% if art %}<div class="event-gallery">{% for rank in [1,2,3,10] %}{{ cosmetic_plate(art.ranks[rank]) }}{% endfor %}</div>{% if art.medal is defined %}<div class="event-frame">{{ cosmetic_preview(art.frame) }}<span>本期专属：活动牌 · 匠心寿司徽章 · 寿司宴台边框<br>前十名可获得相应名次奖励</span></div>{% endif %}{% endif %}
+<div class="event-hints">{% for hint in view.hints %}<div>{{ hint }}</div>{% endfor %}</div>
+</section><footer class="game-footer"><span>PiG Dream! 抓猪派对！</span><strong>和猪友一起，迎接下一场精彩</strong></footer>
+</main></body></html>

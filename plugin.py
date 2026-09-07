@@ -200,6 +200,7 @@ from .pig_catcher.services.red_packets import RedPacketService
 from .pig_catcher.services.scheduled_rewards import ScheduledRewardService
 from .pig_catcher.services.social_rewards_runner import SocialRewardsRunner
 from .pig_catcher.services.tour import TourService
+from .pig_catcher.services.weekly_transition import WeeklyTransitionService
 from .pig_catcher.version import PLUGIN_VERSION
 
 _PURCHASE_PRODUCT_NAMES = tuple(item.display_name for item in ITEM_DEFINITIONS) + tuple(
@@ -520,6 +521,7 @@ class PigCatcherPlugin(MaiBotPlugin):
             self._social_rewards_runner = SocialRewardsRunner(
                 self._red_packet_service, self._scheduled_reward_service, logger=self.ctx.logger,
                 deliver=self._deliver_social_reward,
+                weekly_tick=self._tick_weekly_transition,
             )
             self._social_rewards_runner.start()
             if settings.maintenance.enabled:
@@ -4869,6 +4871,19 @@ class PigCatcherPlugin(MaiBotPlugin):
                 fallback_text=result.receipt.text_summary,
             )
         return await self._deliver_query(stream_id=identity.stream_id, render=render, fallback_text=result.view.text())
+
+    async def _tick_weekly_transition(self) -> None:
+        service = self._weekly_competition_service
+        if service is None or not self.settings.features.weekly_competitions_enabled:
+            return
+        transition = WeeklyTransitionService(service)
+        await transition.process_due()
+        for stream_id, result in await transition.pending_notices():
+            try:
+                await self._deliver_social_reward(stream_id, result)
+                self.ctx.logger.info("周榜交接公告已处理：stream=%s，receipt=%s", stream_id, result.receipt.receipt_id)
+            except Exception:
+                self.ctx.logger.exception("周榜交接公告投递异常：stream=%s；不自动重发已领取回执", stream_id)
 
     async def _deliver_social_reward(self, stream_id: str, result: DispatchResult) -> tuple[bool, str, int]:
         renderer = cast(PigCatcherRenderer, self._renderer)

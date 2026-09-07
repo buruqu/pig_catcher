@@ -81,7 +81,7 @@ def leaderboard(*, status: str, empty: bool = False, season: int = 1) -> WeeklyC
         status_label=status,
         group_name="官方群-CEAB3520",
         metric_label="本期亲手做出的猪寿司拼盘" if season == 2 else "本周抓猪累计官方价值",
-        period_text="2026-09-08 00:00 — 2026-09-15 00:00" if season == 2 else "2026-09-01 00:00 — 2026-09-08 00:00",
+        period_text="2026-09-08 00:02 — 2026-09-15 00:00" if season == 2 else "2026-09-01 00:00 — 2026-09-08 00:00",
         countdown_text="已完成结算" if status == "已结算" else "距离结算 4 天 12 小时",
         page=1,
         page_count=1,
