@@ -10,6 +10,7 @@ from fractions import Fraction
 from math import lcm
 from typing import Any
 
+from . import miumiu
 from .battle_catalog import (
     ASAMU_MOVES,
     BATTLE_RULE_VERSION,
@@ -291,7 +292,8 @@ def new_state(fighters: list[dict], *, seed: str = "") -> dict:
                 "turn": fresh_turn(),
             }
         )
-    return {"version": BATTLE_VERSION, "round": 1, "status": "active", "winner": None, "sides": sides}
+    return {"version": BATTLE_VERSION, "round": 1, "status": "active", "winner": None, "sides": sides,
+            "round_origin": deepcopy(sides), "mimic_pool": deepcopy(mimic_pool)}
 
 
 def _side(state: dict, side: int) -> dict:
@@ -602,7 +604,8 @@ def apply_move(
     key = f"{round_number}:{side}:move:{ordinal}:nested"
     snapshot = player["snapshot"]
     drawn_move = move
-    effects_disabled = bool(turn.get("daniya_world_effects_disabled"))
+    move = miumiu.prepare_move(player, move)
+    effects_disabled = bool(turn.get("daniya_world_effects_disabled")) or "miumiu-noop" in move.tags
     if effects_disabled:
         # “世界·发龙图”保留抽到哪一招的审计事实，但该招的数值、标签、
         # 再抽、贷款与领域资格全部失效。既有跨回合状态不会被误消费。
@@ -617,7 +620,7 @@ def apply_move(
             opponent_reduction=0,
             opponent_reduction_tenths=0,
         )
-    fighter_id = functional_fighter_id or snapshot.get("fighter_id", "")
+    fighter_id = functional_fighter_id or miumiu.effective_fighter(player)
     effect_fighter_id = fighter_id
     effect_tags = set(move.tags)
     effect_move_id = move.move_id
@@ -625,7 +628,7 @@ def apply_move(
     effect_loan = bool(move.loan)
     is_juejue = fighter_id == "juejue"
     is_daniya = fighter_id == "daniya"
-    is_firefly = snapshot.get("fighter_id") == "firefly"
+    is_firefly = miumiu.effective_fighter(player) == "firefly"
     if is_juejue:
         form_before = player.get("juejue_form", "")
     elif is_daniya:
@@ -908,11 +911,17 @@ def apply_move(
         player["juejue_realization_stacks"] += 1
 
     is_copy = mimic is not None or copy_context
+    if mimic is not None and effect_fighter_id == "miumiu":
+        source_move = _move_by_id("miumiu", effect_move_id)
+        if source_move is not None:
+            adapted = miumiu.prepare_move(player, source_move)
+            special_base += _move_base(adapted) - _move_base(source_move)
+            effect_draws += adapted.draws - source_move.draws
 
     # 熠～噜猪的干员效果按确定的子轮盘直接记入事件；巴别塔再部署的
     # 干员只占一个放置名额，但其完整效果顺序执行两遍。
     if "yilu-operator" in effect_tags:
-        if snapshot.get("fighter_id") == "yilu":
+        if miumiu.effective_fighter(player) == "yilu":
             turn["yilu_operator_placements"] = int(turn.get("yilu_operator_placements", 0)) + 1
         if "yilu-vanguard" in effect_tags:
             special_base = Fraction(5 * effect_repeats)
@@ -1338,6 +1347,12 @@ def apply_move(
         special_base += Fraction(forced_gain_bonus)
 
     positive_numeric = special_base > 0
+    if positive_numeric and turn.get("miumiu_split_remaining", 0) > 0:
+        special_base += 4
+    if turn.get("miumiu_split_remaining", 0) > 0:
+        turn["miumiu_split_remaining"] -= 1
+    if effect_move_id == "miumiu-split" and not effects_disabled:
+        turn["miumiu_split_remaining"] = int(turn.get("miumiu_split_remaining", 0)) + 2
     signed_numeric = special_base != 0
     tool = snapshot.get("tool_id", "") if not player["tool_used"] else ""
     penalty = int(player["heavy"] and positive_numeric and tool != "bandage")
@@ -1410,7 +1425,7 @@ def apply_move(
         turn["infinity_used"] = True
     turn["done"] = turn["pending"] == 0
     if (
-        snapshot.get("fighter_id") == "yilu"
+        miumiu.effective_fighter(player) == "yilu"
         and int(turn.get("yilu_operator_placements", 0)) >= 10
     ):
         turn["pending"] = 0
@@ -1603,8 +1618,8 @@ def move_weight_units(
 ) -> int:
     """Return exact ten-thousandths used by the deterministic move wheel."""
 
-    units = int(move.resolved_draw_weight_units)
-    fighter_id = functional_fighter_id or player.get("snapshot", {}).get("fighter_id")
+    units = int(move.resolved_draw_weight_units) + miumiu.draw_bonus(player, move)
+    fighter_id = functional_fighter_id or miumiu.effective_fighter(player)
     if "purple" in move.tags:
         units += int(player.get("purple_weight_steps", 0)) * (MOVE_WEIGHT_SCALE // 10)
     if fighter_id == "juejue" and "domain" in move.tags:
@@ -1643,7 +1658,7 @@ def _apply_firefly_event_context(state: dict, side: int, event: dict) -> None:
     """Apply opponent-aware Firefly/Sam facts without making command order observable."""
 
     player = state["sides"][side]
-    if player.get("snapshot", {}).get("fighter_id") != "firefly":
+    if miumiu.effective_fighter(player) != "firefly":
         return
     if event.get("effects_disabled"):
         event.update(
@@ -1698,10 +1713,14 @@ def play_chunk(state: dict, side: int, seed: str, *, chunk_size: int = MOVE_CHUN
     if type(chunk_size) is not int or chunk_size < 1:
         raise BattleError("无效的连抽分片大小。")
     events = []
+    if not state.get("miumiu_preview") and any(
+        miumiu.effective_fighter(p) in {"miumiu", "juejue"} for p in state["sides"]
+    ) and "miumiu_observations" not in state:
+        _miumiu_preview(state, seed)
     for _ in range(chunk_size):
         if player["turn"]["done"]:
             break
-        fighter_id = player["snapshot"]["fighter_id"]
+        fighter_id = miumiu.effective_fighter(player)
         forced_daniya_ids = tuple(player["turn"].get("daniya_world_forced_move_ids", ()))
         forced_daniya_world = bool(forced_daniya_ids)
         forced_daniya_form = str(
@@ -1752,6 +1771,8 @@ def play_chunk(state: dict, side: int, seed: str, *, chunk_size: int = MOVE_CHUN
                 and "yilu-medic" not in move.tags
                 and "yilu-specialist" not in move.tags
             )
+        elif player.get("miumiu_wheel"):
+            moves = _available_moves(player)
         elif fighter_id == "juejue":
             moves = fighter_form_moves(fighter_id, player["juejue_form"])
         elif fighter_id == "daniya":
@@ -1760,6 +1781,8 @@ def play_chunk(state: dict, side: int, seed: str, *, chunk_size: int = MOVE_CHUN
             moves = fighter_form_moves(fighter_id, player["firefly_form"])
         else:
             moves = FIGHTERS_BY_ID[fighter_id].moves
+        if not player.get("miumiu_wheel") and not forced_daniya_world and not forced_milk:
+            moves = (*moves, *miumiu.blank_moves(player))
         ordinal = player["turn"]["draws"] + 1
         wheel = tuple(
             (
@@ -1792,6 +1815,10 @@ def play_chunk(state: dict, side: int, seed: str, *, chunk_size: int = MOVE_CHUN
             )
             roll = int(selected_option["roll"])
         original_move = moves[index]
+        player.pop("miumiu_rebuild", None)
+        observations = state.get("miumiu_observations")
+        if observations:
+            player["turn"]["miumiu_observed"] = deepcopy(observations[1 - side])
         selected_move = ASAMU_MOVES[7] if forced_milk else original_move
         if forced_milk:
             player["turn"]["forced_milk_dragon_used"] += 1
@@ -1838,6 +1865,9 @@ def play_chunk(state: dict, side: int, seed: str, *, chunk_size: int = MOVE_CHUN
             ),
         )
         _apply_firefly_event_context(state, side, event)
+        if player.get("miumiu_wheel") and event.get("form_before") != event.get("form_after"):
+            # A copied switching skill immediately unlocks the corresponding local form.
+            player["miumiu_wheel"] = []
         player["turn"]["events"].append(deepcopy(event))
         events.append(event)
     return events
@@ -2029,7 +2059,10 @@ def _domain_resolution(state: dict, seed: str, cancelled: list[dict[int, dict]])
 
 
 def _available_moves(player: dict) -> tuple[Move, ...]:
-    fighter_id = player["snapshot"]["fighter_id"]
+    frozen = miumiu.frozen_moves(player)
+    if frozen:
+        return (*frozen, *miumiu.blank_moves(player))
+    fighter_id = miumiu.effective_fighter(player)
     if fighter_id == "juejue":
         return fighter_form_moves(fighter_id, player["juejue_form"])
     if fighter_id == "daniya":
@@ -2070,10 +2103,10 @@ def _asamu_domain_copies(state: dict, seed: str, domain: dict | None) -> tuple[d
             version=state["version"],
             consume_pending=False,
             allow_extra_draws=False,
-            functional_fighter_id=opponent["snapshot"]["fighter_id"],
+            functional_fighter_id=miumiu.effective_fighter(opponent),
             functional_form_id=(
                 opponent.get("daniya_form")
-                if opponent["snapshot"].get("fighter_id") == "daniya"
+                if miumiu.effective_fighter(opponent) == "daniya"
                 else None
             ),
             copy_context=True,
@@ -2089,7 +2122,7 @@ def _asamu_domain_copies(state: dict, seed: str, domain: dict | None) -> tuple[d
             generated_by="asamu-domain-copy",
             copy_slot=slot,
             source_side=opponent_side,
-            source_fighter_id=opponent["snapshot"]["fighter_id"],
+            source_fighter_id=miumiu.effective_fighter(opponent),
             source_move_id=source_move.move_id,
             source_move_name=source_move.name,
             domain_reentry_suppressed="domain" in source_move.tags,
@@ -2883,7 +2916,7 @@ def _dynamic_injury_wheel(state: dict, loser: int) -> tuple[tuple, dict]:
     daniya_opponents = [
         side
         for side_index, side in enumerate(state["sides"])
-        if side_index != loser and side.get("snapshot", {}).get("fighter_id") == "daniya"
+        if side_index != loser and miumiu.effective_fighter(side) == "daniya"
     ]
     daniya_passive_layers = len(daniya_opponents)
     daniya_active_layers = sum(
@@ -2938,10 +2971,22 @@ def resolve_round(state: dict, seed: str) -> dict | None:
     _side(state, 0)
     if not all(side["turn"]["done"] for side in state["sides"]):
         return None
+    flow_records = miumiu.flow_settlement(state)
     provisional = deepcopy(state["sides"])
     interactions = _settle_interactions(state, seed)
+    for previous, player in zip(provisional, state["sides"], strict=True):
+        if player.get("miumiu_wheel") and any(
+            player.get(key) != previous.get(key)
+            for key in ("juejue_form", "daniya_form", "firefly_form")
+        ):
+            player["miumiu_wheel"] = []
+    interactions["miumiu_flow"] = flow_records
+    replay = _miumiu_reconstruction(state, seed, interactions)
+    if replay is not None:
+        return replay
     before = deepcopy(state["sides"])
-    winner_units = [_winner_units(side["weight"]) for side in before]
+    winner_scale = lcm(VICTORY_WEIGHT_SCALE, *(Fraction(side["weight"]).denominator for side in before))
+    winner_units = [max(1, int(Fraction(side["weight"]) * winner_scale)) for side in before]
     roll = randbelow(
         seed,
         f"{state['round']}:winner",
@@ -2962,11 +3007,15 @@ def resolve_round(state: dict, seed: str) -> dict | None:
             "core": "core",
         }[injury]
     injury_rewound = bool(
-        state["sides"][loser]["snapshot"].get("fighter_id") == "juejue"
+        miumiu.effective_fighter(state["sides"][loser]) == "juejue"
         and state["sides"][loser]["turn"].get("juejue_rewind")
         and injury_after_guard in {"light", "heavy"}
     )
     injury_effective = "none" if injury_rewound else injury_after_guard
+    mirror_guarded = injury_effective == "exhausted" and bool(state["sides"][loser].get("miumiu_exhaust_guard"))
+    if mirror_guarded:
+        state["sides"][loser]["miumiu_exhaust_guard"] = False
+        injury_effective = "none"
     if injury_effective != "none":
         apply_injury(state["sides"][loser], injury_effective)
     natural_end = injury_effective == "exhausted"
@@ -2994,11 +3043,12 @@ def resolve_round(state: dict, seed: str) -> dict | None:
         "winner": winner,
         "loser": loser,
         "winner_roll": roll,
-        "winner_weight_scale": VICTORY_WEIGHT_SCALE,
+        "winner_weight_scale": winner_scale,
         "winner_weight_units": tuple(winner_units),
         "injury": injury,
         "injury_rewound": injury_rewound,
         "injury_effective": injury_effective,
+        "miumiu_exhaust_guarded": mirror_guarded,
         "daniya_injury_guarded": daniya_injury_guarded,
         "injury_after_daniya_guard": injury_after_guard,
         "injury_roll": injury_roll,
@@ -3025,7 +3075,7 @@ def resolve_round(state: dict, seed: str) -> dict | None:
             player["weight"] = carryover[index]["next_round_weight"]
             player["round_start_weight"] = carryover[index]["next_round_weight"]
             next_sam_draw_bonus_units = 0
-            if player.get("snapshot", {}).get("fighter_id") == "firefly":
+            if miumiu.effective_fighter(player) == "firefly":
                 if not player["turn"].get("firefly_entered_sam"):
                     next_sam_draw_bonus_units = int(
                         player["turn"].get("firefly_no_transform_bonus_units", 0)
@@ -3077,7 +3127,77 @@ def resolve_round(state: dict, seed: str) -> dict | None:
                 )
         result["firefly_transitions"] = tuple(firefly_transitions)
         result["daniya_world_transitions"] = tuple(daniya_world_transitions)
+        miumiu.add_blank_slots(state)
+        state["round_origin"] = deepcopy(state["sides"])
+        state.pop("miumiu_observations", None)
     return result
+
+
+def _miumiu_reconstruction(state: dict, seed: str, interactions: dict) -> dict | None:
+    domain = interactions.get("domain")
+    if not domain or domain.get("hit_side") not in (0, 1):
+        return None
+    side = int(domain["hit_side"])
+    player = state["sides"][side]
+    if not _domain_has(domain, side, "miumiu", "miumiu-domain"):
+        return None
+    player["miumiu_domain_triggers"] = int(player.get("miumiu_domain_triggers", 0)) + 1
+    if player.get("miumiu_mode"):
+        return None
+    count = player["miumiu_domain_triggers"]
+    success, roll = choose(
+        seed, f"{state['round']}:{side}:miumiu-mode:{count}",
+        ((True, count), (False, 9)), version=state["version"],
+    )
+    interactions["miumiu_check"] = {"side": side, "count": count, "roll": roll, "success": success}
+    if not success:
+        return None
+    opponent = state["sides"][1 - side]
+    moves = _available_moves(opponent)
+    weights = [move_weight_units(opponent, move) for move in moves]
+    fact = miumiu.activate_blank(state, side, moves, weights)
+    generated = []
+    new_seed = f"{seed}:miumiu-reconstruction:{state['round']}:{fact['epoch']}"
+    for actor in (0, 1):
+        while not state["sides"][actor]["turn"]["done"]:
+            generated.extend(play_chunk(state, actor, new_seed))
+            if len(generated) > 4096:
+                raise BattleError("本回合重构超出安全工作量，事务未提交，请联系猪管。")
+    result = resolve_round(state, new_seed)
+    if result is None:
+        raise BattleError("重构回合未完成，事务未提交。")
+    prior_generated = list(interactions.get("generated_events", ()))
+    result["interactions"]["generated_events"] = tuple(prior_generated + generated) + tuple(
+        result["interactions"].get("generated_events", ())
+    )
+    result.setdefault("miumiu_reconstructions", []).insert(0, fact)
+    return result
+
+
+def _miumiu_preview(state: dict, seed: str) -> None:
+    """Both actors observe the same base round, independent of command arrival.
+
+    Preview has no IO or receipts. Adaptive feedback is excluded to prevent
+    two Miumius recursively predicting one another. This rule is user-approved.
+    """
+    shadow = {"version": state["version"], "round": state["round"], "status": "active",
+              "sides": deepcopy(state.get("round_origin", state["sides"])), "miumiu_preview": True}
+    for actor, player in enumerate(shadow["sides"]):
+        player["turn"]["miumiu_preview"] = True
+        actual = state["sides"][actor]["turn"]
+        if player["turn"]["raw"] is None:
+            roll_count(shadow, actor, seed)
+        if actual["raw"] is not None:
+            player["turn"].update(raw=actual["raw"], effective=actual["effective"],
+                                  pending=actual["effective"], done=actual["effective"] == 0)
+            player["next_debt"] = 0
+            player["next_action_bonus"] = 0
+        draws = 0
+        while not player["turn"]["done"]:
+            draws += len(play_chunk(shadow, actor, seed))
+            if draws > 4096:
+                raise BattleError("基础轮盘预演超出安全工作量，事务未提交，请联系猪管。")
+    state["miumiu_observations"] = [miumiu.observe(player) for player in shadow["sides"]]
 
 
 def loot_weights(

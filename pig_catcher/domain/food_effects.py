@@ -9,6 +9,7 @@ from dataclasses import dataclass, replace
 from .enums import Rarity
 from .errors import FoodEffectError
 from .food_lottery import LOTTERY_DESCRIPTION, YILU_LOTTERY, shuffled_catch_distribution
+from .mirror_food import GROUP_WATER_MIRROR, HISTORY_MIRROR_CATCH
 from .rules import (
     apply_monotonic_high_rarity_multipliers,
     lift_target_rarity_from_lower,
@@ -77,6 +78,7 @@ EXCLUSIVE_CATCH_EFFECTS = frozenset(
         NEXT_GUARANTEED_SIX_STAR_CATCH,
         EXCLUSIVE_CATCH_QUALITY,
         SHUFFLED_CATCH_DISTRIBUTION,
+        HISTORY_MIRROR_CATCH,
     }
 )
 EXCLUSIVE_COOK_EFFECTS = frozenset({NEXT_SIX_STAR_COOK, NEXT_FIVE_STAR_COOK, SIX_STAR_COOK_FAILURE_RETURN})
@@ -93,6 +95,7 @@ QUOTA_EXEMPT_CATCH_EFFECTS = frozenset(
 
 CATCH_EFFECT_IDS = frozenset(
     {
+        HISTORY_MIRROR_CATCH,
         NEXT_CATCH_QUALITY,
         NEXT_PIG_RARITY,
         NEXT_PIG_STATURE,
@@ -128,6 +131,7 @@ QUOTA_EFFECT_IDS = frozenset(
 )
 IMMEDIATE_EFFECT_IDS = frozenset(
     {
+        GROUP_WATER_MIRROR,
         WEEKLY_WINDOW_CATCHES,
         PERMANENT_WINDOW_CATCH,
         PERMANENT_SIX_STAR_PROGRESS,
@@ -161,6 +165,7 @@ SUPPORTED_EFFECT_IDS = (
 # 抓猪概率组：所有“提高抓猪高星概率”类效果互斥，防止同类型菜品叠加。
 CATCH_PROBABILITY_GROUP = frozenset(
     {
+        HISTORY_MIRROR_CATCH,
         NEXT_CATCH_QUALITY,
         NEXT_PIG_RARITY,
         NEXT_SIX_STAR_CATCH,
@@ -391,6 +396,24 @@ def resolve_food_effect(
 
     normalized_id = str(effect_id or "").strip()
     raw = dict(params)
+    if normalized_id == HISTORY_MIRROR_CATCH:
+        fixed = raw.get("fixed_weights")
+        if fixed is not None and (
+            not isinstance(fixed, (list, tuple)) or len(fixed) != 6
+            or any(type(v) is not int or v < 0 or v % 10 for v in fixed) or sum(fixed) != 100
+        ):
+            raise FoodEffectError("历史镜像概率必须来自10次抓猪的完整品质记录。")
+        return FoodEffectGrant(
+            normalized_id, {"fixed_weights": list(fixed)} if fixed is not None else {}, 10,
+            "接下来10次抓猪固定使用吃菜前10次抓猪品质占比的倒序分布：1↔6、2↔5、3↔4；"
+            "五星只会出现抹茶猪咪、黄瓜猪或墨提斯猪。不额外赠送次数，不叠加其他概率加成。",
+        )
+    if normalized_id == GROUP_WATER_MIRROR:
+        if raw:
+            raise FoodEffectError("流形水镜冻使用固定的每人两次复制规则。")
+        return FoodEffectGrant(normalized_id, {}, 1,
+            "复制本群当前已登记玩家各自接下来2次抓到的原始猪猪，收入自己的背包（包括自己）；"
+            "原猪归属不变，复制品不再次触发复制。")
     if normalized_id == FOOD_SUPPLY_PACK:
         from .food_supplies import resolve_food_supply_pack
 
@@ -1473,7 +1496,11 @@ def apply_catch_effects(
     if exclusive is not None:
         grant = resolve_food_effect(exclusive.effect_id, exclusive.params)
         exclusive_summary = grant.summary
-        if exclusive.effect_id == SHUFFLED_CATCH_DISTRIBUTION:
+        if exclusive.effect_id == HISTORY_MIRROR_CATCH:
+            if "fixed_weights" not in grant.params:
+                raise FoodEffectError("历史镜像缺少吃菜时的概率快照。")
+            adjusted = list(grant.params["fixed_weights"])
+        elif exclusive.effect_id == SHUFFLED_CATCH_DISTRIBUTION:
             if random_value is None:
                 raise FoodEffectError("雾蓝抓猪结算缺少可审计的随机源。")
             shuffled, shuffle_permutation, shuffle_rolls = shuffled_catch_distribution(

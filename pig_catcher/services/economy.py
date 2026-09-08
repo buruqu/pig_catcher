@@ -94,6 +94,7 @@ from ..domain.gameplay import (
     item_by_id,
     level_progress,
 )
+from ..domain.mirror_food import GROUP_WATER_MIRROR, HISTORY_MIRROR_CATCH, mirrored_history_weights
 from ..domain.models import CommandIdentity, CommandReceipt
 from ..domain.ports import Clock, MessageKeyFactory, RandomSource, SystemClock, SystemRandomSource
 from ..domain.quota import catch_quota_window
@@ -2286,6 +2287,24 @@ class EconomyService:
                 normalized_selector,
             )
             effect = self._food_effect(food)
+            if effect.queued_effect_id == HISTORY_MIRROR_CATCH:
+                history = await session.fetch_all(
+                    """SELECT p.rarity FROM command_receipts r JOIN pig_instances p
+                       ON p.pig_instance_id=r.result_object_id
+                       WHERE r.player_id=? AND r.scope_id=? AND r.command_name='pig-catcher.catch'
+                       ORDER BY r.created_at DESC,r.receipt_id DESC LIMIT 10""",
+                    (identity.player_id, identity.scope.value),
+                )
+                fixed = mirrored_history_weights([int(row["rarity"]) for row in history])
+                effect = replace(effect, queued_effect_params={"fixed_weights": fixed},
+                    summary=effect.summary + " 固定概率（1→6星）：" + "/".join(f"{v}%" for v in fixed) + "。")
+            elif effect.queued_effect_id == GROUP_WATER_MIRROR:
+                await session.execute(
+                    """INSERT INTO water_mirror_targets
+                       (source_food_id,scope_id,receiver_id,catcher_id,remaining,created_at)
+                       SELECT ?,scope_id,?,player_id,2,? FROM players WHERE scope_id=?""",
+                    (food.food_instance_id, identity.player_id, now, identity.scope.value),
+                )
             overflow_active = False
             reward_payload: dict[str, object] = {}
             effect_expires_at = effect.expires_at
@@ -2537,6 +2556,7 @@ class EconomyService:
                 CATCH_WINDOW_TRANSFER,
                 WINDOW_SIX_STAR_RESONANCE,
                 *GROUP_EFFECT_IDS,
+                GROUP_WATER_MIRROR,
             }:
                 effect_entry_id = self._new_identifier()
                 if effect.queued_effect_id == EXTRA_CATCHES:

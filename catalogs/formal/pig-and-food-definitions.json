@@ -7887,7 +7887,14 @@
       ],
       "effect_id": "catch-window-transfer",
       "effect_params": {
-        "fixed_weights": [0, 0, 0, 42, 40, 18]
+        "fixed_weights": [
+          0,
+          0,
+          0,
+          42,
+          40,
+          18
+        ]
       },
       "display_name": "月栖萤光卷",
       "template_id": "food-g1092931381-firefly-moonlight-roll",
@@ -7936,7 +7943,11 @@
       "effect_params": {
         "base_bonus_percent": 3.07,
         "cook_bonus_per_caught_star": 1,
-        "catch_bonus_by_food_rarity": {"4": 10, "5": 30, "6": 50},
+        "catch_bonus_by_food_rarity": {
+          "4": 10,
+          "5": 30,
+          "6": 50
+        },
         "six_star_cook_reward_catches": 3,
         "six_star_catch_reward_food_count": 7
       },
@@ -7949,8 +7960,19 @@
       "kind": "pig",
       "rarity": 6,
       "description": "萤火与月色织成柔软的夜幕，银白发梢、青绿缎带和星形挂饰都在轻轻发亮。它把小小的流萤护在怀里，安静得像一枚尚未点燃的茧，认真起来却仿佛能披上炽焰装甲冲破长夜。",
-      "recipe_tags": ["群友定制", "崩坏：星穹铁道", "流萤", "萤火"],
-      "display_tags": ["群友定制", "双形态战斗猪", "银白长发", "月夜萤光", "温柔抱抱"],
+      "recipe_tags": [
+        "群友定制",
+        "崩坏：星穹铁道",
+        "流萤",
+        "萤火"
+      ],
+      "display_tags": [
+        "群友定制",
+        "双形态战斗猪",
+        "银白长发",
+        "月夜萤光",
+        "温柔抱抱"
+      ],
       "fat_profile": "balanced",
       "stature_profile": "standard",
       "length_min_cm": 45,
@@ -7967,9 +7989,23 @@
       "kind": "food",
       "rarity": 6,
       "description": "月牙、星屑与淡青萤光绕着柔软蛋糕卷缓缓流动，切面藏着一颗澄亮的绿芯。它会先把下一段旅程折进梦里，再把积攒的光一次送往更远的时刻。",
-      "recipe_tags": ["群友定制", "崩坏：星穹铁道", "月夜", "甜香"],
+      "recipe_tags": [
+        "群友定制",
+        "崩坏：星穹铁道",
+        "月夜",
+        "甜香"
+      ],
       "effect_id": "catch-window-transfer",
-      "effect_params": {"fixed_weights": [0, 0, 0, 42, 40, 18]},
+      "effect_params": {
+        "fixed_weights": [
+          0,
+          0,
+          0,
+          42,
+          40,
+          18
+        ]
+      },
       "display_name": "月栖萤光卷",
       "template_id": "food-g237716658-firefly-moonlight-roll",
       "group_scope_id": "qq:237716658"
@@ -7979,8 +8015,18 @@
       "kind": "pig",
       "rarity": 6,
       "description": "粉蓝色云霞铺满相框，三月七猪举着小相机把每一次奇遇都拍进四叶草里。它相信好运值得被记录，也相信下一张照片里一定会有更闪亮的猪猪。",
-      "recipe_tags": ["群友定制", "崩坏：星穹铁道", "三月七", "冰甜"],
-      "display_tags": ["群友定制", "粉蓝相机", "四叶草", "旅途留影"],
+      "recipe_tags": [
+        "群友定制",
+        "崩坏：星穹铁道",
+        "三月七",
+        "冰甜"
+      ],
+      "display_tags": [
+        "群友定制",
+        "粉蓝相机",
+        "四叶草",
+        "旅途留影"
+      ],
       "fat_profile": "balanced",
       "stature_profile": "standard",
       "length_min_cm": 36,
@@ -7997,12 +8043,21 @@
       "kind": "food",
       "rarity": 6,
       "description": "粉蓝双色四叶草凝在晶莹冰糕里，像一张刚洗出的幸运照片。清甜凉意会记住本时段每一次抓猪与做菜的星光，让两条好运轨迹彼此追逐。",
-      "recipe_tags": ["群友定制", "崩坏：星穹铁道", "四叶草", "冰甜"],
+      "recipe_tags": [
+        "群友定制",
+        "崩坏：星穹铁道",
+        "四叶草",
+        "冰甜"
+      ],
       "effect_id": "window-six-star-resonance",
       "effect_params": {
         "base_bonus_percent": 3.07,
         "cook_bonus_per_caught_star": 1,
-        "catch_bonus_by_food_rarity": {"4": 10, "5": 30, "6": 50},
+        "catch_bonus_by_food_rarity": {
+          "4": 10,
+          "5": 30,
+          "6": 50
+        },
         "six_star_cook_reward_catches": 3,
         "six_star_catch_reward_food_count": 7
       },
@@ -8015,8 +8070,19 @@
       "kind": "pig",
       "rarity": 6,
       "description": "萤火与月色织成柔软的夜幕，银白发梢、青绿缎带和星形挂饰都在轻轻发亮。它把小小的流萤护在怀里，安静得像一枚尚未点燃的茧，认真起来却仿佛能披上炽焰装甲冲破长夜。",
-      "recipe_tags": ["群友定制", "崩坏：星穹铁道", "流萤", "萤火"],
-      "display_tags": ["群友定制", "双形态战斗猪", "银白长发", "月夜萤光", "温柔抱抱"],
+      "recipe_tags": [
+        "群友定制",
+        "崩坏：星穹铁道",
+        "流萤",
+        "萤火"
+      ],
+      "display_tags": [
+        "群友定制",
+        "双形态战斗猪",
+        "银白长发",
+        "月夜萤光",
+        "温柔抱抱"
+      ],
       "fat_profile": "balanced",
       "stature_profile": "standard",
       "length_min_cm": 45,
@@ -8033,9 +8099,23 @@
       "kind": "food",
       "rarity": 6,
       "description": "月牙、星屑与淡青萤光绕着柔软蛋糕卷缓缓流动，切面藏着一颗澄亮的绿芯。它会先把下一段旅程折进梦里，再把积攒的光一次送往更远的时刻。",
-      "recipe_tags": ["群友定制", "崩坏：星穹铁道", "月夜", "甜香"],
+      "recipe_tags": [
+        "群友定制",
+        "崩坏：星穹铁道",
+        "月夜",
+        "甜香"
+      ],
       "effect_id": "catch-window-transfer",
-      "effect_params": {"fixed_weights": [0, 0, 0, 42, 40, 18]},
+      "effect_params": {
+        "fixed_weights": [
+          0,
+          0,
+          0,
+          42,
+          40,
+          18
+        ]
+      },
       "display_name": "月栖萤光卷",
       "template_id": "food-qo5e5854406d0297d6feae696a13e3a339-firefly-moonlight-roll",
       "group_scope_id": "qq-official:5E5854406D0297D6FEAE696A13E3A339"
@@ -8045,8 +8125,18 @@
       "kind": "pig",
       "rarity": 6,
       "description": "粉蓝色云霞铺满相框，三月七猪举着小相机把每一次奇遇都拍进四叶草里。它相信好运值得被记录，也相信下一张照片里一定会有更闪亮的猪猪。",
-      "recipe_tags": ["群友定制", "崩坏：星穹铁道", "三月七", "冰甜"],
-      "display_tags": ["群友定制", "粉蓝相机", "四叶草", "旅途留影"],
+      "recipe_tags": [
+        "群友定制",
+        "崩坏：星穹铁道",
+        "三月七",
+        "冰甜"
+      ],
+      "display_tags": [
+        "群友定制",
+        "粉蓝相机",
+        "四叶草",
+        "旅途留影"
+      ],
       "fat_profile": "balanced",
       "stature_profile": "standard",
       "length_min_cm": 36,
@@ -8063,12 +8153,21 @@
       "kind": "food",
       "rarity": 6,
       "description": "粉蓝双色四叶草凝在晶莹冰糕里，像一张刚洗出的幸运照片。清甜凉意会记住本时段每一次抓猪与做菜的星光，让两条好运轨迹彼此追逐。",
-      "recipe_tags": ["群友定制", "崩坏：星穹铁道", "四叶草", "冰甜"],
+      "recipe_tags": [
+        "群友定制",
+        "崩坏：星穹铁道",
+        "四叶草",
+        "冰甜"
+      ],
       "effect_id": "window-six-star-resonance",
       "effect_params": {
         "base_bonus_percent": 3.07,
         "cook_bonus_per_caught_star": 1,
-        "catch_bonus_by_food_rarity": {"4": 10, "5": 30, "6": 50},
+        "catch_bonus_by_food_rarity": {
+          "4": 10,
+          "5": 30,
+          "6": 50
+        },
         "six_star_cook_reward_catches": 3,
         "six_star_catch_reward_food_count": 7
       },
@@ -8081,8 +8180,19 @@
       "kind": "pig",
       "rarity": 6,
       "description": "萤火与月色织成柔软的夜幕，银白发梢、青绿缎带和星形挂饰都在轻轻发亮。它把小小的流萤护在怀里，安静得像一枚尚未点燃的茧，认真起来却仿佛能披上炽焰装甲冲破长夜。",
-      "recipe_tags": ["群友定制", "崩坏：星穹铁道", "流萤", "萤火"],
-      "display_tags": ["群友定制", "双形态战斗猪", "银白长发", "月夜萤光", "温柔抱抱"],
+      "recipe_tags": [
+        "群友定制",
+        "崩坏：星穹铁道",
+        "流萤",
+        "萤火"
+      ],
+      "display_tags": [
+        "群友定制",
+        "双形态战斗猪",
+        "银白长发",
+        "月夜萤光",
+        "温柔抱抱"
+      ],
       "fat_profile": "balanced",
       "stature_profile": "standard",
       "length_min_cm": 45,
@@ -8099,9 +8209,23 @@
       "kind": "food",
       "rarity": 6,
       "description": "月牙、星屑与淡青萤光绕着柔软蛋糕卷缓缓流动，切面藏着一颗澄亮的绿芯。它会先把下一段旅程折进梦里，再把积攒的光一次送往更远的时刻。",
-      "recipe_tags": ["群友定制", "崩坏：星穹铁道", "月夜", "甜香"],
+      "recipe_tags": [
+        "群友定制",
+        "崩坏：星穹铁道",
+        "月夜",
+        "甜香"
+      ],
       "effect_id": "catch-window-transfer",
-      "effect_params": {"fixed_weights": [0, 0, 0, 42, 40, 18]},
+      "effect_params": {
+        "fixed_weights": [
+          0,
+          0,
+          0,
+          42,
+          40,
+          18
+        ]
+      },
       "display_name": "月栖萤光卷",
       "template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-firefly-moonlight-roll",
       "group_scope_id": "qq-official:9EA2810F378FBD7DC3219C56CEAB3520"
@@ -8111,8 +8235,18 @@
       "kind": "pig",
       "rarity": 6,
       "description": "粉蓝色云霞铺满相框，三月七猪举着小相机把每一次奇遇都拍进四叶草里。它相信好运值得被记录，也相信下一张照片里一定会有更闪亮的猪猪。",
-      "recipe_tags": ["群友定制", "崩坏：星穹铁道", "三月七", "冰甜"],
-      "display_tags": ["群友定制", "粉蓝相机", "四叶草", "旅途留影"],
+      "recipe_tags": [
+        "群友定制",
+        "崩坏：星穹铁道",
+        "三月七",
+        "冰甜"
+      ],
+      "display_tags": [
+        "群友定制",
+        "粉蓝相机",
+        "四叶草",
+        "旅途留影"
+      ],
       "fat_profile": "balanced",
       "stature_profile": "standard",
       "length_min_cm": 36,
@@ -8129,18 +8263,451 @@
       "kind": "food",
       "rarity": 6,
       "description": "粉蓝双色四叶草凝在晶莹冰糕里，像一张刚洗出的幸运照片。清甜凉意会记住本时段每一次抓猪与做菜的星光，让两条好运轨迹彼此追逐。",
-      "recipe_tags": ["群友定制", "崩坏：星穹铁道", "四叶草", "冰甜"],
+      "recipe_tags": [
+        "群友定制",
+        "崩坏：星穹铁道",
+        "四叶草",
+        "冰甜"
+      ],
       "effect_id": "window-six-star-resonance",
       "effect_params": {
         "base_bonus_percent": 3.07,
         "cook_bonus_per_caught_star": 1,
-        "catch_bonus_by_food_rarity": {"4": 10, "5": 30, "6": 50},
+        "catch_bonus_by_food_rarity": {
+          "4": 10,
+          "5": 30,
+          "6": 50
+        },
         "six_star_cook_reward_catches": 3,
         "six_star_catch_reward_food_count": 7
       },
       "display_name": "粉蓝四叶草冰糕",
       "template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-march-seven-clover-ice-cake",
       "group_scope_id": "qq-official:9EA2810F378FBD7DC3219C56CEAB3520"
+    },
+    {
+      "source_path": "定制猪群友库/1092931381/洛璃c猪.png",
+      "kind": "pig",
+      "rarity": 6,
+      "description": "白色猫耳探出抹茶香气，异色眼睛紧盯着杯里的翠绿小山。它把黄瓜当吸管，认真吸上一口芭菲：甜点要慢慢吃，好运也要倒过来尝。",
+      "recipe_tags": [
+        "群友定制",
+        "抹茶猫咪",
+        "黄瓜吸管",
+        "异色瞳"
+      ],
+      "display_tags": [
+        "群友定制",
+        "抹茶猫咪",
+        "黄瓜吸管",
+        "异色瞳"
+      ],
+      "fat_profile": "balanced",
+      "stature_profile": "standard",
+      "length_min_cm": 35,
+      "length_max_cm": 145,
+      "weight_min_kg": 30,
+      "weight_max_kg": 480,
+      "display_name": "洛璃c猪",
+      "template_id": "pig-g1092931381-luoli-c",
+      "group_scope_id": "qq:1092931381",
+      "paired_food_template_id": "food-g1092931381-luoli-jade-matcha-parfait",
+      "scope": "group",
+      "effect_id": "",
+      "effect_params": {},
+      "collection": null
+    },
+    {
+      "source_path": "定制美食库/1092931381/翠玉抹茶芭菲.png",
+      "kind": "food",
+      "rarity": 6,
+      "description": "翠绿冻层、绵软奶霜与抹茶团子盛在晶莹高脚杯里，猫耳小猪藏在甜香之间。一根黄瓜吸管搅动回忆，把昨日平凡的星光翻成下一口惊喜。",
+      "recipe_tags": [
+        "群友定制",
+        "抹茶",
+        "芭菲",
+        "历史镜像"
+      ],
+      "effect_id": "history-mirror-catch",
+      "effect_params": {},
+      "display_name": "翠玉抹茶芭菲",
+      "template_id": "food-g1092931381-luoli-jade-matcha-parfait",
+      "group_scope_id": "qq:1092931381",
+      "scope": "group",
+      "paired_food_template_id": "",
+      "collection": null
+    },
+    {
+      "source_path": "定制猪群友库/1092931381/空白缪缪流形猪.png",
+      "kind": "pig",
+      "rarity": 6,
+      "description": "浅色长发与青绿色的发梢自然垂落，透明的流形在身前轻轻浮动，清澈得像一团会自己流动的水。周围点缀着植物与水珠，映着淡淡的绿色光泽，缪缪安静地待在其中——看起来只是一只猪，身边却已经多出了好几个‘自己’。",
+      "recipe_tags": [
+        "群友定制",
+        "战斗猪",
+        "流形",
+        "青绿发梢",
+        "水镜"
+      ],
+      "display_tags": [
+        "群友定制",
+        "战斗猪",
+        "流形",
+        "青绿发梢",
+        "水镜"
+      ],
+      "fat_profile": "balanced",
+      "stature_profile": "standard",
+      "length_min_cm": 35,
+      "length_max_cm": 145,
+      "weight_min_kg": 30,
+      "weight_max_kg": 480,
+      "display_name": "空白缪缪流形猪",
+      "template_id": "pig-g1092931381-miumiu-flow",
+      "group_scope_id": "qq:1092931381",
+      "paired_food_template_id": "food-g1092931381-miumiu-water-mirror-jelly",
+      "scope": "group",
+      "effect_id": "",
+      "effect_params": {},
+      "collection": null
+    },
+    {
+      "source_path": "定制美食库/1092931381/流形水镜冻.png",
+      "kind": "food",
+      "rarity": 6,
+      "description": "透明的水晶果冻中，几只流形随着水波静静漂浮，清澈的水面映出一个又一个相似的身影。仔细看去，连其中的猪猪都像是在水中被一一复刻。缪缪只是轻轻碰了碰水面，流形便已经替她把看到的一切留了下来。",
+      "recipe_tags": [
+        "群友定制",
+        "水晶果冻",
+        "流形",
+        "复制"
+      ],
+      "effect_id": "group-water-mirror",
+      "effect_params": {},
+      "display_name": "流形水镜冻",
+      "template_id": "food-g1092931381-miumiu-water-mirror-jelly",
+      "group_scope_id": "qq:1092931381",
+      "scope": "group",
+      "paired_food_template_id": "",
+      "collection": null
+    },
+    {
+      "source_path": "定制猪群友库/237716658/洛璃c猪.png",
+      "kind": "pig",
+      "rarity": 6,
+      "description": "白色猫耳探出抹茶香气，异色眼睛紧盯着杯里的翠绿小山。它把黄瓜当吸管，认真吸上一口芭菲：甜点要慢慢吃，好运也要倒过来尝。",
+      "recipe_tags": [
+        "群友定制",
+        "抹茶猫咪",
+        "黄瓜吸管",
+        "异色瞳"
+      ],
+      "display_tags": [
+        "群友定制",
+        "抹茶猫咪",
+        "黄瓜吸管",
+        "异色瞳"
+      ],
+      "fat_profile": "balanced",
+      "stature_profile": "standard",
+      "length_min_cm": 35,
+      "length_max_cm": 145,
+      "weight_min_kg": 30,
+      "weight_max_kg": 480,
+      "display_name": "洛璃c猪",
+      "template_id": "pig-g237716658-luoli-c",
+      "group_scope_id": "qq:237716658",
+      "paired_food_template_id": "food-g237716658-luoli-jade-matcha-parfait",
+      "scope": "group",
+      "effect_id": "",
+      "effect_params": {},
+      "collection": null
+    },
+    {
+      "source_path": "定制美食库/237716658/翠玉抹茶芭菲.png",
+      "kind": "food",
+      "rarity": 6,
+      "description": "翠绿冻层、绵软奶霜与抹茶团子盛在晶莹高脚杯里，猫耳小猪藏在甜香之间。一根黄瓜吸管搅动回忆，把昨日平凡的星光翻成下一口惊喜。",
+      "recipe_tags": [
+        "群友定制",
+        "抹茶",
+        "芭菲",
+        "历史镜像"
+      ],
+      "effect_id": "history-mirror-catch",
+      "effect_params": {},
+      "display_name": "翠玉抹茶芭菲",
+      "template_id": "food-g237716658-luoli-jade-matcha-parfait",
+      "group_scope_id": "qq:237716658",
+      "scope": "group",
+      "paired_food_template_id": "",
+      "collection": null
+    },
+    {
+      "source_path": "定制猪群友库/237716658/空白缪缪流形猪.png",
+      "kind": "pig",
+      "rarity": 6,
+      "description": "浅色长发与青绿色的发梢自然垂落，透明的流形在身前轻轻浮动，清澈得像一团会自己流动的水。周围点缀着植物与水珠，映着淡淡的绿色光泽，缪缪安静地待在其中——看起来只是一只猪，身边却已经多出了好几个‘自己’。",
+      "recipe_tags": [
+        "群友定制",
+        "战斗猪",
+        "流形",
+        "青绿发梢",
+        "水镜"
+      ],
+      "display_tags": [
+        "群友定制",
+        "战斗猪",
+        "流形",
+        "青绿发梢",
+        "水镜"
+      ],
+      "fat_profile": "balanced",
+      "stature_profile": "standard",
+      "length_min_cm": 35,
+      "length_max_cm": 145,
+      "weight_min_kg": 30,
+      "weight_max_kg": 480,
+      "display_name": "空白缪缪流形猪",
+      "template_id": "pig-g237716658-miumiu-flow",
+      "group_scope_id": "qq:237716658",
+      "paired_food_template_id": "food-g237716658-miumiu-water-mirror-jelly",
+      "scope": "group",
+      "effect_id": "",
+      "effect_params": {},
+      "collection": null
+    },
+    {
+      "source_path": "定制美食库/237716658/流形水镜冻.png",
+      "kind": "food",
+      "rarity": 6,
+      "description": "透明的水晶果冻中，几只流形随着水波静静漂浮，清澈的水面映出一个又一个相似的身影。仔细看去，连其中的猪猪都像是在水中被一一复刻。缪缪只是轻轻碰了碰水面，流形便已经替她把看到的一切留了下来。",
+      "recipe_tags": [
+        "群友定制",
+        "水晶果冻",
+        "流形",
+        "复制"
+      ],
+      "effect_id": "group-water-mirror",
+      "effect_params": {},
+      "display_name": "流形水镜冻",
+      "template_id": "food-g237716658-miumiu-water-mirror-jelly",
+      "group_scope_id": "qq:237716658",
+      "scope": "group",
+      "paired_food_template_id": "",
+      "collection": null
+    },
+    {
+      "source_path": "定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/洛璃c猪.png",
+      "kind": "pig",
+      "rarity": 6,
+      "description": "白色猫耳探出抹茶香气，异色眼睛紧盯着杯里的翠绿小山。它把黄瓜当吸管，认真吸上一口芭菲：甜点要慢慢吃，好运也要倒过来尝。",
+      "recipe_tags": [
+        "群友定制",
+        "抹茶猫咪",
+        "黄瓜吸管",
+        "异色瞳"
+      ],
+      "display_tags": [
+        "群友定制",
+        "抹茶猫咪",
+        "黄瓜吸管",
+        "异色瞳"
+      ],
+      "fat_profile": "balanced",
+      "stature_profile": "standard",
+      "length_min_cm": 35,
+      "length_max_cm": 145,
+      "weight_min_kg": 30,
+      "weight_max_kg": 480,
+      "display_name": "洛璃c猪",
+      "template_id": "pig-qo5e5854406d0297d6feae696a13e3a339-luoli-c",
+      "group_scope_id": "qq-official:5E5854406D0297D6FEAE696A13E3A339",
+      "paired_food_template_id": "food-qo5e5854406d0297d6feae696a13e3a339-luoli-jade-matcha-parfait",
+      "scope": "group",
+      "effect_id": "",
+      "effect_params": {},
+      "collection": null
+    },
+    {
+      "source_path": "定制美食库/5E5854406D0297D6FEAE696A13E3A339/翠玉抹茶芭菲.png",
+      "kind": "food",
+      "rarity": 6,
+      "description": "翠绿冻层、绵软奶霜与抹茶团子盛在晶莹高脚杯里，猫耳小猪藏在甜香之间。一根黄瓜吸管搅动回忆，把昨日平凡的星光翻成下一口惊喜。",
+      "recipe_tags": [
+        "群友定制",
+        "抹茶",
+        "芭菲",
+        "历史镜像"
+      ],
+      "effect_id": "history-mirror-catch",
+      "effect_params": {},
+      "display_name": "翠玉抹茶芭菲",
+      "template_id": "food-qo5e5854406d0297d6feae696a13e3a339-luoli-jade-matcha-parfait",
+      "group_scope_id": "qq-official:5E5854406D0297D6FEAE696A13E3A339",
+      "scope": "group",
+      "paired_food_template_id": "",
+      "collection": null
+    },
+    {
+      "source_path": "定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/空白缪缪流形猪.png",
+      "kind": "pig",
+      "rarity": 6,
+      "description": "浅色长发与青绿色的发梢自然垂落，透明的流形在身前轻轻浮动，清澈得像一团会自己流动的水。周围点缀着植物与水珠，映着淡淡的绿色光泽，缪缪安静地待在其中——看起来只是一只猪，身边却已经多出了好几个‘自己’。",
+      "recipe_tags": [
+        "群友定制",
+        "战斗猪",
+        "流形",
+        "青绿发梢",
+        "水镜"
+      ],
+      "display_tags": [
+        "群友定制",
+        "战斗猪",
+        "流形",
+        "青绿发梢",
+        "水镜"
+      ],
+      "fat_profile": "balanced",
+      "stature_profile": "standard",
+      "length_min_cm": 35,
+      "length_max_cm": 145,
+      "weight_min_kg": 30,
+      "weight_max_kg": 480,
+      "display_name": "空白缪缪流形猪",
+      "template_id": "pig-qo5e5854406d0297d6feae696a13e3a339-miumiu-flow",
+      "group_scope_id": "qq-official:5E5854406D0297D6FEAE696A13E3A339",
+      "paired_food_template_id": "food-qo5e5854406d0297d6feae696a13e3a339-miumiu-water-mirror-jelly",
+      "scope": "group",
+      "effect_id": "",
+      "effect_params": {},
+      "collection": null
+    },
+    {
+      "source_path": "定制美食库/5E5854406D0297D6FEAE696A13E3A339/流形水镜冻.png",
+      "kind": "food",
+      "rarity": 6,
+      "description": "透明的水晶果冻中，几只流形随着水波静静漂浮，清澈的水面映出一个又一个相似的身影。仔细看去，连其中的猪猪都像是在水中被一一复刻。缪缪只是轻轻碰了碰水面，流形便已经替她把看到的一切留了下来。",
+      "recipe_tags": [
+        "群友定制",
+        "水晶果冻",
+        "流形",
+        "复制"
+      ],
+      "effect_id": "group-water-mirror",
+      "effect_params": {},
+      "display_name": "流形水镜冻",
+      "template_id": "food-qo5e5854406d0297d6feae696a13e3a339-miumiu-water-mirror-jelly",
+      "group_scope_id": "qq-official:5E5854406D0297D6FEAE696A13E3A339",
+      "scope": "group",
+      "paired_food_template_id": "",
+      "collection": null
+    },
+    {
+      "source_path": "定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/洛璃c猪.png",
+      "kind": "pig",
+      "rarity": 6,
+      "description": "白色猫耳探出抹茶香气，异色眼睛紧盯着杯里的翠绿小山。它把黄瓜当吸管，认真吸上一口芭菲：甜点要慢慢吃，好运也要倒过来尝。",
+      "recipe_tags": [
+        "群友定制",
+        "抹茶猫咪",
+        "黄瓜吸管",
+        "异色瞳"
+      ],
+      "display_tags": [
+        "群友定制",
+        "抹茶猫咪",
+        "黄瓜吸管",
+        "异色瞳"
+      ],
+      "fat_profile": "balanced",
+      "stature_profile": "standard",
+      "length_min_cm": 35,
+      "length_max_cm": 145,
+      "weight_min_kg": 30,
+      "weight_max_kg": 480,
+      "display_name": "洛璃c猪",
+      "template_id": "pig-qo9ea2810f378fbd7dc3219c56ceab3520-luoli-c",
+      "group_scope_id": "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
+      "paired_food_template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-luoli-jade-matcha-parfait",
+      "scope": "group",
+      "effect_id": "",
+      "effect_params": {},
+      "collection": null
+    },
+    {
+      "source_path": "定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/翠玉抹茶芭菲.png",
+      "kind": "food",
+      "rarity": 6,
+      "description": "翠绿冻层、绵软奶霜与抹茶团子盛在晶莹高脚杯里，猫耳小猪藏在甜香之间。一根黄瓜吸管搅动回忆，把昨日平凡的星光翻成下一口惊喜。",
+      "recipe_tags": [
+        "群友定制",
+        "抹茶",
+        "芭菲",
+        "历史镜像"
+      ],
+      "effect_id": "history-mirror-catch",
+      "effect_params": {},
+      "display_name": "翠玉抹茶芭菲",
+      "template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-luoli-jade-matcha-parfait",
+      "group_scope_id": "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
+      "scope": "group",
+      "paired_food_template_id": "",
+      "collection": null
+    },
+    {
+      "source_path": "定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/空白缪缪流形猪.png",
+      "kind": "pig",
+      "rarity": 6,
+      "description": "浅色长发与青绿色的发梢自然垂落，透明的流形在身前轻轻浮动，清澈得像一团会自己流动的水。周围点缀着植物与水珠，映着淡淡的绿色光泽，缪缪安静地待在其中——看起来只是一只猪，身边却已经多出了好几个‘自己’。",
+      "recipe_tags": [
+        "群友定制",
+        "战斗猪",
+        "流形",
+        "青绿发梢",
+        "水镜"
+      ],
+      "display_tags": [
+        "群友定制",
+        "战斗猪",
+        "流形",
+        "青绿发梢",
+        "水镜"
+      ],
+      "fat_profile": "balanced",
+      "stature_profile": "standard",
+      "length_min_cm": 35,
+      "length_max_cm": 145,
+      "weight_min_kg": 30,
+      "weight_max_kg": 480,
+      "display_name": "空白缪缪流形猪",
+      "template_id": "pig-qo9ea2810f378fbd7dc3219c56ceab3520-miumiu-flow",
+      "group_scope_id": "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
+      "paired_food_template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-miumiu-water-mirror-jelly",
+      "scope": "group",
+      "effect_id": "",
+      "effect_params": {},
+      "collection": null
+    },
+    {
+      "source_path": "定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/流形水镜冻.png",
+      "kind": "food",
+      "rarity": 6,
+      "description": "透明的水晶果冻中，几只流形随着水波静静漂浮，清澈的水面映出一个又一个相似的身影。仔细看去，连其中的猪猪都像是在水中被一一复刻。缪缪只是轻轻碰了碰水面，流形便已经替她把看到的一切留了下来。",
+      "recipe_tags": [
+        "群友定制",
+        "水晶果冻",
+        "流形",
+        "复制"
+      ],
+      "effect_id": "group-water-mirror",
+      "effect_params": {},
+      "display_name": "流形水镜冻",
+      "template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-miumiu-water-mirror-jelly",
+      "group_scope_id": "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
+      "scope": "group",
+      "paired_food_template_id": "",
+      "collection": null
     }
   ]
 }

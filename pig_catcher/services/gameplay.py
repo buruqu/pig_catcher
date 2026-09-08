@@ -68,6 +68,7 @@ from ..domain.launch_campaign import (
 from ..domain.launch_campaign import (
     effective_window_limit as campaign_window_limit,
 )
+from ..domain.mirror_food import HISTORY_MIRROR_CATCH, MATCHA_PIG_NAMES
 from ..domain.models import CommandIdentity, CommandReceipt
 from ..domain.ports import Clock, MessageKeyFactory, RandomSource, SystemClock, SystemRandomSource
 from ..domain.quota import catch_quota_window, stack_catch_quota_layers
@@ -1440,6 +1441,15 @@ class GameplayService:
             rarity_roll = self.random_source.random()
             rarity = choose_rarity(weights, rarity_roll)
             candidates = candidate_buckets[rarity]
+            history_mirror_active = any(
+                effect.effect_id == HISTORY_MIRROR_CATCH
+                and effect.effect_entry_id in effect_application.consumed_entry_ids
+                for effect in active_effects
+            )
+            if history_mirror_active and rarity is Rarity.FIVE:
+                candidates = [row for row in candidates if row["display_name"] in MATCHA_PIG_NAMES]
+                if not candidates:
+                    raise NoDrawableTemplateError("翠玉抹茶芭菲的专属五星候选缺失，本次未消耗效果或次数。")
             catalog_guide_used = False
             template_roll = self.random_source.random()
             template = self._select_template(
@@ -1453,6 +1463,7 @@ class GameplayService:
                 "catalog-guide" in achievement_catch_tickets
                 and rarity is not Rarity.SIX
                 and not effect_application.collaboration_only
+                and not history_mirror_active
                 and str(template.get("template_id") or "") != KFC_PIG_TEMPLATE_ID
                 and str(template.get("scope_type") or "common") == "common"
             ):
@@ -1699,6 +1710,12 @@ class GameplayService:
                     },
                 )
             technique_resolution: TechniqueCatchResolution | None = None
+            from .mirror_food import grant_water_mirror_copies
+
+            mirror_summaries = await grant_water_mirror_copies(
+                self, session, identity=identity, pig_instance_id=pig_instance_id, now=now,
+            )
+            effect_summaries += tuple(mirror_summaries)
             if active_group_technique is not None:
                 technique_resolution = await self._apply_group_technique_to_catch(
                     session,

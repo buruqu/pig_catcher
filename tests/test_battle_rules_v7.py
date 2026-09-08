@@ -63,7 +63,7 @@ def finish(player: dict) -> None:
 
 
 def test_v8_catalog_has_exact_new_daniya_asamu_and_yilu_definitions():
-    assert BATTLE_RULE_VERSION == 15
+    assert BATTLE_RULE_VERSION >= 15
     assert [move.gain for move in DANIYA_STAGING_MOVES] == [12, 16, 20, 40, 24]
     assert [move.opponent_reduction for move in DANIYA_DISILLUSION_MOVES] == [14, 9, 11, 22, 13]
     assert [move.resolved_draw_weight_units for move in DANIYA_COMMON_MOVES] == [

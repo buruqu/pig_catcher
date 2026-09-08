@@ -305,7 +305,7 @@ _TOPICS: dict[str, HelpTopic] = {
     ),
     "对战": HelpTopic(
         (
-            HelpLine("/战斗猪 设置 <宿傩猪|五条猪|撅撅猪|达妮娅猪|阿萨姆猪|熠～噜猪|栖夜流萤抱抱猪>", "battle"),
+            HelpLine("/战斗猪 设置 <战斗猪名>（含空白缪缪流形猪；全部名单见 /战斗猪 帮助）", "battle"),
             HelpLine("/战斗猪 确认；/战斗猪 取消", "battle"),
             HelpLine("/战斗猪；/战斗猪 强化", "battle"),
             HelpLine("/比划比划 @成员；/比划比划 接受", "battle"),

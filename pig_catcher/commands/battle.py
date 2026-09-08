@@ -5,16 +5,22 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from ..domain.battle_catalog import BattleError, tool_id
+from ..domain.battle_catalog import FIGHTERS_BY_ID, BattleError, tool_id
 
-BATTLE_HELP = """【PiG Dream! 猪猪对战】
+FIGHTER_NAMES = "、".join(f.name for f in FIGHTERS_BY_ID.values())
+FIGHTER_ALIASES = {f.name: f.fighter_id for f in FIGHTERS_BY_ID.values()}
+FIGHTER_ALIASES.update({key: key for key in FIGHTERS_BY_ID})
+FIGHTER_ALIASES["缪缪猪"] = "miumiu"
+
+BATTLE_HELP = f"""【PiG Dream! 猪猪对战】
 /战斗猪 设置 宿傩猪
-（也支持五条猪、撅撅猪、达妮娅猪、阿萨姆猪、熠～噜猪、栖夜流萤抱抱猪；同名自动选低价值，收藏猪用全名#编号）
+（可选：{FIGHTER_NAMES}；同名自动选低价值，收藏猪用全名#编号）
 /战斗猪；/战斗猪 强化；/战斗猪 解除保护 名称#编号
 /战斗猪 确认（设置、强化、解除保护需2分钟内确认）；/战斗猪 取消
 /战斗猪 轮盘 宿傩猪；/战斗猪 轮盘 五条猪；/战斗猪 轮盘 撅撅猪
 /战斗猪 轮盘 达妮娅猪；/战斗猪 轮盘 阿萨姆猪；/战斗猪 轮盘 熠～噜猪
 /战斗猪 轮盘 栖夜流萤抱抱猪
+/战斗猪 轮盘 空白缪缪流形猪
 /战斗猪 器具；/战斗猪 制作 练习护腕 2；/战斗猪 器具 练习护腕（或 无）
 /比划比划 @群友；/比划比划 接受；/比划比划 拒绝；/比划比划 取消
 /出招数 → /出招（第二位完成出招后立即结算，结算图完整展示双方本回合招式）
@@ -22,7 +28,7 @@ BATTLE_HELP = """【PiG Dream! 猪猪对战】
 /对战记录 [页码]；/对战记录 B对战号 [回合] [页码]
 自然力竭败者接下来3次普通 /抓猪 会自动结算战利品，猪直接归胜者且不占普通额度
 /战利品抓猪（保留的手动兼容入口，与普通 /抓猪 使用同一战利品队列）
-每人北京时间每天可主动1场、应战1场。接受才扣额度，五分钟不接受取消。
+每人北京时间每天可主动2场、应战2场。接受才扣额度，五分钟不接受取消。
 每群同时一场；开战后十分钟无有效行动自动无奖励结束。认输不发战利品。
 每回合以基础5和历史折半继承权重起步；本回合净增只向上取整保留50%到后续回合。
 黑闪会成长；苍/赫提高两种茈的出招盘权重，任意一次茈发动后加成归零重算；核心无上限。
@@ -109,45 +115,16 @@ def parse_battle_request(
         if head == "设置" and not tail:
             raise BattleError(
                 "格式：/战斗猪 设置 宿傩猪"
-                "（也支持五条猪、撅撅猪、达妮娅猪、阿萨姆猪、熠～噜猪、栖夜流萤抱抱猪）。"
+                f"（可选：{FIGHTER_NAMES}）。"
             )
         return BattleRequest(
             {"设置": "assign_preview", "强化": "upgrade_preview", "解除保护": "retire_preview"}[head],
             {"selector": tail},
         )
     if head == "轮盘":
-        if tail not in {
-            "宿傩猪",
-            "五条猪",
-            "撅撅猪",
-            "达妮娅猪",
-            "阿萨姆猪",
-            "熠～噜猪",
-            "栖夜流萤抱抱猪",
-            "sukuna",
-            "gojo",
-            "juejue",
-            "daniya",
-            "asamu",
-            "yilu",
-            "firefly",
-            "",
-        }:
-            raise BattleError("目前支持宿傩猪、五条猪、撅撅猪、达妮娅猪、阿萨姆猪、熠～噜猪和栖夜流萤抱抱猪的战斗盘。")
-        return BattleRequest(
-            "wheels",
-            {
-                "fighter_id": {
-                    "宿傩猪": "sukuna",
-                    "五条猪": "gojo",
-                    "撅撅猪": "juejue",
-                    "达妮娅猪": "daniya",
-                    "阿萨姆猪": "asamu",
-                    "熠～噜猪": "yilu",
-                    "栖夜流萤抱抱猪": "firefly",
-                }.get(tail, tail or "sukuna")
-            },
-        )
+        if tail and tail not in FIGHTER_ALIASES:
+            raise BattleError(f"目前支持{FIGHTER_NAMES}的战斗盘。")
+        return BattleRequest("wheels", {"fighter_id": FIGHTER_ALIASES.get(tail, "sukuna")})
     if head == "器具":
         return (
             BattleRequest("equip", {"tool_id": "" if tail == "无" else tool_id(tail)})

@@ -44,7 +44,7 @@ def _failed_subwheel_seed(kind: str) -> str:
 
 
 def test_v14_catalog_has_the_requested_juejue_numeric_buffs() -> None:
-    assert BATTLE_RULE_VERSION == 15
+    assert BATTLE_RULE_VERSION >= 15
     assert JUEJUE_TIME_MOVES[0].move_id == "sand-sculpt"
     assert JUEJUE_TIME_MOVES[0].gain == 15
     assert JUEJUE_VIRTUAL_MOVES[1].move_id == "future-simulation"

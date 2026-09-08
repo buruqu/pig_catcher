@@ -70,7 +70,7 @@ def _finish(player: dict) -> None:
 
 
 def test_v15_catalog_removes_114514_and_uses_the_requested_world_weights() -> None:
-    assert BATTLE_RULE_VERSION == 15
+    assert BATTLE_RULE_VERSION >= 15
     current = {move.move_id: move for move in DANIYA_COMMON_MOVES}
     assert "daniya-world-114514" not in current
     assert current["daniya-world-dragon-image"].gain == 10

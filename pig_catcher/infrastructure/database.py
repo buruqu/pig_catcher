@@ -286,6 +286,7 @@ class PigCatcherDatabase:
         required_tables.update(WINDOW_MECHANIC_TABLES)
         required_tables.add("achievement_badge_slots")
         required_tables.add("battle_daily_second_uses")
+        required_tables.update({"water_mirror_targets", "water_mirror_claims"})
         table_rows = await (
             await connection.execute(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name IN ("
@@ -369,6 +370,7 @@ class PigCatcherDatabase:
             {"battle_second_use_guard", "battle_second_use_no_update", "battle_second_use_no_delete"}
         )
         required_guards.update({"catch_transfer_cap_insert", "catch_transfer_cap_update"})
+        required_guards.add("water_mirror_scope_guard")
         guard_rows = await (
             await connection.execute("SELECT name FROM sqlite_master WHERE type IN ('trigger','index')")
         ).fetchall()

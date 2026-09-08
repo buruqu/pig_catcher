@@ -282,7 +282,7 @@ def test_every_old_and_new_pig_has_reviewed_tags_and_explicit_physical_ranges(
     manifest_by_id: dict[str, dict[str, Any]],
 ) -> None:
     pigs = [entry for entry in definitions if entry["kind"] == "pig"]
-    assert len(pigs) == 231
+    assert len(pigs) == 239
     for entry in pigs:
         name = entry["display_name"]
         tags = entry["display_tags"]
@@ -313,14 +313,14 @@ def test_every_old_and_new_pig_has_reviewed_tags_and_explicit_physical_ranges(
 
 
 def test_four_scopes_share_content_without_merging_six_star_ownership(definitions: list[dict[str, Any]]) -> None:
-    assert Counter(entry["kind"] for entry in definitions) == {"pig": 231, "food": 113}
+    assert Counter(entry["kind"] for entry in definitions) == {"pig": 239, "food": 121}
     scoped = [entry for entry in definitions if entry.get("group_scope_id")]
-    assert len(scoped) == 112
+    assert len(scoped) == 128
     assert {entry["group_scope_id"] for entry in scoped} == set(SCOPES)
     assert all(entry["rarity"] == 6 for entry in scoped)
     assert all(entry.get("group_scope_id") in SCOPES for entry in definitions if entry["rarity"] == 6)
-    assert len({entry["template_id"] for entry in scoped}) == 112
-    assert len({entry["source_path"] for entry in scoped}) == 112
+    assert len({entry["template_id"] for entry in scoped}) == 128
+    assert len({entry["source_path"] for entry in scoped}) == 128
     by_id = {entry["template_id"]: entry for entry in definitions}
     semantic_fields = (
         "kind",
@@ -341,9 +341,9 @@ def test_four_scopes_share_content_without_merging_six_star_ownership(definition
     signatures = []
     for scope in SCOPES:
         visible = [entry for entry in definitions if entry.get("group_scope_id") in (None, "", scope)]
-        assert Counter(entry["kind"] for entry in visible) == {"pig": 189, "food": 71}
+        assert Counter(entry["kind"] for entry in visible) == {"pig": 191, "food": 73}
         private = [entry for entry in scoped if entry["group_scope_id"] == scope]
-        assert Counter(entry["kind"] for entry in private) == {"pig": 14, "food": 14}
+        assert Counter(entry["kind"] for entry in private) == {"pig": 16, "food": 16}
         for entry in private:
             assert f"/{scope.split(':', 1)[1]}/" in f"/{entry['source_path']}"
         for pig in (entry for entry in private if entry["kind"] == "pig"):

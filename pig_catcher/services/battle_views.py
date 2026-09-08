@@ -452,6 +452,8 @@ def move_line(
     domain_bonus: dict | None = None,
 ) -> Line:
     shown_total = Fraction(event["total"]) if effective_total is None else Fraction(effective_total)
+    if "miumiu-noop" in event.get("tags", ()):
+        return Line(f"{event['ordinal']}. \u2800", "本招未产生数值或效果", "")
     if event.get("effects_disabled"):
         return Line(
             f"{event['ordinal']}. {event['name']}",
@@ -734,6 +736,10 @@ def _event_move_wheel(event: dict, definition_version: int) -> BattleWheelCard:
     definition = FIGHTERS_BY_ID[source_fighter_id]
     moves_by_id = {move.move_id: move for move in fighter_moves(source_fighter_id, definition_version)}
     wheel_move_ids = tuple(str(move_id) for move_id in event.get("draw_wheel_move_ids") or ())
+    from ..domain.battle_catalog import Move
+    for move_id in wheel_move_ids:
+        if move_id.startswith("miumiu-noop-"):
+            moves_by_id[move_id] = Move(move_id, "\u2800")
     exact_moves = tuple(moves_by_id.get(move_id) for move_id in wheel_move_ids)
     if wheel_move_ids and all(move is not None for move in exact_moves):
         moves = exact_moves
@@ -1377,12 +1383,17 @@ def matchup(
                 f"{turn['raw']}招",
                 f"原始{turn['raw']}招 - 贷款{weight_label(turn['debt'])}招 = 实际{turn['effective']}招。",
             )
-    if round_result and not events:
+    if round_result:
         events = [
             event
             for side in round_result["after"]
             for event in side["turn"].get("events", ())
         ]
+    if round_result and round_result.get("miumiu_reconstructions"):
+        events = [event for player in round_result["after"] for event in player["turn"].get("events", ())]
+        panels.append(Panel("\u2800模式 · 回合重构", (
+            Line("水面重映", "双方胜利权重清零", "本回合旧招式效果已撤销，以下展示重抽后的完整出招。"),
+        )))
     if events:
         for event_side in (0, 1):
             side_events = [event for event in events if int(event["side"]) == event_side]
@@ -1473,9 +1484,10 @@ def matchup(
         if definition_version >= 3:
             if round_result and round_result.get("carryover"):
                 carry = round_result["carryover"][index]
-                inherited = Fraction(carry["round_start_weight"]) - 5
+                base = 0 if Fraction(carry["round_start_weight"]) == 0 else 5
+                inherited = Fraction(carry["round_start_weight"]) - base
                 weight_breakdown = (
-                    f"基础5 + 历史折半继承{weight_label(inherited)} + "
+                    f"基础{base} + 历史折半继承{weight_label(inherited)} + "
                     f"本回合净增{weight_label(carry['round_gain'])}"
                 )
                 next_weight = (
@@ -1488,10 +1500,11 @@ def matchup(
                 )
             else:
                 start = Fraction(side.get("round_start_weight", side["weight"]))
-                inherited = start - 5
+                base = 0 if start == 0 else 5
+                inherited = start - base
                 current = Fraction(side["weight"]) - start
                 weight_breakdown = (
-                    f"基础5 + 历史折半继承{weight_label(inherited)} + 本回合净增{weight_label(current)}"
+                    f"基础{base} + 历史折半继承{weight_label(inherited)} + 本回合净增{weight_label(current)}"
                 )
                 next_weight = "回合结算后，仅本回合净增的50%向上取整迁移"
         else:
@@ -1508,6 +1521,14 @@ def matchup(
             form, form_track, mechanic_summary = _yilu_state_projection(side)
         elif snap.get("fighter_id") == "firefly":
             form, form_track, mechanic_summary = _firefly_state_projection(side)
+        elif snap.get("fighter_id") == "miumiu":
+            form = "\u2800模式" if side.get("miumiu_mode") else "流形"
+            form_track = "记录与适应"
+            mechanic_summary = (
+                "正在使用映照的招式盘；"
+                + ("力竭保护尚未使用" if side.get("miumiu_exhaust_guard") else "力竭保护已用尽")
+                if side.get("miumiu_mode") else "以双方共同基础预演为比较依据，不受出招先后影响。"
+            )
         world_notes = []
         if turn.get("daniya_world_effects_disabled"):
             world_notes.append("发龙图：本回合全部招式与领域效果失效")
@@ -1759,6 +1780,8 @@ def matchup(
                 ),
             )
         ]
+        if round_result.get("miumiu_exhaust_guarded"):
+            injury_lines.append(Line(loser + " · 水镜庇护", "免疫本次力竭", "保护已消耗，原有伤势风险不变。"))
         if round_result.get("injury_rewound"):
             injury_lines.append(
                 Line(
@@ -2304,12 +2327,15 @@ def wheels(identity: CommandIdentity, fighter_id: str, level: int = 0) -> Battle
         return _firefly_wheels(identity, level)
     definition = FIGHTERS_BY_ID[fighter_id]
     moves = []
+    wheel_name = "自适应招式盘" if fighter_id == "miumiu" else "等权招式盘"
     for move in definition.moves:
         effect = f"胜利权重+{move.gain + level}" if move.gain else ""
         if move.draws:
             effect += f" 再抽{move.draws}次"
         if move.loan:
             effect += "；下个数值招式×2，下回合扣1招"
+        if move.description:
+            effect += "；" + move.description
         total_units = sum(item.resolved_draw_weight_units for item in definition.moves)
         moves.append(
             Line(
@@ -2326,7 +2352,7 @@ def wheels(identity: CommandIdentity, fighter_id: str, level: int = 0) -> Battle
         wheels=(
             wheel_card(
                 "move",
-                definition.name + " · 等权招式盘",
+                definition.name + " · " + wheel_name,
                 tuple((move.name, _move_weight(move)) for move in definition.moves),
                 note="规则预览；没有抽取，强化只增加数值招式的胜利权重。",
             ),
@@ -2346,7 +2372,7 @@ def wheels(identity: CommandIdentity, fighter_id: str, level: int = 0) -> Battle
             ),
         ),
         panels=(
-            Panel("等权招式盘", tuple(moves)),
+            Panel(wheel_name, tuple(moves)),
             Panel(
                 "出招数与伤势盘",
                 (
