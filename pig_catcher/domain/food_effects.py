@@ -53,6 +53,7 @@ NEXT_GUARANTEED_SIX_STAR_CATCH = "next-guaranteed-six-star-catch"
 ROLLING_DAY_WINDOW_CATCHES = "rolling-day-window-catches"
 ROULETTE_CHANCES = "roulette-chances"
 SIX_STAR_COOK_FAILURE_RETURN = "six-star-cook-failure-return"
+NEXT_SIX_STAR_COOK_DUPLICATE = "next-six-star-cook-duplicate"
 GROUP_NEXT_EXCLUSIVE_HIGH_STAR_CATCH = "group-next-exclusive-high-star-catch"
 GROUP_WINDOW_HIGH_STAR_BOOST = "group-window-high-star-boost"
 # Schema 18 前糖醋排骨使用的历史独占加权；保留解析能力以兼容旧审计快照。
@@ -153,6 +154,7 @@ SUPPORTED_EFFECT_IDS = (
     | IMMEDIATE_EFFECT_IDS
     | GROUP_EFFECT_IDS
     | {QUOTA_RESET_CHANCE}
+    | {NEXT_SIX_STAR_COOK_DUPLICATE}
 )
 
 # 互斥作用组：同组效果对同一次动作最多生效一个。
@@ -412,8 +414,9 @@ def resolve_food_effect(
             {"fixed_weights": list(fixed)},
             1,
             (
-                "摧毁下一个抓猪时段的全部基础额度并平移到下下个时段；封锁期间新获得的额度也随之平移。"
-                "下下个时段的平移抓猪固定为4星42%、5星40%、6星18%，其他临时概率效果保留。"
+                "将下一时段的指定额度搬到下下时段：基础5、撅撅猪派最多5、猪寿司拼盘2、巧克力螺5，"
+                "最多搬移17次；与目标时段自身指定额度合计最多34次，固定为4星42%、5星40%、6星18%。"
+                "其他额外次数留在原时段正常使用，不搬移，也不享受本菜固定概率；其他临时概率效果保留。"
             ),
         )
     if normalized_id == WINDOW_SIX_STAR_RESONANCE:
@@ -1056,6 +1059,13 @@ def resolve_food_effect(
             uses,
             f"接下来 {uses} 次做菜必定获得 5 星美食。",
         )
+    if normalized_id == NEXT_SIX_STAR_COOK_DUPLICATE:
+        return FoodEffectGrant(
+            normalized_id,
+            {},
+            1,
+            "下一次成功做出六星菜时额外获得同款一份；可与做菜概率菜和道具并用，失败不消耗；多份排队，每次成功仅触发一份。",
+        )
     if normalized_id == SIX_STAR_COOK_FAILURE_RETURN:
         uses = _integer(raw, "uses", lower=1, upper=10)
         chance = _number(raw, "return_chance_percent", lower=1.0, upper=100.0)
@@ -1471,8 +1481,7 @@ def apply_catch_effects(
             )
             # 倍率属于雾蓝自身：先换位，再增强目标高星档，不能在换位前乘回原档。
             adjusted = [
-                value * (MIST_HIGH_STAR_MULTIPLIER if index >= 3 else 1.0)
-                for index, value in enumerate(shuffled)
+                value * (MIST_HIGH_STAR_MULTIPLIER if index >= 3 else 1.0) for index, value in enumerate(shuffled)
             ]
             exclusive_summary += (
                 " 本次换位原始比例（倍率前）：" + " / ".join(f"{value:g}%" for value in shuffled) + "。"

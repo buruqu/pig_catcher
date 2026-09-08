@@ -1111,7 +1111,7 @@ class AdministrationService:
                     f"日期：{day}（北京时间）\n"
                     f"当前群已登记玩家：{len(plans)} 人\n"
                     f"其中重置前已使用过机会：{active_before} 人\n"
-                    "现均可主动比划 1 次、被比划 1 次\n"
+                    "现均可主动比划 2 次、被比划 2 次\n"
                     f"审计号：{audit_event_id}"
                 )
             else:
@@ -1122,7 +1122,7 @@ class AdministrationService:
                     "【猪管·玩家比划机会重置完成】\n"
                     f"玩家：{target['display_name']}（{target['platform_user_id']}）\n"
                     f"重置前今日已用：{used_text}\n"
-                    "现可主动比划 1 次、被比划 1 次\n"
+                    "现可主动比划 2 次、被比划 2 次\n"
                     f"审计号：{audit_event_id}"
                 )
             receipt = await self._reserve_receipt(

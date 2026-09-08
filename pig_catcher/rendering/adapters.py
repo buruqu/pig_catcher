@@ -528,8 +528,8 @@ def food_card_view(
     """Build one food detail or cooking-result card."""
 
     bonus_selector = ""
-    if cooking is not None and cooking.bonus_serving and len(cooking.foods) > 1:
-        bonus_selector = cooking.foods[1].selector
+    if cooking is not None and len(cooking.foods) > 1:
+        bonus_selector = "、".join(item.selector for item in cooking.foods[1:])
     progress = level_progress(cooking.total_experience) if cooking is not None else None
     return FoodCardViewModel(
         mode_label=mode_label,
@@ -564,6 +564,7 @@ def food_card_view(
         item_remaining_uses=(cooking.item_remaining_uses if cooking is not None else 0),
         catalog_new_count=(cooking.catalog_new_count if cooking is not None else 0),
         bonus_selector=bonus_selector,
+        bonus_label=("大份餐盒 / 美食加餐" if cooking and cooking.bonus_serving else "彩彩慕斯加餐"),
         probability_summary=(cooking.probability_summary if cooking is not None else ""),
         effect_summaries=(cooking.effect_summaries if cooking is not None else ()),
         achievement_firework=(

@@ -1,6 +1,6 @@
 [plugin]
 enabled = true
-config_version = "2.0.28"
+config_version = "2.0.29"
 framework_phase = "6"
 
 [features]
@@ -94,8 +94,8 @@ trade_enabled = true
 max_trade_price = 1000000
 offer_expiry_minutes = 5
 trade_page_size = 8
-daily_gift_send_limit = 5
-daily_gift_receive_limit = 5
+daily_gift_send_limit = 2
+daily_gift_receive_limit = 2
 trade_tax_percent = 5
 
 [launch_campaign]

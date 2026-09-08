@@ -9,6 +9,7 @@ from uuid import uuid4
 from ...domain.battle import dumps, loads
 from ...domain.battle_catalog import (
     BATTLE_FACT_VERSION,
+    DAILY_BATTLE_ROLE_LIMIT,
     FIGHTERS_BY_TEMPLATE,
     LOOT_ATTEMPTS,
     MATERIAL_IDS,
@@ -60,6 +61,9 @@ class BattleRepository:
         return int(row[0]) if row else 0
 
     async def quota_used(self, session: DatabaseSession, player_id: str, day: str, role: str) -> bool:
+        return await self.quota_use_count(session, player_id, day, role) >= DAILY_BATTLE_ROLE_LIMIT
+
+    async def quota_use_count(self, session: DatabaseSession, player_id: str, day: str, role: str) -> int:
         generation = await self.quota_generation(session, player_id, day)
         if generation == 0:
             row = await session.fetch_one(
@@ -72,13 +76,17 @@ class BattleRepository:
                 WHERE player_id=? AND day=? AND role=? AND generation=?""",
                 (player_id, day, role, generation),
             )
-        return row is not None
+        second = await session.fetch_one(
+            "SELECT 1 FROM battle_daily_second_uses WHERE player_id=? AND day=? AND role=? AND generation=?",
+            (player_id, day, role, generation),
+        )
+        return int(row is not None) + int(second is not None)
 
     async def used_roles(self, session: DatabaseSession, player_id: str, day: str) -> set[str]:
         return {
             role
             for role in ("initiator", "opponent")
-            if await self.quota_used(session, player_id, day, role)
+            if await self.quota_use_count(session, player_id, day, role)
         }
 
     async def record_quota_use(
@@ -93,6 +101,15 @@ class BattleRepository:
         now_ms: int,
     ) -> None:
         generation = await self.quota_generation(session, player_id, day)
+        count = await self.quota_use_count(session, player_id, day, role)
+        if count >= DAILY_BATTLE_ROLE_LIMIT:
+            raise BattleError("今日该方向的2次对战额度已用完。")
+        if count:
+            await session.execute(
+                "INSERT INTO battle_daily_second_uses VALUES(?,?,?,?,?,?,?)",
+                (player_id, scope_id, day, role, generation, battle_id, now_ms),
+            )
+            return
         if generation == 0:
             await session.execute(
                 """INSERT INTO battle_daily_uses(player_id,day,role,battle_id)

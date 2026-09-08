@@ -782,18 +782,18 @@ class TradingSection(PluginConfigBase):
         json_schema_extra=_ui("交易列表每页数量", "默认 8，按创建时间倒序展示"),
     )
     daily_gift_send_limit: int = Field(
-        default=5,
+        default=2,
         ge=1,
         le=1000,
         description="每位玩家每天成功主动赠送猪猪或美食的合计次数上限",
-        json_schema_extra=_ui("每日赠送次数", "默认 5 次；北京时间 00:00 刷新，失败或系统赠送不计数"),
+        json_schema_extra=_ui("每日赠送次数", "默认 2 次；北京时间 00:00 刷新，失败或系统赠送不计数"),
     )
     daily_gift_receive_limit: int = Field(
-        default=5,
+        default=2,
         ge=1,
         le=1000,
         description="每位玩家每天成功收到其他玩家赠送的合计次数上限",
-        json_schema_extra=_ui("每日收赠次数", "默认 5 次；北京时间 00:00 刷新，系统群体效果不计数"),
+        json_schema_extra=_ui("每日收赠次数", "默认 2 次；北京时间 00:00 刷新，系统群体效果不计数"),
     )
     trade_tax_percent: int = Field(
         default=5,

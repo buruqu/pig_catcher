@@ -761,9 +761,9 @@ async def test_v23_migrates_food_effects_and_repairs_intermediate_pig_cookie(
         5,
     )
     assert active["彩彩修车猪慕斯"] == (
-        "six-star-cook-failure-return",
-        '{"return_chance_percent":75,"uses":3}',
-        3,
+        "next-six-star-cook-duplicate",
+        '{}',
+        1,
     )
     assert active["猪保千猪排轮盘"] == (
         "even-catch-distribution",

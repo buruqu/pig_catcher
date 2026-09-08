@@ -67,10 +67,10 @@ from ..domain.food_effects import (
     NEXT_HIGH_STAR_CATCH,
     NEXT_SIX_STAR_COOK,
     NEXT_SIX_STAR_COOK_BONUS,
+    NEXT_SIX_STAR_COOK_DUPLICATE,
     NEXT_STACKABLE_SIX_STAR_COOK_BONUS,
     PERMANENT_SIX_STAR_PROGRESS,
     PERMANENT_WINDOW_CATCH,
-    QUOTA_EXEMPT_CATCH_EFFECTS,
     QUOTA_RESET_CHANCE,
     ROLLING_DAY_WINDOW_CATCHES,
     ROULETTE_CHANCES,
@@ -81,7 +81,6 @@ from ..domain.food_effects import (
     WEEKLY_WINDOW_CATCHES,
     WINDOW_SIX_STAR_RESONANCE,
     active_effect_from_row,
-    active_quota_effect_bonuses,
     add_six_star_probability_points,
     apply_cooking_effects,
     apply_six_star_progress,
@@ -617,7 +616,10 @@ def format_cooking_summary(result: CookingResult) -> str:
 
     progress = level_progress(result.total_experience)
     main = result.foods[0]
-    bonus = f"\n大份餐盒加餐：{result.foods[1].selector}" if result.bonus_serving and len(result.foods) > 1 else ""
+    bonus = ""
+    if len(result.foods) > 1:
+        label = "大份餐盒 / 美食加餐" if result.bonus_serving else "彩彩慕斯加餐"
+        bonus = f"\n{label}：" + "、".join(food.selector for food in result.foods[1:])
     item = result.item_name or "无"
     if result.item_name:
         item += f"（连续使用队列剩余 {result.item_remaining_uses} 次）"
@@ -900,10 +902,7 @@ def format_store_summary(result: StorePage) -> str:
         for level in range(11)
     )
     feed_probabilities = tuple(sum(weights[3:]) for weights in feed_distributions)
-    cookware_bonuses = tuple(
-        (cookware_higher_rarity_multiplier(level) - 1.0) * 100.0
-        for level in range(11)
-    )
+    cookware_bonuses = tuple((cookware_higher_rarity_multiplier(level) - 1.0) * 100.0 for level in range(11))
     lucky_before = catch_weights(result.catch_base_weights)
 
     def catch_item_summary(item_id: str) -> str:
@@ -941,15 +940,13 @@ def format_store_summary(result: StorePage) -> str:
         f"玩家：{result.display_name}；余额：{result.coin_balance} 猪币",
         f"分类：{result.category}；单页展示全部 {result.total_count} 项",
         f"猪饲料 Lv.{result.feed_level}；厨具 Lv.{result.cookware_level}",
-        "猪饲料 Lv.0-10 的 4-6 星合计概率："
-        + " / ".join(f"{value:.2f}%" for value in feed_probabilities),
+        "猪饲料 Lv.0-10 的 4-6 星合计概率：" + " / ".join(f"{value:.2f}%" for value in feed_probabilities),
         "猪饲料逐档 4★/5★/6★："
         + " / ".join(
             f"Lv.{level} {weights[3]:.2f}%/{weights[4]:.2f}%/{weights[5]:.2f}%"
             for level, weights in enumerate(feed_distributions)
         ),
-        "厨具 Lv.0-10 的高档菜相对权重增幅："
-        + " / ".join(f"+{value:.0f}%" for value in cookware_bonuses),
+        "厨具 Lv.0-10 的高档菜相对权重增幅：" + " / ".join(f"+{value:.0f}%" for value in cookware_bonuses),
         "单调增益规则：等级、饲料与概率道具组合后，4/5/6 星均不会低于组合前；"
         "定向菜品只从更低星级转移概率，不压低更高星级。",
         f"幸运猪哨（基础权重，使用前→使用后）：{catch_item_summary('lucky-whistle')}",
@@ -1863,6 +1860,18 @@ class EconomyService:
         food_specs = [main_attributes]
         if bonus_attributes is not None:
             food_specs.append(bonus_attributes)
+        # 加餐在确定品质之后执行，独立于概率互斥组；一份效果最多增加一份同款菜。
+        duplicate_effect = next(
+            (e for e in active_effects if e.effect_id == NEXT_SIX_STAR_COOK_DUPLICATE),
+            None,
+        )
+        if duplicate_effect is not None:
+            if int(output_rarity) == 6:
+                food_specs.append(main_attributes)
+                consumed_effect_entry_ids.append(duplicate_effect.effect_entry_id)
+                cook_effect_summaries.append("彩彩修车猪慕斯：成功做出六星菜，额外获得同款一份；本份加餐机会已使用。")
+            else:
+                cook_effect_summaries.append("彩彩修车猪慕斯：本次未做出六星菜，加餐机会保留。")
         food_ids = [self._new_identifier() for _ in food_specs]
         short_codes: list[str] = []
         for _ in food_specs:
@@ -1959,43 +1968,18 @@ class EconomyService:
             )
 
         if resonance_reward_catches:
-            active_transfer = await self.repository.active_catch_window_transfer(
+            reward = resolve_food_effect(EXTRA_CATCHES, {"count": resonance_reward_catches})
+            await self.repository.insert_food_effect(
                 session,
+                effect_entry_id=self._new_identifier(),
                 player_id=identity.player_id,
+                source_food_instance_id=food_ids[0],
+                effect_id=reward.effect_id,
+                params_json=json.dumps(reward.params, ensure_ascii=False, sort_keys=True, separators=(",", ":")),
+                granted_uses=reward.granted_uses,
+                expires_at=self._daily_effect_expiry(datetime.fromisoformat(now.replace("Z", "+00:00"))),
                 now=now,
             )
-            transfer_blocked = bool(
-                active_transfer is not None
-                and str(active_transfer["blocked_window_start"]) <= now < str(active_transfer["blocked_window_end"])
-            )
-            if transfer_blocked:
-                moved_total = await self.repository.add_transferred_catch_uses(
-                    session,
-                    player_id=identity.player_id,
-                    count=resonance_reward_catches,
-                    now=now,
-                )
-                if moved_total is None:
-                    raise RuntimeError("粉蓝四叶草奖励平移状态已变化，本次做菜未结算。")
-                cook_effect_summaries[-1] += f" 当前处于额度封锁时段，3次机会已平移，目标时段累计{moved_total}次。"
-            else:
-                reward = resolve_food_effect(EXTRA_CATCHES, {"count": resonance_reward_catches})
-                await self.repository.insert_food_effect(
-                    session,
-                    effect_entry_id=self._new_identifier(),
-                    player_id=identity.player_id,
-                    source_food_instance_id=food_ids[0],
-                    effect_id=reward.effect_id,
-                    params_json=json.dumps(
-                        reward.params,
-                        ensure_ascii=False,
-                        sort_keys=True,
-                        separators=(",", ":"),
-                    ),
-                    granted_uses=reward.granted_uses,
-                    expires_at=self._daily_effect_expiry(datetime.fromisoformat(now.replace("Z", "+00:00"))),
-                    now=now,
-                )
 
         coin_reward = COOK_COIN_REWARDS[output_rarity]
         experience_reward = COOK_EXPERIENCE_REWARDS[output_rarity]
@@ -2303,7 +2287,6 @@ class EconomyService:
             )
             effect = self._food_effect(food)
             overflow_active = False
-            skip_effect_queue = False
             reward_payload: dict[str, object] = {}
             effect_expires_at = effect.expires_at
             if effect.queued_effect_id in GROUP_EFFECT_IDS:
@@ -2421,11 +2404,14 @@ class EconomyService:
                         f"猪饺的六星菜概率加成已经叠加 {max_stacks} 层；请先用 6 星猪做菜后再食用，美食未消耗。"
                     )
             elif effect.queued_effect_id == CATCH_WINDOW_TRANSFER:
-                if await self.repository.active_catch_window_transfer(
-                    session,
-                    player_id=identity.player_id,
-                    now=now,
-                ) is not None:
+                if (
+                    await self.repository.active_catch_window_transfer(
+                        session,
+                        player_id=identity.player_id,
+                        now=now,
+                    )
+                    is not None
+                ):
                     raise FoodEffectError("已经存在尚未结束的月栖萤光卷平移计划；美食未消耗。")
                 current_window = catch_quota_window(
                     now_datetime,
@@ -2446,26 +2432,10 @@ class EconomyService:
                 blocked_end = iso_timestamp(blocked_window.end)
                 target_start = iso_timestamp(target_window.start)
                 target_end = iso_timestamp(target_window.end)
-                permanent_bonus, weekly_bonus = await self.repository.catch_quota_bonuses(
+                moved_uses = await self.repository.transfer_eligible_quota(
                     session,
                     player_id=identity.player_id,
                     now=blocked_start,
-                )
-                projected_effects = tuple(
-                    active_effect_from_row(row)
-                    for row in await self.repository.list_active_food_effects(
-                        session,
-                        player_id=identity.player_id,
-                        now=blocked_start,
-                    )
-                )
-                current_bonus, today_bonus = active_quota_effect_bonuses(projected_effects)
-                moved_uses = (
-                    self.catch_daily_limit
-                    + permanent_bonus
-                    + weekly_bonus
-                    + current_bonus
-                    + today_bonus
                 )
                 await self.repository.create_catch_window_transfer(
                     session,
@@ -2489,7 +2459,8 @@ class EconomyService:
                     summary=(
                         f"已封存北京时间 {blocked_window.label} 的 {moved_uses} 次基础额度，"
                         f"并平移到 {target_window.label}；目标时段额外增加 {moved_uses} 次，"
-                        "平移抓猪固定为4星42%、5星40%、6星18%。"
+                        "与目标自身指定额度合计最多34次，固定为4星42%、5星40%、6星18%。"
+                        "其他额外次数留在原时段正常使用，不搬移、不套用本菜概率。"
                     ),
                 )
                 reward_payload = {
@@ -2504,11 +2475,14 @@ class EconomyService:
                     refresh_hours=self.quota_refresh_hours,
                     timezone_name=self.quota_timezone_name,
                 )
-                if await self.repository.active_window_resonance(
-                    session,
-                    player_id=identity.player_id,
-                    now=now,
-                ) is not None:
+                if (
+                    await self.repository.active_window_resonance(
+                        session,
+                        player_id=identity.player_id,
+                        now=now,
+                    )
+                    is not None
+                ):
                     raise FoodEffectError("粉蓝四叶草冰糕在本抓猪时段已经生效，不能重复叠加；美食未消耗。")
                 await self.repository.create_window_resonance(
                     session,
@@ -2531,48 +2505,6 @@ class EconomyService:
                     "catch_bonus_percent": 0,
                 }
 
-            active_transfer = await self.repository.active_catch_window_transfer(
-                session,
-                player_id=identity.player_id,
-                now=now,
-            )
-            movable_quota_effects = {
-                EXTRA_CATCHES,
-                CURRENT_WINDOW_CATCHES,
-                TODAY_WINDOW_CATCHES,
-                ROLLING_DAY_WINDOW_CATCHES,
-                WEEK_END_WINDOW_CATCHES,
-                WEEKLY_WINDOW_CATCHES,
-                PERMANENT_WINDOW_CATCH,
-                *QUOTA_EXEMPT_CATCH_EFFECTS,
-            }
-            if (
-                active_transfer is not None
-                and str(active_transfer["blocked_window_start"]) <= now < str(active_transfer["blocked_window_end"])
-                and effect.queued_effect_id in movable_quota_effects
-            ):
-                moved_count = int(effect.queued_effect_params.get("count") or effect.granted_uses)
-                moved_total = await self.repository.add_transferred_catch_uses(
-                    session,
-                    player_id=identity.player_id,
-                    count=moved_count,
-                    now=now,
-                )
-                if moved_total is None:
-                    raise RuntimeError("封锁时段额度平移状态已变化，美食未消耗。")
-                if effect.queued_effect_id in {
-                    EXTRA_CATCHES,
-                    CURRENT_WINDOW_CATCHES,
-                    *QUOTA_EXEMPT_CATCH_EFFECTS,
-                }:
-                    skip_effect_queue = True
-                effect = replace(
-                    effect,
-                    summary=(
-                        f"{effect.summary} 当前处于月栖萤光卷封锁时段，本时段新增的 {moved_count} 次额度"
-                        f"已平移；目标时段累计平移 {moved_total} 次。"
-                    ),
-                )
             consumed = await self.repository.consume_food(
                 session,
                 food_instance_id=food.food_instance_id,
@@ -2593,7 +2525,7 @@ class EconomyService:
             personal_effect_entry_id = ""
             roulette_available_spins = 0
             available_effect_uses = 0
-            if effect.queued_effect_id and not skip_effect_queue and effect.queued_effect_id not in {
+            if effect.queued_effect_id and effect.queued_effect_id not in {
                 WEEKLY_WINDOW_CATCHES,
                 PERMANENT_WINDOW_CATCH,
                 PERMANENT_SIX_STAR_PROGRESS,
@@ -2768,6 +2700,12 @@ class EconomyService:
                 session,
                 player_id=identity.player_id,
                 experience=base_experience + effect.experience_bonus,
+                now=now,
+            )
+            # 指定来源新增后重新计算搬移基数；其他奖励仍保留自己的正常额度队列。
+            await self.repository.refresh_transferred_catch_uses(
+                session,
+                player_id=identity.player_id,
                 now=now,
             )
             group_rewarded_players = 0
@@ -3289,11 +3227,7 @@ class EconomyService:
                 cookware_prices=self.economy.cookware_upgrade_prices,
             )
             resolved = _STORE_CATEGORIES[category]
-            filtered = tuple(
-                product
-                for product in products
-                if resolved is None or product.category == resolved
-            )
+            filtered = tuple(product for product in products if resolved is None or product.category == resolved)
             shop_section = "主商城"
         else:
             filtered = tuple(

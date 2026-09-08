@@ -163,6 +163,7 @@ class EconomyRepository:
                 target_window_start=excluded.target_window_start,
                 target_window_end=excluded.target_window_end,
                 transferred_uses=excluded.transferred_uses,
+                target_catches_used=0,
                 fixed_weights_json=excluded.fixed_weights_json,
                 created_at=excluded.created_at,
                 updated_at=excluded.updated_at
@@ -186,20 +187,26 @@ class EconomyRepository:
         if cursor.rowcount != 1:
             raise RuntimeError("已有尚未结束的抓猪时段平移计划。")
 
-    async def add_transferred_catch_uses(
+    async def transfer_eligible_quota(self, session: DatabaseSession, *, player_id: str, now: str) -> int:
+        """仅指定来源可搬移；按对应时段仍有效的增益计算，最多17次。"""
+        permanent, weekly = await self.catch_quota_bonuses(session, player_id=player_id, now=now)
+        effects = await self.list_active_food_effects(session, player_id=player_id, now=now)
+        sushi = any(e["effect_id"] == "today-window-catches" and e["source_food_name"] == "猪寿司拼盘" for e in effects)
+        return 5 + min(5, permanent) + min(5, weekly) + (2 if sushi else 0)
+
+    async def refresh_transferred_catch_uses(
         self,
         session: DatabaseSession,
         *,
         player_id: str,
-        count: int,
         now: str,
     ) -> int | None:
-        """Move a grant received in the blocked window into the target window."""
-
+        """重新计算指定层而非追加任意奖励；重复调用不会重复搬移。"""
+        count = await self.transfer_eligible_quota(session, player_id=player_id, now=now)
         cursor = await session.execute(
             """
             UPDATE player_catch_window_transfers
-            SET transferred_uses = transferred_uses + ?, updated_at = ?
+            SET transferred_uses = MAX(transferred_uses, ?), updated_at = ?
             WHERE player_id = ?
               AND blocked_window_start <= ?
               AND blocked_window_end > ?
@@ -880,10 +887,7 @@ class EconomyRepository:
         order_sql = (
             "instance.official_value DESC, instance.acquired_at, instance.food_instance_id"
             if prefer_highest
-            else (
-                "instance.is_favorite, instance.official_value, "
-                "instance.acquired_at, instance.food_instance_id"
-            )
+            else ("instance.is_favorite, instance.official_value, instance.acquired_at, instance.food_instance_id")
         )
         limit = 1 if prefer_highest else 20
         rows = await session.fetch_all(
@@ -1134,9 +1138,7 @@ class EconomyRepository:
             raise ValueError("asset_kind must be pig or food")
         table = "pig_instances" if asset_kind == "pig" else "food_instances"
         id_column = "pig_instance_id" if asset_kind == "pig" else "food_instance_id"
-        rarity_clause = (
-            "AND rarity = ?" if rarity is not None else "AND rarity <= ?"
-        )
+        rarity_clause = "AND rarity = ?" if rarity is not None else "AND rarity <= ?"
         rarity_param: object = rarity if rarity is not None else max_rarity
         normalized_name = str(display_name or "").strip()
         name_clause = ""
@@ -1213,9 +1215,7 @@ class EconomyRepository:
         )
         if cursor.rowcount != count:
             raise RuntimeError("批量售卖资产数量发生变化，本次操作未结算。")
-        showcase_column = (
-            "pig_instance_id" if asset_kind == "pig" else "food_instance_id"
-        )
+        showcase_column = "pig_instance_id" if asset_kind == "pig" else "food_instance_id"
         await session.execute(
             f"""
             UPDATE display_preferences
@@ -1565,11 +1565,7 @@ class EconomyRepository:
             """,
             (player_id,),
         )
-        return frozenset(
-            int(row["source_object_id"])
-            for row in rows
-            if str(row["source_object_id"]).isdigit()
-        )
+        return frozenset(int(row["source_object_id"]) for row in rows if str(row["source_object_id"]).isdigit())
 
     async def add_experience(
         self,

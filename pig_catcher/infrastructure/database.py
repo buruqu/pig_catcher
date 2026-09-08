@@ -285,6 +285,7 @@ class PigCatcherDatabase:
         required_tables.update(LAUNCH_TABLES)
         required_tables.update(WINDOW_MECHANIC_TABLES)
         required_tables.add("achievement_badge_slots")
+        required_tables.add("battle_daily_second_uses")
         table_rows = await (
             await connection.execute(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name IN ("
@@ -306,13 +307,9 @@ class PigCatcherDatabase:
             raise MigrationError("数据库缺少猪猪纪念编号字段，请先完成 Schema 65 迁移。")
 
         upgrade_definition = await (
-            await connection.execute(
-                "SELECT sql FROM sqlite_master WHERE type='table' AND name='upgrades'"
-            )
+            await connection.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='upgrades'")
         ).fetchone()
-        normalized_upgrade_sql = (
-            "".join(str(upgrade_definition[0]).lower().split()) if upgrade_definition else ""
-        )
+        normalized_upgrade_sql = "".join(str(upgrade_definition[0]).lower().split()) if upgrade_definition else ""
         if "check(levelbetween0and10)" not in normalized_upgrade_sql:
             raise MigrationError("数据库永久升级等级约束不是 0 至 10，请先完成 Schema 47 迁移。")
 
@@ -368,6 +365,10 @@ class PigCatcherDatabase:
         required_guards.update(LAUNCH_GUARDS)
         required_guards.update(WINDOW_MECHANIC_GUARDS)
         required_guards.update({"achievement_badge_slot_insert_guard", "achievement_badge_slot_update_guard"})
+        required_guards.update(
+            {"battle_second_use_guard", "battle_second_use_no_update", "battle_second_use_no_delete"}
+        )
+        required_guards.update({"catch_transfer_cap_insert", "catch_transfer_cap_update"})
         guard_rows = await (
             await connection.execute("SELECT name FROM sqlite_master WHERE type IN ('trigger','index')")
         ).fetchall()
@@ -385,9 +386,11 @@ class PigCatcherDatabase:
                     continue
                 if not index[4]:
                     raise MigrationError(f"{table}.short_code 仍是永久唯一，消耗后不能释放编号。")
-                definition = await (await connection.execute(
-                    "SELECT sql FROM sqlite_master WHERE type='index' AND name=?", (str(index[1]),)
-                )).fetchone()
+                definition = await (
+                    await connection.execute(
+                        "SELECT sql FROM sqlite_master WHERE type='index' AND name=?", (str(index[1]),)
+                    )
+                ).fetchone()
                 normalized = "".join(str(definition[0]).lower().split()) if definition else ""
                 if "wherestatein('active','locked-for-trade')" not in normalized or "collatenocase" not in normalized:
                     raise MigrationError(f"{table} 的活跃编号大小写或状态约束不正确。")

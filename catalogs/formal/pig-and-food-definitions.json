@@ -3664,11 +3664,8 @@
         "草莓"
       ],
       "group_scope_id": "qq:1092931381",
-      "effect_id": "six-star-cook-failure-return",
-      "effect_params": {
-        "uses": 3,
-        "return_chance_percent": 75
-      }
+      "effect_id": "next-six-star-cook-duplicate",
+      "effect_params": {}
     },
     {
       "template_id": "pig-g237716658-aya-repair",
@@ -3711,11 +3708,8 @@
         "草莓"
       ],
       "group_scope_id": "qq:237716658",
-      "effect_id": "six-star-cook-failure-return",
-      "effect_params": {
-        "uses": 3,
-        "return_chance_percent": 75
-      }
+      "effect_id": "next-six-star-cook-duplicate",
+      "effect_params": {}
     },
     {
       "template_id": "pig-bandori-hhw-happy",
@@ -4697,11 +4691,8 @@
         "草莓"
       ],
       "group_scope_id": "qq-official:5E5854406D0297D6FEAE696A13E3A339",
-      "effect_id": "six-star-cook-failure-return",
-      "effect_params": {
-        "uses": 3,
-        "return_chance_percent": 75
-      }
+      "effect_id": "next-six-star-cook-duplicate",
+      "effect_params": {}
     },
     {
       "template_id": "food-qo5e5854406d0297d6feae696a13e3a339-baogian-pork-roulette",
@@ -5021,11 +5012,8 @@
         "草莓"
       ],
       "group_scope_id": "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
-      "effect_id": "six-star-cook-failure-return",
-      "effect_params": {
-        "uses": 3,
-        "return_chance_percent": 75
-      }
+      "effect_id": "next-six-star-cook-duplicate",
+      "effect_params": {}
     },
     {
       "template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-baogian-pork-roulette",

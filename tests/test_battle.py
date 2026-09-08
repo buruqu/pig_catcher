@@ -545,6 +545,9 @@ async def test_group_mutex_roles_daily_quota_and_scopes(world):
         await world.send(section="count", actor=replace(world.a, scope=ScopeKey("qq.official.bot2", "100")))
     await world.fight(already_started=True)
     world.clock.value += timedelta(seconds=61)
+    await world.fight()
+    world.clock.value += timedelta(seconds=61)
+    assert (await world.db.fetch_one("SELECT COUNT(*) FROM battle_daily_second_uses"))[0] == 2
     with pytest.raises(BattleError, match="次数已用完"):
         await world.invite()
     # 同一天还能交换主动/应战身份；不是每人总共只能一场。
@@ -555,6 +558,9 @@ async def test_group_mutex_roles_daily_quota_and_scopes(world):
 
 async def test_admin_generation_reset_reopens_both_roles_without_deleting_original_usage(world):
     await world.fight()
+    world.clock.value += timedelta(seconds=61)
+    await world.fight()
+    world.clock.value += timedelta(seconds=61)
     with pytest.raises(BattleError, match="次数已用完"):
         await world.invite()
     admin = AdministrationService(
@@ -570,6 +576,7 @@ async def test_admin_generation_reset_reopens_both_roles_without_deleting_origin
         all_players=True,
     )
     assert reset.affected_players == 2
+    assert "主动比划 2 次、被比划 2 次" in reset.receipt.text_summary
     assert (await world.db.fetch_one("SELECT COUNT(*) FROM battle_daily_uses"))[0] == 2
     assert (await world.db.fetch_one("SELECT COUNT(*) FROM battle_daily_quota_state"))[0] == 2
 

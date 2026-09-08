@@ -108,7 +108,7 @@ def food_reward_view(result: EatResult) -> FoodRewardView:
         "window-six-star-resonance": "粉蓝共鸣已点亮",
     }
     hint_by_kind = {
-        "catch-window-transfer": "下一个时段将封存额度；再下一个时段按月栖分布集中返还。",
+        "catch-window-transfer": "只搬指定额度，最多17次；目标合计最多34次。其他额外次数原时段照常抓。",
         "window-six-star-resonance": "共鸣仅持续当前抓猪时段；抓猪与做菜会实时累积彼此的六星概率。",
     }
     prize_by_kind = {

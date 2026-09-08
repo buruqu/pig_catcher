@@ -389,7 +389,8 @@ async def test_established_players_reciprocal_gifts_do_not_open_case(
     )
     social = SocialService(
         database,
-        TradingSection(),
+        # 此处只测监管策略，显式保留旧测试额度，避免被每日2次的业务上限先拦截。
+        TradingSection(daily_gift_send_limit=5, daily_gift_receive_limit=5),
         RankingSection(),
         regulation_service=regulation,
         clock=clock,
@@ -437,7 +438,8 @@ async def test_two_low_activity_new_sources_are_checked_strictly(
     )
     social = SocialService(
         database,
-        TradingSection(),
+        # 此处只测监管策略，显式保留旧测试额度，避免被每日2次的业务上限先拦截。
+        TradingSection(daily_gift_send_limit=5, daily_gift_receive_limit=5),
         RankingSection(),
         regulation_service=regulation,
         clock=clock,
@@ -482,7 +484,8 @@ async def test_gift_regulation_warns_then_blocks_and_escalates_idempotently(
     )
     social = SocialService(
         database,
-        TradingSection(),
+        # 此处只测监管策略，显式保留旧测试额度，避免被每日2次的业务上限先拦截。
+        TradingSection(daily_gift_send_limit=5, daily_gift_receive_limit=5),
         RankingSection(),
         regulation_service=regulation,
         clock=clock,
@@ -635,7 +638,8 @@ async def test_accepted_trade_is_evaluated_before_money_or_asset_moves(
     )
     social = SocialService(
         database,
-        TradingSection(),
+        # 此处只测监管策略，显式保留旧测试额度，避免被每日2次的业务上限先拦截。
+        TradingSection(daily_gift_send_limit=5, daily_gift_receive_limit=5),
         RankingSection(),
         regulation_service=regulation,
         clock=clock,
@@ -729,7 +733,8 @@ async def test_unlisted_scope_never_creates_regulation_state(tmp_path: Path) -> 
     regulation = RegulationService(database, RegulationSection(), clock=clock)
     social = SocialService(
         database,
-        TradingSection(),
+        # 此处只测监管策略，显式保留旧测试额度，避免被每日2次的业务上限先拦截。
+        TradingSection(daily_gift_send_limit=5, daily_gift_receive_limit=5),
         RankingSection(),
         regulation_service=regulation,
         clock=clock,
@@ -760,7 +765,8 @@ async def test_admin_transfers_are_fully_excluded_from_current_and_historical_gr
     )
     social = SocialService(
         database,
-        TradingSection(),
+        # 此处只测监管策略，显式保留旧测试额度，避免被每日2次的业务上限先拦截。
+        TradingSection(daily_gift_send_limit=5, daily_gift_receive_limit=5),
         RankingSection(),
         regulation_service=regulation,
         clock=clock,
@@ -802,7 +808,8 @@ async def test_cases_auto_dismiss_after_24_hours_and_disappear_from_admin_views(
     )
     social = SocialService(
         database,
-        TradingSection(),
+        # 此处只测监管策略，显式保留旧测试额度，避免被每日2次的业务上限先拦截。
+        TradingSection(daily_gift_send_limit=5, daily_gift_receive_limit=5),
         RankingSection(),
         regulation_service=regulation,
         clock=clock,
@@ -859,7 +866,8 @@ async def test_global_regulation_reset_backs_up_and_clears_current_state(
     )
     social = SocialService(
         database,
-        TradingSection(),
+        # 此处只测监管策略，显式保留旧测试额度，避免被每日2次的业务上限先拦截。
+        TradingSection(daily_gift_send_limit=5, daily_gift_receive_limit=5),
         RankingSection(),
         regulation_service=regulation,
         clock=clock,

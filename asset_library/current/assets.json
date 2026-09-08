@@ -5277,11 +5277,8 @@
         "慕斯",
         "草莓"
       ],
-      "effect_id": "six-star-cook-failure-return",
-      "effect_params": {
-        "uses": 3,
-        "return_chance_percent": 75
-      },
+      "effect_id": "next-six-star-cook-duplicate",
+      "effect_params": {},
       "paired_food_template_id": "",
       "collection": null
     },
@@ -5341,11 +5338,8 @@
         "慕斯",
         "草莓"
       ],
-      "effect_id": "six-star-cook-failure-return",
-      "effect_params": {
-        "uses": 3,
-        "return_chance_percent": 75
-      },
+      "effect_id": "next-six-star-cook-duplicate",
+      "effect_params": {},
       "paired_food_template_id": "",
       "collection": null
     },
@@ -6647,11 +6641,8 @@
         "慕斯",
         "草莓"
       ],
-      "effect_id": "six-star-cook-failure-return",
-      "effect_params": {
-        "uses": 3,
-        "return_chance_percent": 75
-      },
+      "effect_id": "next-six-star-cook-duplicate",
+      "effect_params": {},
       "paired_food_template_id": "",
       "collection": null
     },
@@ -7089,11 +7080,8 @@
         "慕斯",
         "草莓"
       ],
-      "effect_id": "six-star-cook-failure-return",
-      "effect_params": {
-        "uses": 3,
-        "return_chance_percent": 75
-      },
+      "effect_id": "next-six-star-cook-duplicate",
+      "effect_params": {},
       "paired_food_template_id": "",
       "collection": null
     },

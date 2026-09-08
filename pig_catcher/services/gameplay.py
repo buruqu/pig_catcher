@@ -579,7 +579,9 @@ def pig_view_from_row(
         alternate_image_relpath=alternate_image_relpath,
         display_tags=(
             ((f"生日纪念 {row['commemorative_code']}",) if row.get("commemorative_code") else ())
-            + display_tags_from_json(row.get("display_tags_json")) if bool(row.get("media_visible", True)) else ()
+            + display_tags_from_json(row.get("display_tags_json"))
+            if bool(row.get("media_visible", True))
+            else ()
         ),
         is_favorite=bool(row.get("is_favorite") or False),
         activity_label={"dispatch": "派遣中", "tour": "巡演中", "battle": "对战中"}.get(
@@ -1057,10 +1059,18 @@ class GameplayService:
                 window_transfer is not None
                 and str(window_transfer["target_window_start"]) <= now < str(window_transfer["target_window_end"])
             )
+            transfer_eligible = 0
+            if transfer_blocked or transfer_target_active:
+                transfer_eligible = await self.economy_repository.transfer_eligible_quota(
+                    session,
+                    player_id=identity.player_id,
+                    now=now,
+                )
             if transfer_blocked:
-                raise DailyCatchLimitError(
-                    "月栖萤光卷正在封存本时段抓猪额度；本时段不能抓猪，"
-                    f"全部额度将在 {str(window_transfer['target_window_start'])} 开始的下个时段返还。"
+                await self.economy_repository.refresh_transferred_catch_uses(
+                    session,
+                    player_id=identity.player_id,
+                    now=now,
                 )
             current_window_bonus, today_window_bonus = active_quota_effect_bonuses(active_effects)
             extra_granted, extra_consumed = await self.economy_repository.extra_catch_grants(
@@ -1118,11 +1128,27 @@ class GameplayService:
                     extra_consumed=extra_consumed,
                 )
             base_window_limit = quota_layers.base_window_limit
+            if transfer_blocked:
+                quota_layers = stack_catch_quota_layers(
+                    configured_base=max(0, base_window_limit - transfer_eligible),
+                    extra_granted=extra_granted,
+                    extra_consumed=extra_consumed,
+                )
+                base_window_limit = quota_layers.base_window_limit
             normal_daily_limit = quota_layers.effective_limit(used_count=daily_count)
             if transfer_target_active:
                 transferred_uses = int(window_transfer["transferred_uses"])
                 base_window_limit += transferred_uses
                 normal_daily_limit += transferred_uses
+            # 只有目标自身指定额度 + 搬移额度享受固定概率；额外池与专属队列不会无限套用。
+            transfer_fixed_limit = (
+                min(34, transfer_eligible + int(window_transfer["transferred_uses"])) if transfer_target_active else 0
+            )
+            transfer_target_active = bool(
+                transfer_target_active
+                and daily_count < transfer_fixed_limit
+                and int(window_transfer["target_catches_used"]) < transfer_fixed_limit
+            )
             daily_limit = self._restricted_daily_limit(
                 normal_limit=normal_daily_limit,
                 restriction=catch_restriction,
@@ -1170,9 +1196,7 @@ class GameplayService:
             armed_item, armed_uses = self._armed_item(armed_row, "catching")
             equipped_item = armed_item
             group_exclusive_effect_active = (
-                False
-                if transfer_target_active
-                else has_compatible_exclusive_group_catch_effect(active_group_effects)
+                False if transfer_target_active else has_compatible_exclusive_group_catch_effect(active_group_effects)
             )
             personal_exclusive_effect_active = (
                 not transfer_target_active
@@ -1184,9 +1208,7 @@ class GameplayService:
             )
             # 六星菜独占效果：回到未受等级、饲料、道具和普通菜影响的基础层。
             exclusive_effect_active = (
-                transfer_target_active
-                or group_exclusive_effect_active
-                or personal_exclusive_effect_active
+                transfer_target_active or group_exclusive_effect_active or personal_exclusive_effect_active
             )
             deferred_achievement_tickets = bool(
                 exclusive_effect_active and (achievement_catch_tickets or achievement_visual_tickets)
@@ -1208,6 +1230,8 @@ class GameplayService:
                 effect_summaries = (
                     "月栖萤光卷平移时段：本时段额外返还 "
                     f"{int(window_transfer['transferred_uses'])} 次额度，品质固定为4星42% / 5星40% / 6星18%。",
+                    f"月栖固定概率剩余 {max(0, transfer_fixed_limit - int(window_transfer['target_catches_used']) - 1)}"
+                    f"/{transfer_fixed_limit} 次；其他额外次数不受影响。",
                 )
                 excluded_summaries = tuple(
                     resolve_food_effect(effect.effect_id, effect.params).summary
@@ -1218,9 +1242,7 @@ class GameplayService:
                 if active_group_effects:
                     excluded_summaries += ("当前全群六星菜概率效果在平移时段保留且未消耗。",)
                 if equipped_item is not None:
-                    excluded_summaries += (
-                        f"已装备的“{equipped_item.display_name}”在平移时段保留且未消耗。",
-                    )
+                    excluded_summaries += (f"已装备的“{equipped_item.display_name}”在平移时段保留且未消耗。",)
             elif group_exclusive_effect_active:
                 effect_application = apply_catch_effects(weights, ())
                 group_effect_application = apply_group_catch_effects(
@@ -1331,7 +1353,8 @@ class GameplayService:
                 )
             if not quota_exempt_catch and daily_count >= daily_limit:
                 raise DailyCatchLimitError(
-                    f"本时段已经抓了 {daily_count}/{daily_limit} 次，"
+                    ("月栖萤光卷已封存本时段指定额度；其他额外次数仍可正常使用。" if transfer_blocked else "")
+                    + f"本时段已经抓了 {daily_count}/{daily_limit} 次，"
                     f"下次刷新：北京时间 {quota_window.next_refresh_label}。"
                 )
             using_extra_catch = (
@@ -1535,8 +1558,7 @@ class GameplayService:
                     now=now,
                 )
                 effect_summaries += (
-                    f"粉蓝四叶草共鸣：本次{int(rarity)}星猪令六星做菜累计加成增至"
-                    f"+{cook_bonus_after / 100:g}个百分点。",
+                    f"粉蓝四叶草共鸣：本次{int(rarity)}星猪令六星做菜累计加成增至+{cook_bonus_after / 100:g}个百分点。",
                 )
                 if rarity is Rarity.SIX:
                     await self.economy_repository.reset_window_resonance_bonus(
@@ -1938,6 +1960,12 @@ class GameplayService:
             )
             if pig_row is None:
                 raise RuntimeError("抓猪实例提交前无法读取。")
+            if transfer_target_active:
+                await session.execute(
+                    "UPDATE player_catch_window_transfers SET target_catches_used=target_catches_used+1,updated_at=? "
+                    "WHERE player_id=? AND target_catches_used<34",
+                    (now, identity.player_id),
+                )
             pig = self._pig_view(pig_row)
             payload: dict[str, Any] = {
                 "daily_count": settled_daily_count,
@@ -2928,6 +2956,26 @@ class GameplayService:
             showcase_row = await self.social_repository.showcase_row(
                 session,
                 player_id=identity.player_id,
+            )
+            transfer = await self.economy_repository.active_catch_window_transfer(
+                session,
+                player_id=identity.player_id,
+                now=now,
+            )
+            quota_adjustment = 0
+            if transfer is not None:
+                if str(transfer["blocked_window_start"]) <= now < str(transfer["blocked_window_end"]):
+                    quota_adjustment = -await self.economy_repository.transfer_eligible_quota(
+                        session,
+                        player_id=identity.player_id,
+                        now=now,
+                    )
+                elif str(transfer["target_window_start"]) <= now < str(transfer["target_window_end"]):
+                    quota_adjustment = int(transfer["transferred_uses"])
+            quota_layers = stack_catch_quota_layers(
+                configured_base=max(0, quota_layers.base_window_limit + quota_adjustment),
+                extra_granted=extra_granted,
+                extra_consumed=extra_consumed,
             )
         experience = int(row["experience"])
         progress = level_progress(experience)

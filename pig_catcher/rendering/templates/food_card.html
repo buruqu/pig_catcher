@@ -41,7 +41,7 @@
         <span class="pill pill--strong">#{{ view.short_code }}</span>
         <span class="pill">{{ view.media_format }}{% if view.is_animated %} · 动态{% endif %}</span>
         {% if view.catalog_new_count %}<span class="pill pill--mint">新图鉴 {{ view.catalog_new_count }}</span>{% endif %}
-        {% if view.bonus_selector %}<span class="pill pill--gold">大份餐盒加餐</span>{% endif %}
+        {% if view.bonus_selector %}<span class="pill pill--gold">{{ view.bonus_label }}</span>{% endif %}
       </div>
       {% if view.achievement_title or view.achievement_badge or view.achievement_badges|reject('equalto', '')|list or view.achievement_badge_capacity == 3 %}<div class="result-cosmetics">{{ cosmetic_plate(view.achievement_title) }}{{ cosmetic_badges(view.achievement_badges, view.achievement_badge, view.achievement_badge_capacity) }}</div>{% endif %}
       <div class="pig-card__facts">

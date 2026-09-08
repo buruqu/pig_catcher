@@ -598,17 +598,17 @@ async def test_moonlight_roll_blocks_next_window_moves_new_grants_and_restores_f
         _identity(message_id="moon-extra-eat"),
         "封锁期额度菜#MOVEPLUS",
     )
-    assert "累计平移 7 次" in moved.effect.summary
+    assert "平移" not in moved.effect.summary
     transfer = await database.fetch_one(
         "SELECT transferred_uses FROM player_catch_window_transfers WHERE player_id=?",
         (owner.player_id,),
     )
-    assert transfer is not None and transfer["transferred_uses"] == 7
+    assert transfer is not None and transfer["transferred_uses"] == 5
     queued = await database.fetch_one(
         "SELECT 1 FROM player_food_effects WHERE source_food_instance_id=?",
         ("moon-extra-catches",),
     )
-    assert queued is None
+    assert queued is not None
 
     await _insert_food(
         database,
@@ -628,12 +628,12 @@ async def test_moonlight_roll_blocks_next_window_moves_new_grants_and_restores_f
         _identity(message_id="moon-dedicated-eat"),
         "封锁期专属轮盘菜#MOVEWHEL",
     )
-    assert "累计平移 9 次" in dedicated.effect.summary
+    assert "平移" not in dedicated.effect.summary
     queued = await database.fetch_one(
         "SELECT 1 FROM player_food_effects WHERE source_food_instance_id=?",
         ("moon-dedicated-catches",),
     )
-    assert queued is None
+    assert queued is not None
 
     clock.value = datetime(2026, 7, 28, 16, 0, tzinfo=UTC)
     target_catching = GameplayService(
@@ -647,9 +647,9 @@ async def test_moonlight_roll_blocks_next_window_moves_new_grants_and_restores_f
     caught = await target_catching.catch(_identity(message_id="moon-target"))
     assert caught.pig.rarity == 4
     assert caught.weights == pytest.approx((0, 0, 0, 42, 40, 18))
-    assert caught.daily_limit == 14
+    assert caught.daily_limit == 10
     assert caught.exclusive_effect_active
-    assert any("额外返还 9 次" in line for line in caught.effect_summaries)
+    assert any("额外返还 5 次" in line for line in caught.effect_summaries)
     await database.close()
 
 

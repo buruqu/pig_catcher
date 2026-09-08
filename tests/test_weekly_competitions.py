@@ -276,7 +276,11 @@ async def test_settlement_rewards_top_ten_once_and_event_cosmetics_can_be_equipp
 
 
 @pytest.mark.asyncio
-async def test_plugin_scores_catch_and_renders_weekly_command_alias(tmp_path: Path) -> None:
+async def test_plugin_scores_catch_and_renders_weekly_command_alias(tmp_path: Path, monkeypatch) -> None:
+    # 时钟必须在插件初始化之前固定，否则真实日期过了结活日会提前关闭测试赛事。
+    launch_clock = MutableClock(datetime(2026, 9, 1, 4, 0, tzinfo=UTC))
+    monkeypatch.setattr(f"{create_plugin.__module__}.pig_catcher.domain.ports.SystemClock.now",
+                        lambda self: launch_clock.now())
     plugin, context = await create_test_plugin(
         tmp_path,
         config_updates={
@@ -285,7 +289,6 @@ async def test_plugin_scores_catch_and_renders_weekly_command_alias(tmp_path: Pa
         },
     )
     await _install_test_pig(plugin, tmp_path)
-    launch_clock = MutableClock(datetime(2026, 9, 1, 4, 0, tzinfo=UTC))
     plugin._weekly_competition_service.clock = launch_clock
     plugin._gameplay_service.clock = launch_clock
     message = build_message(message_id="weekly-plugin-catch")

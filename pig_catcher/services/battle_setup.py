@@ -33,7 +33,10 @@ class BattleSetup:
 
     async def profile(self, session, identity, now_ms):
         profile = await self.repo.profile(session, identity.player_id)
-        used = await self.repo.used_roles(session, identity.player_id, beijing_day(now_ms))
+        used = {
+            role: await self.repo.quota_use_count(session, identity.player_id, beijing_day(now_ms), role)
+            for role in ("initiator", "opponent")
+        }
         pig = (
             await self.repo.member(session, identity.player_id, profile["pig_instance_id"])
             if profile["pig_instance_id"]
@@ -56,8 +59,8 @@ class BattleSetup:
             banner="+0即可参战。强化仅提升数值招式收益，不提升抽中概率；战斗不会销毁参战猪。",
             pigs=(pig_card(pig),) if pig else (),
             stats=(
-                Line("今日主动", "0/1" if "initiator" in used else "1/1", "剩余次数"),
-                Line("今日应战", "0/1" if "opponent" in used else "1/1", "剩余次数"),
+                Line("今日主动", f"{max(0, 2-used['initiator'])}/2", "剩余次数"),
+                Line("今日应战", f"{max(0, 2-used['opponent'])}/2", "剩余次数"),
                 Line("待交付战利品", str(loot), "额外次数，猪归胜者"),
             ),
             panels=(

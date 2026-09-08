@@ -472,14 +472,14 @@ async def test_manual_gifts_have_separate_beijing_daily_send_and_receive_limits(
     other_catch = (await _catch_many(database, clock, count=1, user_id="other-sender"))[0]
     service = SocialService(database, TradingSection(), RankingSection(), clock=clock)
     recipient = _identity(user_id="recipient", message_id="target")
-    for index, catch in enumerate(caught[:5]):
+    for index, catch in enumerate(caught[:2]):
         result = await service.gift(
             _identity(user_id="seller", message_id=f"gift-limit-{index}"),
             recipient,
             asset_kind=AssetKind.PIG,
             selector_text=catch.pig.selector,
         )
-        assert result.sender_remaining == result.recipient_remaining == 4 - index
+        assert result.sender_remaining == result.recipient_remaining == 1 - index
     with pytest.raises(DomainValidationError, match="主动赠送额度"):
         await service.gift(
             _identity(user_id="seller", message_id="gift-limit-sixth"),
@@ -502,7 +502,7 @@ async def test_manual_gifts_have_separate_beijing_daily_send_and_receive_limits(
         asset_kind=AssetKind.PIG,
         selector_text=other_catch.pig.selector,
     )
-    assert (reset.sender_remaining, reset.recipient_remaining) == (4, 4)
+    assert (reset.sender_remaining, reset.recipient_remaining) == (1, 1)
     await database.close()
 
 

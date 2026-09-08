@@ -94,13 +94,8 @@ def test_high_rarity_food_effects_cover_new_gameplay_families() -> None:
     }
     assert foods["雾蓝键盘大福"]["effect_params"] == {"uses": 10}
     assert foods["雾蓝键盘大福"]["effect_id"] == "shuffled-catch-distribution"
-    assert foods["彩彩修车猪慕斯"]["effect_id"] == (
-        "six-star-cook-failure-return"
-    )
-    assert foods["彩彩修车猪慕斯"]["effect_params"] == {
-        "uses": 3,
-        "return_chance_percent": 75,
-    }
+    assert foods["彩彩修车猪慕斯"]["effect_id"] == "next-six-star-cook-duplicate"
+    assert foods["彩彩修车猪慕斯"]["effect_params"] == {}
     assert foods["猪保千猪排轮盘"]["effect_id"] == "roulette-chances"
     assert foods["猪保千猪排轮盘"]["effect_params"] == {"count": 3}
     assert foods["糖醋排骨"]["effect_id"] == "quota-reset"

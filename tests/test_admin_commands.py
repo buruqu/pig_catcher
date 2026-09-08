@@ -459,7 +459,7 @@ async def test_admin_resets_one_or_all_battle_roles_idempotently_and_scope_local
         stream_id="stream-10001",
         **_command_kwargs(single_message, arguments="@目标玩家"),
     )
-    assert single[0] is True and "主动比划 1 次、被比划 1 次" in single[1]
+    assert single[0] is True and "主动比划 2 次、被比划 2 次" in single[1]
     duplicate = await plugin.handle_admin_reset_battle_quota(
         stream_id="stream-10001",
         **_command_kwargs(single_message, arguments="@目标玩家"),

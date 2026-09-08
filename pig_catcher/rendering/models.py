@@ -468,6 +468,7 @@ class FoodCardViewModel:
     item_remaining_uses: int = 0
     catalog_new_count: int = 0
     bonus_selector: str = ""
+    bonus_label: str = "大份餐盒加餐"
     probability_summary: str = ""
     effect_summaries: tuple[str, ...] = ()
     achievement_firework: bool = False
