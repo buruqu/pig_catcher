@@ -208,7 +208,7 @@ async def test_schema70_updates_uneaten_and_locked_food_only(tmp_path):
     with sqlite3.connect(db.path) as con:
         con.execute("DROP TABLE player_clover_chains")
         con.execute("DROP TABLE player_moon_feasts")
-        con.execute("DELETE FROM schema_migrations WHERE version=70")
+        con.execute("DELETE FROM schema_migrations WHERE version>=70")
         con.execute("PRAGMA user_version=69")
     await db.open()
     rows = await db.fetch_all("SELECT state,effect_id,effect_params_json FROM food_instances ORDER BY food_instance_id")

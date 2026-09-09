@@ -21,21 +21,25 @@ from pig_catcher.domain.battle_catalog import (
     FIGHTERS_BY_TEMPLATE,
     FIREFLY_FORM_FIREFLY,
     FIREFLY_FORM_SAM,
-    FIREFLY_MOVES,
     FIREFLY_PIG_TEMPLATE_IDS,
+)
+from pig_catcher.domain.battle_catalog import (
+    FIREFLY_MOVES_V17 as FIREFLY_MOVES,
 )
 from pig_catcher.domain.models import CommandIdentity, ScopeKey
 from pig_catcher.services.battle_views import wheels
 
 
 def _state(right: str = "sukuna") -> dict:
-    return new_state(
+    current = new_state(
         [
             {"fighter_id": "firefly", "level": 0, "trait_bonus": 0, "tool_id": ""},
             {"fighter_id": right, "level": 0, "trait_bonus": 0, "tool_id": ""},
         ],
         seed="firefly-v12",
     )
+    current["version"] = 17
+    return current
 
 
 def _ready(player: dict, pending: int = 1) -> None:
@@ -50,7 +54,7 @@ def _record(state: dict, side: int, move, *, seed: str = "firefly-v12") -> dict:
         seed=seed,
         round_number=state["round"],
         side=side,
-        version=BATTLE_RULE_VERSION,
+        version=17,
     )
     event.update(round=state["round"], side=side, fighter_id=player["snapshot"]["fighter_id"])
     _apply_firefly_event_context(state, side, event)
@@ -168,7 +172,7 @@ def test_firefly_choice_is_frozen_replayable_and_executes_inside_same_chain() ->
         seed="frozen-choice",
         round_number=1,
         side=0,
-        version=BATTLE_RULE_VERSION,
+        version=17,
     )
     queued = choice["firefly_choice"]
     assert len(queued["options"]) == 2
@@ -222,7 +226,7 @@ def test_firefly_domain_hit_doubles_only_own_domain_gain_then_adds_focal_strike(
             f"falling-sky-{index}",
             "1:domain:solo:0",
             wheel,
-            version=BATTLE_RULE_VERSION,
+            version=17,
         )[0]
         == "hit"
     )

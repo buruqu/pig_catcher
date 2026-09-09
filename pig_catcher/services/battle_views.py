@@ -645,9 +645,16 @@ def move_line(
             )
         if event.get("firefly_collapse_to_add"):
             note += (
-                f"；对手溃败+{event['firefly_collapse_to_add']}"
-                f"（待结算至{event.get('firefly_target_collapse_after_pending', 0)}/3）"
+                f"；对手溃败+{weight_label(event['firefly_collapse_to_add'])}"
+                f"（待结算至{weight_label(event.get('firefly_target_collapse_after_pending', 0))}/3）"
             )
+        if event.get("firefly_starfield"):
+            note += "；对手本回合正向增益减半，本回合力竭权重-0.25"
+        if event.get("firefly_opponent_exhaust_delta_units"):
+            delta = _scaled_weight(event["firefly_opponent_exhaust_delta_units"], INJURY_WEIGHT_SCALE)
+            note += f"；对手本回合力竭权重+{delta}"
+        if event.get("firefly_domain_followup"):
+            note += "；结算后延长已有萨姆形态，下回合自己+1招、对手溃败+1"
         if event.get("firefly_next_sam_bonus_used"):
             note += f"；赤染之茧储备+{event['firefly_next_sam_bonus_used']}已消耗"
         if event.get("firefly_first_sam_reduction"):
@@ -1059,7 +1066,7 @@ def _firefly_state_projection(side: dict) -> tuple[str, str, str]:
         track.append(current)
     facts = [
         f"燃芯{side.get('firefly_fuel', 0)}/3",
-        f"溃败{side.get('firefly_collapse', 0)}/3",
+        f"溃败{weight_label(side.get('firefly_collapse', 0))}/3",
     ]
     if form_id == FIREFLY_FORM_SAM:
         facts.append(f"萨姆剩余{side.get('firefly_sam_rounds_remaining', 0)}回合")
@@ -1342,14 +1349,18 @@ def _v4_interaction_panels(interactions: dict, names: list[str]) -> tuple[Panel,
         v5_lines.append(
             Line(
                 names[int(fact["source_side"])] + " · 溃败烙印",
-                f"{names[int(fact['target_side'])]}：{fact['before']} → {fact['after']}/3",
-                f"本回合命中累计{fact['added']}层；超过3层的部分不会继续增加。",
+                f"{names[int(fact['target_side'])]}：{weight_label(fact['before'])} → {weight_label(fact['after'])}/3",
+                f"本回合命中累计{weight_label(fact['added'])}层；超过3层的部分不会继续增加。",
             )
         )
+    for fact in interactions.get("firefly_domain_continuations", ()):
+        v5_lines.append(Line(names[int(fact["side"])] + " · 星海余焰",
+                             f"下回合自己+{fact['count']}招、对手溃败+{fact['count']}",
+                             f"萨姆形态延长{fact['count']}回合" if fact["extended_sam"] else "保持流萤形态"))
     if v5_lines:
         panels.append(
             Panel(
-                "达妮娅猪 / 阿萨姆猪 / 熠～噜猪 · 回合机制",
+                "战斗猪 · 回合机制",
                 tuple(v5_lines),
                 "失效统一只将一招的全部胜率数值归零；抽数、状态、领域及其他功能事实全部保留。",
             )
@@ -2305,7 +2316,7 @@ def _firefly_wheels(identity: CommandIdentity, level: int) -> BattleView:
     lines = []
     for move in definition.moves:
         base_units = move.resolved_draw_weight_units
-        firefly_units = base_units - 100 if "sam-skill" in move.tags else base_units
+        firefly_units = base_units - MOVE_WEIGHT_SCALE // 10 if "sam-skill" in move.tags else base_units
         firefly_options.append((move.name, max(1, firefly_units) / MOVE_WEIGHT_SCALE))
         sam_options.append((move.name, base_units / MOVE_WEIGHT_SCALE))
         training = f"；强化后基础正数+{level}" if move.resolved_gain_tenths > 0 else ""
@@ -2341,16 +2352,18 @@ def _firefly_wheels(identity: CommandIdentity, level: int) -> BattleView:
                 "双形态共鸣",
                 (
                     Line("燃芯", "最多3层", "每层令萨姆技能胜率+5、出现权重+0.1；点燃星海按技能规则结算后清空。"),
-                    Line("溃败", "最多3层", "每层令萨姆技能额外+4，并令对手伤势盘的力竭权重+0.1。"),
+                    Line("溃败", "最多3层",
+                         "每层令萨姆技能额外+5；1/2/3层令对手本回合力竭权重+0.08/+0.18/+0.35，半层按相邻档插值。"),
                     Line("流萤 → 萨姆", "抽到萨姆技能立即切换", "萨姆形态持续2回合；流萤形态的该招基础出现权重-0.1。"),
-                    Line("萨姆中的流萤技能", "残梦回声", "不退出萨姆；飞萤之火缺省值按+10并保存候选与自动选择事实。"),
+                    Line("萨姆中的流萤技能", "残梦回声",
+                         "不退出萨姆、不获燃芯；飞萤之火选萨姆技+12，选流萤技按半效结算（溃败亦为半层）。"),
                 ),
-                "飞萤之火与领域后的二选一由规则引擎按固定收益策略自动完成，不新增容易超时的中途指令。",
+                "飞萤之火自动择优并保存候选。领域结算后延长已有萨姆形态1回合，下回合对手溃败+1、自己+1招。",
             ),
         ),
         hints=(
             "领域命中或领域战获胜时，领域自身有效胜率翻倍；焦土陨击的+12不重复翻倍。",
-            "对手3层溃败时，领域额外令其本回合胜率-15。",
+            "焦土陨击在对手满3层溃败时再使其胜率-15、本回合力竭权重+0.2。",
         ),
     )
 

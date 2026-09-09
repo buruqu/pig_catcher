@@ -5,13 +5,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .errors import PigCatcherError
+from .firefly_catalog import build_moves as build_firefly_moves
 from .mirror_battle_catalog import luoli_moves, miumiu_moves
 from .miumiu_catalog import build_moves
 from .special_content import GOJO_PIG_TEMPLATE_ID, SUKUNA_PIG_TEMPLATE_ID
 
 # 对战规则版本与活动成就事实版本分离：新版对战会改变随机命名空间，
 # 但新增字段仍是 activity_progress v1 可以向后兼容读取的事实载荷。
-BATTLE_RULE_VERSION = 17
+BATTLE_RULE_VERSION = 18
 BATTLE_FACT_VERSION = 1
 DAILY_BATTLE_ROLE_LIMIT = 2
 BATTLE_VERSION = BATTLE_RULE_VERSION
@@ -621,7 +622,7 @@ YILU_MOVES = (
     ),
 )
 
-FIREFLY_MOVES = (
+FIREFLY_MOVES_V17 = (
     Move(
         "firefly-crimson-cocoon",
         "流萤·我曾安眠，赤染之茧",
@@ -685,6 +686,7 @@ FIREFLY_MOVES = (
         draw_weight_units=7500,
     ),
 )
+FIREFLY_MOVES = build_firefly_moves(Move)
 FIREFLY_FORMS = (
     FighterForm(FIREFLY_FORM_FIREFLY, "流萤", FIREFLY_MOVES),
     FighterForm(FIREFLY_FORM_SAM, "萨姆", FIREFLY_MOVES),
@@ -822,6 +824,8 @@ def fighter_moves(fighter_id: str, rule_version: int = BATTLE_RULE_VERSION) -> t
         return ()
     if fighter_id == "firefly" and rule_version < 12:
         return ()
+    if fighter_id == "firefly" and rule_version < 18:
+        return FIREFLY_MOVES_V17
     if fighter_id == "juejue" and rule_version < 4:
         return ()
     if fighter_id == "daniya" and rule_version < 15:
@@ -836,6 +840,8 @@ def fighter_form_moves(
     form_id: str,
     rule_version: int = BATTLE_RULE_VERSION,
 ) -> tuple[Move, ...]:
+    if fighter_id == "firefly" and form_id in {FIREFLY_FORM_FIREFLY, FIREFLY_FORM_SAM}:
+        return fighter_moves(fighter_id, rule_version)
     if fighter_id == "daniya" and rule_version < 15:
         if form_id == DANIYA_FORM_STAGING:
             return DANIYA_STAGING_MOVES + DANIYA_COMMON_MOVES_V14
