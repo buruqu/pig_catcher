@@ -51,3 +51,8 @@ Schema71仅更新战利品版本约束，使Battle18自然终局仍发放3次战
 来源文档SHA-256：`1aae28d58066cd50be4dca339783024e718fbacbefd99db261d9157e0d69b9a0`。
 
 最终开发门禁：`2240 passed in 379.72s`；Ruff、compileall、离线锁文件校验和Git差异检查通过。新版专用22项测试全部通过，上一版八格回归保留在明确的Battle17测试状态。
+
+
+生产发布完成（2026-09-09 18:56）：本地代码提交`bfc86e4`，未推送。2.0.33包956个受管文件逐字节核验，清单SHA-256为`e26f9d1a82a745e0f400f2b17f2aaef11de91e008d81b7171b6cabbf82549cff`。停机冷备验证后升级Schema71，只改变迁移记录表，全部玩家业务表摘要不变。上线后完整性正常、外键0、账本差异0、缺失素材0，私人配置除版本号外无变化；插件加载成功且自身启动错误0，两个官方QQ账号READY。
+
+可恢复备份：`D:/MaiBotArchives/pig_catcher/releases/2.0.33-firefly-v18-20260909`。正式库演练与7张图片：`D:/MaiBotArchives/pig_catcher/acceptance/firefly-2.0.33-20260909`。未代发群内实战消息；实际QQ对局效果以玩家后续操作观察。
