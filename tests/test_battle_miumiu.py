@@ -68,7 +68,7 @@ def test_reconstruction_restores_old_states_and_copies_only_wheel():
     assert [m.resolved_draw_weight_units for m in blanks] == [40000, 40000]
 
 
-def test_blank_mode_actual_domain_roll_replays_and_returns_generated_events(monkeypatch):
+def test_blank_domain_now_consumes_humidity_without_legacy_reconstruction(monkeypatch):
     state = state_for()
     for side in state["sides"]:
         side["turn"].update(raw=1, effective=1, pending=1, done=False)
@@ -90,11 +90,10 @@ def test_blank_mode_actual_domain_roll_replays_and_returns_generated_events(monk
 
     monkeypatch.setattr(battle, "choose", force)
     result = battle.resolve_round(state, "replay")
-    assert result["miumiu_reconstructions"]
-    generated = result["interactions"]["generated_events"]
-    assert generated and all(e["ordinal"] > 1 for e in generated)
-    assert len({(e["side"], e["ordinal"]) for e in generated}) == len(generated)
-    assert state["sides"][0]["miumiu_mode"]
+    assert "miumiu_reconstructions" not in result
+    assert not state["sides"][0].get("miumiu_mode")
+    assert state["sides"][0]["miumiu_humidity"] == 0
+    assert any(fact.get("consumed") == 2 for fact in result["interactions"]["mirror"])
 
 
 def test_noop_does_not_get_auras_or_spend_double():
@@ -121,7 +120,7 @@ def test_preview_consumes_prior_milk_dragon_before_comparing_order():
     )
 
 
-async def test_reconstruction_service_receipts_are_atomic_and_replayable(world, monkeypatch):  # noqa: F811
+async def test_humidity_service_receipts_are_atomic_and_replayable(world, monkeypatch):  # noqa: F811
     await world.start()
     match = await world.match()
     state = battle.loads(match["state_json"])
@@ -150,14 +149,17 @@ async def test_reconstruction_service_receipts_are_atomic_and_replayable(world, 
     await world.send(section="move", actor=world.a)
     first = await world.send(section="move", actor=world.b, mid="mirror-settle")
     counts = len(await world.db.fetch_all("SELECT * FROM battle_moves"))
+    await world.db.close()
+    await world.db.open()
     repeated = await world.send(section="move", actor=world.b, mid="mirror-settle")
     assert first.receipt.receipt_id == repeated.receipt.receipt_id
     assert len(await world.db.fetch_all("SELECT * FROM battle_moves")) == counts
     row = await world.db.fetch_one("SELECT result_json FROM battle_rounds")
     summary = battle.loads(row[0])
-    assert summary["miumiu_reconstructions"]
-    assert counts > sum(len(p["turn"]["events"]) for p in summary["after"])
-    assert "水面重映" in first.view.text()
+    assert "miumiu_reconstructions" not in summary
+    assert counts == sum(len(p["turn"]["events"]) for p in summary["after"])
+    assert "润化" in first.view.text()
+    assert any(fact.get("consumed") == 2 for fact in summary["interactions"]["mirror"])
 
 
 async def test_every_registered_wheel_is_queryable_with_public_miumiu_descriptions(world):  # noqa: F811
@@ -165,6 +167,7 @@ async def test_every_registered_wheel_is_queryable_with_public_miumiu_descriptio
         request = parse_battle_request("轮盘 " + fighter.name)
         assert request.args["fighter_id"] == fighter.fighter_id
     preview = await world.send("轮盘 空白缪缪流形猪")
-    assert "自适应招式盘" in preview.view.text()
-    assert "25%" in preview.view.text() and "最高+18" in preview.view.text()
+    assert "流形与润化招式盘" in preview.view.text()
+    assert "25%" in preview.view.text() and "无上限" in preview.view.text()
+    assert "润化" in preview.view.text() and "最终结算点数" in preview.view.text()
     assert "力竭保护" not in preview.view.text() and "回合重构" not in preview.view.text()

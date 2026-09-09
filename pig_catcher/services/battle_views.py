@@ -35,6 +35,7 @@ from ..domain.dispatch_views import DispatchLine as Line
 from ..domain.dispatch_views import DispatchPanel as Panel
 from ..domain.dispatch_views import DispatchPigCard
 from ..domain.display import format_length, format_weight
+from ..domain.mirror_battle_catalog import LUOLI_STATUS_HELP
 from ..domain.models import CommandIdentity
 
 STATUS_NAMES = {
@@ -693,10 +694,31 @@ def move_line(
             else f"原{_signed_weight(original)} · 调整{_signed_weight(-deducted)}"
             f" → 累计{weight_label(shown_total)}"
         )
-        note += "；" + "、".join(adjustment["reasons"]) + "；本招全部胜率数值归零，功能保留"
+        note += "；" + "、".join(adjustment["reasons"])
+        note += "；本招全部胜率数值归零，功能保留" if deducted == original else "；部分数值调整，功能保留"
     if domain_bonus:
         reason = str(domain_bonus.get("reason") or "领域战获胜")
         note += f"；{reason}，本招额外+{weight_label(domain_bonus['gain'])}（本回合仅一次）"
+    mirror = event.get("mirror", {})
+    if mirror.get("kind") == "miumiu":
+        note += f"；润化{mirror['humidity_before']}→{mirror['humidity_after']}"
+        if "mimic_reference" in mirror:
+            note += f"；共同预演参考数值{weight_label(mirror['mimic_reference'])}（只取数值）"
+        if mirror.get("next_rebuild_bonus"):
+            note += f"；下回合每次数值招式+{mirror['next_rebuild_bonus']}"
+        if mirror.get("disturb_next"):
+            note += "；对方下回合正向数值变化-20%"
+        if mirror.get("blank_consumed"):
+            note += f"；已消耗{mirror['blank_consumed']}层润化，领域命中后结算"
+    if mirror.get("kind") == "luoli":
+        note += f"；黄瓜+{mirror['cucumbers_generated']}，给对方账单+{mirror['bills_generated']}"
+        if mirror.get("allergy"):
+            note += "；心音与猫毛过敏本回合已触发"
+        if mirror.get("injury_before") != mirror.get("injury_after"):
+            labels = {"heavy": "重伤", "light": "轻伤", "none": "无伤"}
+            note += f"；伤势{labels[mirror['injury_before']]}→{labels[mirror['injury_after']]}"
+    if mirror.get("rebuild_bonus"):
+        note += f"；上回合重构额外+{mirror['rebuild_bonus']}"
     if event["tool_used"]:
         note += f"；{TOOLS_BY_ID[event['tool_used']].name}已消耗"
     return Line(f"{event['ordinal']}. {event['name']}", value, note)
@@ -1066,6 +1088,10 @@ def _v4_interaction_panels(interactions: dict, names: list[str]) -> tuple[Panel,
         "v4回合交互",
     )
     panels: list[Panel] = []
+    if interactions.get("mirror"):
+        panels.append(Panel("润化与黄瓜账单结算", tuple(
+            Line(names[int(fact["side"])], fact["text"]) for fact in interactions["mirror"]
+        )))
     mechanism_lines: list[Line] = []
     for fact in interactions["future_simulations"]:
         _required(
@@ -1521,6 +1547,21 @@ def matchup(
             form, form_track, mechanic_summary = _yilu_state_projection(side)
         elif snap.get("fighter_id") == "firefly":
             form, form_track, mechanic_summary = _firefly_state_projection(side)
+        elif snap.get("fighter_id") == "luoli":
+            form = "黄瓜与账单"
+            form_track = f"黄瓜{side.get('luoli_cucumbers', 0)} · 账单{side.get('luoli_bills', 0)}"
+            mechanic_summary = " · ".join(filter(None, (
+                "心音：本回合黄瓜增益翻倍，回合末保留黄瓜" if turn.get("luoli_heart") else "",
+                "猫毛过敏：账单减益翻倍，回合末保留账单" if turn.get("luoli_allergy") else "",
+                "睡觉增益：本回合获取与生成数量×2" if turn.get("luoli_sleep_bonus") else "",
+                "通常每回合结束清除最多5根黄瓜、5张账单",
+            )))
+        elif snap.get("fighter_id") == "miumiu" and state["version"] >= 17:
+            form = "流形与润化"
+            form_track = f"润化{side.get('miumiu_humidity', 0)}层 · 本场持续保留"
+            mechanic_summary = "观测与拟态只复制数值；润化用于恢复、重构与领域爆发。"
+            if turn.get("miumiu_rebuild_bonus"):
+                mechanic_summary += f"本回合每次数值招式+{turn['miumiu_rebuild_bonus']}。"
         elif snap.get("fighter_id") == "miumiu":
             form = "\u2800模式" if side.get("miumiu_mode") else "流形"
             form_track = "记录与适应"
@@ -2327,9 +2368,11 @@ def wheels(identity: CommandIdentity, fighter_id: str, level: int = 0) -> Battle
         return _firefly_wheels(identity, level)
     definition = FIGHTERS_BY_ID[fighter_id]
     moves = []
-    wheel_name = "自适应招式盘" if fighter_id == "miumiu" else "等权招式盘"
+    wheel_name = {"miumiu": "流形与润化招式盘", "luoli": "黄瓜与账单招式盘"}.get(fighter_id, "等权招式盘")
     for move in definition.moves:
         effect = f"胜利权重+{move.gain + level}" if move.gain else ""
+        if move.opponent_reduction:
+            effect += f"；对方胜利权重-{move.opponent_reduction}"
         if move.draws:
             effect += f" 再抽{move.draws}次"
         if move.loan:
@@ -2373,6 +2416,8 @@ def wheels(identity: CommandIdentity, fighter_id: str, level: int = 0) -> Battle
         ),
         panels=(
             Panel(wheel_name, tuple(moves)),
+            *((Panel("黄瓜与账单状态", tuple(Line(name, summary) for name, summary in LUOLI_STATUS_HELP)),)
+              if fighter_id == "luoli" else ()),
             Panel(
                 "出招数与伤势盘",
                 (

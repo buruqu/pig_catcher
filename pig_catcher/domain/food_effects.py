@@ -83,9 +83,10 @@ EXCLUSIVE_CATCH_EFFECTS = frozenset(
 )
 EXCLUSIVE_COOK_EFFECTS = frozenset({NEXT_SIX_STAR_COOK, NEXT_FIVE_STAR_COOK, SIX_STAR_COOK_FAILURE_RETURN})
 
-# 这三种六星菜自带独立抓猪次数。成功结算时消耗效果次数，但不消耗正常时段额度。
+# 这些六星菜自带独立抓猪次数。成功结算时消耗效果次数，但不消耗正常时段额度。
 QUOTA_EXEMPT_CATCH_EFFECTS = frozenset(
     {
+        HISTORY_MIRROR_CATCH,
         NEXT_SIX_STAR_CATCH,
         NEXT_HIGH_STAR_CATCH,
         EVEN_CATCH_DISTRIBUTION,
@@ -405,8 +406,8 @@ def resolve_food_effect(
             raise FoodEffectError("历史镜像概率必须来自10次抓猪的完整品质记录。")
         return FoodEffectGrant(
             normalized_id, {"fixed_weights": list(fixed)} if fixed is not None else {}, 10,
-            "接下来10次抓猪固定使用吃菜前10次抓猪品质占比的倒序分布：1↔6、2↔5、3↔4；"
-            "五星只会出现抹茶猪咪、黄瓜猪或墨提斯猪。不额外赠送次数，不叠加其他概率加成。",
+            "获得额外10次专属抓猪，不消耗普通额度；固定使用吃菜前10次抓猪品质占比的倒序分布：1↔6、2↔5、3↔4；"
+            "五星只会出现抹茶猪咪、黄瓜猪或墨提斯猪，不叠加其他概率加成。",
         )
     if normalized_id == GROUP_WATER_MIRROR:
         if raw:

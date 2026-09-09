@@ -5,12 +5,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .errors import PigCatcherError
+from .mirror_battle_catalog import luoli_moves, miumiu_moves
 from .miumiu_catalog import build_moves
 from .special_content import GOJO_PIG_TEMPLATE_ID, SUKUNA_PIG_TEMPLATE_ID
 
 # 对战规则版本与活动成就事实版本分离：新版对战会改变随机命名空间，
 # 但新增字段仍是 activity_progress v1 可以向后兼容读取的事实载荷。
-BATTLE_RULE_VERSION = 16
+BATTLE_RULE_VERSION = 17
 BATTLE_FACT_VERSION = 1
 DAILY_BATTLE_ROLE_LIMIT = 2
 BATTLE_VERSION = BATTLE_RULE_VERSION
@@ -690,7 +691,10 @@ FIREFLY_FORMS = (
 )
 
 
-MIUMIU_MOVES = build_moves(Move)
+MIUMIU_MOVES_V16 = build_moves(Move)
+MIUMIU_MOVES = miumiu_moves(Move)
+LUOLI_MOVES = luoli_moves(Move)
+LUOLI_PIG_TEMPLATE_IDS = tuple(value.replace("firefly-embrace", "luoli-c") for value in FIREFLY_PIG_TEMPLATE_IDS)
 MIUMIU_PIG_TEMPLATE_IDS = tuple(value.replace("firefly-embrace", "miumiu-flow") for value in FIREFLY_PIG_TEMPLATE_IDS)
 
 FIGHTERS = (
@@ -780,6 +784,8 @@ FIGHTERS = (
         forms=FIREFLY_FORMS,
         initial_form_id=FIREFLY_FORM_FIREFLY,
     ),
+    FighterDefinition("luoli", LUOLI_PIG_TEMPLATE_IDS[0], "洛璃c猪", LUOLI_MOVES,
+                      template_aliases=LUOLI_PIG_TEMPLATE_IDS[1:]),
     FighterDefinition("miumiu", MIUMIU_PIG_TEMPLATE_IDS[0], "空白缪缪流形猪", MIUMIU_MOVES,
                       template_aliases=MIUMIU_PIG_TEMPLATE_IDS[1:]),
 )
@@ -804,6 +810,10 @@ LEGACY_MOVE_IDS = {
 
 def fighter_moves(fighter_id: str, rule_version: int = BATTLE_RULE_VERSION) -> tuple[Move, ...]:
     moves = FIGHTERS_BY_ID[fighter_id].moves
+    if fighter_id == "luoli" and rule_version < 17:
+        return ()
+    if fighter_id == "miumiu" and rule_version == 16:
+        return MIUMIU_MOVES_V16
     if fighter_id == "miumiu" and rule_version < 16:
         return ()
     if fighter_id in {"daniya", "asamu"} and rule_version < 5:

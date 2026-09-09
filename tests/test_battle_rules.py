@@ -58,7 +58,7 @@ def ready(player, pending=1):
 
 
 def test_exact_catalog_and_growth_costs():
-    assert [len(f.moves) for f in FIGHTERS] == [10, 10, 16, 17, 10, 9, 8, 10]
+    assert [len(f.moves) for f in FIGHTERS] == [10, 10, 16, 17, 10, 9, 8, 11, 10]
     assert all(move.draw_weight == 1 for fighter in FIGHTERS[:6] for move in fighter.moves)
     assert [m.gain for m in FIGHTERS[0].moves] == [10, 10, 15, 21, 35, 0, 14, 7, 12, 28]
     assert [m.gain for m in FIGHTERS[1].moves] == [13, 20, 14, 10, 10, 14, 24, 30, 14, 35]

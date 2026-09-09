@@ -10,7 +10,7 @@ from fractions import Fraction
 from math import lcm
 from typing import Any
 
-from . import miumiu
+from . import mirror_battle, miumiu
 from .battle_catalog import (
     ASAMU_MOVES,
     BATTLE_RULE_VERSION,
@@ -604,7 +604,8 @@ def apply_move(
     key = f"{round_number}:{side}:move:{ordinal}:nested"
     snapshot = player["snapshot"]
     drawn_move = move
-    move = miumiu.prepare_move(player, move)
+    if version < 17:
+        move = miumiu.prepare_move(player, move)
     effects_disabled = bool(turn.get("daniya_world_effects_disabled")) or "miumiu-noop" in move.tags
     if effects_disabled:
         # “世界·发龙图”保留抽到哪一招的审计事实，但该招的数值、标签、
@@ -1346,12 +1347,17 @@ def apply_move(
     if is_firefly and forced_gain_bonus and not firefly_sam_skill:
         special_base += Fraction(forced_gain_bonus)
 
+    mirror_fact = {}
+    if version >= 17:
+        special_base, mirror_fact = mirror_battle.local_move(
+            player, effect_move_id, special_base, disabled=effects_disabled, copied=is_copy,
+        )
     positive_numeric = special_base > 0
     if positive_numeric and turn.get("miumiu_split_remaining", 0) > 0:
         special_base += 4
     if turn.get("miumiu_split_remaining", 0) > 0:
         turn["miumiu_split_remaining"] -= 1
-    if effect_move_id == "miumiu-split" and not effects_disabled:
+    if effect_move_id == "miumiu-split" and not effects_disabled and not is_copy:
         turn["miumiu_split_remaining"] = int(turn.get("miumiu_split_remaining", 0)) + 2
     signed_numeric = special_base != 0
     tool = snapshot.get("tool_id", "") if not player["tool_used"] else ""
@@ -1457,6 +1463,7 @@ def apply_move(
         )
     return {
         "ordinal": ordinal,
+        "mirror": mirror_fact,
         "move_id": drawn_move.move_id,
         "name": drawn_move.name,
         "base": drawn_move.gain,
@@ -2477,6 +2484,13 @@ def _settle_interactions(state: dict, seed: str) -> dict:
                     record["cancelled_gain"] += applied
         zeroes.append(record)
 
+    mirror_records = []
+    if version >= 17:
+        mirror_records = mirror_battle.prepare_interactions(
+            state, domain, cancelled, protected_juejue_sides | daniya_damage_immunity_sides, seed,
+            choose=choose, remaining=_remaining_event_gain, reduce=_reduce_event, cancel=_cancel_event,
+        )
+
     adjustments = []
     for side, entries in enumerate(cancelled):
         deduction = sum(entry["gain"] for entry in entries.values())
@@ -2540,7 +2554,7 @@ def _settle_interactions(state: dict, seed: str) -> dict:
                     boost_reason=boost_reason,
                 )
 
-    domain_effects: list[str] = []
+    domain_effects: list[str] = list((domain or {}).get("mirror_effects", ()))
     auto_mimic = None
     extra_round_reduction = list(yilu_defender_reductions)
     if domain is not None and domain.get("hit_side") in (0, 1):
@@ -2679,7 +2693,8 @@ def _settle_interactions(state: dict, seed: str) -> dict:
             )
         if _domain_has(domain, hit_side, "firefly", "firefly-falling-sky"):
             player = state["sides"][hit_side]
-            player["weight"] += 12
+            firefly_domain_gain = mirror_battle.gain(player, 12) if version >= 17 else Fraction(12)
+            player["weight"] += firefly_domain_gain
             player["turn"]["firefly_self_exhaust_delta_units"] = Fraction(
                 player["turn"].get("firefly_self_exhaust_delta_units", 0)
             )
@@ -2689,7 +2704,7 @@ def _settle_interactions(state: dict, seed: str) -> dict:
             ) + Fraction(3, 2)
             trigger = "领域战获胜" if domain.get("mode") == "clash" else "领域命中"
             domain_effects.append(
-                f"自破碎的天空坠落{trigger}：追加Δ指令-焦土陨击，自己胜率+12、对手本回合力竭权重+0.15"
+                f"自破碎的天空坠落{trigger}：追加Δ指令-焦土陨击，自己胜率+{weight_label(firefly_domain_gain)}、对手本回合力竭权重+0.15"
             )
 
     if domain is not None:
@@ -2828,6 +2843,8 @@ def _settle_interactions(state: dict, seed: str) -> dict:
         else:
             bonus = Fraction(40 * count)
             swapped = False
+        if version >= 17:
+            bonus = mirror_battle.gain(state["sides"][current_side], bonus)
         retaliation_after[current_side] += bonus
         retaliation_records.append(
             {
@@ -2849,7 +2866,8 @@ def _settle_interactions(state: dict, seed: str) -> dict:
         if not layers:
             continue
         before_true_damage = Fraction(player["weight"])
-        player["weight"] *= 2**layers
+        extra = Fraction(player["weight"]) * (2**layers - 1)
+        player["weight"] += mirror_battle.gain(player, extra) if version >= 17 else extra
         yilu_true_damage.append(
             {
                 "side": current_side,
@@ -2881,8 +2899,14 @@ def _settle_interactions(state: dict, seed: str) -> dict:
             }
         )
 
+    if version >= 17:
+        mirror_records.extend(mirror_battle.final_effects(
+            state, domain, protected_juejue_sides | daniya_damage_immunity_sides,
+        ))
+
     return {
         "domain": domain,
+        "mirror": mirror_records,
         "daniya_transition": daniya_transition,
         "asamu_domain_copies": asamu_domain_copies,
         "generated_events": tuple(asamu_domain_copies)
@@ -2942,12 +2966,24 @@ def _dynamic_injury_wheel(state: dict, loser: int) -> tuple[tuple, dict]:
     )
     for name in ("heavy", "exhausted"):
         exact_weights[name] *= injury_factor
+    mirror_before_sleep = exact_weights["exhausted"]
+    if state["version"] >= 17:
+        exact_weights["exhausted"] = max(
+            Fraction(1, 10), exact_weights["exhausted"] + Fraction(player.get("mirror_exhaust_offset_units", 0)),
+        )
+        mirror_before_sleep = exact_weights["exhausted"]
+        if player["turn"].get("luoli_sleep_hit"):
+            exact_weights["heavy"] /= 2
+            exact_weights["exhausted"] /= 2
     weight_scale = 1
     for value in exact_weights.values():
         weight_scale = lcm(weight_scale, value.denominator)
     wheel = tuple((name, int(exact_weights[name] * weight_scale)) for name, _weight in base)
     return wheel, {
         "base_wheel": base,
+        "mirror_exhaust_before_sleep_units": mirror_before_sleep,
+        "mirror_exhaust_offset_units": player.get("mirror_exhaust_offset_units", 0),
+        "luoli_sleep_hit": bool(player["turn"].get("luoli_sleep_hit")),
         "permanent_exhaust_bonus_units": permanent_bonus,
         "firefly_collapse_bonus_units": collapse_bonus,
         "firefly_current_delta_units": current_firefly_delta,
@@ -2971,7 +3007,7 @@ def resolve_round(state: dict, seed: str) -> dict | None:
     _side(state, 0)
     if not all(side["turn"]["done"] for side in state["sides"]):
         return None
-    flow_records = miumiu.flow_settlement(state)
+    flow_records = miumiu.flow_settlement(state) if state["version"] < 17 else []
     provisional = deepcopy(state["sides"])
     interactions = _settle_interactions(state, seed)
     for previous, player in zip(provisional, state["sides"], strict=True):
@@ -2984,6 +3020,20 @@ def resolve_round(state: dict, seed: str) -> dict | None:
     replay = _miumiu_reconstruction(state, seed, interactions)
     if replay is not None:
         return replay
+    if state["version"] >= 17:
+        for side, player in enumerate(state["sides"]):
+            for layers in player["turn"].get("miumiu_recoveries", ()):
+                _, injury = _dynamic_injury_wheel(state, side)
+                current = Fraction(injury["mirror_exhaust_before_sleep_units"])
+                restored = max(1, (current / 10 / (layers + 1)).__floor__()) * 10
+                player["mirror_exhaust_offset_units"] = (
+                    Fraction(player.get("mirror_exhaust_offset_units", 0)) + restored - current
+                )
+                interactions["mirror"].append({
+                    "side": side,
+                    "text": f"净水即生命：润化{layers}层，力竭盘{weight_label(current / 10)}→{restored // 10}",
+                    "humidity": layers, "exhaust_before_units": current, "exhaust_after_units": restored,
+                })
     before = deepcopy(state["sides"])
     winner_scale = lcm(VICTORY_WEIGHT_SCALE, *(Fraction(side["weight"]).denominator for side in before))
     winner_units = [max(1, int(Fraction(side["weight"]) * winner_scale)) for side in before]
@@ -3105,7 +3155,9 @@ def resolve_round(state: dict, seed: str) -> dict | None:
             player["daniya_world_disable_next"] = False
             player["daniya_world_forced_move_ids_next"] = []
             player["daniya_world_forced_form_next"] = ""
+            mirror_next = mirror_battle.finish_round(player) if state["version"] >= 17 else {}
             player["turn"] = fresh_turn()
+            player["turn"].update(mirror_next)
             player["turn"]["firefly_sam_draw_bonus_units"] = next_sam_draw_bonus_units
             player["turn"]["yilu_round_base_bonus"] = int(
                 player.get("yilu_next_round_base_bonus", 0)
@@ -3134,6 +3186,8 @@ def resolve_round(state: dict, seed: str) -> dict | None:
 
 
 def _miumiu_reconstruction(state: dict, seed: str, interactions: dict) -> dict | None:
+    if state["version"] >= 17:
+        return None
     domain = interactions.get("domain")
     if not domain or domain.get("hit_side") not in (0, 1):
         return None
@@ -3197,7 +3251,8 @@ def _miumiu_preview(state: dict, seed: str) -> None:
             draws += len(play_chunk(shadow, actor, seed))
             if draws > 4096:
                 raise BattleError("基础轮盘预演超出安全工作量，事务未提交，请联系猪管。")
-    state["miumiu_observations"] = [miumiu.observe(player) for player in shadow["sides"]]
+    observe = mirror_battle.observation if state["version"] >= 17 else miumiu.observe
+    state["miumiu_observations"] = [observe(player) for player in shadow["sides"]]
 
 
 def loot_weights(

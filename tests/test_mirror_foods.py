@@ -3,7 +3,7 @@ from datetime import timedelta
 import pytest
 
 from pig_catcher.config.model import CatchingSection
-from pig_catcher.domain.errors import FoodEffectError
+from pig_catcher.domain.errors import CatchCooldownError, DailyCatchLimitError, FoodEffectError
 from pig_catcher.domain.food_effects import EXCLUSIVE_CATCH_EFFECTS, QUOTA_EXEMPT_CATCH_EFFECTS
 from pig_catcher.domain.mirror_food import HISTORY_MIRROR_CATCH, mirrored_history_weights
 from pig_catcher.services import FrameworkService, GameplayService
@@ -11,10 +11,10 @@ from tests.test_economy import FixedClock, SequenceRandom, _database_with_catalo
 from tests.test_food_social_balance_v68 import eat_fixture
 
 
-def test_history_is_fixed_inverse_not_shuffled_or_extra_quota():
+def test_history_is_fixed_inverse_with_dedicated_extra_quota():
     assert mirrored_history_weights([1, 1, 1, 2, 2, 3, 4, 5, 6, 6]) == [20, 10, 10, 10, 20, 30]
     assert HISTORY_MIRROR_CATCH in EXCLUSIVE_CATCH_EFFECTS
-    assert HISTORY_MIRROR_CATCH not in QUOTA_EXEMPT_CATCH_EFFECTS
+    assert HISTORY_MIRROR_CATCH in QUOTA_EXEMPT_CATCH_EFFECTS
     with pytest.raises(FoodEffectError):
         mirrored_history_weights([1] * 9)
 
@@ -60,6 +60,65 @@ async def test_parfait_requires_ten_catches_then_freezes_reverse_history(tmp_pat
     result = await game.catch(_identity(message_id="mirrored"))
     assert result.weights == pytest.approx((0, 0, 0, 0, 0, 100))
     assert result.pig.rarity == 6
-    assert result.daily_count == before.daily_count + 1  # no dedicated quota
+    assert result.daily_count == before.daily_count
+    assert result.quota_exempt_catch
     assert any("9" in s for s in result.effect_summaries)
+    await db.close()
+
+
+@pytest.mark.asyncio
+async def test_parfait_all_ten_after_quota_exhaustion_cooldown_restart_and_duplicate(tmp_path):
+    db = await _database_with_catalog(tmp_path, pig_rarities=(1, 6), food_rarities=(6,), manifest_version=4)
+    clock = FixedClock()
+    game = GameplayService(
+        db, CatchingSection(cooldown_seconds=0), clock=clock, random_source=SequenceRandom(*([0.01] * 1000))
+    )
+    for index in range(10):
+        clock.value += timedelta(hours=3)
+        await game.catch(_identity(message_id=f"past-{index}"))
+    used = (await game.profile(_identity(message_id="profile-before"))).daily_count
+    for index in range(5 - used):
+        await game.catch(_identity(message_id=f"fill-{index}"))
+    await eat_fixture(db, clock, "EXTRA", "翠玉抹茶芭菲", HISTORY_MIRROR_CATCH)
+    game = GameplayService(
+        db, CatchingSection(cooldown_seconds=20), clock=clock, random_source=SequenceRandom(*([0.01] * 1000))
+    )
+    with pytest.raises(CatchCooldownError):
+        await game.catch(_identity(message_id="too-fast"))
+    for index in range(10):
+        clock.value += timedelta(seconds=21)
+        result = await game.catch(_identity(message_id=f"extra-{index}"))
+        assert result.quota_exempt_catch and result.daily_count == 5
+        assert result.weights == pytest.approx((0, 0, 0, 0, 0, 100))
+        assert (
+            await db.fetch_one(
+                "SELECT catch_quota_cost FROM command_receipts WHERE receipt_id=?", (result.receipt.receipt_id,)
+            )
+        )[0] == 0
+        if index == 2:
+            pending = dict(
+                await db.fetch_one("SELECT * FROM player_food_effects WHERE effect_id=?", (HISTORY_MIRROR_CATCH,))
+            )
+            assert pending["granted_uses"] - pending["consumed_uses"] == 7
+            # 模拟仍有7次的Schema68队列升级，迁移不能补满或重新计算历史。
+            async with db.transaction() as session:
+                await session.execute("PRAGMA user_version=68")
+                await session.execute("DELETE FROM schema_migrations WHERE version=69")
+            await db.close()
+            await db.open()
+            after = dict(
+                await db.fetch_one("SELECT * FROM player_food_effects WHERE effect_id=?", (HISTORY_MIRROR_CATCH,))
+            )
+            assert pending == after
+            repeated = await game.catch(_identity(message_id="extra-2"))
+            assert not repeated.receipt_created
+            assert repeated.pig.pig_instance_id == result.pig.pig_instance_id
+    clock.value += timedelta(seconds=21)
+    with pytest.raises(DailyCatchLimitError):
+        await game.catch(_identity(message_id="extra-eleven"))
+    assert (
+        await db.fetch_one(
+            "SELECT COUNT(*) FROM command_receipts WHERE catch_quota_cost=0 AND command_name='pig-catcher.catch'"
+        )
+    )[0] == 10
     await db.close()
