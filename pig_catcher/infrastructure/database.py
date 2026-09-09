@@ -222,8 +222,11 @@ class PigCatcherDatabase:
         from .migrations.v0061_window_mechanics_battle_v12 import GUARDS as WINDOW_MECHANIC_GUARDS
         from .migrations.v0061_window_mechanics_battle_v12 import TABLES as WINDOW_MECHANIC_TABLES
         from .migrations.v0062_battle_rule_v13 import GUARDS as BATTLE_LOOT_TOTAL_GUARDS
+        from .migrations.v0070_feast_chains import GUARDS as FEAST_GUARDS
 
         required_tables = {
+            "player_clover_chains",
+            "player_moon_feasts",
             "red_packets",
             "red_packet_claims",
             "scheduled_reward_campaigns",
@@ -315,6 +318,8 @@ class PigCatcherDatabase:
             raise MigrationError("数据库永久升级等级约束不是 0 至 10，请先完成 Schema 47 迁移。")
 
         required_guards = {
+            "idx_clover_active",
+            "idx_moon_active",
             "material_ledger_no_update",
             "material_ledger_no_delete",
             "occupancy_validate_owner",
@@ -356,6 +361,7 @@ class PigCatcherDatabase:
             "idx_tour_protected_player",
             "idx_tour_joint_reservation",
         }
+        required_guards.update(FEAST_GUARDS)
         required_guards.update(BATTLE_GUARDS)
         required_guards.update(ACTIVITY_GUARDS)
         required_guards.update(ASSET_CODE_GUARDS)

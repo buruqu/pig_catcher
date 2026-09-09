@@ -28,6 +28,7 @@ from ..domain.errors import (
     ReceiptConflictError,
     TechniqueError,
 )
+from ..domain.feasts import CLOVER_CATCH, moon_weights
 from ..domain.food_effects import (
     CATCH_DUPLICATION_CHANCE,
     CATCH_EFFECT_IDS,
@@ -113,6 +114,7 @@ from ..infrastructure.repositories import (
     SocialRepository,
     TechniqueRepository,
 )
+from ..infrastructure.repositories.feasts import active_moon, feast_status, require_catch_allowed, settle_clover_catch
 from ..infrastructure.repositories.restrictions import CATCH_WINDOW_LIMIT
 from ..version import RULESET_VERSION
 from .assets import CollectionProgress
@@ -234,6 +236,7 @@ class CatchResult:
     excluded_summaries: tuple[str, ...] = ()
     exclusive_effect_active: bool = False
     quota_exempt_catch: bool = False
+    growth_modifiers_excluded: bool = False
     global_size_record: bool = False
     global_weight_record: bool = False
     giant_sighting: bool = False
@@ -320,6 +323,7 @@ class PlayerProfile:
     veteran_claimed_tier: int = 0
     veteran_next_tier_level: int | None = 21
     veteran_next_tier_coin_reward: int | None = 1_000
+    feast_status: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -772,7 +776,7 @@ def format_profile_summary(profile: PlayerProfile) -> str:
         f"本时段抓猪：{profile.daily_count}/{profile.daily_limit}\n"
         f"抓猪冷却：{profile.cooldown_remaining_seconds} 秒\n"
         f"已装备抓猪道具：{armed}\n"
-        f"已装备做菜道具：{cooking_armed}"
+        f"已装备做菜道具：{cooking_armed}" + ("\n" + "\n".join(profile.feast_status) if profile.feast_status else "")
     )
 
 
@@ -1047,6 +1051,8 @@ class GameplayService:
                     now=now,
                 )
             )
+            moon = await require_catch_allowed(session, identity.player_id, now)
+            moon_active = bool(moon and moon["target_start"] <= now < moon["target_end"] and moon["used"] < 15)
             window_transfer = await self.economy_repository.active_catch_window_transfer(
                 session,
                 player_id=identity.player_id,
@@ -1197,10 +1203,13 @@ class GameplayService:
             armed_item, armed_uses = self._armed_item(armed_row, "catching")
             equipped_item = armed_item
             group_exclusive_effect_active = (
-                False if transfer_target_active else has_compatible_exclusive_group_catch_effect(active_group_effects)
+                False
+                if (transfer_target_active or moon_active)
+                else has_compatible_exclusive_group_catch_effect(active_group_effects)
             )
             personal_exclusive_effect_active = (
                 not transfer_target_active
+                and not moon_active
                 and not group_exclusive_effect_active
                 and has_compatible_exclusive_catch_effect(
                     applicable_active_effects,
@@ -1218,13 +1227,29 @@ class GameplayService:
                 armed_item = None
                 achievement_catch_tickets = frozenset()
                 achievement_visual_tickets = frozenset()
+            if moon_active:
+                achievement_catch_tickets = frozenset()
+                achievement_visual_tickets = frozenset()
             weights = self._available_weights(
                 buckets=buckets,
-                feed_level=0 if exclusive_effect_active else feed_level,
-                player_level=1 if exclusive_effect_active else probability_level,
+                feed_level=0 if (exclusive_effect_active or moon_active) else feed_level,
+                player_level=1 if (exclusive_effect_active or moon_active) else probability_level,
                 item_id=armed_item.item_id if armed_item is not None else "",
             )
-            if transfer_target_active:
+            if moon_active:
+                ordinary_effects = tuple(e for e in applicable_active_effects if e.source_food_rarity < 6)
+                effect_application = apply_catch_effects(
+                    weights, ordinary_effects, random_value=self.random_source.random
+                )
+                weights = moon_weights(effect_application.weights)
+                group_effect_application = apply_group_catch_effects(weights, ())
+                effect_summaries = effect_application.summaries + (
+                    f"月栖萤光卷：4/5/6星概率×3，本次为专属额外抓猪，剩余{14 - int(moon['used'])}/15次。",
+                )
+                excluded_summaries = effect_application.skipped_summaries + (
+                    "月栖奖励排除永久提升、其他六星菜及临时成就券；对应道具和菜品队列保留。",
+                )
+            elif transfer_target_active:
                 effect_application = apply_catch_effects(weights, ())
                 group_effect_application = apply_group_catch_effects(weights, ())
                 weights = normalize_weights(json.loads(str(window_transfer["fixed_weights_json"])))
@@ -1338,6 +1363,7 @@ class GameplayService:
             )
             quota_exempt_catch = bool(
                 quota_exempt_catch
+                or moon_active
                 or group_effect_application.dedicated_entry_id
                 or group_effect_application.quota_exempt
             )
@@ -1394,7 +1420,7 @@ class GameplayService:
                 session,
                 player_id=identity.player_id,
             )
-            if six_star_progress_stacks and not exclusive_effect_active:
+            if six_star_progress_stacks and not exclusive_effect_active and not moon_active:
                 progressed_weights = apply_six_star_progress(
                     weights,
                     stacks=six_star_progress_stacks,
@@ -1410,7 +1436,7 @@ class GameplayService:
                     )
             elif six_star_progress_stacks:
                 excluded_summaries += ("达妮娅泡泡云冻永久概率加成本次受六星菜独占规则影响，未参与结算。",)
-            if window_resonance is not None and not exclusive_effect_active:
+            if window_resonance is not None and not exclusive_effect_active and not moon_active:
                 resonance_bonus = 3.07 + int(window_resonance["catch_bonus_basis_points"]) / 100.0
                 weights = add_six_star_probability_points(
                     weights,
@@ -1426,6 +1452,7 @@ class GameplayService:
             campaign_probability_active = bool(
                 first_day_active(self.launch_campaign, now_datetime)
                 and not exclusive_effect_active
+                and not moon_active
                 and not effect_application.collaboration_only
                 and not effect_application.shuffle_permutation
             )
@@ -1559,9 +1586,28 @@ class GameplayService:
                     )
                 else:
                     effect_summaries += ("美食加成本次未触发复制。",)
+            effect_summaries += await settle_clover_catch(
+                session,
+                player_id=identity.player_id,
+                effects=active_effects,
+                consumed=effect_application.consumed_entry_ids,
+                rarity=rarity,
+                now=now,
+                entry_id=self._new_identifier()
+                if any(
+                    e.effect_id == CLOVER_CATCH and e.effect_entry_id in effect_application.consumed_entry_ids
+                    for e in active_effects
+                )
+                else "",
+            )
+            if moon_active:
+                await session.execute(
+                    "UPDATE player_moon_feasts SET used=used+1,updated_at=? WHERE source_food_instance_id=?",
+                    (now, moon["source_food_instance_id"]),
+                )
             auto_gift_target_player_id = ""
             resonance_reward_foods: tuple[str, ...] = ()
-            if window_resonance is not None:
+            if window_resonance is not None and not moon_active:
                 cook_bonus_after = await self.economy_repository.add_window_resonance_cook_bonus(
                     session,
                     player_id=identity.player_id,
@@ -1582,6 +1628,8 @@ class GameplayService:
                 "ruleset_version": RULESET_VERSION,
                 "base_weights": list(self.catching.weights()),
                 "normalized_weights": [round(value, 8) for value in weights],
+                "moon_feast_source": moon["source_food_instance_id"] if moon_active else "",
+                "moon_feast_remaining": 14 - int(moon["used"]) if moon_active else 0,
                 "shuffle_permutation": list(effect_application.shuffle_permutation),
                 "shuffle_rolls": list(effect_application.shuffle_rolls),
                 "feed_level": feed_level,
@@ -1612,6 +1660,7 @@ class GameplayService:
                 "today_window_bonus": today_window_bonus,
                 "exclusive_effect_active": exclusive_effect_active,
                 "quota_exempt_catch": quota_exempt_catch,
+                "growth_modifiers_excluded": moon_active,
                 "catch_window_limit_restriction_id": (
                     str(catch_restriction["restriction_id"]) if catch_restriction is not None else ""
                 ),
@@ -1656,7 +1705,7 @@ class GameplayService:
                     "updated_at": now,
                 },
             )
-            if window_resonance is not None and rarity is Rarity.SIX:
+            if window_resonance is not None and not moon_active and rarity is Rarity.SIX:
                 resonance_reward_foods = await self._grant_random_three_star_foods(
                     session,
                     identity=identity,
@@ -1713,7 +1762,11 @@ class GameplayService:
             from .mirror_food import grant_water_mirror_copies
 
             mirror_summaries = await grant_water_mirror_copies(
-                self, session, identity=identity, pig_instance_id=pig_instance_id, now=now,
+                self,
+                session,
+                identity=identity,
+                pig_instance_id=pig_instance_id,
+                now=now,
             )
             effect_summaries += tuple(mirror_summaries)
             if active_group_technique is not None:
@@ -2011,6 +2064,7 @@ class GameplayService:
                 "excluded_summaries": list(excluded_summaries),
                 "exclusive_effect_active": exclusive_effect_active,
                 "quota_exempt_catch": quota_exempt_catch,
+                "growth_modifiers_excluded": moon_active,
                 "group_hidden_boost_triggered": (group_effect_application.hidden_boost_triggered),
                 "group_effect_source_user_id": (group_effect_application.source_user_id),
                 "group_effect_source_display_name": (group_effect_application.source_display_name),
@@ -2061,6 +2115,7 @@ class GameplayService:
                 excluded_summaries=excluded_summaries,
                 exclusive_effect_active=exclusive_effect_active,
                 quota_exempt_catch=quota_exempt_catch,
+                growth_modifiers_excluded=moon_active,
                 global_size_record=global_size_record,
                 global_weight_record=global_weight_record,
                 giant_sighting=giant_sighting,
@@ -2110,6 +2165,7 @@ class GameplayService:
                 excluded_summaries=excluded_summaries,
                 exclusive_effect_active=exclusive_effect_active,
                 quota_exempt_catch=quota_exempt_catch,
+                growth_modifiers_excluded=moon_active,
                 global_size_record=global_size_record,
                 global_weight_record=global_weight_record,
                 giant_sighting=giant_sighting,
@@ -2979,6 +3035,9 @@ class GameplayService:
                 player_id=identity.player_id,
                 now=now,
             )
+            feast_lines = await feast_status(session, identity.player_id, now)
+            profile_moon = await active_moon(session, identity.player_id, now)
+            moon_blocked = bool(profile_moon and profile_moon["blocked_start"] <= now < profile_moon["blocked_end"])
             quota_adjustment = 0
             if transfer is not None:
                 if str(transfer["blocked_window_start"]) <= now < str(transfer["blocked_window_end"]):
@@ -3014,7 +3073,7 @@ class GameplayService:
             held_records=int(row["held_records"]),
             daily_count=daily_count,
             daily_limit=self._restricted_daily_limit(
-                normal_limit=quota_layers.effective_limit(used_count=daily_count),
+                normal_limit=0 if moon_blocked else quota_layers.effective_limit(used_count=daily_count),
                 restriction=catch_restriction,
             ),
             cooldown_remaining_seconds=_cooldown_remaining(
@@ -3055,6 +3114,7 @@ class GameplayService:
             veteran_claimed_tier=max(claimed_veteran_tiers, default=0),
             veteran_next_tier_level=benefits.next_tier_level,
             veteran_next_tier_coin_reward=benefits.next_tier_coin_reward,
+            feast_status=feast_lines,
         )
 
     async def pig_detail(self, identity: CommandIdentity, selector_text: str) -> PigView:
@@ -3558,6 +3618,7 @@ class GameplayService:
             ),
             exclusive_effect_active=bool(payload.get("exclusive_effect_active") or False),
             quota_exempt_catch=bool(payload.get("quota_exempt_catch") or False),
+            growth_modifiers_excluded=bool(payload.get("growth_modifiers_excluded") or False),
             global_size_record=bool(payload.get("global_size_record") or False),
             global_weight_record=bool(payload.get("global_weight_record") or False),
             giant_sighting=bool(payload.get("giant_sighting") or False),

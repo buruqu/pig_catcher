@@ -7885,17 +7885,8 @@
         "月夜",
         "甜香"
       ],
-      "effect_id": "catch-window-transfer",
-      "effect_params": {
-        "fixed_weights": [
-          0,
-          0,
-          0,
-          42,
-          40,
-          18
-        ]
-      },
+      "effect_id": "moon-feast",
+      "effect_params": {},
       "display_name": "月栖萤光卷",
       "template_id": "food-g1092931381-firefly-moonlight-roll",
       "group_scope_id": "qq:1092931381"
@@ -7932,25 +7923,15 @@
       "source_path": "定制美食库/1092931381/粉蓝四叶草冰糕.png",
       "kind": "food",
       "rarity": 6,
-      "description": "粉蓝双色四叶草凝在晶莹冰糕里，像一张刚洗出的幸运照片。清甜凉意会记住本时段每一次抓猪与做菜的星光，让两条好运轨迹彼此追逐。",
+      "description": "粉蓝双色四叶草凝在晶莹冰糕里，像一张刚洗出的幸运照片。清甜凉意会收集十次专属抓猪的星光，汇入下一次六星料理；若愿望成真，还会送来新的抓猪机会与七道美食。",
       "recipe_tags": [
         "群友定制",
         "崩坏：星穹铁道",
         "四叶草",
         "冰甜"
       ],
-      "effect_id": "window-six-star-resonance",
-      "effect_params": {
-        "base_bonus_percent": 3.07,
-        "cook_bonus_per_caught_star": 1,
-        "catch_bonus_by_food_rarity": {
-          "4": 10,
-          "5": 30,
-          "6": 50
-        },
-        "six_star_cook_reward_catches": 3,
-        "six_star_catch_reward_food_count": 7
-      },
+      "effect_id": "clover-feast",
+      "effect_params": {},
       "display_name": "粉蓝四叶草冰糕",
       "template_id": "food-g1092931381-march-seven-clover-ice-cake",
       "group_scope_id": "qq:1092931381"
@@ -7995,17 +7976,8 @@
         "月夜",
         "甜香"
       ],
-      "effect_id": "catch-window-transfer",
-      "effect_params": {
-        "fixed_weights": [
-          0,
-          0,
-          0,
-          42,
-          40,
-          18
-        ]
-      },
+      "effect_id": "moon-feast",
+      "effect_params": {},
       "display_name": "月栖萤光卷",
       "template_id": "food-g237716658-firefly-moonlight-roll",
       "group_scope_id": "qq:237716658"
@@ -8042,25 +8014,15 @@
       "source_path": "定制美食库/237716658/粉蓝四叶草冰糕.png",
       "kind": "food",
       "rarity": 6,
-      "description": "粉蓝双色四叶草凝在晶莹冰糕里，像一张刚洗出的幸运照片。清甜凉意会记住本时段每一次抓猪与做菜的星光，让两条好运轨迹彼此追逐。",
+      "description": "粉蓝双色四叶草凝在晶莹冰糕里，像一张刚洗出的幸运照片。清甜凉意会收集十次专属抓猪的星光，汇入下一次六星料理；若愿望成真，还会送来新的抓猪机会与七道美食。",
       "recipe_tags": [
         "群友定制",
         "崩坏：星穹铁道",
         "四叶草",
         "冰甜"
       ],
-      "effect_id": "window-six-star-resonance",
-      "effect_params": {
-        "base_bonus_percent": 3.07,
-        "cook_bonus_per_caught_star": 1,
-        "catch_bonus_by_food_rarity": {
-          "4": 10,
-          "5": 30,
-          "6": 50
-        },
-        "six_star_cook_reward_catches": 3,
-        "six_star_catch_reward_food_count": 7
-      },
+      "effect_id": "clover-feast",
+      "effect_params": {},
       "display_name": "粉蓝四叶草冰糕",
       "template_id": "food-g237716658-march-seven-clover-ice-cake",
       "group_scope_id": "qq:237716658"
@@ -8105,17 +8067,8 @@
         "月夜",
         "甜香"
       ],
-      "effect_id": "catch-window-transfer",
-      "effect_params": {
-        "fixed_weights": [
-          0,
-          0,
-          0,
-          42,
-          40,
-          18
-        ]
-      },
+      "effect_id": "moon-feast",
+      "effect_params": {},
       "display_name": "月栖萤光卷",
       "template_id": "food-qo5e5854406d0297d6feae696a13e3a339-firefly-moonlight-roll",
       "group_scope_id": "qq-official:5E5854406D0297D6FEAE696A13E3A339"
@@ -8152,25 +8105,15 @@
       "source_path": "定制美食库/5E5854406D0297D6FEAE696A13E3A339/粉蓝四叶草冰糕.png",
       "kind": "food",
       "rarity": 6,
-      "description": "粉蓝双色四叶草凝在晶莹冰糕里，像一张刚洗出的幸运照片。清甜凉意会记住本时段每一次抓猪与做菜的星光，让两条好运轨迹彼此追逐。",
+      "description": "粉蓝双色四叶草凝在晶莹冰糕里，像一张刚洗出的幸运照片。清甜凉意会收集十次专属抓猪的星光，汇入下一次六星料理；若愿望成真，还会送来新的抓猪机会与七道美食。",
       "recipe_tags": [
         "群友定制",
         "崩坏：星穹铁道",
         "四叶草",
         "冰甜"
       ],
-      "effect_id": "window-six-star-resonance",
-      "effect_params": {
-        "base_bonus_percent": 3.07,
-        "cook_bonus_per_caught_star": 1,
-        "catch_bonus_by_food_rarity": {
-          "4": 10,
-          "5": 30,
-          "6": 50
-        },
-        "six_star_cook_reward_catches": 3,
-        "six_star_catch_reward_food_count": 7
-      },
+      "effect_id": "clover-feast",
+      "effect_params": {},
       "display_name": "粉蓝四叶草冰糕",
       "template_id": "food-qo5e5854406d0297d6feae696a13e3a339-march-seven-clover-ice-cake",
       "group_scope_id": "qq-official:5E5854406D0297D6FEAE696A13E3A339"
@@ -8215,17 +8158,8 @@
         "月夜",
         "甜香"
       ],
-      "effect_id": "catch-window-transfer",
-      "effect_params": {
-        "fixed_weights": [
-          0,
-          0,
-          0,
-          42,
-          40,
-          18
-        ]
-      },
+      "effect_id": "moon-feast",
+      "effect_params": {},
       "display_name": "月栖萤光卷",
       "template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-firefly-moonlight-roll",
       "group_scope_id": "qq-official:9EA2810F378FBD7DC3219C56CEAB3520"
@@ -8262,25 +8196,15 @@
       "source_path": "定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/粉蓝四叶草冰糕.png",
       "kind": "food",
       "rarity": 6,
-      "description": "粉蓝双色四叶草凝在晶莹冰糕里，像一张刚洗出的幸运照片。清甜凉意会记住本时段每一次抓猪与做菜的星光，让两条好运轨迹彼此追逐。",
+      "description": "粉蓝双色四叶草凝在晶莹冰糕里，像一张刚洗出的幸运照片。清甜凉意会收集十次专属抓猪的星光，汇入下一次六星料理；若愿望成真，还会送来新的抓猪机会与七道美食。",
       "recipe_tags": [
         "群友定制",
         "崩坏：星穹铁道",
         "四叶草",
         "冰甜"
       ],
-      "effect_id": "window-six-star-resonance",
-      "effect_params": {
-        "base_bonus_percent": 3.07,
-        "cook_bonus_per_caught_star": 1,
-        "catch_bonus_by_food_rarity": {
-          "4": 10,
-          "5": 30,
-          "6": 50
-        },
-        "six_star_cook_reward_catches": 3,
-        "six_star_catch_reward_food_count": 7
-      },
+      "effect_id": "clover-feast",
+      "effect_params": {},
       "display_name": "粉蓝四叶草冰糕",
       "template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-march-seven-clover-ice-cake",
       "group_scope_id": "qq-official:9EA2810F378FBD7DC3219C56CEAB3520"

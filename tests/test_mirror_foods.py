@@ -103,7 +103,9 @@ async def test_parfait_all_ten_after_quota_exhaustion_cooldown_restart_and_dupli
             # 模拟仍有7次的Schema68队列升级，迁移不能补满或重新计算历史。
             async with db.transaction() as session:
                 await session.execute("PRAGMA user_version=68")
-                await session.execute("DELETE FROM schema_migrations WHERE version=69")
+                await session.execute("DELETE FROM schema_migrations WHERE version>68")
+                await session.execute("DROP TABLE player_clover_chains")
+                await session.execute("DROP TABLE player_moon_feasts")
             await db.close()
             await db.open()
             after = dict(

@@ -78,6 +78,13 @@
       <div class="profile-stat"><span class="asset-caption">{{ asset_icon('showcase') }}美食展示</span><strong style="font-size:17px">{{ view.showcase_food or "未设置" }}</strong></div>
     </section>
 
+    {% if view.feast_status %}
+    <section class="profile-sheet__collections">
+      <h2 class="section-title">美食专属进度</h2>
+      {% for line in view.feast_status %}<p>{{ line }}</p>{% endfor %}
+    </section>
+    {% endif %}
+
     <section class="profile-sheet__collections">
       <h2 class="section-title asset-caption">{{ asset_icon('collection') }}联动收藏</h2>
       {% if view.collections %}

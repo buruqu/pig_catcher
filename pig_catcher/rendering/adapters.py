@@ -184,12 +184,16 @@ def _probability_sources(
     item_name: str,
     effect_count: int,
     exclusive_effect_active: bool = False,
+    growth_modifiers_excluded: bool = False,
 ) -> str:
     """Summarize every factor that shaped the final probability."""
 
     if exclusive_effect_active:
         return "六星菜独占规则（等级、升级、道具与其他菜品均未参与）"
     parts: list[str] = []
+    if growth_modifiers_excluded:
+        parts.append("月栖奖励：等级、饲料及永久提升未参与")
+        player_level, feed_level = None, None
     if player_level:
         parts.append(f"等级 Lv.{player_level}")
     if feed_level is not None:
@@ -284,6 +288,7 @@ def pig_card_view(
                 item_name=catch.item_name,
                 effect_count=len(catch.effect_summaries),
                 exclusive_effect_active=catch.exclusive_effect_active,
+                growth_modifiers_excluded=catch.growth_modifiers_excluded,
             )
             if catch is not None
             else ""
@@ -339,6 +344,7 @@ def profile_view(profile: PlayerProfile) -> ProfileViewModel:
         veteran_claimed_tier=profile.veteran_claimed_tier,
         veteran_next_tier_level=profile.veteran_next_tier_level,
         veteran_next_tier_coin_reward=profile.veteran_next_tier_coin_reward,
+        feast_status=profile.feast_status,
     )
 
 

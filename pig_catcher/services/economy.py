@@ -46,6 +46,7 @@ from ..domain.errors import (
     StoreProductError,
     UpgradeLimitError,
 )
+from ..domain.feasts import CLOVER_COOK, CLOVER_FEAST, MOON_FEAST, discounted_price
 from ..domain.feature_shop import (
     FEATURE_SHOP_PRODUCTS_BY_NAME,
     FeatureShopProduct,
@@ -129,6 +130,7 @@ from ..infrastructure.repositories import (
     TechniqueRepository,
 )
 from ..infrastructure.repositories.activity_locks import require_unoccupied
+from ..infrastructure.repositories.feasts import moon_discount_active, settle_clover_cook, start_clover, start_moon
 from ..version import RULESET_VERSION
 from .command_state import (
     iso_timestamp,
@@ -1968,6 +1970,27 @@ class EconomyService:
                 )
             )
 
+        clover_success = await settle_clover_cook(
+            session,
+            player_id=identity.player_id,
+            effects=active_effects,
+            consumed=consumed_effect_entry_ids,
+            success=output_rarity is Rarity.SIX,
+            now=now,
+            entry_id=self._new_identifier()
+            if any(
+                e.effect_id == CLOVER_COOK and e.effect_entry_id in consumed_effect_entry_ids for e in active_effects
+            )
+            else "",
+        )
+        if clover_success:
+            rewards = await self._grant_clover_foods(session, identity=identity, source=source, now=now)
+            cook_effect_summaries.append(
+                "粉蓝成功奖励：3次专属额外抓猪（六星概率+3.07个百分点）；7道非六星菜已入背包："
+                + "、".join(rewards)
+                + "。"
+            )
+
         if resonance_reward_catches:
             reward = resolve_food_effect(EXTRA_CATCHES, {"count": resonance_reward_catches})
             await self.repository.insert_food_effect(
@@ -2093,6 +2116,82 @@ class EconomyService:
             veteran_coin_reward=veteran_reward.coin_reward,
             veteran_reward_levels=veteran_reward.rewarded_levels,
         )
+
+    async def _grant_clover_foods(
+        self,
+        session: DatabaseSession,
+        *,
+        identity: CommandIdentity,
+        source: PigView,
+        now: str,
+    ) -> tuple[str, ...]:
+        """成功做出六星菜时，仅发放普通1至5星菜，不递归触发做菜奖励。"""
+        templates = []
+        for star in range(1, 6):
+            templates.extend(
+                await self.repository.list_drawable_food_templates(session, scope_id=identity.scope.value, rarity=star)
+            )
+        templates = [t for t in templates if str(t["template_id"]) not in SOURCE_EXCLUSIVE_FOOD_TEMPLATE_IDS]
+        if not templates:
+            raise CookingTemplateError("粉蓝奖励找不到当前群可用的非六星菜，整次做菜回滚。")
+        labels: list[str] = []
+        reserved_codes: list[str] = []
+        for index in range(7):
+            template_roll = self.random_source.random()
+            template = templates[min(int(template_roll * len(templates)), len(templates) - 1)]
+            portion_roll = self.random_source.random()
+            attributes = generate_food_attributes(
+                rarity=Rarity(int(template["rarity"])),
+                template_id=str(template["template_id"]),
+                source_weight=source.weight_value,
+                source_weight_percentile=source.weight_percentile,
+                portion_roll=portion_roll,
+            )
+            food_instance_id = self._new_identifier()
+            short_code = await self._new_unique_short_code(session, reserved=reserved_codes)
+            reserved_codes.append(short_code)
+            await self.repository.insert_food_instance(
+                session,
+                values={
+                    "food_instance_id": food_instance_id,
+                    "short_code": short_code,
+                    "scope_id": identity.scope.value,
+                    "owner_player_id": identity.player_id,
+                    "template_id": str(template["template_id"]),
+                    "template_version": int(template["template_version"]),
+                    "source_pig_instance_id": source.pig_instance_id,
+                    "rarity": int(template["rarity"]),
+                    "display_name_snapshot": str(template["display_name"]),
+                    "portion_weight": attributes.portion_weight,
+                    "fat_category": source.fat_category,
+                    "official_value": attributes.official_value,
+                    "effect_id": str(template.get("effect_id") or ""),
+                    "effect_params_json": str(template.get("effect_params_json") or "{}"),
+                    "ruleset_version": RULESET_VERSION,
+                    "random_snapshot_json": self._snapshot_json(
+                        {
+                            "ruleset_version": RULESET_VERSION,
+                            "source": "clover-feast",
+                            "source_key": source.pig_instance_id,
+                            "reward_index": index + 1,
+                            "template_roll": template_roll,
+                            "portion_roll": portion_roll,
+                            "source_pig_instance_id": source.pig_instance_id,
+                        }
+                    ),
+                    "acquired_at": now,
+                    "updated_at": now,
+                },
+            )
+            await self.repository.upsert_food_catalog(
+                session,
+                player_id=identity.player_id,
+                template_id=str(template["template_id"]),
+                portion_weight=attributes.portion_weight,
+                now=now,
+            )
+            labels.append(f"{template['display_name']}#{short_code}")
+        return tuple(labels)
 
     async def _batch_cook_from_receipt(
         self,
@@ -2296,8 +2395,11 @@ class EconomyService:
                     (identity.player_id, identity.scope.value),
                 )
                 fixed = mirrored_history_weights([int(row["rarity"]) for row in history])
-                effect = replace(effect, queued_effect_params={"fixed_weights": fixed},
-                    summary=effect.summary + " 固定概率（1→6星）：" + "/".join(f"{v}%" for v in fixed) + "。")
+                effect = replace(
+                    effect,
+                    queued_effect_params={"fixed_weights": fixed},
+                    summary=effect.summary + " 固定概率（1→6星）：" + "/".join(f"{v}%" for v in fixed) + "。",
+                )
             elif effect.queued_effect_id == GROUP_WATER_MIRROR:
                 await session.execute(
                     """INSERT INTO water_mirror_targets
@@ -2422,6 +2524,47 @@ class EconomyService:
                     raise FoodEffectError(
                         f"猪饺的六星菜概率加成已经叠加 {max_stacks} 层；请先用 6 星猪做菜后再食用，美食未消耗。"
                     )
+            elif effect.queued_effect_id == MOON_FEAST:
+                current_window = catch_quota_window(
+                    now_datetime, refresh_hours=self.quota_refresh_hours, timezone_name=self.quota_timezone_name
+                )
+                blocked_window = catch_quota_window(
+                    current_window.end + timedelta(microseconds=1),
+                    refresh_hours=self.quota_refresh_hours,
+                    timezone_name=self.quota_timezone_name,
+                )
+                target_window = catch_quota_window(
+                    blocked_window.end + timedelta(microseconds=1),
+                    refresh_hours=self.quota_refresh_hours,
+                    timezone_name=self.quota_timezone_name,
+                )
+                await start_moon(
+                    session,
+                    identity,
+                    food.food_instance_id,
+                    now,
+                    (iso_timestamp(blocked_window.start), iso_timestamp(blocked_window.end)),
+                    (iso_timestamp(target_window.start), iso_timestamp(target_window.end)),
+                )
+                effect_expires_at = iso_timestamp(target_window.end)
+                effect = replace(
+                    effect,
+                    summary=(
+                        f"北京时间{blocked_window.label}禁止所有抓猪；{target_window.label}获得15次额外抓猪，"
+                        "4/5/6星概率×3，可叠加商城道具和非六星菜（永久提升除外）；同一奖励时段全部商城道具8.8折。"
+                        "15次机会在奖励时段结束后失效，普通额度不受扣减。"
+                    ),
+                )
+                reward_payload = {
+                    "kind": MOON_FEAST,
+                    "dedicated_catches": 15,
+                    "blocked_window": blocked_window.label,
+                    "target_window": target_window.label,
+                    "summary": effect.summary,
+                }
+            elif effect.queued_effect_id == CLOVER_FEAST:
+                await start_clover(session, identity, food.food_instance_id, now, self._new_identifier())
+                reward_payload = {"kind": CLOVER_FEAST, "dedicated_catches": 10, "summary": effect.summary}
             elif effect.queued_effect_id == CATCH_WINDOW_TRANSFER:
                 if (
                     await self.repository.active_catch_window_transfer(
@@ -2555,6 +2698,8 @@ class EconomyService:
                 TECHNIQUE_PERMIT,
                 CATCH_WINDOW_TRANSFER,
                 WINDOW_SIX_STAR_RESONANCE,
+                CLOVER_FEAST,
+                MOON_FEAST,
                 *GROUP_EFFECT_IDS,
                 GROUP_WATER_MIRROR,
             }:
@@ -3238,6 +3383,7 @@ class EconomyService:
             )
             if profile is None:
                 raise RuntimeError("商城无法读取玩家余额。")
+            discounted = await moon_discount_active(session, identity.player_id, now)
         feature_system = _FEATURE_STORE_CATEGORIES.get(category)
         if feature_system is None:
             products = build_store_products(
@@ -3262,6 +3408,17 @@ class EconomyService:
                 for product in build_feature_shop_products(feature_system)
             )
             shop_section = category
+        if discounted:
+            filtered = tuple(
+                replace(
+                    product,
+                    unit_price=discounted_price(product.unit_price),
+                    effect_summary=f"月栖奖励时段8.8折（原价{product.unit_price}猪币）；" + product.effect_summary,
+                )
+                if product.product_type in {"item", "feature-tool"}
+                else product
+                for product in filtered
+            )
         page_size = max(1, len(filtered))
         return StorePage(
             display_name=identity.display_name,
@@ -3396,6 +3553,10 @@ class EconomyService:
                 unit_price = prices[current_level]
                 upgrade_level = current_level + 1
                 upgrade_type_value = upgrade_type.value
+            if product_type in {"item", "feature-tool"} and await moon_discount_active(
+                session, identity.player_id, now
+            ):
+                unit_price = discounted_price(unit_price)
             total_price = unit_price * quantity
             balance_after = await self.repository.apply_currency_change(
                 session,

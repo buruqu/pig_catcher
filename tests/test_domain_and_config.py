@@ -839,6 +839,7 @@ def test_effect_resolution_sorts_by_eaten_time_before_selecting_group() -> None:
 
 def test_six_star_exclusive_effects_override_weights_with_multi_uses() -> None:
     assert QUOTA_EXEMPT_CATCH_EFFECTS == {
+        "clover-dedicated-catch",
         "history-mirror-catch",
         "next-six-star-catch",
         "next-high-star-catch",

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
+from ...domain.feasts import discounted_price
 from ...domain.feature_shop import (
     FEATURE_SHOP_PRODUCTS_BY_ID,
     FEATURE_SHOP_TARGET_INVENTORIES,
@@ -1693,7 +1694,13 @@ class EconomyRepository:
             raise ValueError("功能商城商品系统不在仓储白名单中。")
         if isinstance(quantity, bool) or not isinstance(quantity, int) or quantity <= 0:
             raise ValueError("功能商城购买数量必须为正整数。")
-        if unit_price != canonical.unit_price or unit_price <= 0:
+        discount = await session.fetch_one(
+            "SELECT 1 FROM player_moon_feasts WHERE player_id=? AND scope_id=? "
+            "AND discount_start<=? AND discount_end>?",
+            (player_id, scope_id, now, now),
+        )
+        expected_price = discounted_price(canonical.unit_price) if discount else canonical.unit_price
+        if unit_price != expected_price or unit_price <= 0:
             raise ValueError("功能商城购买单价与商品目录不一致。")
         if total_price != unit_price * quantity:
             raise ValueError("功能商城购买总价与单价、数量不一致。")

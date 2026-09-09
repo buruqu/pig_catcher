@@ -104,17 +104,23 @@ def food_reward_view(result: EatResult) -> FoodRewardView:
     is_lottery = bool(payload.get("prize_id"))
     reward_kind = str(payload.get("kind") or "")
     title_by_kind = {
+        "clover-feast": "粉蓝专属抓猪已到账",
+        "moon-feast": "月栖时段计划已生效",
         "catch-window-transfer": "月光迁时已生效",
         "window-six-star-resonance": "粉蓝共鸣已点亮",
     }
     hint_by_kind = {
+        "clover-feast": "发送 /抓猪 使用10次专属机会；全部完成后，发送 /做菜 六星猪名 使用一次累计加成。",
+        "moon-feast": "奖励时段内15次专属抓猪与商城道具8.8折同时生效；永久升级维持原价。",
         "catch-window-transfer": "只搬指定额度，最多17次；目标合计最多34次。其他额外次数原时段照常抓。",
         "window-six-star-resonance": "共鸣仅持续当前抓猪时段；抓猪与做菜会实时累积彼此的六星概率。",
     }
     prize_by_kind = {
-        "catch-window-transfer": (
-            f"{payload.get('blocked_window', '')} → {payload.get('target_window', '')}"
-        ).strip(" →"),
+        "clover-feast": "10次抓猪 → 一次六星猪做菜 → 成功奖励3次抓猪与7道菜",
+        "moon-feast": str(payload.get("target_window") or "奖励时段"),
+        "catch-window-transfer": (f"{payload.get('blocked_window', '')} → {payload.get('target_window', '')}").strip(
+            " →"
+        ),
         "window-six-star-resonance": str(payload.get("window") or ""),
     }
     return FoodRewardView(
@@ -134,11 +140,7 @@ def food_reward_view(result: EatResult) -> FoodRewardView:
         coin_bonus=result.effect.coin_bonus,
         experience=result.base_experience + result.effect.experience_bonus,
         items=tuple(items),
-        prize_label=str(
-            payload.get("prize_label")
-            or payload.get("title")
-            or prize_by_kind.get(reward_kind, "")
-        ),
+        prize_label=str(payload.get("prize_label") or payload.get("title") or prize_by_kind.get(reward_kind, "")),
         animation=str(payload.get("animation") or ""),
         hint=(
             "奖励已加入你的猪猪／美食背包；重复查看不会再次发奖。"

@@ -10,6 +10,7 @@ import pytest
 from pig_catcher.domain.feature_shop import feature_shop_product_by_name
 from pig_catcher.infrastructure.database import DatabaseSession
 from pig_catcher.infrastructure.migrations.v0048_feature_tool_store_ledger import MIGRATION_0048
+from pig_catcher.infrastructure.migrations.v0070_feast_chains import MIGRATION_0070
 from pig_catcher.infrastructure.repositories.economy import EconomyRepository
 
 PLAYER_ID = "player-feature-shop"
@@ -53,6 +54,9 @@ async def feature_shop_database():
     )
     for statement in MIGRATION_0048.statements:
         await connection.executescript(statement)
+    for statement in MIGRATION_0070.statements:
+        if "CREATE TABLE player_moon_feasts(" in statement:
+            await connection.executescript(statement)
     await connection.commit()
     try:
         yield connection, DatabaseSession(connection)

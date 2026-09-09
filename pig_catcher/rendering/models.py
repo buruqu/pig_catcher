@@ -219,6 +219,7 @@ class ProfileViewModel(CosmeticViewModel):
     veteran_claimed_tier: int = 0
     veteran_next_tier_level: int | None = 21
     veteran_next_tier_coin_reward: int | None = 1_000
+    feast_status: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

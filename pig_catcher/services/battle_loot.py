@@ -18,6 +18,7 @@ from ..domain.short_codes import new_short_code
 from ..domain.special_content import KFC_PIG_TEMPLATE_ID, is_crazy_thursday
 from ..infrastructure.repositories.dispatch import iso_ms
 from ..infrastructure.repositories.economy import EconomyRepository
+from ..infrastructure.repositories.feasts import require_catch_allowed
 from ..infrastructure.repositories.gameplay import GameplayRepository
 from ..infrastructure.repositories.restrictions import CATCH_WINDOW_LIMIT, RestrictionRepository
 from ..version import RULESET_VERSION
@@ -27,6 +28,7 @@ from .gameplay import _cooldown_remaining
 
 
 async def claim_loot(service, session, identity, now_ms: int, key: str):
+    await require_catch_allowed(session, identity.player_id, iso_ms(now_ms))
     row = await session.fetch_one(
         """SELECT l.*,b.random_seed,b.definition_version FROM battle_loot l
         JOIN battle_matches b USING(battle_id)
@@ -91,8 +93,7 @@ async def claim_loot(service, session, identity, now_ms: int, key: str):
     template_roll = randbelow(seed, prefix + ":template", len(candidates), version=rule_version)
     template = candidates[template_roll]
     attribute_rolls = tuple(
-        randbelow(seed, prefix + f":attribute:{index}", 1 << 53, version=rule_version) / (1 << 53)
-        for index in range(5)
+        randbelow(seed, prefix + f":attribute:{index}", 1 << 53, version=rule_version) / (1 << 53) for index in range(5)
     )
     attributes = generate_pig_attributes(
         rarity=rarity,

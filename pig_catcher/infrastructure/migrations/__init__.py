@@ -70,6 +70,7 @@ from .v0066_weekly_transition import MIGRATION_0066
 from .v0067_food_quota_social_balance import MIGRATION_0067
 from .v0068_mirror_foods import MIGRATION_0068
 from .v0069_mirror_battle_v17 import MIGRATION_0069
+from .v0070_feast_chains import MIGRATION_0070
 
 MIGRATIONS: tuple[Migration, ...] = (
     MIGRATION_0001,
@@ -141,6 +142,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     MIGRATION_0067,
     MIGRATION_0068,
     MIGRATION_0069,
+    MIGRATION_0070,
 )
 
 __all__ = ["MIGRATIONS", "Migration"]
