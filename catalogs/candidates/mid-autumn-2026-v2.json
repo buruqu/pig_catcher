@@ -1,0 +1,68 @@
+{
+  "definition_version": 1,
+  "catalog_id": "pig-catcher-mid-autumn-2026-candidate-v2",
+  "source_label": "2026-09-24 Codex image generation; revised to match user-provided pig library style",
+  "license": "generated-art-review-pending",
+  "entries": [
+    {
+      "template_id": "pig-midautumn-2026-lantern",
+      "source_path": "pig-lantern.png",
+      "kind": "pig",
+      "display_name": "提灯猪",
+      "rarity": 2,
+      "description": "提着装了月光的灯笼，在桂花香里晃晃悠悠寻找团圆的路。",
+      "fat_profile": "balanced",
+      "recipe_tags": ["中秋", "灯笼", "月饼"],
+      "display_tags": ["中秋限定", "提灯", "赏月"]
+    },
+    {
+      "template_id": "pig-midautumn-2026-osmanthus",
+      "source_path": "pig-osmanthus.png",
+      "kind": "pig",
+      "display_name": "桂花猪",
+      "rarity": 4,
+      "description": "头顶桂花冠，蹄里捧着刚出炉的猪月饼，脸上还沾着面粉。",
+      "fat_profile": "balanced",
+      "recipe_tags": ["中秋", "桂花", "月饼"],
+      "display_tags": ["中秋限定", "桂花", "做饼"]
+    },
+    {
+      "template_id": "pig-midautumn-2026-jade-rabbit",
+      "source_path": "pig-jade-rabbit.png",
+      "kind": "pig",
+      "display_name": "玉兔猪",
+      "rarity": 5,
+      "description": "借来一对兔耳装扮，举起玉杵认真捣饼，却怎么也藏不住猪鼻子。",
+      "fat_profile": "balanced",
+      "recipe_tags": ["中秋", "玉兔", "月饼"],
+      "display_tags": ["中秋限定", "玉兔装扮", "月宫"]
+    },
+    {
+      "template_id": "food-midautumn-2026-red-bean",
+      "source_path": "food-red-bean-pig-mooncake.png",
+      "kind": "food",
+      "display_name": "豆沙猪月饼",
+      "rarity": 2,
+      "description": "饼面印着圆圆的猪鼻，切开是绵密豆沙，趁热分一半给同行的猪。",
+      "recipe_tags": ["中秋", "猪月饼", "豆沙"]
+    },
+    {
+      "template_id": "food-midautumn-2026-osmanthus-lava",
+      "source_path": "food-osmanthus-pig-mooncake.png",
+      "kind": "food",
+      "display_name": "桂花猪月饼",
+      "rarity": 4,
+      "description": "猪脸压印在桂花香酥皮上，切开时金黄奶香流心缓缓淌出。",
+      "recipe_tags": ["中秋", "猪月饼", "桂花", "流心"]
+    },
+    {
+      "template_id": "food-midautumn-2026-snow-skin",
+      "source_path": "food-snow-skin-pig-mooncake.png",
+      "kind": "food",
+      "display_name": "冰皮猪月饼",
+      "rarity": 5,
+      "description": "白软冰皮压着猪脸花纹，蓝色奶馅里藏了一点金黄流心。",
+      "recipe_tags": ["中秋", "猪月饼", "冰皮"]
+    }
+  ]
+}
