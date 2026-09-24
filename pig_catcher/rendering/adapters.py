@@ -1952,6 +1952,7 @@ def achievement_ranking_view(result: object) -> AchievementRankingViewModel:
 def weekly_competition_view(result: object) -> WeeklyCompetitionViewModel:
     return WeeklyCompetitionViewModel(
         cooking_metric=result.cooking_metric,
+        eating_metric=result.eating_metric,
         season_number=result.season_number,
         name=result.name,
         status_label=result.status_label,

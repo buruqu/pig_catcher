@@ -138,8 +138,8 @@ def test_supplement_counts_and_reviewed_high_star_food_effects(definitions):
     from pig_catcher.domain.round9_food_rules import reviewed_food_revisions
 
     revisions = reviewed_food_revisions()
-    assert len(definitions) == 360
-    assert Counter(row["kind"] for row in definitions) == {"pig": 239, "food": 121}
+    assert len(definitions) == 366
+    assert Counter(row["kind"] for row in definitions) == {"pig": 242, "food": 124}
     new_names = {PurePosixPath(path).stem for path in EXPECTED_SOURCES}
     new_rows = [row for row in definitions if row["display_name"] in new_names]
     assert Counter(row["kind"] for row in new_rows) == {"pig": 18, "food": 12}
@@ -262,7 +262,7 @@ def test_new_band_has_five_distinct_roles_without_overwriting_old_viola(definiti
     assert by_id["pig-bandori-viola-green-tea"]["collection"]["total"] == 1
     assert "pig-bandori-viola-green-tea" in GUESTS
     assert "pig-bandori-viola-green-tea" not in MAIN_FORMS
-    assert len(LEGACY_REGULAR_IDS) == 49 and len(ACHIEVEMENT_DEFINITIONS) == 130
+    assert len(LEGACY_REGULAR_IDS) == 49 and len(ACHIEVEMENT_DEFINITIONS) == 131
     assert len(FIXED_SETS["tour-band-themes-v1"]) == 9
     assert "yumemita" not in FIXED_SETS["tour-band-themes-v1"]
     assert _COLLECTION_ALIASES["mugendai"] == "bandori-yumemita-viola"
@@ -300,7 +300,7 @@ async def test_full_catalog_visibility_and_collection_denominator_in_four_scopes
             identity = _identity(scope)
             pigs = await game.catalog(identity, rarity=None, undiscovered_only=False)
             foods = await economy.food_catalog(identity, rarity=None, undiscovered_only=False)
-            assert pigs.total_count == 191 and foods.total_count == 73
+            assert pigs.total_count == 194 and foods.total_count == 76
             group = next(c for c in pigs.collections if c.collection_id == "bandori-yumemita")
             assert (group.total_count, group.available_count, group.collected_count) == (5, 5, 0)
             target = _entry(manifest, SIX_PIG, scope)
@@ -329,7 +329,7 @@ async def test_full_catalog_visibility_and_collection_denominator_in_four_scopes
             complete = await game.catalog(identity, rarity=None, undiscovered_only=False)
             assert next(c for c in complete.collections if c.collection_id == "bandori-yumemita").collected_count == 5
         outsider = await game.catalog(_identity("qq:999"), rarity=None, undiscovered_only=False)
-        assert outsider.total_count == 175
+        assert outsider.total_count == 178
         assert all(p.rarity < 6 for p in outsider.entries)
     finally:
         await db.close()

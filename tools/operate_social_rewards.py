@@ -1,4 +1,4 @@
-"""Operator-only durable birthday scheduling/status. No raw player data in output."""
+"""Operator-only durable birthday and Mid-Autumn scheduling/status. No raw player data in output."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from pig_catcher.infrastructure.database import PigCatcherDatabase  # noqa: E402
-from pig_catcher.services.scheduled_rewards import BIRTHDAY_ID, ScheduledRewardService  # noqa: E402
+from pig_catcher.services.scheduled_rewards import BIRTHDAY_ID, MID_AUTUMN_ID, ScheduledRewardService  # noqa: E402
 from pig_catcher.version import SCHEMA_VERSION  # noqa: E402
 
 
@@ -52,6 +52,17 @@ def status(path: Path) -> dict:
             result["birthday_grants"] = db.execute(
                 "SELECT COUNT(*) FROM scheduled_reward_grants WHERE campaign_id=?", (BIRTHDAY_ID,)
             ).fetchone()[0]
+            result["midautumn_scopes"] = [
+                dict(row)
+                for row in db.execute(
+                    "SELECT g.scope_id,g.recipient_count,g.completed_at,r.send_status FROM scheduled_reward_scopes g "
+                    "LEFT JOIN command_receipts r ON r.receipt_id=g.receipt_id WHERE g.campaign_id=?",
+                    (MID_AUTUMN_ID,),
+                )
+            ]
+            result["midautumn_grants"] = db.execute(
+                "SELECT COUNT(*) FROM scheduled_reward_grants WHERE campaign_id=?", (MID_AUTUMN_ID,)
+            ).fetchone()[0]
             result["red_packets"] = [
                 dict(row)
                 for row in db.execute(
@@ -70,6 +81,8 @@ async def mutate(args) -> dict:
         service = ScheduledRewardService(database)
         if args.action == "schedule":
             return await service.schedule_birthday(args.scope, numbering_confirmed=args.confirm_commemorative)
+        if args.action == "schedule-midautumn":
+            return await service.schedule_mid_autumn(args.scope)
         return {"newly_granted": await service.process_due(), "notices": "由在线插件发送，不在此脚本重复发送"}
     finally:
         await database.close()
@@ -79,7 +92,7 @@ if __name__ == "__main__":
     sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--database", type=Path, required=True)
-    parser.add_argument("action", choices=("status", "schedule", "run-due"))
+    parser.add_argument("action", choices=("status", "schedule", "schedule-midautumn", "run-due"))
     parser.add_argument("--scope", action="append", default=[])
     parser.add_argument(
         "--confirm-commemorative",

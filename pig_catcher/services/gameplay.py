@@ -72,8 +72,12 @@ from ..domain.launch_campaign import (
 )
 from ..domain.mid_autumn import (
     EXCLUSIVE_MOONCAKE_IDS,
+    MID_AUTUMN_CATCH_UP_CHANCE,
+    MID_AUTUMN_PIG_IDS,
+    MID_AUTUMN_PIG_UP_IDS,
     MOONCAKE_BY_PIG_AND_RARITY,
     mid_autumn_boost_active,
+    mooncake_cook_chance,
 )
 from ..domain.mirror_food import HISTORY_MIRROR_CATCH, MATCHA_PIG_NAMES
 from ..domain.models import CommandIdentity, CommandReceipt
@@ -1120,7 +1124,9 @@ class GameplayService:
             if window_boost is not None:
                 # 提额窗口：本时段额度按提升值计算，且无视玩家违规限制
                 quota_layers = stack_catch_quota_layers(
-                    configured_base=int(window_boost["limit_value"]),
+                    configured_base=max(
+                        int(window_boost["limit_value"]), 10 if mid_autumn_boost_active(now_datetime) else 0
+                    ),
                     extra_granted=extra_granted,
                     extra_consumed=extra_consumed,
                 )
@@ -1131,6 +1137,8 @@ class GameplayService:
                     now_datetime,
                     normal_limit=self.catching.daily_limit,
                 )
+                if mid_autumn_boost_active(now_datetime):
+                    configured_base_limit = max(10, configured_base_limit)
                 quota_layers = stack_catch_quota_layers(
                     configured_base=configured_base_limit,
                     permanent_bonus=permanent_bonus,
@@ -1170,6 +1178,11 @@ class GameplayService:
                 session,
                 scope_id=identity.scope.value,
             )
+            # 节日模板始终隔离于常驻随机池；活动 UP 在确定普通结果后单独结算。
+            festival_templates = [
+                template for template in templates if str(template["template_id"]) in MID_AUTUMN_PIG_IDS
+            ]
+            templates = [template for template in templates if str(template["template_id"]) not in MID_AUTUMN_PIG_IDS]
             if not is_crazy_thursday(
                 now_datetime,
                 timezone_name=self.catching.daily_reset_timezone,
@@ -1512,8 +1525,33 @@ class GameplayService:
                     effect_application.giant_template_multiplier if rarity is Rarity.FIVE else 1.0
                 ),
             )
+            festival_up_roll: float | None = None
+            festival_selection_roll: float | None = None
+            festival_up_template_id = ""
+            if (
+                mid_autumn_boost_active(now_datetime)
+                and not history_mirror_active
+                and not effect_application.collaboration_only
+            ):
+                available_festival_templates = [
+                    row for festival_id in MID_AUTUMN_PIG_UP_IDS
+                    for row in festival_templates
+                    if str(row["template_id"]) == festival_id
+                ] if rarity is Rarity.FIVE else []
+                if available_festival_templates:
+                    festival_up_roll = self.random_source.random()
+                    if festival_up_roll < MID_AUTUMN_CATCH_UP_CHANCE:
+                        festival_selection_roll = self.random_source.random()
+                        selection_index = min(
+                            int(festival_selection_roll * len(available_festival_templates)),
+                            len(available_festival_templates) - 1,
+                        )
+                        template = available_festival_templates[selection_index]
+                        festival_up_template_id = str(template["template_id"])
+                        effect_summaries += ("中秋限定猪 UP：五星结果有 50% 概率变为随机中秋五星猪。",)
             if (
                 "catalog-guide" in achievement_catch_tickets
+                and not festival_up_template_id
                 and rarity is not Rarity.SIX
                 and not effect_application.collaboration_only
                 and not history_mirror_active
@@ -1697,6 +1735,9 @@ class GameplayService:
                 "launch_campaign_id": self.launch_campaign.campaign_id if self.launch_campaign.enabled else "",
                 "launch_first_day_active": first_day_active(self.launch_campaign, now_datetime),
                 "launch_high_star_multiplier_applied": campaign_probability_active,
+                "mid_autumn_up_roll": festival_up_roll,
+                "mid_autumn_selection_roll": festival_selection_roll,
+                "mid_autumn_up_template_id": festival_up_template_id,
                 "group_technique_id": (
                     str(active_group_technique["technique_id"]) if active_group_technique is not None else ""
                 ),
@@ -2668,6 +2709,10 @@ class GameplayService:
             raise TechniqueError(f"领域缺少 {int(output_rarity)} 星美食模板，本次抓猪未结算。")
         special_roll: float | None = None
         special_template_id = MOONCAKE_BY_PIG_AND_RARITY.get((source_template_id, int(output_rarity)), "")
+        if special_template_id:
+            special_roll = self.random_source.random()
+            if special_roll >= mooncake_cook_chance(datetime.fromisoformat(now.replace("Z", "+00:00"))):
+                special_template_id = ""
         template_roll: float | None = None
         recipient_rolls: tuple[float, ...] = ()
         gojo_self_caught_in_own_domain = False
@@ -2985,7 +3030,9 @@ class GameplayService:
             )
             if window_boost is not None:
                 quota_layers = stack_catch_quota_layers(
-                    configured_base=int(window_boost["limit_value"]),
+                    configured_base=max(
+                        int(window_boost["limit_value"]), 10 if mid_autumn_boost_active(now_datetime) else 0
+                    ),
                     extra_granted=extra_granted,
                     extra_consumed=extra_consumed,
                 )
@@ -2996,6 +3043,8 @@ class GameplayService:
                     now_datetime,
                     normal_limit=self.catching.daily_limit,
                 )
+                if mid_autumn_boost_active(now_datetime):
+                    configured_base_limit = max(10, configured_base_limit)
                 quota_layers = stack_catch_quota_layers(
                     configured_base=configured_base_limit,
                     permanent_bonus=permanent_bonus,

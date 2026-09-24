@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "art_version": "pig-dream-cosmetics-v2-weekly002",
+  "art_version": "pig-dream-cosmetics-v3-weekly003",
   "origin": "原创无字AI插画母版 + 原生SVG徽记 + 本地Chromium精确文字；没有官方队标素材",
   "source_policy": "母版按实际PNG模式保留；白底不冒充透明插画。成品外轮廓和徽章/边框有alpha。",
   "build": {
-    "browser": "152.0.7977.77",
+    "browser": "153.0.8010.53",
     "font_filename": "msyhbd.ttc",
     "font_sha256": "4508821b3dffe01f0ef5e5326a3e60df705a44633858811f67b6982dce3f6ee6"
   },
@@ -42,18 +42,22 @@
       "sha256": "00c4a5bc6506c43becd33f141abff53df24d937cbbec0c41cabf8803a3cf6cc5"
     },
     {
+      "path": "pig_catcher/rendering/assets/ui/masters/weekly-003.png",
+      "sha256": "55404f2296c5d4dd2a54b38ee8ae0eec87053cd52fc2a18e15407e9a669bc056"
+    },
+    {
       "path": "pig_catcher/rendering/assets/ui/cosmetics/definitions.json",
-      "sha256": "34837d538af081a818eec5993560f9cfaa131cd7f69439e5b89ad67f86d4e72d"
+      "sha256": "325eab8018d30386515a4e7525b39bfa8675117df3185123c72fe07cb7b2e384"
     },
     {
       "path": "tools/build_cosmetic_art.py",
-      "sha256": "ae648f70a8c8548f30b78db34a84fb6d42fa4f3f7fb2edf766f1f7ea5ac1d64f"
+      "sha256": "9fbf4d0a146cec889e927b9c525d468f6e1115a73a07599fe41bd7e6d1fa70b1"
     }
   ],
   "counts": {
-    "badge": 40,
-    "title": 32,
-    "frame": 17,
+    "badge": 46,
+    "title": 33,
+    "frame": 18,
     "cosmetic": 1
   },
   "entries": [
@@ -2794,83 +2798,6 @@
       }
     },
     {
-      "id": "achievement-choice-pink",
-      "kind": "frame",
-      "files": {
-        "emblem": {
-          "path": "achievement-choice-pink/emblem.svg",
-          "sha256": "b4cefa2ae5d73abaed59f061143d4995f5457e03275172a294754d478a4607cf",
-          "bytes": 330
-        },
-        "border": {
-          "path": "achievement-choice-pink/border.png",
-          "sha256": "5f5ab5e44dd94aace79560973522c03763237782f1d6469deeea47bd2f63a3b9",
-          "bytes": 4409,
-          "width": 192,
-          "height": 192,
-          "format": "PNG",
-          "alpha": true,
-          "transparent": true
-        },
-        "border_source": {
-          "path": "achievement-choice-pink/border.svg",
-          "sha256": "1b0c962f0e07f61e1605358f84f88fc1db5eb0c97a947a3a274506956d6ce96f",
-          "bytes": 1845
-        },
-        "png": {
-          "path": "achievement-choice-pink/art.png",
-          "sha256": "b3119611b7ffd4dfe2a38ee05c903d74969d43a10913758239b2d4f9d66f5bcc",
-          "bytes": 16624,
-          "width": 480,
-          "height": 600,
-          "format": "PNG",
-          "alpha": false,
-          "transparent": false
-        },
-        "compact": {
-          "path": "achievement-choice-pink/compact.webp",
-          "sha256": "56e14a77e92087525d27dcb2ad34471c5cc017d99dc55140fd85f8139f26eecf",
-          "bytes": 3886,
-          "width": 240,
-          "height": 300,
-          "format": "WEBP",
-          "alpha": false,
-          "transparent": false
-        }
-      }
-    },
-    {
-      "id": "achievement-choice",
-      "kind": "badge",
-      "files": {
-        "emblem": {
-          "path": "achievement-choice/emblem.svg",
-          "sha256": "b4cefa2ae5d73abaed59f061143d4995f5457e03275172a294754d478a4607cf",
-          "bytes": 330
-        },
-        "png": {
-          "path": "achievement-choice/art.png",
-          "sha256": "5e8dd1abbb88ee47f32033bd6d6e426270400b2cafeb2427263a3c31363ac179",
-          "bytes": 18931,
-          "width": 256,
-          "height": 256,
-          "format": "PNG",
-          "alpha": true,
-          "transparent": true
-        },
-        "compact": {
-          "path": "achievement-choice/compact.webp",
-          "sha256": "a9667fbbb9c6b87e3ff8d6f7220300af1c6d3ae0b891e8f60c7ff1cf5342202a",
-          "bytes": 4550,
-          "width": 128,
-          "height": 128,
-          "format": "WEBP",
-          "alpha": true,
-          "transparent": true
-        }
-      }
-    },
-    {
       "id": "weekly-002-sushi-title",
       "kind": "title",
       "files": {
@@ -3094,6 +3021,346 @@
           "path": "weekly-002-sushi-medal/compact.webp",
           "sha256": "2c2f2a20f91f82a86c82fee5ca991b421b6805de77aa9094ceab9ad990a86600",
           "bytes": 5310,
+          "width": 128,
+          "height": 128,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "achievement-choice-pink",
+      "kind": "frame",
+      "files": {
+        "emblem": {
+          "path": "achievement-choice-pink/emblem.svg",
+          "sha256": "b4cefa2ae5d73abaed59f061143d4995f5457e03275172a294754d478a4607cf",
+          "bytes": 330
+        },
+        "border": {
+          "path": "achievement-choice-pink/border.png",
+          "sha256": "5f5ab5e44dd94aace79560973522c03763237782f1d6469deeea47bd2f63a3b9",
+          "bytes": 4409,
+          "width": 192,
+          "height": 192,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "border_source": {
+          "path": "achievement-choice-pink/border.svg",
+          "sha256": "1b0c962f0e07f61e1605358f84f88fc1db5eb0c97a947a3a274506956d6ce96f",
+          "bytes": 1845
+        },
+        "png": {
+          "path": "achievement-choice-pink/art.png",
+          "sha256": "b3119611b7ffd4dfe2a38ee05c903d74969d43a10913758239b2d4f9d66f5bcc",
+          "bytes": 16624,
+          "width": 480,
+          "height": 600,
+          "format": "PNG",
+          "alpha": false,
+          "transparent": false
+        },
+        "compact": {
+          "path": "achievement-choice-pink/compact.webp",
+          "sha256": "56e14a77e92087525d27dcb2ad34471c5cc017d99dc55140fd85f8139f26eecf",
+          "bytes": 3886,
+          "width": 240,
+          "height": 300,
+          "format": "WEBP",
+          "alpha": false,
+          "transparent": false
+        }
+      }
+    },
+    {
+      "id": "achievement-choice",
+      "kind": "badge",
+      "files": {
+        "emblem": {
+          "path": "achievement-choice/emblem.svg",
+          "sha256": "b4cefa2ae5d73abaed59f061143d4995f5457e03275172a294754d478a4607cf",
+          "bytes": 330
+        },
+        "png": {
+          "path": "achievement-choice/art.png",
+          "sha256": "5e8dd1abbb88ee47f32033bd6d6e426270400b2cafeb2427263a3c31363ac179",
+          "bytes": 18931,
+          "width": 256,
+          "height": 256,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "achievement-choice/compact.webp",
+          "sha256": "a9667fbbb9c6b87e3ff8d6f7220300af1c6d3ae0b891e8f60c7ff1cf5342202a",
+          "bytes": 4550,
+          "width": 128,
+          "height": 128,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "weekly-003-mooncake-title",
+      "kind": "title",
+      "files": {
+        "emblem": {
+          "path": "weekly-003-mooncake-title/emblem.svg",
+          "sha256": "023320d2c18f11252b8dcceb9837652b1c87ff26c14c0daeecd9a12963112554",
+          "bytes": 717
+        },
+        "png": {
+          "path": "weekly-003-mooncake-title/art.png",
+          "sha256": "83f59b9d3e52b176d28cb4987c67c51ee93c3b96e92ce713515a7b373dc99b21",
+          "bytes": 254315,
+          "width": 1200,
+          "height": 360,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "weekly-003-mooncake-title/compact.webp",
+          "sha256": "b0d60983b281ef80b08ed7c1c8e623851a1b313e4cef00a9b23c026b9f7ecb53",
+          "bytes": 15616,
+          "width": 600,
+          "height": 180,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "weekly-003-mooncake-frame",
+      "kind": "frame",
+      "files": {
+        "emblem": {
+          "path": "weekly-003-mooncake-frame/emblem.svg",
+          "sha256": "023320d2c18f11252b8dcceb9837652b1c87ff26c14c0daeecd9a12963112554",
+          "bytes": 717
+        },
+        "border": {
+          "path": "weekly-003-mooncake-frame/border.png",
+          "sha256": "ccc506ba9fb2367253a5bec63081d164bb640d8154d86fd29907a1e55c9d4088",
+          "bytes": 12628,
+          "width": 192,
+          "height": 192,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "border_source": {
+          "path": "weekly-003-mooncake-frame/border.svg",
+          "sha256": "ecbd5f4d78faa2b44da44431e9eefcddf002f54ebb80d44d235c88c24ddc90fc",
+          "bytes": 3607
+        },
+        "png": {
+          "path": "weekly-003-mooncake-frame/art.png",
+          "sha256": "0144b2f7f42a4640c7b4490a074989f26d0f10a4bf701d1643cbd3123afd6629",
+          "bytes": 30856,
+          "width": 480,
+          "height": 600,
+          "format": "PNG",
+          "alpha": false,
+          "transparent": false
+        },
+        "compact": {
+          "path": "weekly-003-mooncake-frame/compact.webp",
+          "sha256": "6d9ce81e2f10f3d1b1268df45065f58814ebf678babdd6a26d3699e6b4e30c32",
+          "bytes": 6200,
+          "width": 240,
+          "height": 300,
+          "format": "WEBP",
+          "alpha": false,
+          "transparent": false
+        }
+      }
+    },
+    {
+      "id": "weekly-003-mooncake-rank-1",
+      "kind": "badge",
+      "files": {
+        "emblem": {
+          "path": "weekly-003-mooncake-rank-1/emblem.svg",
+          "sha256": "30246925e5cba0ec74283508d8c84efcb4a6298d1dec6c7828eacc0c2387f317",
+          "bytes": 717
+        },
+        "png": {
+          "path": "weekly-003-mooncake-rank-1/art.png",
+          "sha256": "3760cac7647f40d443cbd56f79d09e14c1737785ca047e7fe5185e003c1ea271",
+          "bytes": 240823,
+          "width": 1200,
+          "height": 360,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "weekly-003-mooncake-rank-1/compact.webp",
+          "sha256": "476df01b0cec5c6d5ecaa43e2e201e44b59b69831520be446cd1770ae28195c7",
+          "bytes": 13084,
+          "width": 600,
+          "height": 180,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "weekly-003-mooncake-rank-2",
+      "kind": "badge",
+      "files": {
+        "emblem": {
+          "path": "weekly-003-mooncake-rank-2/emblem.svg",
+          "sha256": "203dd5b3fbde55bbea690ddf86b41ac34c10021f4b9370cb6320fcd9659a2a84",
+          "bytes": 717
+        },
+        "png": {
+          "path": "weekly-003-mooncake-rank-2/art.png",
+          "sha256": "e01a018f7e17c41ef79208bea820e968cbe467e32ddb5a8f1b6caab399813a90",
+          "bytes": 234355,
+          "width": 1200,
+          "height": 360,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "weekly-003-mooncake-rank-2/compact.webp",
+          "sha256": "03cef934b2b04d4de967ed4cc5567f0d05a0ed6d68088640916342734aec9e6c",
+          "bytes": 13328,
+          "width": 600,
+          "height": 180,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "weekly-003-mooncake-rank-3",
+      "kind": "badge",
+      "files": {
+        "emblem": {
+          "path": "weekly-003-mooncake-rank-3/emblem.svg",
+          "sha256": "76039e4035315cb6aae4e3ca4d87491e3af41640c68705388d11e6a235e42dcb",
+          "bytes": 717
+        },
+        "png": {
+          "path": "weekly-003-mooncake-rank-3/art.png",
+          "sha256": "2a1cd2dbf579fa466fb2278d39bd2b0bf619dde41ebb7ea63557c19b0e7355e5",
+          "bytes": 250333,
+          "width": 1200,
+          "height": 360,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "weekly-003-mooncake-rank-3/compact.webp",
+          "sha256": "e139c7765f7e93ef5dc460415e751eff27268f72774a4f498fb5bfad2271b176",
+          "bytes": 13924,
+          "width": 600,
+          "height": 180,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "weekly-003-mooncake-rank-10",
+      "kind": "badge",
+      "files": {
+        "emblem": {
+          "path": "weekly-003-mooncake-rank-10/emblem.svg",
+          "sha256": "023320d2c18f11252b8dcceb9837652b1c87ff26c14c0daeecd9a12963112554",
+          "bytes": 717
+        },
+        "png": {
+          "path": "weekly-003-mooncake-rank-10/art.png",
+          "sha256": "5261ba2a855ed6ee1d33f4111fb37aa7ad18ab380b59d88a53e7c831aa65a629",
+          "bytes": 237641,
+          "width": 1200,
+          "height": 360,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "weekly-003-mooncake-rank-10/compact.webp",
+          "sha256": "b76d2aafcf0671ca7079a9e880dae51f41b314bee4cd8a3586418d7d839295b9",
+          "bytes": 12328,
+          "width": 600,
+          "height": 180,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "weekly-003-mooncake-medal",
+      "kind": "badge",
+      "files": {
+        "emblem": {
+          "path": "weekly-003-mooncake-medal/emblem.svg",
+          "sha256": "023320d2c18f11252b8dcceb9837652b1c87ff26c14c0daeecd9a12963112554",
+          "bytes": 717
+        },
+        "png": {
+          "path": "weekly-003-mooncake-medal/art.png",
+          "sha256": "1d4767ae50002eed1ebc58f1beca5220951c12bc3e38b42b0f97258fbe5486de",
+          "bytes": 24679,
+          "width": 256,
+          "height": 256,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "weekly-003-mooncake-medal/compact.webp",
+          "sha256": "970c5c6b65ebc1a149141754735b12298034c1b29de5f7df3cc244d72a3d67c7",
+          "bytes": 5300,
+          "width": 128,
+          "height": 128,
+          "format": "WEBP",
+          "alpha": true,
+          "transparent": true
+        }
+      }
+    },
+    {
+      "id": "weekly-003-mooncake-stamp",
+      "kind": "badge",
+      "files": {
+        "emblem": {
+          "path": "weekly-003-mooncake-stamp/emblem.svg",
+          "sha256": "023320d2c18f11252b8dcceb9837652b1c87ff26c14c0daeecd9a12963112554",
+          "bytes": 717
+        },
+        "png": {
+          "path": "weekly-003-mooncake-stamp/art.png",
+          "sha256": "9830ff9ba0bb8bf52a94500b3b88cb2033d0205e883f2692c47617c1734162d8",
+          "bytes": 91841,
+          "width": 256,
+          "height": 256,
+          "format": "PNG",
+          "alpha": true,
+          "transparent": true
+        },
+        "compact": {
+          "path": "weekly-003-mooncake-stamp/compact.webp",
+          "sha256": "9ecb3f82f24d448def32840f6250cb438b42704b7133a5558ac7700267d4ef94",
+          "bytes": 10066,
           "width": 128,
           "height": 128,
           "format": "WEBP",

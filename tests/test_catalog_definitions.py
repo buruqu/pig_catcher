@@ -25,11 +25,11 @@ def _entries() -> list[dict[str, object]]:
     return list(payload["entries"])
 
 
-def test_formal_catalog_has_all_344_named_assets_and_stable_ids() -> None:
+def test_formal_catalog_has_all_named_assets_and_stable_ids() -> None:
     entries = _entries()
-    assert len(entries) == 360
-    assert len({entry["template_id"] for entry in entries}) == 360
-    assert len({entry["source_path"] for entry in entries}) == 360
+    assert len(entries) == 366
+    assert len({entry["template_id"] for entry in entries}) == 366
+    assert len({entry["source_path"] for entry in entries}) == 366
     assert all(str(entry["description"]).strip() for entry in entries)
     pig_counts = Counter(
         int(entry["rarity"])
@@ -41,8 +41,8 @@ def test_formal_catalog_has_all_344_named_assets_and_stable_ids() -> None:
         for entry in entries
         if entry["kind"] == "food"
     )
-    assert pig_counts == {1: 30, 2: 30, 3: 31, 4: 36, 5: 48, 6: 64}
-    assert food_counts == {1: 7, 2: 9, 3: 10, 4: 15, 5: 16, 6: 64}
+    assert pig_counts == {1: 30, 2: 30, 3: 31, 4: 36, 5: 51, 6: 64}
+    assert food_counts == {1: 7, 2: 9, 3: 10, 4: 15, 5: 19, 6: 64}
 
 
 def test_high_rarity_food_effects_cover_new_gameplay_families() -> None:

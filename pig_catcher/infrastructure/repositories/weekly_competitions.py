@@ -31,6 +31,11 @@ _SOURCE_TABLES: Mapping[str, tuple[str, str, Mapping[str, str]]] = {
             "rarity": "source.rarity",
         },
     ),
+    "food-consumed": (
+        "food_instances",
+        "food_instance_id",
+        {},
+    ),
 }
 
 
@@ -155,11 +160,17 @@ class WeeklyCompetitionRepository:
             return []
         command_placeholders = ",".join("?" for _ in normalized_commands)
         receipt_filter = " AND receipt.receipt_id = ?" if receipt_id else ""
+        template_filter = ""
+        if source_template_ids:
+            if source_result_type not in {"food", "food-consumed"}:
+                raise ValueError("Template filter requires a food source")
+            template_filter = f" AND source.template_id IN ({','.join('?' for _ in source_template_ids)})"
         parameters: tuple[object, ...] = (
             source_result_type,
             *normalized_commands,
             starts_at,
             ends_at,
+            *source_template_ids,
             *((receipt_id,) if receipt_id else ()),
         )
         rows = await session.fetch_all(
@@ -180,12 +191,14 @@ class WeeklyCompetitionRepository:
             FROM command_receipts AS receipt
             JOIN {source_table} AS source
               ON source.{source_id_column} = receipt.result_object_id
+             AND source.scope_id = receipt.scope_id
             WHERE receipt.business_status = 'committed'
               AND receipt.player_id IS NOT NULL
               AND receipt.result_type = ?
               AND receipt.command_name IN ({command_placeholders})
               AND receipt.created_at >= ?
               AND receipt.created_at < ?
+              {template_filter}
               {receipt_filter}
             ORDER BY receipt.created_at, receipt.receipt_id
             """,

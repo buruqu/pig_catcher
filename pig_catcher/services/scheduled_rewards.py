@@ -13,6 +13,16 @@ from ..domain.dispatch_views import DispatchView
 from ..domain.enums import AssetKind
 from ..domain.errors import DomainValidationError
 from ..domain.item_bag import CODE_CHANGE_COUPON, PIG_CHOICE_COUPON
+from ..domain.mid_autumn import (
+    JADE_RABBIT_PIG_ID,
+    LANTERN_PIG_ID,
+    MID_AUTUMN_END,
+    MID_AUTUMN_START,
+    OSMANTHUS_MOONCAKE_ID,
+    OSMANTHUS_PIG_ID,
+    RED_BEAN_MOONCAKE_ID,
+    SNOW_SKIN_MOONCAKE_ID,
+)
 from ..domain.models import CommandIdentity, ScopeKey
 from ..domain.ports import Clock, SystemClock
 from ..infrastructure.database import PigCatcherDatabase
@@ -31,6 +41,12 @@ BIRTHDAY_REWARDS = {
     "food": "撅撅猪派",
     "commemorative_code": "20260906",
     "numbering": "commemorative-label-with-unique-operation-code",
+}
+MID_AUTUMN_ID = "pig-midautumn-2026-opening-gift"
+MID_AUTUMN_REWARDS = {
+    "coins": 92_500,
+    "pigs": [LANTERN_PIG_ID, OSMANTHUS_PIG_ID, JADE_RABBIT_PIG_ID],
+    "foods": [RED_BEAN_MOONCAKE_ID, OSMANTHUS_MOONCAKE_ID, SNOW_SKIN_MOONCAKE_ID],
 }
 
 
@@ -94,6 +110,78 @@ class ScheduledRewardService:
             )
         return {"campaign_id": BIRTHDAY_ID, "created": True, "scheduled_at": iso_timestamp(BIRTHDAY_AT)}
 
+    async def schedule_mid_autumn(self, scope_ids: list[str]) -> dict:
+        """安排 9 月 25 日零点福利，收件人固定为该时刻已登记玩家。"""
+        scopes = sorted({ScopeKey.parse(scope).value for scope in scope_ids})
+        if not scopes:
+            raise DomainValidationError("中秋福利至少需要一个明确的群范围。")
+        payload = {**MID_AUTUMN_REWARDS, "scope_ids": scopes}
+        raw = encode(payload)
+        digest = hashlib.sha256(raw.encode()).hexdigest()
+        scheduled_at = iso_timestamp(MID_AUTUMN_START)
+        now = iso_timestamp(self.clock.now())
+        async with self.database.transaction() as session:
+            existing = await session.fetch_one(
+                "SELECT payload_hash,scheduled_at FROM scheduled_reward_campaigns WHERE campaign_id=?",
+                (MID_AUTUMN_ID,),
+            )
+            if existing:
+                if existing["payload_hash"] != digest or existing["scheduled_at"] != scheduled_at:
+                    raise DomainValidationError("中秋福利已存在不同参数，禁止改写或重复建立。")
+                return {"campaign_id": MID_AUTUMN_ID, "created": False, "scheduled_at": scheduled_at}
+            for scope in scopes:
+                if not await session.fetch_one("SELECT 1 FROM scopes WHERE scope_id=? AND enabled=1", (scope,)):
+                    raise DomainValidationError(f"未找到启用的群范围：{scope}")
+                await self._mid_autumn_templates(session, scope, payload)
+            await session.execute(
+                "INSERT INTO scheduled_reward_campaigns(campaign_id,title,scheduled_at,payload_json,payload_hash,"
+                "created_at) VALUES(?,?,?,?,?,?)",
+                (MID_AUTUMN_ID, "月圆猪饼宴·开场福利", scheduled_at, raw, digest, now),
+            )
+            await session.executemany(
+                "INSERT INTO scheduled_reward_scopes(campaign_id,scope_id) VALUES(?,?)",
+                [(MID_AUTUMN_ID, scope) for scope in scopes],
+            )
+            await self.admin.repository.insert_audit_event(
+                session,
+                audit_event_id=uuid4().hex,
+                scope_id=None,
+                actor_user_id="system-midautumn",
+                action="midautumn-campaign-scheduled",
+                object_type="reward-campaign",
+                object_id=MID_AUTUMN_ID,
+                detail_json=encode({"scheduled_at": scheduled_at, "payload_hash": digest, "scope_ids": scopes}),
+                now=now,
+            )
+        return {"campaign_id": MID_AUTUMN_ID, "created": True, "scheduled_at": scheduled_at}
+
+    async def ensure_mid_autumn_scheduled(self) -> bool:
+        """素材正式导入后自动登记一次；未导入时不制造空礼包。"""
+        if self.clock.now().astimezone(MID_AUTUMN_START.tzinfo) >= MID_AUTUMN_END:
+            return False
+        async with self.database.transaction(immediate=False) as session:
+            if await session.fetch_one(
+                "SELECT 1 FROM scheduled_reward_campaigns WHERE campaign_id=?", (MID_AUTUMN_ID,)
+            ):
+                return False
+            pig_count = await session.fetch_one(
+                f"SELECT COUNT(*) FROM pig_templates WHERE enabled=1 AND scope_type='common' "
+                f"AND template_id IN ({','.join('?' for _ in MID_AUTUMN_REWARDS['pigs'])})",
+                tuple(MID_AUTUMN_REWARDS["pigs"]),
+            )
+            food_count = await session.fetch_one(
+                f"SELECT COUNT(*) FROM food_templates WHERE enabled=1 AND scope_type='common' "
+                f"AND template_id IN ({','.join('?' for _ in MID_AUTUMN_REWARDS['foods'])})",
+                tuple(MID_AUTUMN_REWARDS["foods"]),
+            )
+            if int(pig_count[0]) != 3 or int(food_count[0]) != 3:
+                return False
+            scopes = await session.fetch_all("SELECT scope_id FROM scopes WHERE enabled=1 ORDER BY scope_id")
+        if not scopes:
+            return False
+        result = await self.schedule_mid_autumn([str(row["scope_id"]) for row in scopes])
+        return bool(result["created"])
+
     async def process_due(self) -> int:
         """One short transaction per group; crashes retry only uncommitted groups."""
         now = iso_timestamp(self.clock.now())
@@ -127,6 +215,8 @@ class ScheduledRewardService:
         return granted
 
     async def _grant_scope(self, campaign_id: str, scope_id: str, now: str) -> int:
+        if campaign_id == MID_AUTUMN_ID:
+            return await self._grant_mid_autumn_scope(scope_id, now)
         async with self.database.transaction() as session:
             row = await session.fetch_one(
                 "SELECT c.*,s.completed_at AS scope_completed FROM scheduled_reward_campaigns c "
@@ -292,6 +382,120 @@ class ScheduledRewardService:
             )
             return len(players)
 
+    async def _grant_mid_autumn_scope(self, scope_id: str, now: str) -> int:
+        async with self.database.transaction() as session:
+            row = await session.fetch_one(
+                "SELECT c.*,s.completed_at AS scope_completed FROM scheduled_reward_campaigns c "
+                "JOIN scheduled_reward_scopes s ON s.campaign_id=c.campaign_id WHERE c.campaign_id=? AND s.scope_id=?",
+                (MID_AUTUMN_ID, scope_id),
+            )
+            if not row or row["scope_completed"] or row["scheduled_at"] > now:
+                return 0
+            payload = json.loads(row["payload_json"])
+            if hashlib.sha256(encode(payload).encode()).hexdigest() != row["payload_hash"]:
+                raise DomainValidationError("中秋福利参数校验失败，发放已停止。")
+            templates = await self._mid_autumn_templates(session, scope_id, payload)
+            scope = await session.fetch_one("SELECT * FROM scopes WHERE scope_id=?", (scope_id,))
+            players = await session.fetch_all(
+                "SELECT * FROM players WHERE scope_id=? AND created_at<=? ORDER BY player_id",
+                (scope_id, row["scheduled_at"]),
+            )
+            actor = CommandIdentity(
+                ScopeKey.parse(scope_id),
+                str(scope["stream_id"] or "midautumn-system"),
+                "system-midautumn",
+                "中秋福利",
+                group_name=scope["group_name"],
+            )
+            for player_row in players:
+                player = dict(player_row)
+                balance = await self.admin.economy_repository.apply_currency_change(
+                    session,
+                    player_id=player["player_id"],
+                    scope_id=scope_id,
+                    amount=int(payload["coins"]),
+                    reason_code="midautumn-campaign",
+                    reason_text="月圆猪饼宴·开场福利·20260925",
+                    source_object_type="reward-campaign",
+                    source_object_id=MID_AUTUMN_ID,
+                    ledger_entry_id=uuid4().hex,
+                    idempotency_key=f"{MID_AUTUMN_ID}:{player['player_id']}:coins",
+                    now=now,
+                )
+                if balance is None:
+                    raise RuntimeError("中秋猪币入账失败，当前群整批回滚。")
+                assets = []
+                for kind, template in templates:
+                    assets.append(await self.admin._insert_granted_asset(
+                        session,
+                        identity=actor,
+                        target=player,
+                        asset_kind=kind,
+                        template=template,
+                        requested_short_code=None,
+                        now=now,
+                    ))
+                await session.execute(
+                    "INSERT INTO scheduled_reward_grants(campaign_id,player_id,scope_id,result_json,created_at) "
+                    "VALUES(?,?,?,?,?)",
+                    (
+                        MID_AUTUMN_ID,
+                        player["player_id"],
+                        scope_id,
+                        encode({"balance": balance, "coins": payload["coins"], "assets": assets}),
+                        now,
+                    ),
+                )
+            view = DispatchView(
+                "月圆猪饼宴",
+                scope["group_name"] or "全体猪友",
+                subtitle="PiG Dream! · 2026 中秋开场福利",
+                banner="中秋猪猪和猪月饼已送到！活动期间吃下猪月饼，冲刺第三期排行榜。",
+                stats=(Line("本群领取人数", f"{len(players)} 人"), Line("每人猪币", "+92,500")),
+                panels=(Panel("每位已登记玩家", (
+                    Line("中秋限定猪猪", "灯笼照月猪、桂花猪、玉兔猪各 ×1"),
+                    Line("三种猪月饼", "豆沙、桂花、冰皮各 ×1"),
+                    Line("抓猪基础额度", "活动期间每时段 10 次"),
+                )),),
+                hints=(
+                    "/猪猪背包 · /美食背包 查看到账福利。",
+                    "发放对象：9 月 25 日 00:00 前已在本群登记的玩家；每人仅发一次。",
+                ),
+                presentation="midautumn",
+                scene_key="20260925",
+            )
+            receipt = await self.receipts.reserve(
+                session,
+                idempotency_key=f"{MID_AUTUMN_ID}:{scope_id}:notice",
+                scope_id=scope_id,
+                player_id=None,
+                command_name="pig-catcher.scheduled-reward",
+                request_fingerprint=row["payload_hash"],
+                result_type="midautumn-reward",
+                result_object_id=MID_AUTUMN_ID,
+                result_json=encode({"view": view.payload(), "recipient_count": len(players)}),
+                text_summary=view.text(),
+                now=now,
+                catch_quota_cost=0,
+            )
+            await session.execute(
+                "UPDATE scheduled_reward_scopes SET receipt_id=?,recipient_count=?,completed_at=? "
+                "WHERE campaign_id=? AND scope_id=?",
+                (receipt.receipt.receipt_id, len(players), now, MID_AUTUMN_ID, scope_id),
+            )
+            await self.admin.repository.insert_audit_event(
+                session,
+                audit_event_id=uuid4().hex,
+                scope_id=scope_id,
+                actor_user_id="system-midautumn",
+                action="midautumn-campaign-granted",
+                object_type="reward-campaign",
+                object_id=MID_AUTUMN_ID,
+                detail_json=encode({"recipient_count": len(players), "payload_hash": row["payload_hash"]}),
+                now=now,
+            )
+            return len(players)
+
     async def pending_notices(self) -> list[tuple[str, DispatchResult]]:
         rows = await self.database.fetch_all(
             "SELECT r.idempotency_key,s.stream_id FROM scheduled_reward_scopes g "
@@ -319,4 +523,16 @@ class ScheduledRewardService:
             if len(templates) != 1:
                 raise DomainValidationError(f"{scope} 的生日奖励 {name} 未唯一授权，本群没有发放。")
             result.append(templates[0])
+        return tuple(result)
+
+    async def _mid_autumn_templates(self, session, scope, payload):
+        result = []
+        for kind, template_ids in ((AssetKind.PIG, payload["pigs"]), (AssetKind.FOOD, payload["foods"])):
+            for template_id in template_ids:
+                templates = await self.admin.repository.eligible_templates(
+                    session, scope_id=scope, asset_kind=kind, selector=template_id
+                )
+                if len(templates) != 1 or templates[0]["template_id"] != template_id:
+                    raise DomainValidationError(f"{scope} 的中秋奖励 {template_id} 未唯一授权，本群没有发放。")
+                result.append((kind, templates[0]))
         return tuple(result)

@@ -100,6 +100,7 @@ from ..domain.mid_autumn import (
     EXCLUSIVE_MOONCAKE_IDS,
     MOONCAKE_BY_PIG_AND_RARITY,
     mid_autumn_boost_active,
+    mooncake_cook_chance,
 )
 from ..domain.mirror_food import GROUP_WATER_MIRROR, HISTORY_MIRROR_CATCH, mirrored_history_weights
 from ..domain.models import CommandIdentity, CommandReceipt
@@ -1752,6 +1753,7 @@ class EconomyService:
             raise CookingTemplateError(f"当前群没有可用的 {int(output_rarity)} 星美食模板，原料猪未消耗。")
         desired_affinity = source.fat_category
         special_food_roll: float | None = None
+        mooncake_roll: float | None = None
         special_template_id = ""
         if source.rarity == 6 and int(output_rarity) == 6:
             paired_template_id = source.paired_food_template_id
@@ -1760,7 +1762,15 @@ class EconomyService:
                 raise CookingTemplateError("这只六星猪没有当前群可用的对应定制六星菜，原料猪未消耗。")
         else:
             paired_template_id = ""
-            special_template_id = MOONCAKE_BY_PIG_AND_RARITY.get((source.template_id, int(output_rarity)), "")
+            mooncake_id = MOONCAKE_BY_PIG_AND_RARITY.get((source.template_id, int(output_rarity)), "")
+            if mooncake_id:
+                mooncake_roll = self.random_source.random()
+                mooncake_chance = mooncake_cook_chance(datetime.fromisoformat(now.replace("Z", "+00:00")))
+                if mooncake_roll < mooncake_chance:
+                    special_template_id = mooncake_id
+                    cook_effect_summaries.append(
+                        f"中秋猪月饼 UP：命中对应口味，概率 {mooncake_chance * 100:g}%。"
+                    )
             if int(output_rarity) == 5:
                 if source.template_id == KFC_PIG_TEMPLATE_ID:
                     special_food_roll = self.random_source.random()
@@ -1924,6 +1934,7 @@ class EconomyService:
             "desired_affinity": desired_affinity,
             "paired_food_template_id": paired_template_id,
             "special_food_roll": special_food_roll,
+            "mooncake_roll": mooncake_roll,
             "special_food_template_id": special_template_id,
             "domain_gojo_bypass": domain_gojo_bypass,
             "bonus_roll": bonus_roll,

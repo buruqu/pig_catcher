@@ -45,7 +45,7 @@ def test_all_real_reward_sources_are_covered_without_placeholder_rewards():
     actual = _actual_rewards()
     registered = {(key, item["kind"]) for key, item in cosmetics.COSMETIC_DEFINITIONS.items()}
     assert registered == actual
-    assert Counter(kind for _, kind in registered) == {"title": 32, "frame": 17, "badge": 40, "cosmetic": 1}
+    assert Counter(kind for _, kind in registered) == {"title": 33, "frame": 18, "badge": 46, "cosmetic": 1}
 
 
 @pytest.mark.parametrize("key", tuple(cosmetics.COSMETIC_DEFINITIONS))
@@ -95,9 +95,9 @@ def test_legacy_names_and_kind_disambiguation():
 def test_cosmetic_cards_support_base_milestone_chest_activity_and_weekly():
     rewards = [AchievementReward(kind, key) for key, kind in sorted(_actual_rewards())]
     cards = cosmetics.cosmetic_cards(rewards)
-    assert len(cards) == 90
+    assert len(cards) == 98
     assert {card["id"] for card in cards} == set(cosmetics.COSMETIC_DEFINITIONS)
-    assert sum(card["is_plate"] for card in cards) == 40
+    assert sum(card["is_plate"] for card in cards) == 45
     assert cosmetics.cosmetic_cards([AchievementReward("coin", "pig-coin", 100)]) == ()
 
 
@@ -148,7 +148,7 @@ def test_all_titles_and_weekly_plates_have_distinct_generated_art(art_manifest):
         if cosmetics.COSMETIC_DEFINITIONS[item["id"]]["kind"] == "title"
         or cosmetics.COSMETIC_DEFINITIONS[item["id"]].get("rank")
     ]
-    assert len({item["files"]["png"]["sha256"] for item in plates}) == 40
+    assert len({item["files"]["png"]["sha256"] for item in plates}) == 45
     for item in plates:
         with Image.open(ART_ROOT / item["files"]["png"]["path"]) as picture:
             assert picture.mode == "RGBA"
@@ -271,7 +271,7 @@ def test_first_season_board_displays_all_four_art_previews_without_claiming_owne
         assert f'alt="抓猪冲刺！！！·{rank}牌"' in html
 
 
-@pytest.mark.parametrize("season", (0, 3, 99))
+@pytest.mark.parametrize("season", (0, 4, 99))
 def test_unregistered_season_never_reads_or_reuses_first_season_art(season):
     env = _weekly_environment()
 

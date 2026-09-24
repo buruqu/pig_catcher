@@ -7,6 +7,8 @@
     :root { --font-family: {{ font_family }}; }
     {{ theme_css | safe }}
     .achievement-firework{position:absolute;z-index:8;inset:112px 18px auto;display:flex;justify-content:space-between;pointer-events:none;color:#d83f7a;font-size:42px;text-shadow:0 3px 12px #fff}.achievement-firework span:nth-child(2){color:#d09a22;transform:translateY(24px)}
+    .midautumn-stamp-on-card{position:absolute;z-index:4;right:13px;top:12px;width:106px;height:106px;display:grid;place-items:center;border-radius:24px;background:#fffaf4d9;box-shadow:0 5px 16px #9a64703b;pointer-events:none}
+    .midautumn-stamp-on-card img{width:100px;height:100px;object-fit:contain}
   </style>
 </head>
 <body>
@@ -32,6 +34,10 @@
       <div class="pig-card__media-placeholder">历史实例仍然保留<br>素材授权已撤回</div>
       {% else %}
       <div class="pig-card__media-placeholder">素材文件暂时不可用<br>业务数据仍然安全保留</div>
+      {% endif %}
+      {% if 'weekly-003-mooncake-stamp' in view.achievement_badges or view.achievement_badge == 'weekly-003-mooncake-stamp' %}
+      {% set moon_stamp = cosmetic_detail('weekly-003-mooncake-stamp', kind='badge') %}
+      {% if moon_stamp.image_data_url %}<div class="midautumn-stamp-on-card" aria-label="月下三味成就印章"><img src="{{ moon_stamp.image_data_url }}" alt="月下三味"></div>{% endif %}
       {% endif %}
     </section>
 

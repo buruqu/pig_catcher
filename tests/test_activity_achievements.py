@@ -95,11 +95,11 @@ def test_runtime_pack_matches_reviewed_design_and_freezes_old_denominators():
         (Path(__file__).parents[1] / "docs/design-data/three-systems-achievements-r1.json").read_text(encoding="utf-8")
     )
     assert design["runtime_registration_allowed"] is False
-    assert len(LEGACY_ACHIEVEMENT_DEFINITIONS) == 82
+    assert len(LEGACY_ACHIEVEMENT_DEFINITIONS) == 83
     assert len(LEGACY_REGULAR_IDS) == 49
-    assert len(ACHIEVEMENT_DEFINITIONS) == 130
+    assert len(ACHIEVEMENT_DEFINITIONS) == 131
     assert len(ACTIVITY_IDS) == 48
-    assert sum(d.points for d in ACHIEVEMENT_DEFINITIONS) == 4040
+    assert sum(d.points for d in ACHIEVEMENT_DEFINITIONS) == 4060
     added = [ACHIEVEMENT_BY_ID[e["achievement_id"]] for e in design["entries"]]
     assert sum(d.points for d in added) == 1665
     assert sum(d.hidden for d in added) == 14

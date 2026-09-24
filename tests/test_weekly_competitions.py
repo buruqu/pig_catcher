@@ -134,7 +134,7 @@ async def _seed_catch(
 
 
 def test_first_weekly_definition_is_data_driven_and_complete() -> None:
-    assert len(WEEKLY_COMPETITION_DEFINITIONS) == 2
+    assert len(WEEKLY_COMPETITION_DEFINITIONS) == 3
     definition = WEEKLY_COMPETITION_DEFINITIONS[0]
     assert definition.season_number == 1
     assert definition.name == "抓猪冲刺！！！"

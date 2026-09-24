@@ -32,6 +32,7 @@ from ..domain.activity_achievements import ACTIVITY_REWARDS, LEGACY_REGULAR_IDS
 from ..domain.dispatch import MATERIAL_SCALE, safe_display_name
 from ..domain.errors import DomainValidationError
 from ..domain.gameplay import generate_pig_attributes, level_progress
+from ..domain.mid_autumn import EXCLUSIVE_MOONCAKE_IDS, mid_autumn_boost_active
 from ..domain.models import CommandIdentity, CommandReceipt
 from ..domain.ports import Clock, SystemClock
 from ..domain.short_codes import new_short_code, normalize_short_code
@@ -756,6 +757,14 @@ class AchievementService:
                 additions["sushi_platter_instances"] = sushi_ids
         if receipt.result_type == "food-consumed":
             deltas["foods_eaten"] = 1
+            if mid_autumn_boost_active(datetime.fromisoformat(receipt.created_at.replace("Z", "+00:00"))):
+                flavors = {
+                    str(row.get("template_id") or "")
+                    for row in foods
+                    if str(row.get("template_id") or "") in EXCLUSIVE_MOONCAKE_IDS
+                }
+                if flavors:
+                    additions["midautumn_mooncake_flavors"] = flavors
             flags["kfc_group_settlement"] = (
                 "炸猪全家桶" in names and int(payload.get("group_rewarded_players") or 0) >= 1
             )

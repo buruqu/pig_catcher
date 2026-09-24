@@ -72,6 +72,12 @@ def _note(x: int = 50, y: int = 28) -> str:
 def emblem_svg(name: str, color: str, gold: str) -> str:
     """逐项登记的原创图案；不能用默认字符冒充遗漏的外观。"""
     shared = {
+        "mooncake-pig": '<path d="M50 10a39 39 0 1 0 39 39 33 33 0 0 1-39-39z" fill="#f9e1a6"/>'
+        + '<path d="M27 38 18 23l19 6M73 38l9-15-19 6"/>'
+        + '<circle cx="50" cy="55" r="29" fill="#f8c4bf"/>'
+        + '<path d="M31 50q6-7 12 0m14 0q6-7 12 0" fill="none"/>'
+        + _snout(50, 66, 0.52)
+        + _star(82, 20, 9),
         "sushi-crown": '<path d="m28 29-6-17 16 8 12-17 12 17 16-8-6 17z" fill="#e6bc68"/>'
         + '<path d="M10 80h80l-7 10H17z" fill="#fff3dc"/>'
         + '<rect x="17" y="47" width="66" height="31" rx="12" fill="#fffdf5"/>'
@@ -223,6 +229,11 @@ def _border_svg(item: dict[str, Any], color: str, gold: str) -> str:
                 '<path d="M51 24h90M51 168h90M24 51v90M168 51v90" stroke="#c89549" stroke-width="2" stroke-dasharray="2 6" fill="none"/>',
             ]
         )
+    if item.get("family") == "weekly-003-moonlight":
+        pieces.extend([
+            '<path d="M31 15h130M31 177h130M15 31v130M177 31v130" stroke="#e4bd78" stroke-width="3" fill="none"/>',
+            '<path d="M96 12a14 14 0 1 0 12 20 12 12 0 0 1-12-20zM96 180a14 14 0 1 1 12-20 12 12 0 0 0-12 20z" fill="#f7d899"/>',
+        ])
     for x, y, rotation in ((3, 3, 0), (141, 3, 90), (141, 141, 180), (3, 141, 270)):
         pieces.append(f'<g transform="translate({x} {y}) rotate({rotation} 24 24)">{corner}</g>')
     pieces.append("</svg>")
@@ -233,7 +244,7 @@ def _plate_html(item: dict[str, Any], theme: dict[str, str], master: str) -> str
     color, gold = item.get("color", theme["color"]), theme["gold"]
     rank = int(item.get("rank", 0))
     variant = (f" rank-{rank}" if rank else f" theme-{item['theme']}") + (
-        " sushi-plate" if item["theme"] == "weekly-002" else ""
+        " sushi-plate" if item["theme"] == "weekly-002" else " mooncake-plate" if item["theme"] == "weekly-003" else ""
     )
     emblem = _data_url(emblem_svg(item["emblem"], color, gold).encode(), "image/svg+xml")
     title = theme["label"] if rank else item["name"]
@@ -295,6 +306,10 @@ body{font-family:CosmeticCJK,'Microsoft YaHei',sans-serif}.plate{width:1200px;he
 .plate-shape{position:relative;width:100%;height:100%;overflow:hidden;border:3px solid var(--gold);background:#fffdfb;
 clip-path:polygon(2% 0,98% 0,100% 10%,100% 90%,98% 100%,2% 100%,0 90%,0 10%)}
 .master{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+.mooncake-plate .plate-shape{background:linear-gradient(110deg,#fff0f1,#fffaf0 60%,#fff5ea)}
+.mooncake-plate .master{left:28px;right:auto;width:340px;height:100%;object-fit:contain}
+.moon-stamp{width:256px;height:256px;display:grid;place-items:center;filter:drop-shadow(0 8px 10px #9a64704d)}
+.moon-stamp img{width:252px;height:252px;object-fit:contain}
 .foil-line{position:absolute;inset:8px;border:1px solid var(--gold);pointer-events:none}
 .foil-line.inner{inset:15px;border-color:var(--ink);opacity:.38}
 .side-rail{position:absolute;top:20px;bottom:20px;width:6px;background:var(--gold);opacity:.68}
@@ -463,6 +478,9 @@ async def build(browser_path: Path, font_path: Path, *, selected_theme: str | No
                     files.update(border=_file_record(border), border_source=_file_record(border_source))
                     html = _frame_html(item, theme, _data_url(border.read_bytes(), "image/png"))
                     width, height = 480, 600
+                elif item["id"] == "weekly-003-mooncake-stamp":
+                    html = f'<article class="moon-stamp" data-export><img src="{masters[item["theme"]]}" alt=""></article>'
+                    width, height = 256, 256
                 elif item["kind"] == "title" or item.get("rank"):
                     html = _plate_html(item, theme, masters[item["theme"]])
                     width, height = 1200, 360

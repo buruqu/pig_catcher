@@ -103,8 +103,8 @@ class WeeklyCompetitionDefinition:
             raise ValueError("Fixed weekly window needs both start and end")
         if self.tie_breaker not in {"best-single", "earliest-score"}:
             raise ValueError("Unsupported weekly tie breaker")
-        if self.source_result_type == "cooking" and not self.source_template_ids:
-            raise ValueError("Cooking competition requires exact food template filters")
+        if self.source_result_type in {"cooking", "food-consumed"} and not self.source_template_ids:
+            raise ValueError("Food competition requires exact food template filters")
 
     def rewards_for_rank(self, rank: int) -> tuple[WeeklyReward, ...]:
         """Resolve one deterministic final-rank reward bundle."""
@@ -129,6 +129,12 @@ WEEKLY_SUSHI_FRAME_ID = "weekly-002-sushi-frame"
 WEEKLY_SUSHI_MEDAL_ID = "weekly-002-sushi-medal"
 WEEKLY_SUSHI_BADGE_IDS = {rank: f"weekly-002-sushi-rank-{rank}" for rank in (1, 2, 3, 10)}
 
+WEEKLY_MOONCAKE_TITLE_ID = "weekly-003-mooncake-title"
+WEEKLY_MOONCAKE_FRAME_ID = "weekly-003-mooncake-frame"
+WEEKLY_MOONCAKE_STAMP_ID = "weekly-003-mooncake-stamp"
+WEEKLY_MOONCAKE_MEDAL_ID = "weekly-003-mooncake-medal"
+WEEKLY_MOONCAKE_BADGE_IDS = {rank: f"weekly-003-mooncake-rank-{rank}" for rank in (1, 2, 3, 10)}
+
 
 def _sushi_rewards(rank: int, *, coins: int, catch_tickets: int, fireworks: int) -> tuple[WeeklyReward, ...]:
     return (
@@ -139,6 +145,18 @@ def _sushi_rewards(rank: int, *, coins: int, catch_tickets: int, fireworks: int)
         WeeklyReward("frame", WEEKLY_SUSHI_FRAME_ID),
         WeeklyReward("badge", WEEKLY_SUSHI_BADGE_IDS[rank if rank <= 3 else 10]),
         WeeklyReward("badge", WEEKLY_SUSHI_MEDAL_ID),
+    )
+
+
+def _mooncake_rewards(rank: int, *, coins: int, catch_tickets: int, fireworks: int) -> tuple[WeeklyReward, ...]:
+    return (
+        WeeklyReward("coin", "pig-coin", coins),
+        WeeklyReward("ticket", "achievement-catch", catch_tickets),
+        WeeklyReward("ticket", "achievement-firework", fireworks),
+        WeeklyReward("title", WEEKLY_MOONCAKE_TITLE_ID),
+        WeeklyReward("frame", WEEKLY_MOONCAKE_FRAME_ID),
+        WeeklyReward("badge", WEEKLY_MOONCAKE_BADGE_IDS[rank if rank <= 3 else 10]),
+        WeeklyReward("badge", WEEKLY_MOONCAKE_MEDAL_ID),
     )
 
 
@@ -200,6 +218,32 @@ WEEKLY_COMPETITION_DEFINITIONS: tuple[WeeklyCompetitionDefinition, ...] = (
         fixed_starts_at="2026-09-08T00:02:00+08:00",
         fixed_ends_at="2026-09-15T00:00:00+08:00",
     ),
+    WeeklyCompetitionDefinition(
+        definition_key="weekly-003-mooncake-feast",
+        season_number=3,
+        name="月圆猪饼宴",
+        source_result_type="food-consumed",
+        source_command_names=("pig-catcher.eat",),
+        source_field="",
+        source_template_ids=(
+            "food-midautumn-2026-red-bean",
+            "food-midautumn-2026-osmanthus-lava",
+            "food-midautumn-2026-snow-skin",
+        ),
+        aggregation=WeeklyAggregation.COUNT,
+        sort_direction=WeeklySortDirection.DESCENDING,
+        tie_breaker="earliest-score",
+        metric_label="本期吃下的中秋猪月饼",
+        metric_unit="个",
+        reward_tiers=(
+            WeeklyRewardTier((1,), _mooncake_rewards(1, coins=10_000, catch_tickets=5, fireworks=2)),
+            WeeklyRewardTier((2,), _mooncake_rewards(2, coins=8_000, catch_tickets=4, fireworks=2)),
+            WeeklyRewardTier((3,), _mooncake_rewards(3, coins=6_000, catch_tickets=3, fireworks=1)),
+            WeeklyRewardTier(tuple(range(4, 11)), _mooncake_rewards(10, coins=3_000, catch_tickets=2, fireworks=1)),
+        ),
+        fixed_starts_at="2026-09-25T00:00:00+08:00",
+        fixed_ends_at="2026-10-01T00:00:00+08:00",
+    ),
 )
 
 WEEKLY_COMPETITIONS_BY_KEY = {definition.definition_key: definition for definition in WEEKLY_COMPETITION_DEFINITIONS}
@@ -207,6 +251,11 @@ WEEKLY_COMPETITIONS_BY_SEASON = {definition.season_number: definition for defini
 
 
 WEEKLY_REWARD_NAMES = {
+    WEEKLY_MOONCAKE_TITLE_ID: "月圆猪饼宴·团圆食客",
+    WEEKLY_MOONCAKE_FRAME_ID: "月圆猪饼宴·桂月流光边框",
+    WEEKLY_MOONCAKE_STAMP_ID: "月下三味·团圆猪月饼印章",
+    WEEKLY_MOONCAKE_MEDAL_ID: "月圆猪饼宴·月桂徽章",
+    **{key: f"月圆猪饼宴·{rank}牌" for rank, key in WEEKLY_MOONCAKE_BADGE_IDS.items()},
     WEEKLY_SUSHI_TITLE_ID: "寿司拼盘大王",
     WEEKLY_SUSHI_FRAME_ID: "寿司拼盘大王·寿司宴台边框",
     WEEKLY_SUSHI_MEDAL_ID: "寿司拼盘大王·匠心寿司徽章",
@@ -221,6 +270,11 @@ WEEKLY_REWARD_NAMES = {
 
 
 __all__ = [
+    "WEEKLY_MOONCAKE_BADGE_IDS",
+    "WEEKLY_MOONCAKE_FRAME_ID",
+    "WEEKLY_MOONCAKE_STAMP_ID",
+    "WEEKLY_MOONCAKE_MEDAL_ID",
+    "WEEKLY_MOONCAKE_TITLE_ID",
     "WEEKLY_COMPETITION_DEFINITIONS",
     "WEEKLY_COMPETITIONS_BY_KEY",
     "WEEKLY_COMPETITIONS_BY_SEASON",

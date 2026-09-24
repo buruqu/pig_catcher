@@ -373,6 +373,21 @@ def _stamp_definitions() -> list[AchievementDefinition]:
     ]
 
 
+def _mid_autumn_definitions() -> list[AchievementDefinition]:
+    return [
+        AchievementDefinition(
+            "midautumn-2026-three-mooncakes",
+            "月下三味",
+            "中秋限定",
+            AchievementTier.RARE,
+            "2026 年中秋活动期间，各吃下一种豆沙、桂花、冰皮猪月饼。",
+            "吃下三种不同口味的猪月饼，每种口味至少一次。",
+            AchievementCondition(AchievementConditionKind.SET, "midautumn_mooncake_flavors", 3),
+            (_cosmetic("badge", "weekly-003-mooncake-stamp"),),
+        )
+    ]
+
+
 def _hidden_definitions() -> list[AchievementDefinition]:
     rows = (
         (
@@ -565,6 +580,7 @@ def _ultimate_definitions() -> list[AchievementDefinition]:
 
 LEGACY_ACHIEVEMENT_DEFINITIONS: tuple[AchievementDefinition, ...] = tuple(
     _regular_definitions() + _stamp_definitions() + _hidden_definitions() + _ultimate_definitions()
+    + _mid_autumn_definitions()
 )
 ACHIEVEMENT_DEFINITIONS = LEGACY_ACHIEVEMENT_DEFINITIONS + _activity_definitions()
 ACHIEVEMENT_BY_ID: Mapping[str, AchievementDefinition] = MappingProxyType(

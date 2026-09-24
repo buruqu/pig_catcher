@@ -1,9 +1,9 @@
 {
   "source_root": "asset_library/current/media",
   "definitions": "catalogs/formal/pig-and-food-definitions.json",
-  "entry_count": 344,
-  "unique_binary_count": 261,
-  "stored_binary_count": 348,
+  "entry_count": 366,
+  "unique_binary_count": 271,
+  "stored_binary_count": 370,
   "duplicate_aliases": [
     {
       "source_path": "猪猪素材库/紫色品质/翻滚猪.jpg",
@@ -2419,6 +2419,160 @@
       "media_path": "media/定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/粉蓝四叶草冰糕.png",
       "sha256": "cfa4115b7e4899b56a16095ebcd05849ffef678fda86c69259b2167ace894b2f",
       "bytes": 2476054
+    },
+    {
+      "template_id": "pig-g1092931381-luoli-c",
+      "source_path": "定制猪群友库/1092931381/洛璃c猪.png",
+      "media_path": "media/定制猪群友库/1092931381/洛璃c猪.png",
+      "sha256": "ea44d8f1397fcdf5395bfc20dc1fcf93935d5c897cbb445a399e85991ede2114",
+      "bytes": 2287642
+    },
+    {
+      "template_id": "food-g1092931381-luoli-jade-matcha-parfait",
+      "source_path": "定制美食库/1092931381/翠玉抹茶芭菲.png",
+      "media_path": "media/定制美食库/1092931381/翠玉抹茶芭菲.png",
+      "sha256": "b6a9205cb2a18deb53baf22ee5c51fcab6ca290b1bc411e180be5893f57605e7",
+      "bytes": 2305650
+    },
+    {
+      "template_id": "pig-g1092931381-miumiu-flow",
+      "source_path": "定制猪群友库/1092931381/空白缪缪流形猪.png",
+      "media_path": "media/定制猪群友库/1092931381/空白缪缪流形猪.png",
+      "sha256": "bd600fb234144cdba3e9051af78bda8ac7df1969d02725244164cd93425d52bb",
+      "bytes": 2712075
+    },
+    {
+      "template_id": "food-g1092931381-miumiu-water-mirror-jelly",
+      "source_path": "定制美食库/1092931381/流形水镜冻.png",
+      "media_path": "media/定制美食库/1092931381/流形水镜冻.png",
+      "sha256": "6888be33cda81eea2ddd4e1473747cd456a2b4f8fae0c9788fa9b589fffe540e",
+      "bytes": 2974545
+    },
+    {
+      "template_id": "pig-g237716658-luoli-c",
+      "source_path": "定制猪群友库/237716658/洛璃c猪.png",
+      "media_path": "media/定制猪群友库/237716658/洛璃c猪.png",
+      "sha256": "ea44d8f1397fcdf5395bfc20dc1fcf93935d5c897cbb445a399e85991ede2114",
+      "bytes": 2287642
+    },
+    {
+      "template_id": "food-g237716658-luoli-jade-matcha-parfait",
+      "source_path": "定制美食库/237716658/翠玉抹茶芭菲.png",
+      "media_path": "media/定制美食库/237716658/翠玉抹茶芭菲.png",
+      "sha256": "b6a9205cb2a18deb53baf22ee5c51fcab6ca290b1bc411e180be5893f57605e7",
+      "bytes": 2305650
+    },
+    {
+      "template_id": "pig-g237716658-miumiu-flow",
+      "source_path": "定制猪群友库/237716658/空白缪缪流形猪.png",
+      "media_path": "media/定制猪群友库/237716658/空白缪缪流形猪.png",
+      "sha256": "bd600fb234144cdba3e9051af78bda8ac7df1969d02725244164cd93425d52bb",
+      "bytes": 2712075
+    },
+    {
+      "template_id": "food-g237716658-miumiu-water-mirror-jelly",
+      "source_path": "定制美食库/237716658/流形水镜冻.png",
+      "media_path": "media/定制美食库/237716658/流形水镜冻.png",
+      "sha256": "6888be33cda81eea2ddd4e1473747cd456a2b4f8fae0c9788fa9b589fffe540e",
+      "bytes": 2974545
+    },
+    {
+      "template_id": "pig-qo5e5854406d0297d6feae696a13e3a339-luoli-c",
+      "source_path": "定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/洛璃c猪.png",
+      "media_path": "media/定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/洛璃c猪.png",
+      "sha256": "ea44d8f1397fcdf5395bfc20dc1fcf93935d5c897cbb445a399e85991ede2114",
+      "bytes": 2287642
+    },
+    {
+      "template_id": "food-qo5e5854406d0297d6feae696a13e3a339-luoli-jade-matcha-parfait",
+      "source_path": "定制美食库/5E5854406D0297D6FEAE696A13E3A339/翠玉抹茶芭菲.png",
+      "media_path": "media/定制美食库/5E5854406D0297D6FEAE696A13E3A339/翠玉抹茶芭菲.png",
+      "sha256": "b6a9205cb2a18deb53baf22ee5c51fcab6ca290b1bc411e180be5893f57605e7",
+      "bytes": 2305650
+    },
+    {
+      "template_id": "pig-qo5e5854406d0297d6feae696a13e3a339-miumiu-flow",
+      "source_path": "定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/空白缪缪流形猪.png",
+      "media_path": "media/定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/空白缪缪流形猪.png",
+      "sha256": "bd600fb234144cdba3e9051af78bda8ac7df1969d02725244164cd93425d52bb",
+      "bytes": 2712075
+    },
+    {
+      "template_id": "food-qo5e5854406d0297d6feae696a13e3a339-miumiu-water-mirror-jelly",
+      "source_path": "定制美食库/5E5854406D0297D6FEAE696A13E3A339/流形水镜冻.png",
+      "media_path": "media/定制美食库/5E5854406D0297D6FEAE696A13E3A339/流形水镜冻.png",
+      "sha256": "6888be33cda81eea2ddd4e1473747cd456a2b4f8fae0c9788fa9b589fffe540e",
+      "bytes": 2974545
+    },
+    {
+      "template_id": "pig-qo9ea2810f378fbd7dc3219c56ceab3520-luoli-c",
+      "source_path": "定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/洛璃c猪.png",
+      "media_path": "media/定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/洛璃c猪.png",
+      "sha256": "ea44d8f1397fcdf5395bfc20dc1fcf93935d5c897cbb445a399e85991ede2114",
+      "bytes": 2287642
+    },
+    {
+      "template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-luoli-jade-matcha-parfait",
+      "source_path": "定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/翠玉抹茶芭菲.png",
+      "media_path": "media/定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/翠玉抹茶芭菲.png",
+      "sha256": "b6a9205cb2a18deb53baf22ee5c51fcab6ca290b1bc411e180be5893f57605e7",
+      "bytes": 2305650
+    },
+    {
+      "template_id": "pig-qo9ea2810f378fbd7dc3219c56ceab3520-miumiu-flow",
+      "source_path": "定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/空白缪缪流形猪.png",
+      "media_path": "media/定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/空白缪缪流形猪.png",
+      "sha256": "bd600fb234144cdba3e9051af78bda8ac7df1969d02725244164cd93425d52bb",
+      "bytes": 2712075
+    },
+    {
+      "template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-miumiu-water-mirror-jelly",
+      "source_path": "定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/流形水镜冻.png",
+      "media_path": "media/定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/流形水镜冻.png",
+      "sha256": "6888be33cda81eea2ddd4e1473747cd456a2b4f8fae0c9788fa9b589fffe540e",
+      "bytes": 2974545
+    },
+    {
+      "template_id": "pig-midautumn-2026-lantern",
+      "source_path": "中秋限定2026/pig-lantern.png",
+      "media_path": "media/中秋限定2026/pig-lantern.png",
+      "sha256": "46b159e4e1b88f902e510da73140c281f0d41528f3d15a4bbd26d3fc6c4faec6",
+      "bytes": 1364505
+    },
+    {
+      "template_id": "pig-midautumn-2026-osmanthus",
+      "source_path": "中秋限定2026/pig-osmanthus.png",
+      "media_path": "media/中秋限定2026/pig-osmanthus.png",
+      "sha256": "13f6b25e9117c77a3cb04b9181cc616fdd3deb80c537c8937d20e0d52fa3c097",
+      "bytes": 1564532
+    },
+    {
+      "template_id": "pig-midautumn-2026-jade-rabbit",
+      "source_path": "中秋限定2026/pig-jade-rabbit.png",
+      "media_path": "media/中秋限定2026/pig-jade-rabbit.png",
+      "sha256": "f1bde15eea68795db590ba242ef0e9a2968b0356485cd325d86624bf8ccbdf24",
+      "bytes": 1262330
+    },
+    {
+      "template_id": "food-midautumn-2026-red-bean",
+      "source_path": "中秋限定2026/food-red-bean-pig-mooncake.png",
+      "media_path": "media/中秋限定2026/food-red-bean-pig-mooncake.png",
+      "sha256": "c50f1b1bc8f2c85ce1b179b074121e66261ead2e6ede9575b0f1205ad96d6b75",
+      "bytes": 1163459
+    },
+    {
+      "template_id": "food-midautumn-2026-osmanthus-lava",
+      "source_path": "中秋限定2026/food-osmanthus-pig-mooncake.png",
+      "media_path": "media/中秋限定2026/food-osmanthus-pig-mooncake.png",
+      "sha256": "8d46ab608f58b4a4bf4dce10480cf08a3dea2875eb84b0e189f44e0fbfbfe0ad",
+      "bytes": 1227526
+    },
+    {
+      "template_id": "food-midautumn-2026-snow-skin",
+      "source_path": "中秋限定2026/food-snow-skin-pig-mooncake.png",
+      "media_path": "media/中秋限定2026/food-snow-skin-pig-mooncake.png",
+      "sha256": "3128135238e5ebbb9d013f2b65e7f768abbd22401c9d51efb554457757e09749",
+      "bytes": 1060646
     }
   ]
 }

@@ -122,6 +122,7 @@ class WeeklyCompetitionPage:
     player_score_text: str
     entries: tuple[WeeklyCompetitionRankingEntry, ...]
     cooking_metric: bool = False
+    eating_metric: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -155,7 +156,7 @@ def format_weekly_competition_summary(page: WeeklyCompetitionPage) -> str:
         f"第 {page.page}/{page.page_count} 页｜参榜 {page.total_count} 人",
     ]
     for entry in page.entries:
-        if page.cooking_metric:
+        if page.cooking_metric or page.eating_metric:
             lines.append(f"{entry.rank}. {entry.display_name}｜{entry.score_text}｜最后计分 {entry.last_update_at}")
             continue
         lines.append(
@@ -163,7 +164,11 @@ def format_weekly_competition_summary(page: WeeklyCompetitionPage) -> str:
             f"抓到 {entry.catch_count} 只｜单只最高 {entry.highest_single_text}"
         )
     if not page.entries:
-        lines.append("本群本期还没有有效做菜成绩。" if page.cooking_metric else "本群本期还没有有效抓猪记录。")
+        lines.append(
+            "本群本期还没有吃下中秋猪月饼。"
+            if page.eating_metric
+            else "本群本期还没有有效做菜成绩。" if page.cooking_metric else "本群本期还没有有效抓猪记录。"
+        )
     if page.player_rank is None:
         lines.append("我的名次：尚未上榜")
     else:
@@ -302,6 +307,7 @@ class WeeklyCompetitionService:
             metric_label=str(competition["metric_label"]),
             metric_unit=str(competition["metric_unit"]),
             cooking_metric=definition.source_result_type == "cooking",
+            eating_metric=definition.source_result_type == "food-consumed",
             period_text=(f"{start_local:%m月%d日 %H:%M} — {end_local:%m月%d日 %H:%M}（北京时间）"),
             countdown_text=(
                 "距开始 "

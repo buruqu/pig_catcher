@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "art_version": "pig-dream-cosmetics-v2-weekly002",
+  "art_version": "pig-dream-cosmetics-v3-weekly003",
   "note": "原创主题收藏牌；只登记奖励身份和美术，不存触发条件。未来周榜必须另建经过审核的独立主题包。",
   "themes": {
     "collection": {"label": "收藏册", "color": "#ab537d", "gold": "#bb8f46", "master": "collection.png"},
@@ -10,7 +10,8 @@
     "rain": {"label": "雨幕纪念", "color": "#62649d", "gold": "#b2a178", "master": "rain.png", "crop": [0,110,1774,610]},
     "ultimate": {"label": "终极收藏", "color": "#8d6137", "gold": "#cba244", "master": "ultimate.png"},
     "weekly-001": {"label": "抓猪冲刺！！！", "metric": "本周抓猪价值榜", "color": "#b54e73", "gold": "#c6953e", "master": "weekly-001.png"},
-    "weekly-002": {"label": "寿司拼盘大王", "metric": "寿司出餐榜", "color": "#315b4d", "gold": "#c89549", "master": "weekly-002.png"}
+    "weekly-002": {"label": "寿司拼盘大王", "metric": "寿司出餐榜", "color": "#315b4d", "gold": "#c89549", "master": "weekly-002.png"},
+    "weekly-003": {"label": "月圆猪饼宴", "metric": "猪月饼品鉴榜", "color": "#995d86", "gold": "#d7a44f", "master": "weekly-003.png"}
   },
   "entries": [
     {"id":"three-gift-partners","kind":"badge","name":"礼物走过三双手","theme":"collection","emblem":"gift","origin":"legacy"},
@@ -101,6 +102,14 @@
     {"id":"weekly-002-sushi-rank-3","kind":"badge","name":"寿司拼盘大王·3牌","theme":"weekly-002","emblem":"sushi-crown","season":2,"rank":3,"color":"#9c6549","origin":"weekly-002"},
     {"id":"weekly-002-sushi-rank-10","kind":"badge","name":"寿司拼盘大王·10牌","theme":"weekly-002","emblem":"sushi-crown","season":2,"rank":10,"color":"#315b4d","origin":"weekly-002"},
     {"id":"weekly-002-sushi-medal","kind":"badge","name":"寿司拼盘大王·匠心寿司徽章","theme":"weekly-002","emblem":"sushi-crown","season":2,"origin":"weekly-002"},
+    {"id":"weekly-003-mooncake-title","kind":"title","name":"月圆猪饼宴·团圆食客","theme":"weekly-003","emblem":"mooncake-pig","season":3,"origin":"weekly-003"},
+    {"id":"weekly-003-mooncake-frame","kind":"frame","name":"月圆猪饼宴·桂月流光边框","theme":"weekly-003","emblem":"mooncake-pig","family":"weekly-003-moonlight","season":3,"origin":"weekly-003"},
+    {"id":"weekly-003-mooncake-rank-1","kind":"badge","name":"月圆猪饼宴·1牌","theme":"weekly-003","emblem":"mooncake-pig","season":3,"rank":1,"color":"#a67527","origin":"weekly-003"},
+    {"id":"weekly-003-mooncake-rank-2","kind":"badge","name":"月圆猪饼宴·2牌","theme":"weekly-003","emblem":"mooncake-pig","season":3,"rank":2,"color":"#697a9b","origin":"weekly-003"},
+    {"id":"weekly-003-mooncake-rank-3","kind":"badge","name":"月圆猪饼宴·3牌","theme":"weekly-003","emblem":"mooncake-pig","season":3,"rank":3,"color":"#ae7569","origin":"weekly-003"},
+    {"id":"weekly-003-mooncake-rank-10","kind":"badge","name":"月圆猪饼宴·10牌","theme":"weekly-003","emblem":"mooncake-pig","season":3,"rank":10,"color":"#995d86","origin":"weekly-003"},
+    {"id":"weekly-003-mooncake-medal","kind":"badge","name":"月圆猪饼宴·月桂徽章","theme":"weekly-003","emblem":"mooncake-pig","season":3,"origin":"weekly-003"},
+    {"id":"weekly-003-mooncake-stamp","kind":"badge","name":"月下三味·团圆猪月饼印章","theme":"weekly-003","emblem":"mooncake-pig","origin":"mid-autumn-2026"},
     {"id":"achievement-choice-pink","kind":"frame","name":"自选粉金边框","theme":"collection","emblem":"gift-ribbon","family":"choice-pink","origin":"choice"},
     {"id":"achievement-choice","kind":"badge","name":"成就自选徽章","theme":"collection","emblem":"gift-ribbon","origin":"choice"}
   ]

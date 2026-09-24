@@ -51,9 +51,10 @@ class SocialRewardsRunner:
                 errors.append(exc)
         await self.packets.expire()
         try:
+            await self.campaigns.ensure_mid_autumn_scheduled()
             count = await self.campaigns.process_due()
             if count:
-                self.logger.info("抓猪定时生日福利已入账：%s人", count)
+                self.logger.info("抓猪定时活动福利已入账：%s人", count)
         finally:
             # A failed scope cannot suppress already committed notices in other scopes.
             for stream, result in await self.campaigns.pending_notices():
@@ -66,7 +67,7 @@ class SocialRewardsRunner:
             try:
                 await self.tick()
             except Exception:
-                self.logger.exception("抓猪红包/生日定时处理失败；未提交事务将于下一轮安全重试")
+                self.logger.exception("抓猪红包/活动定时处理失败；未提交事务将于下一轮安全重试")
             try:
                 await asyncio.wait_for(self._stop.wait(), timeout=self.interval)
             except TimeoutError:

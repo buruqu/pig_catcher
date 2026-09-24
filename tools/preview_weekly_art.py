@@ -7,6 +7,7 @@ import asyncio
 import base64
 import json
 import sys
+from datetime import datetime
 from html import escape
 from pathlib import Path
 
@@ -36,9 +37,15 @@ async def run(args):
             (1, "金色冠军 · 第1名"),
             (2, "银蓝亚军 · 第2名"),
             (3, "赤铜季军 · 第3名"),
-            (10, "海苔绿十牌 · 第4—10名"),
+            (10, "前十纪念牌 · 第4—10名"),
         )
     )
+    starts = datetime.fromisoformat(definition.fixed_starts_at)
+    ends = datetime.fromisoformat(definition.fixed_ends_at)
+    period_text = f"{starts:%Y年%m月%d日%H:%M}—{ends:%m月%d日%H:%M} · 北京时间"
+    metric_text = f"{definition.metric_label}越多，排名越靠前。"
+    medal_name = escape(cosmetic_detail(art["medal"], variant="detail")["name"])
+    frame_name = escape(cosmetic_detail(art["frame"], variant="detail")["name"])
     card = f"data:image/png;base64,{base64.b64encode(args.card.read_bytes()).decode()}"
     html = f'''<!doctype html><html lang="zh-CN"><meta charset="utf-8"><style>
     *{{box-sizing:border-box}}body{{margin:0;font-family:'Microsoft YaHei',sans-serif;background:#fff9f2;color:#315b4d}}
@@ -54,10 +61,10 @@ async def run(args):
     .sample{{width:100%;display:block}}.note{{font-size:15px;color:#87745f;text-align:center;margin:20px 0 0}}
     </style><main data-preview><div class="kicker">PiG Dream! · 第{args.season}期活动 · 美术预览</div>
     <h1>{escape(definition.name)}</h1><p>卷起热爱，端出你的王冠！</p>
-    <p>2026年9月8日00:02起开幕—9月15日00:00 · 北京时间<br>以群内正式开幕公告为准。亲手做出的猪寿司拼盘越多，排名越靠前。</p>
+    <p>{period_text}<br>以群内正式开幕公告为准。{escape(metric_text)}</p>
     {picture(art["title"], "hero")}<div class="plates">{plates}</div>
-    <div class="bottom"><section><h2>匠心寿司徽章</h2>{picture(art["medal"], "medal")}
-    <h2>寿司宴台边框</h2>{picture(art["frame"], "frame")}<p>前十专属纪念<br>获奖后可自由佩戴</p></section>
+    <div class="bottom"><section><h2>{medal_name}</h2>{picture(art["medal"], "medal")}
+    <h2>{frame_name}</h2>{picture(art["frame"], "frame")}<p>前十专属纪念<br>获奖后可自由佩戴</p></section>
     <section><h2>边框装备实机样式</h2><img class="sample" src="{card}" alt="离线抓猪卡边框示意"></section></div>
     <p class="note">美术与排版预览，不是获奖通知；抓猪卡内为离线测试样例。</p></main></html>'''
     page_path = output / "index.html"
@@ -78,7 +85,7 @@ async def run(args):
             })""")
             if any(diagnostics.values()):
                 raise ValueError(diagnostics)
-            await page.locator("main").screenshot(path=str(output / "寿司拼盘大王-活动美术一览.png"))
+            await page.locator("main").screenshot(path=str(output / f"{definition.name}-活动美术一览.png"))
         finally:
             await browser.close()
     (output / "report.json").write_text(json.dumps(diagnostics), encoding="utf-8")

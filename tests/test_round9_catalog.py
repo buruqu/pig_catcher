@@ -282,7 +282,7 @@ def test_every_old_and_new_pig_has_reviewed_tags_and_explicit_physical_ranges(
     manifest_by_id: dict[str, dict[str, Any]],
 ) -> None:
     pigs = [entry for entry in definitions if entry["kind"] == "pig"]
-    assert len(pigs) == 239
+    assert len(pigs) == 242
     for entry in pigs:
         name = entry["display_name"]
         tags = entry["display_tags"]
@@ -313,7 +313,7 @@ def test_every_old_and_new_pig_has_reviewed_tags_and_explicit_physical_ranges(
 
 
 def test_four_scopes_share_content_without_merging_six_star_ownership(definitions: list[dict[str, Any]]) -> None:
-    assert Counter(entry["kind"] for entry in definitions) == {"pig": 239, "food": 121}
+    assert Counter(entry["kind"] for entry in definitions) == {"pig": 242, "food": 124}
     scoped = [entry for entry in definitions if entry.get("group_scope_id")]
     assert len(scoped) == 128
     assert {entry["group_scope_id"] for entry in scoped} == set(SCOPES)
@@ -341,7 +341,7 @@ def test_four_scopes_share_content_without_merging_six_star_ownership(definition
     signatures = []
     for scope in SCOPES:
         visible = [entry for entry in definitions if entry.get("group_scope_id") in (None, "", scope)]
-        assert Counter(entry["kind"] for entry in visible) == {"pig": 191, "food": 73}
+        assert Counter(entry["kind"] for entry in visible) == {"pig": 194, "food": 76}
         private = [entry for entry in scoped if entry["group_scope_id"] == scope]
         assert Counter(entry["kind"] for entry in private) == {"pig": 16, "food": 16}
         for entry in private:

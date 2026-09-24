@@ -56,18 +56,18 @@
   </section>
   <section class="weekly-ranks">
     {% for item in view.entries %}
-    <div class="weekly-row{% if view.cooking_metric %} cooking-row{% endif %}{% if item.rank <= 3 %} rank-{{ item.rank }}{% endif %}">
+    <div class="weekly-row{% if view.cooking_metric or view.eating_metric %} cooking-row{% endif %}{% if item.rank <= 3 %} rank-{{ item.rank }}{% endif %}">
       <div class="weekly-rank">{{ item.rank }}</div>
       <div class="weekly-player"><strong>{{ item.display_name }}</strong><span>最后计分 {{ item.last_update_at }}</span></div>
       <div class="weekly-score">{{ item.score_text }}</div>
-      {% if view.cooking_metric %}<div class="weekly-catches">寿司有效出餐 {{ item.catch_count }} 次</div>{% else %}<div class="weekly-catches">抓到 {{ item.catch_count }} 只</div>
+      {% if view.eating_metric %}<div class="weekly-catches">有效吃下 {{ item.catch_count }} 个</div>{% elif view.cooking_metric %}<div class="weekly-catches">寿司有效出餐 {{ item.catch_count }} 次</div>{% else %}<div class="weekly-catches">抓到 {{ item.catch_count }} 只</div>
       <div class="weekly-best">单只最高<strong>{{ item.highest_single_text }}</strong></div>
       {% endif %}
     </div>
-    {% else %}<div class="empty-state">{% if view.cooking_metric %}本群本期还没有寿司出餐记录<br>亲手做出猪寿司拼盘，即可上榜{% else %}本群本期还没有有效抓猪记录<br>成功抓到第一只猪即可上榜{% endif %}</div>{% endfor %}
+    {% else %}<div class="empty-state">{% if view.eating_metric %}本群本期还没有人吃下猪月饼<br>吃下任意一种中秋猪月饼，即可上榜{% elif view.cooking_metric %}本群本期还没有寿司出餐记录<br>亲手做出猪寿司拼盘，即可上榜{% else %}本群本期还没有有效抓猪记录<br>成功抓到第一只猪即可上榜{% endif %}</div>{% endfor %}
   </section>
   <div class="weekly-self">{{ view.player_position_text }}</div>
-  <footer class="game-footer"><span>{% if view.cooking_metric %}仅计本人做菜出餐份数 · 同分先达成者优先{% else %}同分依次比较单只最高价值、抓取数量、达成时间{% endif %}</span><strong>{{ view.page }}/{{ view.page_count }} · {{ view.total_count }} 人</strong></footer>
+  <footer class="game-footer"><span>{% if view.eating_metric %}仅计活动期间本人成功吃下的三款猪月饼 · 同分先达成者优先{% elif view.cooking_metric %}仅计本人做菜出餐份数 · 同分先达成者优先{% else %}同分依次比较单只最高价值、抓取数量、达成时间{% endif %}</span><strong>{{ view.page }}/{{ view.page_count }} · {{ view.total_count }} 人</strong></footer>
 </main>
 </body>
 </html>

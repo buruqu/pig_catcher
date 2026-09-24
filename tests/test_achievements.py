@@ -20,7 +20,7 @@ from .test_plugin import _command_kwargs, _install_test_pig
 
 def test_v2_registry_contains_the_frozen_first_season_shape() -> None:
     ids = [item.achievement_id for item in ACHIEVEMENT_DEFINITIONS]
-    assert len(ids) == len(set(ids)) == 130
+    assert len(ids) == len(set(ids)) == 131
     categories = Counter(item.category for item in ACHIEVEMENT_DEFINITIONS)
     assert (
         sum(
