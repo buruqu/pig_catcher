@@ -1,0 +1,68 @@
+{
+  "definition_version": 1,
+  "catalog_id": "pig-catcher-mid-autumn-2026-candidate-v1",
+  "source_label": "2026-09-24 Codex image generation, original Mid-Autumn pig and mooncake art",
+  "license": "generated-art-review-pending",
+  "entries": [
+    {
+      "template_id": "pig-midautumn-2026-lantern",
+      "source_path": "pig-lantern-moon.png",
+      "kind": "pig",
+      "display_name": "灯笼照月猪",
+      "rarity": 2,
+      "description": "提着一盏把月亮装进去的小灯笼，沿着桂花香寻找团圆的路。",
+      "fat_profile": "balanced",
+      "recipe_tags": ["中秋", "灯笼", "月饼"],
+      "display_tags": ["中秋限定", "提灯", "赏月"]
+    },
+    {
+      "template_id": "pig-midautumn-2026-osmanthus",
+      "source_path": "pig-osmanthus-reunion.png",
+      "kind": "pig",
+      "display_name": "桂枝团圆猪",
+      "rarity": 4,
+      "description": "桂枝花冠上还落着花，刚把第一炉月饼递出，自己脸上也沾了面粉。",
+      "fat_profile": "balanced",
+      "recipe_tags": ["中秋", "桂花", "月饼"],
+      "display_tags": ["中秋限定", "桂花", "做饼"]
+    },
+    {
+      "template_id": "pig-midautumn-2026-jade-rabbit",
+      "source_path": "pig-jade-rabbit-mortar.png",
+      "kind": "pig",
+      "display_name": "玉兔捣糕猪",
+      "rarity": 5,
+      "description": "戴上兔耳头饰在月宫捣糕，杵得认真，偶尔把星屑撒成一圈。",
+      "fat_profile": "balanced",
+      "recipe_tags": ["中秋", "玉兔", "月饼"],
+      "display_tags": ["中秋限定", "玉兔装扮", "月宫"]
+    },
+    {
+      "template_id": "food-midautumn-2026-red-bean",
+      "source_path": "food-lantern-red-bean-mooncake.png",
+      "kind": "food",
+      "display_name": "灯笼豆沙月饼",
+      "rarity": 2,
+      "description": "酥皮刻着一盏小灯，掰开是绵密豆沙，趁热分一半给同行的猪。",
+      "recipe_tags": ["中秋", "月饼", "豆沙"]
+    },
+    {
+      "template_id": "food-midautumn-2026-osmanthus-lava",
+      "source_path": "food-osmanthus-lava-mooncake.png",
+      "kind": "food",
+      "display_name": "桂花流心月饼",
+      "rarity": 4,
+      "description": "桂花纹酥皮包着金黄奶香流心，切开时像把一轮小月亮放进盘里。",
+      "recipe_tags": ["中秋", "月饼", "桂花", "流心"]
+    },
+    {
+      "template_id": "food-midautumn-2026-snow-skin",
+      "source_path": "food-jade-rabbit-snow-skin-mooncake.png",
+      "kind": "food",
+      "display_name": "玉兔冰皮月饼",
+      "rarity": 5,
+      "description": "冰皮柔白，玉兔与弯月花纹相映，蝶豆花奶馅裹着一点金黄流心。",
+      "recipe_tags": ["中秋", "月饼", "冰皮", "玉兔"]
+    }
+  ]
+}
