@@ -64,6 +64,7 @@ from ..domain.food_effects import (
     GROUP_EFFECT_IDS,
     GROUP_NEXT_EXCLUSIVE_HIGH_STAR_CATCH,
     GROUP_WINDOW_HIGH_STAR_BOOST,
+    MID_AUTUMN_COIN_REWARD,
     NEXT_GUARANTEED_SIX_STAR_CATCH,
     NEXT_HIGH_STAR_CATCH,
     NEXT_SIX_STAR_COOK,
@@ -94,6 +95,11 @@ from ..domain.gameplay import (
     ItemDefinition,
     item_by_id,
     level_progress,
+)
+from ..domain.mid_autumn import (
+    EXCLUSIVE_MOONCAKE_IDS,
+    MOONCAKE_BY_PIG_AND_RARITY,
+    mid_autumn_boost_active,
 )
 from ..domain.mirror_food import GROUP_WATER_MIRROR, HISTORY_MIRROR_CATCH, mirrored_history_weights
 from ..domain.models import CommandIdentity, CommandReceipt
@@ -1599,6 +1605,7 @@ class EconomyService:
                 weights,
                 active_effects,
                 source_rarity=source.rarity,
+                mid_autumn_active=mid_autumn_boost_active(datetime.fromisoformat(now)),
             )
         weights = effect_application.weights
         six_star_progress_stacks = await self.repository.six_star_progress_stacks(
@@ -1753,6 +1760,7 @@ class EconomyService:
                 raise CookingTemplateError("这只六星猪没有当前群可用的对应定制六星菜，原料猪未消耗。")
         else:
             paired_template_id = ""
+            special_template_id = MOONCAKE_BY_PIG_AND_RARITY.get((source.template_id, int(output_rarity)), "")
             if int(output_rarity) == 5:
                 if source.template_id == KFC_PIG_TEMPLATE_ID:
                     special_food_roll = self.random_source.random()
@@ -1776,7 +1784,7 @@ class EconomyService:
             ordinary_templates = [
                 candidate
                 for candidate in templates
-                if str(candidate["template_id"]) not in SOURCE_EXCLUSIVE_FOOD_TEMPLATE_IDS
+                if str(candidate["template_id"]) not in SOURCE_EXCLUSIVE_FOOD_TEMPLATE_IDS | EXCLUSIVE_MOONCAKE_IDS
             ]
             if applied_item is not None and applied_item.item_id == "precision-knife":
                 desired_affinity = "lean"
@@ -2131,7 +2139,11 @@ class EconomyService:
             templates.extend(
                 await self.repository.list_drawable_food_templates(session, scope_id=identity.scope.value, rarity=star)
             )
-        templates = [t for t in templates if str(t["template_id"]) not in SOURCE_EXCLUSIVE_FOOD_TEMPLATE_IDS]
+        templates = [
+            t
+            for t in templates
+            if str(t["template_id"]) not in SOURCE_EXCLUSIVE_FOOD_TEMPLATE_IDS | EXCLUSIVE_MOONCAKE_IDS
+        ]
         if not templates:
             raise CookingTemplateError("粉蓝奖励找不到当前群可用的非六星菜，整次做菜回滚。")
         labels: list[str] = []
@@ -2385,7 +2397,7 @@ class EconomyService:
                 identity,
                 normalized_selector,
             )
-            effect = self._food_effect(food)
+            effect = self._food_effect(food, now=now_datetime)
             if effect.queued_effect_id == HISTORY_MIRROR_CATCH:
                 history = await session.fetch_all(
                     """SELECT p.rarity FROM command_receipts r JOIN pig_instances p
@@ -2692,6 +2704,7 @@ class EconomyService:
                 PERMANENT_WINDOW_CATCH,
                 PERMANENT_SIX_STAR_PROGRESS,
                 GROUP_COIN_TRIBUTE,
+                MID_AUTUMN_COIN_REWARD,
                 FOOD_SUPPLY_PACK,
                 YILU_LOTTERY,
                 ROULETTE_CHANCES,
@@ -4293,7 +4306,7 @@ class EconomyService:
             raise ReceiptConflictError("美食实例写入后无法读取。")
         return food_view_from_row(row)
 
-    def _food_effect(self, food: FoodView) -> FoodEffectOutcome:
+    def _food_effect(self, food: FoodView, *, now: datetime | None = None) -> FoodEffectOutcome:
         effect_id = food.effect_id.strip()
         if not effect_id:
             return FoodEffectOutcome("基础效果：本次获得品鉴经验。")
@@ -4307,8 +4320,16 @@ class EconomyService:
                 coin_bonus = int(grant.params["self_coin"])
             elif grant.effect_id == GROUP_WINDOW_HIGH_STAR_BOOST:
                 coin_bonus = int(grant.params["coin_per_player"])
+            elif grant.effect_id == MID_AUTUMN_COIN_REWARD:
+                if now is None:
+                    raise FoodEffectError("冰皮猪月饼结算缺少当前时间。")
+                coin_bonus = 20_000 if mid_autumn_boost_active(now) else 10_000
             return FoodEffectOutcome(
-                summary=grant.summary,
+                summary=(
+                    f"食用冰皮猪月饼，获得{coin_bonus}猪币。"
+                    if grant.effect_id == MID_AUTUMN_COIN_REWARD
+                    else grant.summary
+                ),
                 coin_bonus=coin_bonus,
                 queued_effect_id=grant.effect_id,
                 queued_effect_params=grant.params,

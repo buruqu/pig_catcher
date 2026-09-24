@@ -12,6 +12,7 @@ from .feasts import CLOVER_CATCH, CLOVER_COOK, CLOVER_DESCRIPTION, CLOVER_FEAST,
 from .food_lottery import LOTTERY_DESCRIPTION, YILU_LOTTERY, shuffled_catch_distribution
 from .mirror_food import GROUP_WATER_MIRROR, HISTORY_MIRROR_CATCH
 from .rules import (
+    BASE_CATCH_WEIGHTS,
     apply_monotonic_high_rarity_multipliers,
     lift_target_rarity_from_lower,
     normalize_weights,
@@ -31,6 +32,9 @@ NEXT_PIG_RARITY = "next-pig-rarity"
 NEXT_FOOD_RARITY = "next-food-rarity"
 NEXT_PIG_STATURE = "next-pig-stature"
 NEXT_SIX_STAR_CATCH = "next-six-star-catch"
+MID_AUTUMN_FIXED_SIX_STAR_CATCH = "mid-autumn-fixed-six-star-catch"
+MID_AUTUMN_SIX_STAR_COOK_BONUS = "mid-autumn-six-star-cook-bonus"
+MID_AUTUMN_COIN_REWARD = "mid-autumn-coin-reward"
 WEEKLY_WINDOW_CATCHES = "weekly-window-catches"
 PERMANENT_WINDOW_CATCH = "permanent-window-catch"
 NEXT_HIGH_STAR_CATCH = "next-high-star-catch"
@@ -74,6 +78,7 @@ WINDOW_SIX_STAR_RESONANCE = "window-six-star-resonance"
 EXCLUSIVE_CATCH_EFFECTS = frozenset(
     {
         NEXT_SIX_STAR_CATCH,
+        MID_AUTUMN_FIXED_SIX_STAR_CATCH,
         CLOVER_CATCH,
         NEXT_HIGH_STAR_CATCH,
         EVEN_CATCH_DISTRIBUTION,
@@ -104,6 +109,7 @@ CATCH_EFFECT_IDS = frozenset(
         NEXT_PIG_RARITY,
         NEXT_PIG_STATURE,
         NEXT_SIX_STAR_CATCH,
+        MID_AUTUMN_FIXED_SIX_STAR_CATCH,
         CLOVER_CATCH,
         NEXT_HIGH_STAR_CATCH,
         EVEN_CATCH_DISTRIBUTION,
@@ -124,6 +130,7 @@ COOK_EFFECT_IDS = frozenset(
         NEXT_SIX_STAR_COOK,
         CLOVER_COOK,
         NEXT_SIX_STAR_COOK_BONUS,
+        MID_AUTUMN_SIX_STAR_COOK_BONUS,
         NEXT_STACKABLE_SIX_STAR_COOK_BONUS,
         NEXT_FOOD_RARITY,
         NEXT_FIVE_STAR_COOK,
@@ -147,6 +154,7 @@ IMMEDIATE_EFFECT_IDS = frozenset(
         TECHNIQUE_PERMIT,
         ROULETTE_CHANCES,
         FOOD_SUPPLY_PACK,
+        MID_AUTUMN_COIN_REWARD,
         YILU_LOTTERY,
         CATCH_WINDOW_TRANSFER,
         WINDOW_SIX_STAR_RESONANCE,
@@ -177,6 +185,7 @@ CATCH_PROBABILITY_GROUP = frozenset(
         NEXT_CATCH_QUALITY,
         NEXT_PIG_RARITY,
         NEXT_SIX_STAR_CATCH,
+        MID_AUTUMN_FIXED_SIX_STAR_CATCH,
         CLOVER_CATCH,
         NEXT_HIGH_STAR_CATCH,
         EVEN_CATCH_DISTRIBUTION,
@@ -203,6 +212,7 @@ COOK_PROBABILITY_GROUP = frozenset(
         NEXT_SIX_STAR_COOK,
         CLOVER_COOK,
         NEXT_SIX_STAR_COOK_BONUS,
+        MID_AUTUMN_SIX_STAR_COOK_BONUS,
         NEXT_STACKABLE_SIX_STAR_COOK_BONUS,
         NEXT_FIVE_STAR_COOK,
         NEXT_EXTREME_FIVE_STAR_COOK,
@@ -406,6 +416,21 @@ def resolve_food_effect(
 
     normalized_id = str(effect_id or "").strip()
     raw = dict(params)
+    if normalized_id in {
+        MID_AUTUMN_FIXED_SIX_STAR_CATCH,
+        MID_AUTUMN_SIX_STAR_COOK_BONUS,
+        MID_AUTUMN_COIN_REWARD,
+    }:
+        if raw:
+            raise FoodEffectError("中秋猪月饼使用固定效果参数。")
+        summaries = {
+            MID_AUTUMN_FIXED_SIX_STAR_CATCH: ("下一次抓猪的六星概率固定为25%；北京时间9月25日至30日触发时固定为100%。"),
+            MID_AUTUMN_SIX_STAR_COOK_BONUS: (
+                "下一次用六星猪做菜的六星菜概率+25个百分点；北京时间9月25日至30日触发时+50个百分点。"
+            ),
+            MID_AUTUMN_COIN_REWARD: ("食用后获得10000猪币；北京时间9月25日至30日食用获得20000猪币。"),
+        }
+        return FoodEffectGrant(normalized_id, {}, 1, summaries[normalized_id])
     if normalized_id in {CLOVER_FEAST, MOON_FEAST}:
         if raw:
             raise FoodEffectError("新版粉蓝冰糕和月栖卷使用固定审核参数。")
@@ -1356,7 +1381,13 @@ def has_compatible_exclusive_catch_effect(
     return any(
         effect.effect_id in EXCLUSIVE_CATCH_EFFECTS
         and (
-            effect.effect_id not in {CLOVER_CATCH, NEXT_SIX_STAR_CATCH, NEXT_GUARANTEED_SIX_STAR_CATCH}
+            effect.effect_id
+            not in {
+                CLOVER_CATCH,
+                NEXT_SIX_STAR_CATCH,
+                NEXT_GUARANTEED_SIX_STAR_CATCH,
+                MID_AUTUMN_FIXED_SIX_STAR_CATCH,
+            }
             or six_star_available
         )
         for effect in effects
@@ -1509,6 +1540,7 @@ def apply_catch_effects(
     *,
     random_value: Callable[[], float] | None = None,
     shuffle_base_weights: Sequence[float] | None = None,
+    mid_autumn_active: bool = False,
 ) -> CatchEffectApplication:
     """Apply ordinary effect families or one priority six-star exclusive effect."""
 
@@ -1535,6 +1567,7 @@ def apply_catch_effects(
                 NEXT_SIX_STAR_CATCH,
                 CLOVER_CATCH,
                 NEXT_GUARANTEED_SIX_STAR_CATCH,
+                MID_AUTUMN_FIXED_SIX_STAR_CATCH,
             }
             or adjusted[5] > 0
         )
@@ -1573,6 +1606,12 @@ def apply_catch_effects(
             if lower_total > 0:
                 scale = (100.0 - target) / lower_total
                 adjusted = [value * scale for value in adjusted[:5]] + [target]
+        elif exclusive.effect_id == MID_AUTUMN_FIXED_SIX_STAR_CATCH:
+            target = 100.0 if mid_autumn_active else 25.0
+            base = normalize_weights(BASE_CATCH_WEIGHTS)
+            lower_scale = (100.0 - target) / sum(base[:5])
+            adjusted = [value * lower_scale for value in base[:5]] + [target]
+            exclusive_summary = f"豆沙猪月饼：本次抓猪六星概率固定为{target:g}%。"
         elif exclusive.effect_id == NEXT_HIGH_STAR_CATCH:
             four = float(grant.params["four_star_percent"])
             five = float(grant.params["five_star_percent"])
@@ -2045,6 +2084,7 @@ def apply_cooking_effects(
     effects: Sequence[ActiveFoodEffect],
     *,
     source_rarity: Rarity | int,
+    mid_autumn_active: bool = False,
 ) -> CookingEffectApplication:
     """Apply at most one queued effect from each compatible cooking family."""
 
@@ -2159,9 +2199,19 @@ def apply_cooking_effects(
             adjusted[4] -= shifted
             adjusted[5] += shifted
         consumed.extend(effect.effect_entry_id for effect in effects if effect.effect_entry_id in selected_ids)
+        mooncake_bonus, mooncake_skipped = _one_per_group(effects, frozenset({MID_AUTUMN_SIX_STAR_COOK_BONUS}))
+        skipped.extend(mooncake_skipped)
+        if mooncake_bonus is not None:
+            bonus_points = 50.0 if mid_autumn_active else 25.0
+            adjusted = list(add_six_star_probability_points(adjusted, bonus_points=bonus_points, action="cook"))
+            consumed.append(mooncake_bonus.effect_entry_id)
+            summaries.append(f"桂花猪月饼：本次六星菜概率+{bonus_points:g}个百分点。")
     else:
         for effect in effects:
-            if effect.effect_id in six_star_bonus_group | {NEXT_STACKABLE_SIX_STAR_COOK_BONUS}:
+            if effect.effect_id in six_star_bonus_group | {
+                NEXT_STACKABLE_SIX_STAR_COOK_BONUS,
+                MID_AUTUMN_SIX_STAR_COOK_BONUS,
+            }:
                 skipped.append(
                     resolve_food_effect(effect.effect_id, effect.params).summary + "（需要使用 6 星猪，当前未消耗）"
                 )

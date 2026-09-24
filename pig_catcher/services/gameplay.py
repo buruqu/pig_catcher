@@ -32,6 +32,7 @@ from ..domain.feasts import CLOVER_CATCH, moon_weights
 from ..domain.food_effects import (
     CATCH_DUPLICATION_CHANCE,
     CATCH_EFFECT_IDS,
+    MID_AUTUMN_FIXED_SIX_STAR_CATCH,
     QUOTA_EXEMPT_CATCH_EFFECTS,
     active_effect_from_row,
     active_group_effect_from_row,
@@ -68,6 +69,11 @@ from ..domain.launch_campaign import (
 )
 from ..domain.launch_campaign import (
     effective_window_limit as campaign_window_limit,
+)
+from ..domain.mid_autumn import (
+    EXCLUSIVE_MOONCAKE_IDS,
+    MOONCAKE_BY_PIG_AND_RARITY,
+    mid_autumn_boost_active,
 )
 from ..domain.mirror_food import HISTORY_MIRROR_CATCH, MATCHA_PIG_NAMES
 from ..domain.models import CommandIdentity, CommandReceipt
@@ -1239,12 +1245,31 @@ class GameplayService:
             if moon_active:
                 ordinary_effects = tuple(e for e in applicable_active_effects if e.source_food_rarity < 6)
                 effect_application = apply_catch_effects(
-                    weights, ordinary_effects, random_value=self.random_source.random
+                    weights,
+                    ordinary_effects,
+                    random_value=self.random_source.random,
+                    mid_autumn_active=mid_autumn_boost_active(now_datetime),
                 )
-                weights = moon_weights(effect_application.weights)
+                mooncake_fixed = any(
+                    effect.effect_id == MID_AUTUMN_FIXED_SIX_STAR_CATCH
+                    and effect.effect_entry_id in effect_application.consumed_entry_ids
+                    for effect in ordinary_effects
+                )
+                if mooncake_fixed:
+                    # A fixed six-star probability cannot be multiplied by the moon bonus.
+                    exclusive_effect_active = True
+                    armed_item = None
+                    weights = effect_application.weights
+                else:
+                    weights = moon_weights(effect_application.weights)
                 group_effect_application = apply_group_catch_effects(weights, ())
                 effect_summaries = effect_application.summaries + (
-                    f"月栖萤光卷：4/5/6星概率×3，本次为专属额外抓猪，剩余{14 - int(moon['used'])}/15次。",
+                    (
+                        f"月栖萤光卷：本次使用专属额外抓猪，剩余{14 - int(moon['used'])}/15次；"
+                        "豆沙猪月饼固定概率优先，本次不乘高星倍率。"
+                        if mooncake_fixed
+                        else f"月栖萤光卷：4/5/6星概率×3，本次为专属额外抓猪，剩余{14 - int(moon['used'])}/15次。"
+                    ),
                 )
                 excluded_summaries = effect_application.skipped_summaries + (
                     "月栖奖励排除永久提升、其他六星菜及临时成就券；对应道具和菜品队列保留。",
@@ -1294,6 +1319,7 @@ class GameplayService:
                     applicable_active_effects,
                     random_value=self.random_source.random,
                     shuffle_base_weights=self.catching.weights(),
+                    mid_autumn_active=mid_autumn_boost_active(now_datetime),
                 )
                 weights = effect_application.weights
                 if effect_application.shuffle_permutation:
@@ -2641,7 +2667,7 @@ class GameplayService:
         if not food_templates:
             raise TechniqueError(f"领域缺少 {int(output_rarity)} 星美食模板，本次抓猪未结算。")
         special_roll: float | None = None
-        special_template_id = ""
+        special_template_id = MOONCAKE_BY_PIG_AND_RARITY.get((source_template_id, int(output_rarity)), "")
         template_roll: float | None = None
         recipient_rolls: tuple[float, ...] = ()
         gojo_self_caught_in_own_domain = False
@@ -2704,7 +2730,7 @@ class GameplayService:
                 candidates = [
                     candidate
                     for candidate in food_templates
-                    if str(candidate["template_id"]) not in SOURCE_EXCLUSIVE_FOOD_TEMPLATE_IDS
+                    if str(candidate["template_id"]) not in SOURCE_EXCLUSIVE_FOOD_TEMPLATE_IDS | EXCLUSIVE_MOONCAKE_IDS
                 ]
                 if not candidates:
                     raise TechniqueError("领域缺少可用的普通五星菜模板。")

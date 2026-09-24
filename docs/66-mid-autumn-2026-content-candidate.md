@@ -1,15 +1,15 @@
-# 2026 中秋限定猪与猪月饼：素材候选 v2
+# 2026 中秋限定猪与猪月饼：隔离候选 v3
 
-本轮只准备节日内容，不确定福利、活动玩法、投放时间、获取概率与四／五星月饼的吃菜效果；这些事项由用户另行设计。用户已确认最高五星，并要求猪猪改为现有素材库画风、月饼印猪脸、保留三种猪月饼。本文和配套 JSON、六张图片均为隔离候选，未并入正式目录或运行数据。第一版透明背景插画保留在 `asset_library/candidates/mid-autumn-2026/`，其元数据 `catalogs/candidates/mid-autumn-2026.json` 已被本版取代。
+用户确认限定内容最高五星，猪猪沿用素材库的扁平画风，月饼印猪脸，并将提灯猪改名为「灯笼照月猪」。灯笼照月猪的插画已重画为四条腿。六张候选图位于 `asset_library/candidates/mid-autumn-2026-v3/`，配套定义在 `catalogs/candidates/mid-autumn-2026-v3.json`。v1 和 v2 仅供比对；v3 尚未并入正式素材目录、生产数据库或运行中的插件。
 
-| 星级 | 猪猪 | 月饼 | 视觉要点 |
+| 星级 | 专属原料猪 | 只由该猪制作的猪月饼 | 食用效果 |
 | ---: | --- | --- | --- |
-| 2 | [提灯猪](../asset_library/candidates/mid-autumn-2026-v2/pig-lantern.png) | [豆沙猪月饼](../asset_library/candidates/mid-autumn-2026-v2/food-red-bean-pig-mooncake.png) | 扁平小猪提月亮灯笼；猪脸压印与豆沙切面 |
-| 4 | [桂花猪](../asset_library/candidates/mid-autumn-2026-v2/pig-osmanthus.png) | [桂花猪月饼](../asset_library/candidates/mid-autumn-2026-v2/food-osmanthus-pig-mooncake.png) | 桂花冠和沾面粉的做饼猪；猪脸压印与金黄流心 |
-| 5 | [玉兔猪](../asset_library/candidates/mid-autumn-2026-v2/pig-jade-rabbit.png) | [冰皮猪月饼](../asset_library/candidates/mid-autumn-2026-v2/food-snow-skin-pig-mooncake.png) | 戴兔耳头饰的猪持玉杵；猪脸压印与蓝金双色馅 |
+| 2 | [灯笼照月猪](../asset_library/candidates/mid-autumn-2026-v3/pig-lantern.png) | [豆沙猪月饼](../asset_library/candidates/mid-autumn-2026-v3/food-red-bean-pig-mooncake.png) | 下一次抓猪六星概率固定 25%；中秋加成为固定 100% |
+| 4 | [桂花猪](../asset_library/candidates/mid-autumn-2026-v3/pig-osmanthus.png) | [桂花猪月饼](../asset_library/candidates/mid-autumn-2026-v3/food-osmanthus-pig-mooncake.png) | 下一次用六星猪做菜，六星菜概率加 25 个百分点；中秋加 50 个百分点 |
+| 5 | [玉兔猪](../asset_library/candidates/mid-autumn-2026-v3/pig-jade-rabbit.png) | [冰皮猪月饼](../asset_library/candidates/mid-autumn-2026-v3/food-snow-skin-pig-mooncake.png) | 食用后得 10000 猪币；中秋食用得 20000 猪币 |
 
-三只猪按照现有素材库的扁平桃粉猪、黑点眼、白色聚光区、深紫边角和底部手写名牌制作；仍清楚保留猪鼻、猪耳与猪蹄。玉兔只是头饰，避免把限定猪画成兔。三款月饼正面都印有猪脸，切面和配色区分豆沙、桂花流心与冰皮。六张独立原图位于 `asset_library/candidates/mid-autumn-2026-v2/`，元数据在 `catalogs/candidates/mid-autumn-2026-v2.json`；源图片保留生成时原始字节。素材由 Codex 图像生成工具根据本次用户请求和用户提供的库内风格参考创作；正式发布前需完成项目素材审核并把候选目录的授权标签替换为明确的发布口径。
+中秋加强时段按北京时间 2026 年 9 月 25 日 00:00（含）至 10 月 1 日 00:00（不含），覆盖 9 月 25—30 日。当前实现以**实际抓猪、做菜或食用时刻**判断是否加强；前两道月饼先吃后触发，效果会保留到匹配的动作成功结算，失败的动作不消耗效果。豆沙固定概率不受饲料、等级、道具或其他概率菜加成；它使用普通抓猪额度，不额外发放次数。桂花为百分点加成，与常规六星做菜加成相加，最高不超过 100%；若六星菜独占效果接管本次做菜，桂花效果保留。冰皮猪币在食用交易内记入个人流水，重复消息只重放原回执。
 
-公共一至五星模板不能使用群专属六星猪的 `paired_food_template_id`。表中的对应关系是内容策划关系，后续做菜专属渠道若被用户选用，应在活动规则中实现，不能假设目录字段已自动绑定。四／五星月饼效果仍未定，候选定义不填 `effect_id`；不可把上一版活动稿的福利、集章、概率或菜品效果复制进正式版。
+产出规则不改变现有做菜星级概率：只有来源猪与月饼相匹配，且本次做菜结果落在对应的 2／4／5 星时，才产出对应月饼；其他星级照常出普通菜。三道猪月饼已排除普通随机菜池和其他随机赠菜池，其他猪无法产出。公共一至五星猪不使用专属六星猪的 `paired_food_template_id` 字段，配对逻辑在做菜服务中单独处理。
 
-正式接入时，先按最终投放规则加入限时获取校验，再合入正式目录和 Manifest；避免把候选公共模板导入后变成永久可抽。节后已有实例如何继续做菜、是否允许自选券取得限定猪，也待活动设计时一并确定。
+节日活动玩法、福利、限定猪的获取与节后供应规则由用户继续设计。候选素材暂不进入正式目录；不得因此让限定猪永久随机出现在抓猪池中。全部规则完成后再一并准备上线版本。
