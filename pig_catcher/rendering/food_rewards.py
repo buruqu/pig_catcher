@@ -110,13 +110,13 @@ def food_reward_view(result: EatResult) -> FoodRewardView:
         "window-six-star-resonance": "粉蓝共鸣已点亮",
     }
     hint_by_kind = {
-        "clover-feast": "发送 /抓猪 使用10次专属机会；全部完成后，发送 /做菜 六星猪名 使用一次累计加成。",
-        "moon-feast": "奖励时段内15次专属抓猪与商城道具8.8折同时生效；永久升级维持原价。",
+        "clover-feast": "发送 /抓猪 使用7次专属机会；全部完成后，下3次用六星猪 /做菜 各抽一次概率加成。",
+        "moon-feast": "奖励时段内18次专属抓猪与商城道具8.8折同时生效；永久升级维持原价。",
         "catch-window-transfer": "只搬指定额度，最多17次；目标合计最多34次。其他额外次数原时段照常抓。",
         "window-six-star-resonance": "共鸣仅持续当前抓猪时段；抓猪与做菜会实时累积彼此的六星概率。",
     }
     prize_by_kind = {
-        "clover-feast": "10次抓猪 → 一次六星猪做菜 → 成功奖励3次抓猪与7道菜",
+        "clover-feast": "7次抓猪 → 3次六星猪做菜 → 每次成功奖励3次抓猪与7道菜",
         "moon-feast": str(payload.get("target_window") or "奖励时段"),
         "catch-window-transfer": (f"{payload.get('blocked_window', '')} → {payload.get('target_window', '')}").strip(
             " →"

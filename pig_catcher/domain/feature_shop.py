@@ -60,25 +60,25 @@ _PRICE_TABLE: Final[Mapping[FeatureShopSystem, Mapping[str, int]]] = MappingProx
     {
         FeatureShopSystem.DISPATCH: MappingProxyType(
             {
-                "region-map": 520,
-                "souvenir-camera": 720,
-                "encounter-compass": 1480,
-                "sorting-box": 420,
+                "region-map": 460,
+                "souvenir-camera": 640,
+                "encounter-compass": 1320,
+                "sorting-box": 370,
             }
         ),
         FeatureShopSystem.TOUR: MappingProxyType(
             {
-                "cable": 520,
-                "cue": 760,
-                "recorder": 880,
-                "confetti": 220,
+                "cable": 460,
+                "cue": 680,
+                "recorder": 780,
+                "confetti": 200,
             }
         ),
         FeatureShopSystem.BATTLE: MappingProxyType(
             {
-                "wristband": 880,
-                "bandage": 820,
-                "confetti": 220,
+                "wristband": 780,
+                "bandage": 730,
+                "confetti": 200,
             }
         ),
     }

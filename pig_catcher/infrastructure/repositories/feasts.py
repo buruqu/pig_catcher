@@ -4,7 +4,14 @@ import json
 from datetime import datetime, timedelta, timezone
 
 from ...domain.errors import DailyCatchLimitError, FoodEffectError
-from ...domain.feasts import CLOVER_CATCH, CLOVER_COOK
+from ...domain.feasts import (
+    CLOVER_CATCH,
+    CLOVER_COOK,
+    CLOVER_COOKS,
+    CLOVER_INITIAL_CATCHES,
+    CLOVER_REWARD_CATCHES,
+    MOON_REWARD_CATCHES,
+)
 from .economy import EconomyRepository
 
 
@@ -33,24 +40,35 @@ async def feast_status(session, player_id, now):
     chain = await active_clover(session, player_id)
     if chain:
         if chain["stage"] == "initial":
+            target = chain["initial_target"]
             lines.append(
-                f"粉蓝冰糕：初始专属抓猪剩余{10 - chain['initial_used']}/10次，"
-                f"累计{chain['star_sum']}颗星，抓完后启用做菜加成。"
+                f"粉蓝冰糕：初始专属抓猪剩余{target - chain['initial_used']}/{target}次，"
+                "抓完后启用3次六星猪做菜加成。"
             )
         elif chain["stage"] == "cook":
-            lines.append(f"粉蓝冰糕：下一次六星猪做菜概率{13.07 + chain['star_sum']:g}%，无论成败消耗。")
+            lines.append(
+                f"粉蓝冰糕：六星猪做菜剩余{CLOVER_COOKS - chain['cook_used']}/{CLOVER_COOKS}次，"
+                f"奖励抓猪剩余{chain['reward_granted'] - chain['reward_used']}次；"
+                "每档概率各50%，抽取+3.07或+30.7个百分点。"
+            )
         else:
-            lines.append(f"粉蓝冰糕：成功做菜奖励抓猪剩余{3 - chain['reward_used']}/3次，六星概率+3.07个百分点。")
+            lines.append(
+                f"粉蓝冰糕：成功做菜奖励抓猪剩余{chain['reward_granted'] - chain['reward_used']}"
+                f"/{chain['reward_granted']}次，每档概率各50%，抽取+3.07或+30.7个百分点。"
+            )
     moon = await active_moon(session, player_id, now)
     if moon:
         target = datetime.fromisoformat(moon["target_start"].replace("Z", "+00:00"))
         label = target.astimezone(timezone(timedelta(hours=8))).strftime("%m-%d %H:%M")
         if now < moon["blocked_start"]:
-            lines.append(f"月栖卷：下一时段禁抓；北京时间{label}起15次额外抓猪与商城道具8.8折。")
+            lines.append(f"月栖卷：下一时段禁抓；北京时间{label}起{MOON_REWARD_CATCHES}次额外抓猪与商城道具8.8折。")
         elif now < moon["blocked_end"]:
-            lines.append(f"月栖卷：本时段禁止所有抓猪；北京时间{label}起领取15次额外抓猪与8.8折。")
+            lines.append(f"月栖卷：本时段禁止所有抓猪；北京时间{label}起领取{MOON_REWARD_CATCHES}次额外抓猪与8.8折。")
         else:
-            lines.append(f"月栖卷：本时段额外抓猪剩余{15 - moon['used']}/15次，4/5/6星概率×3；商城道具8.8折。")
+            lines.append(
+                f"月栖卷：本时段额外抓猪剩余{max(0, MOON_REWARD_CATCHES - moon['used'])}"
+                f"/{MOON_REWARD_CATCHES}次，4/5/6星概率×3.5；商城道具8.8折。"
+            )
     return tuple(lines)
 
 
@@ -70,12 +88,22 @@ async def require_catch_allowed(session, player_id, now):
     moon = await active_moon(session, player_id, now)
     if moon and moon["blocked_start"] <= now < moon["blocked_end"]:
         raise DailyCatchLimitError(
-            "月栖萤光卷：本时段禁止抓猪，所有普通、专属及战利品次数保留；下一时段可使用15次奖励。"
+            f"月栖萤光卷：本时段禁止抓猪，所有普通、专属及战利品次数保留；下一时段可使用{MOON_REWARD_CATCHES}次奖励。"
         )
     return moon
 
 
-async def queue_clover(session, *, player_id, source_id, phase, now, entry_id, star_sum=0):
+async def queue_clover(
+    session,
+    *,
+    player_id,
+    source_id,
+    phase,
+    now,
+    entry_id,
+    star_sum=0,
+    initial_target=CLOVER_INITIAL_CATCHES,
+):
     cook = phase == "cook"
     await EconomyRepository().insert_food_effect(
         session,
@@ -83,8 +111,10 @@ async def queue_clover(session, *, player_id, source_id, phase, now, entry_id, s
         player_id=player_id,
         source_food_instance_id=source_id,
         effect_id=CLOVER_COOK if cook else CLOVER_CATCH,
-        params_json=json.dumps({"chain_id": source_id, "phase": phase, "star_sum": star_sum}),
-        granted_uses=1 if cook else (10 if phase == "initial" else 3),
+        params_json=json.dumps(
+            {"chain_id": source_id, "phase": phase, "star_sum": star_sum, "initial_target": initial_target}
+        ),
+        granted_uses=CLOVER_COOKS if cook else (initial_target if phase == "initial" else CLOVER_REWARD_CATCHES),
         expires_at=None,
         now=now,
     )
@@ -101,7 +131,13 @@ async def start_clover(session, identity, source_id, now, entry_id):
         (source_id, identity.player_id, identity.scope.value, now, now),
     )
     await queue_clover(
-        session, player_id=identity.player_id, source_id=source_id, phase="initial", now=now, entry_id=entry_id
+        session,
+        player_id=identity.player_id,
+        source_id=source_id,
+        phase="initial",
+        now=now,
+        entry_id=entry_id,
+        initial_target=CLOVER_INITIAL_CATCHES,
     )
 
 
@@ -113,13 +149,16 @@ async def settle_clover_catch(session, *, player_id, effects, consumed, rarity, 
     if chain is None or chain["source_food_instance_id"] != selected.params["chain_id"]:
         raise FoodEffectError("粉蓝专属次数与累计状态不一致，本次抓猪回滚。")
     if chain["stage"] == "initial":
+        target = chain["initial_target"]
         used, stars = chain["initial_used"] + 1, chain["star_sum"] + int(rarity)
+        if used > target:
+            raise FoodEffectError("粉蓝专属抓猪超过已发放次数，本次抓猪回滚。")
         await session.execute(
             "UPDATE player_clover_chains SET initial_used=?,star_sum=?,stage=?,updated_at=? "
             "WHERE source_food_instance_id=?",
-            (used, stars, "cook" if used == 10 else "initial", now, chain["source_food_instance_id"]),
+            (used, stars, "cook" if used == target else "initial", now, chain["source_food_instance_id"]),
         )
-        if used == 10:
+        if used == target:
             await queue_clover(
                 session,
                 player_id=player_id,
@@ -128,23 +167,28 @@ async def settle_clover_catch(session, *, player_id, effects, consumed, rarity, 
                 now=now,
                 entry_id=entry_id,
                 star_sum=stars,
+                initial_target=target,
             )
-        return (
-            f"粉蓝累计：{used}/10次，共{stars}颗星；"
-            + (
-                f"下一次六星猪做菜的六星概率为{13.07 + stars:g}%，无论成败消耗。"
-                if used == 10
-                else "完成10次后启用做菜加成。"
-            ),
-        )
-    if chain["stage"] != "reward":
+        progress = "已解锁3次六星猪做菜加成。" if used == target else f"完成{target}次后启用做菜加成。"
+        return (f"粉蓝专属抓猪：{used}/{target}次；{progress}",)
+    if chain["stage"] not in {"cook", "reward"}:
         raise FoodEffectError("粉蓝奖励阶段异常，本次抓猪回滚。")
     used = chain["reward_used"] + 1
+    if used > chain["reward_granted"]:
+        raise FoodEffectError("粉蓝奖励抓猪超出已发放次数，本次抓猪回滚。")
     await session.execute(
         "UPDATE player_clover_chains SET reward_used=?,stage=?,updated_at=? WHERE source_food_instance_id=?",
-        (used, "complete" if used == 3 else "reward", now, chain["source_food_instance_id"]),
+        (
+            used,
+            "complete" if chain["cook_used"] == CLOVER_COOKS and used == chain["reward_granted"] else chain["stage"],
+            now,
+            chain["source_food_instance_id"],
+        ),
     )
-    return (f"粉蓝成功做菜奖励：已使用{used}/3次；这些奖励抓猪不会再次累计做菜概率。",)
+    return (
+        f"粉蓝成功做菜奖励：已使用{used}/{chain['reward_granted']}次；"
+        "每次加成独立抽取，不累计做菜概率。",
+    )
 
 
 async def settle_clover_cook(session, *, player_id, effects, consumed, success, now, entry_id):
@@ -155,13 +199,21 @@ async def settle_clover_cook(session, *, player_id, effects, consumed, success, 
     if (
         chain is None
         or chain["stage"] != "cook"
-        or chain["initial_used"] != 10
+        or chain["initial_used"] != chain["initial_target"]
         or chain["source_food_instance_id"] != selected.params["chain_id"]
     ):
         raise FoodEffectError("粉蓝做菜累计状态异常，本次做菜回滚。")
+    cook_used = chain["cook_used"] + 1
+    reward_granted = chain["reward_granted"] + (CLOVER_REWARD_CATCHES if success else 0)
+    if cook_used > CLOVER_COOKS:
+        raise FoodEffectError("粉蓝做菜次数超出上限，本次做菜回滚。")
+    stage = "cook" if cook_used < CLOVER_COOKS else (
+        "reward" if reward_granted > chain["reward_used"] else "complete"
+    )
     await session.execute(
-        "UPDATE player_clover_chains SET stage=?,updated_at=? WHERE source_food_instance_id=?",
-        ("reward" if success else "complete", now, chain["source_food_instance_id"]),
+        "UPDATE player_clover_chains SET cook_used=?,reward_granted=?,stage=?,updated_at=? "
+        "WHERE source_food_instance_id=?",
+        (cook_used, reward_granted, stage, now, chain["source_food_instance_id"]),
     )
     if success:
         await queue_clover(

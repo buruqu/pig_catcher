@@ -1665,7 +1665,7 @@ async def test_store_purchase_upgrade_insufficient_balance_and_ledger(
     assert len(store.products) == 18
     products = {product.display_name: product for product in store.products}
     assert products["超级幸运猪哨"].unit_price == 1680
-    assert products["超级主厨香料"].unit_price == 3600
+    assert products["超级主厨香料"].unit_price == 2200
     store_card = store_view(store)
     assert tuple(row.value for row in store_card.feed_probability_rows) == (
         "13.00%",
@@ -1792,9 +1792,9 @@ async def test_feature_stores_are_separate_and_purchase_into_existing_tool_inven
         quantity=1,
     )
     assert bought_map.product_type == "feature-tool"
-    assert bought_map.inventory_quantity == 2 and bought_map.balance_after == 960
-    assert duplicate.receipt_created is False and duplicate.balance_after == 960
-    assert bought_wristband.inventory_quantity == 1 and bought_wristband.balance_after == 80
+    assert bought_map.inventory_quantity == 2 and bought_map.balance_after == 1080
+    assert duplicate.receipt_created is False and duplicate.balance_after == 1080
+    assert bought_wristband.inventory_quantity == 1 and bought_wristband.balance_after == 300
     with pytest.raises(InsufficientBalanceError):
         await service.purchase(
             _identity(message_id="feature-buy-insufficient"),
@@ -1822,8 +1822,8 @@ async def test_feature_stores_are_separate_and_purchase_into_existing_tool_inven
     assert dispatch_row is not None and dispatch_row["quantity"] == 2
     assert battle_row is not None and battle_row["quantity"] == 1
     assert [tuple(row) for row in ledger_rows] == [
-        ("dispatch", "feature-dispatch-region-map", "region-map", 2, 1040, 2),
-        ("battle", "feature-battle-wristband", "wristband", 1, 880, 1),
+        ("dispatch", "feature-dispatch-region-map", "region-map", 2, 920, 2),
+        ("battle", "feature-battle-wristband", "wristband", 1, 780, 1),
     ]
     await database.close()
 

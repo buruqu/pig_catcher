@@ -231,19 +231,19 @@ def test_rebalanced_item_catalog_is_unique_and_priced_by_strength() -> None:
         "幸运猪哨": 840,
         "超级幸运猪哨": 1680,
         "星辉探猪镜": 1680,
-        "巨物玉米": 240,
-        "增膘豆饼": 200,
-        "精瘦青饲料": 200,
-        "猪币悬赏牌": 320,
-        "主厨香料": 480,
-        "超级主厨香料": 3600,
-        "精准刀工券": 260,
-        "慢炖调料包": 360,
-        "大份餐盒": 1280,
-        "稳火保底锅盖": 840,
-        "升星炉芯": 680,
-        "丰收围裙": 600,
-        "天逆鉾": 2000,
+        "巨物玉米": 210,
+        "增膘豆饼": 180,
+        "精瘦青饲料": 180,
+        "猪币悬赏牌": 280,
+        "主厨香料": 420,
+        "超级主厨香料": 2200,
+        "精准刀工券": 230,
+        "慢炖调料包": 320,
+        "大份餐盒": 1120,
+        "稳火保底锅盖": 740,
+        "升星炉芯": 600,
+        "丰收围裙": 520,
+        "天逆鉾": 1760,
     }
     assert len(ITEM_DEFINITIONS) == 16
     assert {item.display_name: item.price for item in ITEM_DEFINITIONS} == expected_prices
@@ -251,7 +251,7 @@ def test_rebalanced_item_catalog_is_unique_and_priced_by_strength() -> None:
     assert len({item.effect_summary for item in ITEM_DEFINITIONS}) == 16
     assert all(item.action_type in {"catching", "cooking"} for item in ITEM_DEFINITIONS)
     assert expected_prices["超级幸运猪哨"] < 2000
-    assert expected_prices["超级主厨香料"] == 3600
+    assert expected_prices["超级主厨香料"] == 2200
 
 
 def test_phase8_item_food_and_calendar_rules_are_explicit() -> None:

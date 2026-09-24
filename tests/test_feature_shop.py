@@ -24,17 +24,17 @@ from pig_catcher.infrastructure.database import PigCatcherDatabase
 from pig_catcher.infrastructure.migrations.v0048_feature_tool_store_ledger import MIGRATION_0048
 
 EXPECTED_PRICES = {
-    "feature-dispatch-region-map": 520,
-    "feature-dispatch-souvenir-camera": 720,
-    "feature-dispatch-encounter-compass": 1480,
-    "feature-dispatch-sorting-box": 420,
-    "feature-tour-cable": 520,
-    "feature-tour-cue": 760,
-    "feature-tour-recorder": 880,
-    "feature-tour-confetti": 220,
-    "feature-battle-wristband": 880,
-    "feature-battle-bandage": 820,
-    "feature-battle-confetti": 220,
+    "feature-dispatch-region-map": 460,
+    "feature-dispatch-souvenir-camera": 640,
+    "feature-dispatch-encounter-compass": 1320,
+    "feature-dispatch-sorting-box": 370,
+    "feature-tour-cable": 460,
+    "feature-tour-cue": 680,
+    "feature-tour-recorder": 780,
+    "feature-tour-confetti": 200,
+    "feature-battle-wristband": 780,
+    "feature-battle-bandage": 730,
+    "feature-battle-confetti": 200,
 }
 
 

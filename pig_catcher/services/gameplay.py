@@ -28,7 +28,7 @@ from ..domain.errors import (
     ReceiptConflictError,
     TechniqueError,
 )
-from ..domain.feasts import CLOVER_CATCH, moon_weights
+from ..domain.feasts import CLOVER_CATCH, MOON_HIGH_STAR_MULTIPLIER, MOON_REWARD_CATCHES, moon_weights
 from ..domain.food_effects import (
     CATCH_DUPLICATION_CHANCE,
     CATCH_EFFECT_IDS,
@@ -1062,7 +1062,9 @@ class GameplayService:
                 )
             )
             moon = await require_catch_allowed(session, identity.player_id, now)
-            moon_active = bool(moon and moon["target_start"] <= now < moon["target_end"] and moon["used"] < 15)
+            moon_active = bool(
+                moon and moon["target_start"] <= now < moon["target_end"] and moon["used"] < MOON_REWARD_CATCHES
+            )
             window_transfer = await self.economy_repository.active_catch_window_transfer(
                 session,
                 player_id=identity.player_id,
@@ -1256,7 +1258,9 @@ class GameplayService:
                 item_id=armed_item.item_id if armed_item is not None else "",
             )
             if moon_active:
-                ordinary_effects = tuple(e for e in applicable_active_effects if e.source_food_rarity < 6)
+                ordinary_effects = tuple(
+                    e for e in applicable_active_effects if e.effect_id not in QUOTA_EXEMPT_CATCH_EFFECTS
+                )
                 effect_application = apply_catch_effects(
                     weights,
                     ordinary_effects,
@@ -1276,16 +1280,20 @@ class GameplayService:
                 else:
                     weights = moon_weights(effect_application.weights)
                 group_effect_application = apply_group_catch_effects(weights, ())
-                effect_summaries = effect_application.summaries + (
-                    (
-                        f"月栖萤光卷：本次使用专属额外抓猪，剩余{14 - int(moon['used'])}/15次；"
+                moon_remaining = f"{MOON_REWARD_CATCHES - 1 - int(moon['used'])}/{MOON_REWARD_CATCHES}次"
+                if mooncake_fixed:
+                    moon_summary = (
+                        f"月栖萤光卷：本次使用专属额外抓猪，剩余{moon_remaining}；"
                         "豆沙猪月饼固定概率优先，本次不乘高星倍率。"
-                        if mooncake_fixed
-                        else f"月栖萤光卷：4/5/6星概率×3，本次为专属额外抓猪，剩余{14 - int(moon['used'])}/15次。"
-                    ),
-                )
+                    )
+                else:
+                    moon_summary = (
+                        f"月栖萤光卷：4/5/6星概率×{MOON_HIGH_STAR_MULTIPLIER:g}，"
+                        f"本次为专属额外抓猪，剩余{moon_remaining}。"
+                    )
+                effect_summaries = effect_application.summaries + (moon_summary,)
                 excluded_summaries = effect_application.skipped_summaries + (
-                    "月栖奖励排除永久提升、其他六星菜及临时成就券；对应道具和菜品队列保留。",
+                    "月栖奖励排除永久提升及临时成就券；独立抓猪次数保留。",
                 )
             elif transfer_target_active:
                 effect_application = apply_catch_effects(weights, ())
@@ -1693,7 +1701,9 @@ class GameplayService:
                 "base_weights": list(self.catching.weights()),
                 "normalized_weights": [round(value, 8) for value in weights],
                 "moon_feast_source": moon["source_food_instance_id"] if moon_active else "",
-                "moon_feast_remaining": 14 - int(moon["used"]) if moon_active else 0,
+                "moon_feast_remaining": MOON_REWARD_CATCHES - 1 - int(moon["used"]) if moon_active else 0,
+                "clover_bonus_roll": effect_application.clover_bonus_roll,
+                "clover_bonus_points": effect_application.clover_bonus_points,
                 "shuffle_permutation": list(effect_application.shuffle_permutation),
                 "shuffle_rolls": list(effect_application.shuffle_rolls),
                 "feed_level": feed_level,

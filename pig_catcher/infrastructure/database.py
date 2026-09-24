@@ -310,6 +310,16 @@ class PigCatcherDatabase:
         if not any(str(row[1]) == "commemorative_code" and bool(row[3]) for row in instance_columns):
             raise MigrationError("数据库缺少猪猪纪念编号字段，请先完成 Schema 65 迁移。")
 
+        clover_columns = await (await connection.execute("PRAGMA table_info(player_clover_chains)")).fetchall()
+        if not {"initial_target", "cook_used", "reward_granted"}.issubset({str(row[1]) for row in clover_columns}):
+            raise MigrationError("数据库缺少粉蓝冰糕三次做菜字段，请先完成 Schema 72 迁移。")
+        moon_definition = await (
+            await connection.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='player_moon_feasts'")
+        ).fetchone()
+        normalized_moon_sql = "".join(str(moon_definition[0]).lower().split()) if moon_definition else ""
+        if "check(usedbetween0and18)" not in normalized_moon_sql:
+            raise MigrationError("数据库月栖奖励次数约束不是 18 次，请先完成 Schema 72 迁移。")
+
         upgrade_definition = await (
             await connection.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='upgrades'")
         ).fetchone()

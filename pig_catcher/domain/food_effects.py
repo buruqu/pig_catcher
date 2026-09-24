@@ -8,7 +8,17 @@ from dataclasses import dataclass, replace
 
 from .enums import Rarity
 from .errors import FoodEffectError
-from .feasts import CLOVER_CATCH, CLOVER_COOK, CLOVER_DESCRIPTION, CLOVER_FEAST, MOON_DESCRIPTION, MOON_FEAST
+from .feasts import (
+    CLOVER_BONUS_POINTS,
+    CLOVER_CATCH,
+    CLOVER_COOK,
+    CLOVER_COOKS,
+    CLOVER_DESCRIPTION,
+    CLOVER_FEAST,
+    CLOVER_INITIAL_CATCHES,
+    MOON_DESCRIPTION,
+    MOON_FEAST,
+)
 from .food_lottery import LOTTERY_DESCRIPTION, YILU_LOTTERY, shuffled_catch_distribution
 from .mirror_food import GROUP_WATER_MIRROR, HISTORY_MIRROR_CATCH
 from .rules import (
@@ -263,6 +273,8 @@ class CatchEffectApplication:
     experience_multiplier: float = 1.0
     shuffle_permutation: tuple[int, ...] = ()
     shuffle_rolls: tuple[float, ...] = ()
+    clover_bonus_roll: float | None = None
+    clover_bonus_points: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -274,6 +286,8 @@ class CookingEffectApplication:
     summaries: tuple[str, ...]
     skipped_summaries: tuple[str, ...] = ()
     serving_multiplier: float = 1.0
+    clover_bonus_roll: float | None = None
+    clover_bonus_points: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -444,22 +458,29 @@ def resolve_food_effect(
         if normalized_id == CLOVER_CATCH:
             if phase not in {"initial", "reward"}:
                 raise FoodEffectError("粉蓝抓猪阶段无效。")
-            uses = 10 if phase == "initial" else 3
+            if phase == "initial":
+                uses = _integer(raw, "initial_target", lower=7, upper=10) if "initial_target" in raw else 10
+                if uses not in {CLOVER_INITIAL_CATCHES, 10}:
+                    raise FoodEffectError("粉蓝抓猪次数只允许新版7次或旧版10次。")
+            else:
+                uses = 3
             return FoodEffectGrant(
                 normalized_id,
                 raw,
                 uses,
-                f"粉蓝冰糕：{uses}次专属抓猪，六星概率+3.07个百分点，不消耗普通额度；其他加成保留且不消耗。",
+                f"粉蓝冰糕：{uses}次专属抓猪，每次各以50%概率抽取六星概率+3.07或+30.7个百分点；"
+                "其他加成保留且不消耗。",
             )
-        stars = _integer(raw, "star_sum", lower=10, upper=60)
         if phase != "cook":
             raise FoodEffectError("粉蓝做菜阶段无效。")
+        if "star_sum" in raw:
+            _integer(raw, "star_sum", lower=7, upper=60)
         return FoodEffectGrant(
             normalized_id,
-            {**raw, "six_star_percent": 13.07 + stars},
-            1,
-            f"粉蓝10次抓猪累计{stars}颗星：下一次六星猪做菜概率为{13.07 + stars:g}%"
-            "（基础10%+3.07个百分点+累计星级）；无论成败消耗，成功奖励3次专属抓猪和7道非六星菜。",
+            raw,
+            CLOVER_COOKS,
+            "粉蓝冰糕：下3次六星猪做菜每次各以50%概率抽取六星菜概率+3.07或+30.7个百分点；"
+            "无论成败均消耗，成功每次奖励3次专属抓猪和7道非六星菜。",
         )
     if normalized_id == HISTORY_MIRROR_CATCH:
         fixed = raw.get("fixed_weights")
@@ -1547,7 +1568,7 @@ def apply_catch_effects(
     effects = tuple(
         sorted(
             effects,
-            key=lambda effect: (effect.effect_id != CLOVER_COOK, effect.created_at, effect.effect_entry_id),
+            key=lambda effect: (effect.effect_id != CLOVER_CATCH, effect.created_at, effect.effect_entry_id),
         )
     )
     adjusted = list(normalize_weights(weights))
@@ -1559,6 +1580,8 @@ def apply_catch_effects(
     giant_template_multiplier = 1.0
     shuffle_permutation: tuple[int, ...] = ()
     shuffle_rolls: tuple[float, ...] = ()
+    clover_bonus_roll: float | None = None
+    clover_bonus_points = 0.0
 
     def exclusive_compatible(effect: ActiveFoodEffect) -> bool:
         return (
@@ -1599,7 +1622,12 @@ def apply_catch_effects(
                 " 本次换位原始比例（倍率前）：" + " / ".join(f"{value:g}%" for value in shuffled) + "。"
             )
         elif exclusive.effect_id == CLOVER_CATCH:
-            adjusted = list(add_six_star_probability_points(adjusted, bonus_points=3.07, action="catch"))
+            if random_value is None:
+                raise FoodEffectError("粉蓝专属抓猪缺少可审计的随机源。")
+            clover_bonus_roll = random_value()
+            clover_bonus_points = CLOVER_BONUS_POINTS[int(clover_bonus_roll >= 0.5)]
+            adjusted = list(add_six_star_probability_points(adjusted, bonus_points=clover_bonus_points, action="catch"))
+            exclusive_summary = f"粉蓝冰糕：本次六星概率+{clover_bonus_points:g}个百分点。"
         elif exclusive.effect_id == NEXT_SIX_STAR_CATCH:
             target = float(grant.params["six_star_percent"])
             lower_total = sum(adjusted[:5])
@@ -1667,6 +1695,8 @@ def apply_catch_effects(
             skipped_summaries=tuple(skipped),
             shuffle_permutation=shuffle_permutation,
             shuffle_rolls=shuffle_rolls,
+            clover_bonus_roll=clover_bonus_roll,
+            clover_bonus_points=clover_bonus_points,
         )
 
     ordinary_probability_group = CATCH_PROBABILITY_GROUP - EXCLUSIVE_CATCH_EFFECTS
@@ -2085,6 +2115,7 @@ def apply_cooking_effects(
     *,
     source_rarity: Rarity | int,
     mid_autumn_active: bool = False,
+    random_value: Callable[[], float] | None = None,
 ) -> CookingEffectApplication:
     """Apply at most one queued effect from each compatible cooking family."""
 
@@ -2115,8 +2146,18 @@ def apply_cooking_effects(
     skipped.extend(exclusive_skipped)
     if exclusive is not None:
         grant = resolve_food_effect(exclusive.effect_id, exclusive.params)
+        clover_bonus_roll: float | None = None
+        clover_bonus_points = 0.0
         if exclusive.effect_id in {CLOVER_COOK, NEXT_SIX_STAR_COOK}:
-            six_star_percent = float(grant.params["six_star_percent"])
+            if exclusive.effect_id == CLOVER_COOK:
+                if random_value is None:
+                    raise FoodEffectError("粉蓝做菜缺少可审计的随机源。")
+                clover_bonus_roll = random_value()
+                clover_bonus_points = CLOVER_BONUS_POINTS[int(clover_bonus_roll >= 0.5)]
+                six_star_percent = min(100.0, adjusted[5] + clover_bonus_points)
+                grant = replace(grant, summary=f"粉蓝冰糕：本次六星菜概率+{clover_bonus_points:g}个百分点。")
+            else:
+                six_star_percent = float(grant.params["six_star_percent"])
             adjusted = [
                 0.0,
                 0.0,
@@ -2144,6 +2185,8 @@ def apply_cooking_effects(
             consumed_entry_ids=tuple(consumed),
             summaries=tuple(summaries),
             skipped_summaries=tuple(skipped),
+            clover_bonus_roll=clover_bonus_roll,
+            clover_bonus_points=clover_bonus_points,
         )
 
     normal_cook_group = frozenset(

@@ -46,7 +46,17 @@ from ..domain.errors import (
     StoreProductError,
     UpgradeLimitError,
 )
-from ..domain.feasts import CLOVER_COOK, CLOVER_FEAST, MOON_FEAST, discounted_price
+from ..domain.feasts import (
+    CLOVER_COOK,
+    CLOVER_FEAST,
+    CLOVER_INITIAL_CATCHES,
+    CLOVER_REWARD_CATCHES,
+    CLOVER_REWARD_FOODS,
+    MOON_FEAST,
+    MOON_HIGH_STAR_MULTIPLIER,
+    MOON_REWARD_CATCHES,
+    discounted_price,
+)
 from ..domain.feature_shop import (
     FEATURE_SHOP_PRODUCTS_BY_NAME,
     FeatureShopProduct,
@@ -1607,6 +1617,7 @@ class EconomyService:
                 active_effects,
                 source_rarity=source.rarity,
                 mid_autumn_active=mid_autumn_boost_active(datetime.fromisoformat(now)),
+                random_value=self.random_source.random,
             )
         weights = effect_application.weights
         six_star_progress_stacks = await self.repository.six_star_progress_stacks(
@@ -1943,6 +1954,8 @@ class EconomyService:
             "output_multiplier": output_multiplier,
             "food_effect_entry_ids": consumed_effect_entry_ids,
             "food_effect_summaries": cook_effect_summaries,
+            "clover_bonus_roll": effect_application.clover_bonus_roll,
+            "clover_bonus_points": effect_application.clover_bonus_points,
             "exclusive_effect_active": exclusive_effect_active,
             "failure_return_roll": failure_return_roll,
             "failure_return_triggered": failure_return_triggered,
@@ -2005,7 +2018,8 @@ class EconomyService:
         if clover_success:
             rewards = await self._grant_clover_foods(session, identity=identity, source=source, now=now)
             cook_effect_summaries.append(
-                "粉蓝成功奖励：3次专属额外抓猪（六星概率+3.07个百分点）；7道非六星菜已入背包："
+                f"粉蓝成功奖励：{CLOVER_REWARD_CATCHES}次专属额外抓猪（每次独立抽取+3.07或+30.7个百分点）；"
+                f"{CLOVER_REWARD_FOODS}道非六星菜已入背包："
                 + "、".join(rewards)
                 + "。"
             )
@@ -2159,7 +2173,7 @@ class EconomyService:
             raise CookingTemplateError("粉蓝奖励找不到当前群可用的非六星菜，整次做菜回滚。")
         labels: list[str] = []
         reserved_codes: list[str] = []
-        for index in range(7):
+        for index in range(CLOVER_REWARD_FOODS):
             template_roll = self.random_source.random()
             template = templates[min(int(template_roll * len(templates)), len(templates) - 1)]
             portion_roll = self.random_source.random()
@@ -2573,21 +2587,25 @@ class EconomyService:
                 effect = replace(
                     effect,
                     summary=(
-                        f"北京时间{blocked_window.label}禁止所有抓猪；{target_window.label}获得15次额外抓猪，"
-                        "4/5/6星概率×3，可叠加商城道具和非六星菜（永久提升除外）；同一奖励时段全部商城道具8.8折。"
-                        "15次机会在奖励时段结束后失效，普通额度不受扣减。"
+                        f"北京时间{blocked_window.label}禁止所有抓猪；{target_window.label}获得{MOON_REWARD_CATCHES}次额外抓猪，"
+                        f"4/5/6星概率×{MOON_HIGH_STAR_MULTIPLIER:g}，可叠加商城道具和其他临时菜品（永久提升与其他独立抓猪次数除外）；"
+                        f"同一奖励时段全部商城道具8.8折。{MOON_REWARD_CATCHES}次机会在奖励时段结束后失效，普通额度不受扣减。"
                     ),
                 )
                 reward_payload = {
                     "kind": MOON_FEAST,
-                    "dedicated_catches": 15,
+                    "dedicated_catches": MOON_REWARD_CATCHES,
                     "blocked_window": blocked_window.label,
                     "target_window": target_window.label,
                     "summary": effect.summary,
                 }
             elif effect.queued_effect_id == CLOVER_FEAST:
                 await start_clover(session, identity, food.food_instance_id, now, self._new_identifier())
-                reward_payload = {"kind": CLOVER_FEAST, "dedicated_catches": 10, "summary": effect.summary}
+                reward_payload = {
+                    "kind": CLOVER_FEAST,
+                    "dedicated_catches": CLOVER_INITIAL_CATCHES,
+                    "summary": effect.summary,
+                }
             elif effect.queued_effect_id == CATCH_WINDOW_TRANSFER:
                 if (
                     await self.repository.active_catch_window_transfer(
