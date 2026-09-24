@@ -12,7 +12,6 @@ from .feasts import (
     CLOVER_BONUS_POINTS,
     CLOVER_CATCH,
     CLOVER_COOK,
-    CLOVER_COOKS,
     CLOVER_DESCRIPTION,
     CLOVER_FEAST,
     CLOVER_INITIAL_CATCHES,
@@ -473,14 +472,13 @@ def resolve_food_effect(
             )
         if phase != "cook":
             raise FoodEffectError("粉蓝做菜阶段无效。")
-        if "star_sum" in raw:
-            _integer(raw, "star_sum", lower=7, upper=60)
+        stars = _integer(raw, "star_sum", lower=7, upper=96)
         return FoodEffectGrant(
             normalized_id,
             raw,
-            CLOVER_COOKS,
-            "粉蓝冰糕：下3次六星猪做菜每次各以50%概率抽取六星菜概率+3.07或+30.7个百分点；"
-            "无论成败均消耗，成功每次奖励3次专属抓猪和7道非六星菜。",
+            1,
+            f"粉蓝冰糕：下一次六星猪做菜的六星菜概率按已完成的专属抓猪累计星数+{stars}个百分点；"
+            "本轮无论成败均消耗加成，成功后按轮次继续奖励。",
         )
     if normalized_id == HISTORY_MIRROR_CATCH:
         fixed = raw.get("fixed_weights")
@@ -2150,12 +2148,15 @@ def apply_cooking_effects(
         clover_bonus_points = 0.0
         if exclusive.effect_id in {CLOVER_COOK, NEXT_SIX_STAR_COOK}:
             if exclusive.effect_id == CLOVER_COOK:
-                if random_value is None:
-                    raise FoodEffectError("粉蓝做菜缺少可审计的随机源。")
-                clover_bonus_roll = random_value()
-                clover_bonus_points = CLOVER_BONUS_POINTS[int(clover_bonus_roll >= 0.5)]
+                clover_bonus_points = float(grant.params["star_sum"])
                 six_star_percent = min(100.0, adjusted[5] + clover_bonus_points)
-                grant = replace(grant, summary=f"粉蓝冰糕：本次六星菜概率+{clover_bonus_points:g}个百分点。")
+                grant = replace(
+                    grant,
+                    summary=(
+                        f"粉蓝冰糕：累计专属抓猪{int(clover_bonus_points)}星，"
+                        f"本次六星菜概率+{clover_bonus_points:g}个百分点。"
+                    ),
+                )
             else:
                 six_star_percent = float(grant.params["six_star_percent"])
             adjusted = [

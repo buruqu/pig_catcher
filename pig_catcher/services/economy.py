@@ -2002,7 +2002,7 @@ class EconomyService:
                 )
             )
 
-        clover_success = await settle_clover_cook(
+        clover_reward_due, clover_ended = await settle_clover_cook(
             session,
             player_id=identity.player_id,
             effects=active_effects,
@@ -2015,13 +2015,19 @@ class EconomyService:
             )
             else "",
         )
-        if clover_success:
+        if clover_reward_due:
             rewards = await self._grant_clover_foods(session, identity=identity, source=source, now=now)
             cook_effect_summaries.append(
                 f"粉蓝成功奖励：{CLOVER_REWARD_CATCHES}次专属额外抓猪（每次独立抽取+3.07或+30.7个百分点）；"
                 f"{CLOVER_REWARD_FOODS}道非六星菜已入背包："
                 + "、".join(rewards)
                 + "。"
+            )
+        elif clover_ended:
+            cook_effect_summaries.append(
+                "粉蓝冰糕：第3轮六星菜制作成功，效果结束。"
+                if output_rarity is Rarity.SIX
+                else "粉蓝冰糕：本轮未做出六星菜，效果结束。"
             )
 
         if resonance_reward_catches:

@@ -106,7 +106,7 @@ async def equip(db, clock, owner, iid, action="catching"):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("success", [True, False])
-async def test_clover_seven_then_three_cooks_and_rewards_are_atomic_durable(tmp_path, success):
+async def test_clover_rounds_require_each_reward_catch_before_next_cook(tmp_path, success):
     db, clock, owner = await setup(tmp_path)
     await eat(db, clock, "next-catch-quality", "OTHER", {"multiplier": 2}, rarity=4)
     await equip(db, clock, owner, "super-lucky-whistle")
@@ -139,34 +139,59 @@ async def test_clover_seven_then_three_cooks_and_rewards_are_atomic_durable(tmp_
     ] == 0
     await six_pig(db, owner, "READY")
     await equip(db, clock, owner, "super-chef-spice", "cooking")
-    results = []
-    for index in range(3):
+    for index in range(3 if success else 1):
         if index:
             await six_pig(db, owner, f"READY{index}")
         code = "READY" if index == 0 else f"READY{index}"
-        service = economy(db, clock, 0.9 if success else 0.1, 0.99 if success else 0, *([0.5] * 100))
+        before = await db.fetch_one("SELECT star_sum,cook_used,stage FROM player_clover_chains")
+        assert before["stage"] == "cook" and before["cook_used"] == index
+        spice_before = (await db.fetch_one("SELECT quantity FROM item_inventory WHERE item_id='super-chef-spice'"))[0]
+        service = economy(db, clock, 0.99 if success else 0, *([0.5] * 100))
         who = _identity(message_id=f"ready-cook-{index}")
         result = await service.cook(who, code)
-        assert result.weights[5] == pytest.approx(40.7 if success else 13.07)
+        assert result.weights[5] == pytest.approx(10 + before["star_sum"])
         assert result.foods[0].rarity == (6 if success else 5)
+        spice_after = await db.fetch_one("SELECT quantity FROM item_inventory WHERE item_id='super-chef-spice'")
+        assert spice_after[0] == spice_before
         replay = await service.cook(who, code)
         assert not replay.receipt_created
-        results.append(result)
-    assert (await db.fetch_one("SELECT quantity FROM item_inventory WHERE item_id='super-chef-spice'"))[0] == 2
+        after = await db.fetch_one("SELECT cook_used,reward_granted,reward_used,stage FROM player_clover_chains")
+        assert after["cook_used"] == index + 1
+        if success and index < 2:
+            assert after["stage"] == "reward"
+            assert after["reward_granted"] - after["reward_used"] == 3
+            # A six-star cook between reward catches cannot use the next round's bonus.
+            await six_pig(db, owner, f"WAIT{index}")
+            waiting = await economy(db, clock, 0, *([0.5] * 10)).cook(
+                _identity(message_id=f"waiting-cook-{index}"), f"WAIT{index}"
+            )
+            assert waiting.weights[5] in (10, 20)  # Only ordinary cooking rules apply while Clover is locked.
+            assert (
+                await db.fetch_one(
+                    "SELECT COUNT(*) FROM player_food_effects WHERE effect_id=? AND consumed_uses<granted_uses",
+                    (CLOVER_COOK,),
+                )
+            )[0] == 0
+            old_stars = (await db.fetch_one("SELECT star_sum FROM player_clover_chains"))[0]
+            for reward_index in range(3):
+                reward = await catching.catch(_identity(message_id=f"reward-{index}-{reward_index}"))
+                assert any(reward.weights[5] == pytest.approx(value) for value in (4.07, 31.7))
+                assert json.loads(reward.receipt.result_json)["quota_exempt_catch"] is True
+                progress = await db.fetch_one("SELECT star_sum,stage FROM player_clover_chains")
+                assert progress["stage"] == ("cook" if reward_index == 2 else "reward")
+            assert (await db.fetch_one("SELECT star_sum FROM player_clover_chains"))[0] > old_stars
+    if not success:
+        assert (await db.fetch_one("SELECT quantity FROM item_inventory WHERE item_id='super-chef-spice'"))[0] == 2
     foods = await db.fetch_all(
         "SELECT rarity,random_snapshot_json FROM food_instances WHERE random_snapshot_json LIKE '%clover-feast%'"
     )
-    assert len(foods) == (21 if success else 0)
+    assert len(foods) == (14 if success else 0)
     assert all(1 <= row["rarity"] <= 5 for row in foods)
-    if success:
-        for i in range(9):
-            reward = await catching.catch(_identity(message_id=f"reward-{i}"))
-            assert any(reward.weights[5] == pytest.approx(value) for value in (4.07, 31.7))
-            assert json.loads(reward.receipt.result_json)["quota_exempt_catch"] is True
     chain = await db.fetch_one("SELECT * FROM player_clover_chains")
-    assert chain["stage"] == "complete" and 7 <= chain["star_sum"] <= 42
-    assert chain["cook_used"] == 3
-    assert chain["reward_granted"] == chain["reward_used"] == (9 if success else 0)
+    assert chain["stage"] == "complete"
+    assert chain["star_sum"] >= 7 + (6 if success else 0)
+    assert chain["cook_used"] == (3 if success else 1)
+    assert chain["reward_granted"] == chain["reward_used"] == (6 if success else 0)
     await db.close()
 
 
@@ -195,28 +220,25 @@ async def test_clover_mixed_stars_and_concurrent_seventh_catch(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_clover_reward_catches_can_interleave_with_remaining_cooks(tmp_path):
+async def test_clover_second_round_failure_stops_before_third(tmp_path):
     db, clock, owner = await setup(tmp_path)
     await eat(db, clock, CLOVER_FEAST, "CLOVER")
     catcher = game(db, clock)
     for index in range(7):
         await catcher.catch(_identity(message_id=f"initial-{index}"))
     await six_pig(db, owner, "SUCCESS")
-    await economy(db, clock, 0.1, 0.99, *([0.5] * 100)).cook(_identity(message_id="cook-success"), "SUCCESS")
+    await economy(db, clock, 0.99, *([0.5] * 100)).cook(_identity(message_id="cook-success"), "SUCCESS")
     chain = await db.fetch_one("SELECT cook_used,reward_granted,reward_used,stage FROM player_clover_chains")
-    assert tuple(chain) == (1, 3, 0, "cook")
-    await catcher.catch(_identity(message_id="interleaved-reward"))
+    assert tuple(chain) == (1, 3, 0, "reward")
+    for index in range(3):
+        await catcher.catch(_identity(message_id=f"round-two-reward-{index}"))
     chain = await db.fetch_one("SELECT cook_used,reward_granted,reward_used,stage FROM player_clover_chains")
-    assert tuple(chain) == (1, 3, 1, "cook")
-    for index in range(2):
-        code = f"FAIL{index}"
-        await six_pig(db, owner, code)
-        await economy(db, clock, 0.1, 0, *([0.5] * 10)).cook(_identity(message_id=f"cook-{code}"), code)
-    chain = await db.fetch_one("SELECT cook_used,reward_granted,reward_used,stage FROM player_clover_chains")
-    assert tuple(chain) == (3, 3, 1, "reward")
-    for index in range(2):
-        await catcher.catch(_identity(message_id=f"remaining-reward-{index}"))
+    assert tuple(chain) == (1, 3, 3, "cook")
+    await six_pig(db, owner, "FAIL")
+    result = await economy(db, clock, 0, *([0.5] * 10)).cook(_identity(message_id="cook-fail"), "FAIL")
+    assert result.weights[5] == pytest.approx(10 + (await db.fetch_one("SELECT star_sum FROM player_clover_chains"))[0])
     assert (await db.fetch_one("SELECT stage FROM player_clover_chains"))[0] == "complete"
+    assert (await db.fetch_one("SELECT reward_granted FROM player_clover_chains"))[0] == 3
     await db.close()
 
 
@@ -281,6 +303,8 @@ async def test_schema72_migrates_inflight_clover_and_moon_counters(tmp_path, mon
         await eat(db, clock, MOON_FEAST, "MOON")
         peer = _identity(user_id="201", message_id="legacy-peer")
         await FrameworkService(db).touch_identity(peer)
+        rewarded = _identity(user_id="202", message_id="legacy-rewarded")
+        await FrameworkService(db).touch_identity(rewarded)
         await _insert_food(
             db,
             player_id=peer.player_id,
@@ -289,6 +313,19 @@ async def test_schema72_migrates_inflight_clover_and_moon_counters(tmp_path, mon
             display_name="旧粉蓝冰糕",
             short_code="LEGACY",
             instance_id="food-legacy-clover",
+            rarity=6,
+            official_value=25000,
+            effect_id=CLOVER_FEAST,
+            effect_params={},
+        )
+        await _insert_food(
+            db,
+            player_id=rewarded.player_id,
+            scope_id=rewarded.scope.value,
+            template_id="food-6-group",
+            display_name="旧奖励阶段冰糕",
+            short_code="REWARDED",
+            instance_id="food-legacy-rewarded",
             rarity=6,
             official_value=25000,
             effect_id=CLOVER_FEAST,
@@ -308,6 +345,25 @@ async def test_schema72_migrates_inflight_clover_and_moon_counters(tmp_path, mon
                     "food-CLOVER",
                     CLOVER_COOK,
                     json.dumps({"chain_id": "food-CLOVER", "phase": "cook", "star_sum": 10}),
+                    now,
+                    now,
+                ),
+            )
+            await session.execute(
+                "INSERT INTO player_clover_chains(source_food_instance_id,player_id,scope_id,initial_used,star_sum,"
+                "reward_used,stage,created_at,updated_at) VALUES(?,?,?,10,10,1,'reward',?,?)",
+                ("food-legacy-rewarded", rewarded.player_id, rewarded.scope.value, now, now),
+            )
+            await session.execute(
+                "INSERT INTO player_food_effects(effect_entry_id,player_id,source_food_instance_id,"
+                "effect_id,params_json,granted_uses,consumed_uses,expires_at,created_at,updated_at) "
+                "VALUES(?,?,?,?,?,3,1,NULL,?,?)",
+                (
+                    "legacy-clover-reward",
+                    rewarded.player_id,
+                    "food-legacy-rewarded",
+                    CLOVER_CATCH,
+                    json.dumps({"chain_id": "food-legacy-rewarded", "phase": "reward", "star_sum": 10}),
                     now,
                     now,
                 ),
@@ -340,8 +396,13 @@ async def test_schema72_migrates_inflight_clover_and_moon_counters(tmp_path, mon
         (owner.player_id,),
     )
     assert tuple(chain) == (10, 10, 0, 0, "cook")
+    old_reward = await db.fetch_one(
+        "SELECT cook_used,reward_granted,reward_used,stage FROM player_clover_chains WHERE player_id=?",
+        (rewarded.player_id,),
+    )
+    assert tuple(old_reward) == (1, 3, 1, "reward")
     cook_effect = await db.fetch_one("SELECT granted_uses FROM player_food_effects WHERE effect_id=?", (CLOVER_COOK,))
-    assert cook_effect[0] == 3
+    assert cook_effect[0] == 1
     clock.value += timedelta(hours=4)
     for index in range(3):
         caught = await game(db, clock).catch(_identity(message_id=f"post-migration-{index}"))
@@ -354,6 +415,13 @@ async def test_schema72_migrates_inflight_clover_and_moon_counters(tmp_path, mon
         "SELECT initial_target,initial_used,stage FROM player_clover_chains WHERE player_id=?", (peer.player_id,)
     )
     assert tuple(legacy_chain) == (10, 10, "cook")
+    for index in range(2):
+        await game(db, clock).catch(_identity(user_id="202", message_id=f"legacy-reward-left-{index}"))
+    rewarded_chain = await db.fetch_one(
+        "SELECT cook_used,reward_used,star_sum,stage FROM player_clover_chains WHERE player_id=?",
+        (rewarded.player_id,),
+    )
+    assert tuple(rewarded_chain) == (1, 3, 12, "cook")
     await db.close()
 
 
@@ -465,7 +533,7 @@ def test_clover_independent_bonus_branches_and_ordinary_pig_boundary():
             effect_entry_id="x",
             effect_id=CLOVER_COOK,
             params_json=json.dumps({"chain_id": "f", "phase": "cook", "star_sum": 60}),
-            granted_uses=3,
+            granted_uses=1,
             consumed_uses=0,
             created_at="2026-01-01",
             source_food_rarity=6,
@@ -473,8 +541,9 @@ def test_clover_independent_bonus_branches_and_ordinary_pig_boundary():
     )
     low = apply_cooking_effects((0, 0, 0, 0, 90, 10), (effect,), source_rarity=6, random_value=lambda: 0.1)
     high = apply_cooking_effects((0, 0, 0, 0, 90, 10), (effect,), source_rarity=6, random_value=lambda: 0.9)
-    assert low.weights[5] == pytest.approx(13.07)
-    assert high.weights[5] == pytest.approx(40.7)
+    assert low.weights[5] == pytest.approx(70)
+    assert high.weights[5] == pytest.approx(70)
+    assert low.clover_bonus_roll is None and low.clover_bonus_points == 60
     for rarity in range(1, 6):
         result = apply_cooking_effects((0, 0, 0, 0, 100, 0), (effect,), source_rarity=rarity)
         assert result.weights[5] == 0 and not result.consumed_entry_ids
@@ -508,7 +577,7 @@ async def test_clover_missing_reward_pool_rolls_back_entire_cook(tmp_path):
     async with db.transaction() as s:
         await s.execute("UPDATE food_templates SET enabled=0 WHERE rarity<6")
     with pytest.raises(CookingTemplateError, match="非六星菜"):
-        await economy(db, clock, 0.1, 0.99, 0, 0.5).cook(_identity(message_id="failed"), "SOURCE")
+        await economy(db, clock, 0.99, 0, 0.5).cook(_identity(message_id="failed"), "SOURCE")
     assert (await db.fetch_one("SELECT state FROM pig_instances WHERE pig_instance_id='pig-SOURCE'"))[0] == "active"
     assert (await db.fetch_one("SELECT stage FROM player_clover_chains"))[0] == "cook"
     assert (await db.fetch_one("SELECT consumed_uses FROM player_food_effects WHERE effect_id=?", (CLOVER_COOK,)))[
