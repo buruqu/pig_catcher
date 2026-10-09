@@ -10,7 +10,7 @@ from fractions import Fraction
 from math import lcm
 from typing import Any
 
-from . import firefly_battle, mirror_battle, miumiu
+from . import daniya_battle, firefly_battle, mirror_battle, miumiu, xixi_battle
 from .battle_catalog import (
     ASAMU_MOVES,
     BATTLE_RULE_VERSION,
@@ -123,6 +123,8 @@ def randbelow(seed: str, key: str, bound: int, *, version: int = BATTLE_RULE_VER
 
 
 def choose(seed: str, key: str, wheel: tuple, *, version: int = BATTLE_RULE_VERSION) -> tuple[Any, int]:
+    scale = lcm(*(Fraction(weight).denominator for _, weight in wheel))
+    wheel = tuple((value, int(Fraction(weight) * scale)) for value, weight in wheel)
     roll = randbelow(seed, key, sum(weight for _, weight in wheel), version=version)
     cursor = roll
     for value, weight in wheel:
@@ -194,12 +196,12 @@ def fresh_turn() -> dict:
     }
 
 
-def _frozen_mimic_pool() -> dict[str, list[dict]]:
+def _frozen_mimic_pool(version: int = BATTLE_VERSION) -> dict[str, list[dict]]:
     pool: dict[str, list[dict]] = {"large": [], "small": []}
     for fighter in FIGHTERS:
         if fighter.fighter_id == "juejue":
             continue
-        for move in fighter.moves:
+        for move in fighter_moves(fighter.fighter_id, version):
             base = _move_base(move)
             opponent_reduction = _opponent_reduction_base(move)
             # v6只允许有胜率数值或对手减益数值的招式进入池；抽中后才连同
@@ -222,13 +224,17 @@ def _frozen_mimic_pool() -> dict[str, list[dict]]:
     return pool
 
 
-def new_state(fighters: list[dict], *, seed: str = "") -> dict:
+def new_state(fighters: list[dict], *, seed: str = "", version: int = BATTLE_VERSION) -> dict:
     if len(fighters) != 2:
         raise BattleError("对战必须有两名玩家。")
     sides = []
-    mimic_pool = _frozen_mimic_pool()
+    mimic_pool = _frozen_mimic_pool(version)
     for side, snapshot in enumerate(fighters):
-        if snapshot.get("fighter_id") not in FIGHTERS_BY_ID or not 0 <= snapshot.get("level", 0) <= 5:
+        if (
+            snapshot.get("fighter_id") not in FIGHTERS_BY_ID
+            or not 0 <= snapshot.get("level", 0) <= 5
+            or not fighter_moves(snapshot["fighter_id"], version)
+        ):
             raise BattleError("未知战斗猪或养成等级。")
         fighter_id = snapshot["fighter_id"]
         is_juejue = fighter_id == "juejue"
@@ -238,7 +244,7 @@ def new_state(fighters: list[dict], *, seed: str = "") -> dict:
                 seed,
                 f"entry:{side}:juejue-form",
                 ((JUEJUE_FORM_TIME, 1), (JUEJUE_FORM_VIRTUAL, 1)),
-                version=BATTLE_VERSION,
+                version=version,
             )
         sides.append(
             {
@@ -292,12 +298,23 @@ def new_state(fighters: list[dict], *, seed: str = "") -> dict:
                 "turn": fresh_turn(),
             }
         )
-    return {"version": BATTLE_VERSION, "round": 1, "status": "active", "winner": None, "sides": sides,
-            "round_origin": deepcopy(sides), "mimic_pool": deepcopy(mimic_pool)}
+    if version >= 19:
+        for player in sides:
+            daniya_battle.ensure_player(player)
+            xixi_battle.ensure_player(player)
+    return {
+        "version": version,
+        "round": 1,
+        "status": "active",
+        "winner": None,
+        "sides": sides,
+        "round_origin": deepcopy(sides),
+        "mimic_pool": deepcopy(mimic_pool),
+    }
 
 
 def _side(state: dict, side: int) -> dict:
-    if state["version"] not in {17, BATTLE_VERSION}:
+    if state["version"] not in {17, 18, BATTLE_VERSION}:
         raise BattleError("该对战使用另一版本规则，需要相应规则引擎恢复，不能重新抽取。")
     if state["status"] != "active" or side not in (0, 1):
         raise BattleError("对战已结束或不是本场参与者。")
@@ -350,6 +367,9 @@ def _side(state: dict, side: int) -> dict:
     player.setdefault("firefly_next_sam_gain_bonus", 0)
     for key, value in fresh_turn().items():
         player["turn"].setdefault(key, deepcopy(value))
+    if state["version"] >= 19:
+        daniya_battle.ensure_player(player)
+        xixi_battle.ensure_player(player)
     return player
 
 
@@ -358,10 +378,17 @@ def roll_count(state: dict, side: int, seed: str) -> dict:
     turn = player["turn"]
     if turn["raw"] is not None:
         return {"changed": False, **deepcopy(turn)}
+    if state["version"] >= 19:
+        xixi_battle.begin_round(player, state["round"], seed, choose=choose, version=state["version"])
     wheel = HEAVY_COUNT_WHEEL if player["heavy"] else COUNT_WHEEL
+    if state["version"] >= 19:
+        wheel = xixi_battle.count_wheel(player, wheel)
+    turn["count_wheel"] = deepcopy(wheel)
     raw, roll = choose(seed, f"{state['round']}:{side}:count", wheel, version=state["version"])
     debt = player["next_debt"]
-    bonus = player["next_action_bonus"]
+    bonus = player["next_action_bonus"] + (
+        int(player.get("xixi_permanent_action_bonus", 0)) if state["version"] >= 19 else 0
+    )
     player["next_debt"] = 0  # 只扣下一回合，负数不会继续倒欠。
     player["next_action_bonus"] = 0
     effective = max(0, raw + bonus - debt)
@@ -467,11 +494,11 @@ def _juejue_mimic(player: dict, seed: str, key: str, version: int) -> dict:
     }
 
 
-def _move_by_id(fighter_id: str, move_id: str) -> Move | None:
+def _move_by_id(fighter_id: str, move_id: str, version: int = BATTLE_VERSION) -> Move | None:
     fighter = FIGHTERS_BY_ID.get(fighter_id)
     if fighter is None:
         return None
-    return next((move for move in fighter.moves if move.move_id == move_id), None)
+    return next((move for move in fighter_moves(fighter_id, version) if move.move_id == move_id), None)
 
 
 def _yilu_add_markers(player: dict, amount: int) -> dict:
@@ -588,6 +615,7 @@ def apply_move(
     forced_gain_bonus: int | Fraction = 0,
     firefly_echo_scale: int | Fraction = 1,
     firefly_choice_context: dict | None = None,
+    automatic: bool = False,
 ) -> dict:
     """应用一个确定招式。
 
@@ -634,11 +662,7 @@ def apply_move(
     if is_juejue:
         form_before = player.get("juejue_form", "")
     elif is_daniya:
-        form_before = (
-            functional_form_id
-            or player.get("daniya_form")
-            or DANIYA_FORM_STAGING
-        )
+        form_before = functional_form_id or player.get("daniya_form") or DANIYA_FORM_STAGING
     elif is_firefly:
         form_before = player.get("firefly_form", FIREFLY_FORM_FIREFLY)
     else:
@@ -703,20 +727,14 @@ def apply_move(
     yilu_true_damage_added = 0
     yilu_medic_recoveries: list[dict] = []
     yilu_specialist_draws_added = 0
-    yilu_future_base_before = int(player.get("yilu_future_base_bonus", 0)) + int(
-        turn.get("yilu_round_base_bonus", 0)
-    )
+    yilu_future_base_before = int(player.get("yilu_future_base_bonus", 0)) + int(turn.get("yilu_round_base_bonus", 0))
     asamu_future_gain_before = int(player.get("asamu_future_gain_bonus", 0))
     firefly_fuel_before = int(player.get("firefly_fuel", 0))
     firefly_collapse_to_add = 0
     firefly_conditional_reduction = 0
     firefly_self_exhaust_delta_units = Fraction(0)
     firefly_choice = None
-    firefly_echo = bool(
-        is_firefly
-        and form_before == FIREFLY_FORM_SAM
-        and "firefly-skill" in effect_tags
-    )
+    firefly_echo = bool(is_firefly and form_before == FIREFLY_FORM_SAM and "firefly-skill" in effect_tags)
     firefly_echo_scale = Fraction(firefly_echo_scale)
     firefly_sam_skill = bool(is_firefly and "sam-skill" in effect_tags)
     firefly_sam_skill_index_before = int(turn.get("firefly_sam_skills_used", 0))
@@ -759,12 +777,12 @@ def apply_move(
         else:
             player["firefly_fuel"] = min(3, firefly_fuel_before + 1)
             if "firefly-crimson-cocoon" in effect_tags:
-                player["firefly_next_sam_gain_bonus"] = int(
-                    player.get("firefly_next_sam_gain_bonus", 0)
-                ) + (10 if version >= 18 else 6)
-                turn["firefly_no_transform_bonus_units"] = int(
-                    turn.get("firefly_no_transform_bonus_units", 0)
-                ) + (2500 if version >= 18 else 2000)
+                player["firefly_next_sam_gain_bonus"] = int(player.get("firefly_next_sam_gain_bonus", 0)) + (
+                    10 if version >= 18 else 6
+                )
+                turn["firefly_no_transform_bonus_units"] = int(turn.get("firefly_no_transform_bonus_units", 0)) + (
+                    2500 if version >= 18 else 2000
+                )
             elif "firefly-dream-destination" in effect_tags:
                 firefly_self_exhaust_delta_units = Fraction(-2) if version >= 18 else Fraction(-3, 2)
                 firefly_conditional_reduction = 8 if version >= 18 else 5
@@ -786,9 +804,7 @@ def apply_move(
                 if firefly_choice["selected_family"] == "firefly":
                     if version >= 18:
                         player["firefly_fuel"] = min(3, player["firefly_fuel"] + 1)
-                    turn["domain_clash_bonus_units"] = int(
-                        turn.get("domain_clash_bonus_units", 0)
-                    ) + 2
+                    turn["domain_clash_bonus_units"] = int(turn.get("domain_clash_bonus_units", 0)) + 2
 
     if firefly_sam_skill:
         if form_before == FIREFLY_FORM_FIREFLY:
@@ -819,10 +835,13 @@ def apply_move(
             if form_before == FIREFLY_FORM_SAM:
                 special_base = Fraction(20 + fuel_gain + queued_bonus)
                 opponent_reduction = Fraction(10)
-                player["firefly_sam_rounds_remaining"] = max(
-                    1,
-                    int(player.get("firefly_sam_rounds_remaining", 0)),
-                ) + 1
+                player["firefly_sam_rounds_remaining"] = (
+                    max(
+                        1,
+                        int(player.get("firefly_sam_rounds_remaining", 0)),
+                    )
+                    + 1
+                )
                 firefly_collapse_to_add = 1
             else:
                 player["firefly_sam_rounds_remaining"] = 2
@@ -842,10 +861,13 @@ def apply_move(
     elif is_firefly and "firefly-domain" in effect_tags:
         # QQ链式指令不插入额外的中途交互：萨姆形态优先延长，否则回到流萤并获得下回合+1招。
         if form_before == FIREFLY_FORM_SAM:
-            player["firefly_sam_rounds_remaining"] = max(
-                1,
-                int(player.get("firefly_sam_rounds_remaining", 0)),
-            ) + 1
+            player["firefly_sam_rounds_remaining"] = (
+                max(
+                    1,
+                    int(player.get("firefly_sam_rounds_remaining", 0)),
+                )
+                + 1
+            )
             firefly_domain_choice = "extend-sam"
         else:
             player["firefly_form"] = FIREFLY_FORM_FIREFLY
@@ -855,9 +877,9 @@ def apply_move(
         firefly_domain_choice = ""
 
     if firefly_self_exhaust_delta_units:
-        turn["firefly_self_exhaust_delta_units"] = Fraction(
-            turn.get("firefly_self_exhaust_delta_units", 0)
-        ) + firefly_self_exhaust_delta_units
+        turn["firefly_self_exhaust_delta_units"] = (
+            Fraction(turn.get("firefly_self_exhaust_delta_units", 0)) + firefly_self_exhaust_delta_units
+        )
 
     if is_juejue and "juejue-accelerate" in move.tags:
         tier, subwheel = _juejue_subwheel(player, "acceleration", seed, key, version)
@@ -912,11 +934,7 @@ def apply_move(
         else:
             opponent_next_bonus = tier.failure_opponent_bonus
     elif is_juejue and "juejue-mimic" in move.tags:
-        mimic = (
-            deepcopy(mimic_override)
-            if mimic_override is not None
-            else _juejue_mimic(player, seed, key, version)
-        )
+        mimic = deepcopy(mimic_override) if mimic_override is not None else _juejue_mimic(player, seed, key, version)
         # 冻结entry是本场唯一事实源；目录热修后也不能回查覆盖数值或功能。
         special_base = Fraction(mimic.get("base", 0))
         numeric_direction = mimic.get("direction", "self")
@@ -941,7 +959,7 @@ def apply_move(
 
     is_copy = mimic is not None or copy_context
     if mimic is not None and effect_fighter_id == "miumiu":
-        source_move = _move_by_id("miumiu", effect_move_id)
+        source_move = _move_by_id("miumiu", effect_move_id, version)
         if source_move is not None:
             adapted = miumiu.prepare_move(player, source_move)
             special_base += _move_base(adapted) - _move_base(source_move)
@@ -958,9 +976,7 @@ def apply_move(
                 marker = _yilu_add_markers(player, 2)
                 yilu_marker_events.append(marker)
                 special_extra_draws += 1 + int(marker["threshold_draws"])
-            player["yilu_future_base_bonus"] = int(
-                player.get("yilu_future_base_bonus", 0)
-            ) + 2 * effect_repeats
+            player["yilu_future_base_bonus"] = int(player.get("yilu_future_base_bonus", 0)) + 2 * effect_repeats
         elif "yilu-guard" in effect_tags:
             special_base = Fraction(0)
             for _repeat in range(effect_repeats):
@@ -973,9 +989,7 @@ def apply_move(
                 special_base += consumed * 5
                 if consumed >= 8:
                     yilu_true_damage_added += 1
-            turn["yilu_true_damage_layers"] = int(
-                turn.get("yilu_true_damage_layers", 0)
-            ) + yilu_true_damage_added
+            turn["yilu_true_damage_layers"] = int(turn.get("yilu_true_damage_layers", 0)) + yilu_true_damage_added
         elif "yilu-defender" in effect_tags:
             special_base = Fraction(2 * effect_repeats)
             for repeat_index in range(1, effect_repeats + 1):
@@ -1075,9 +1089,7 @@ def apply_move(
                 consumed = int(player.get("yilu_markers", 0))
                 player["yilu_markers"] = 0
                 yilu_consumed_markers += consumed
-                turn["yilu_injury_recovery_layers"] = int(
-                    turn.get("yilu_injury_recovery_layers", 0)
-                ) + 1
+                turn["yilu_injury_recovery_layers"] = int(turn.get("yilu_injury_recovery_layers", 0)) + 1
                 injury_before = str(player.get("injury_state", "none"))
                 recovered = injury_before == "heavy" or bool(player.get("heavy"))
                 if recovered:
@@ -1104,16 +1116,12 @@ def apply_move(
                 marker = _yilu_add_markers(player, 1)
                 yilu_marker_events.append(marker)
                 special_extra_draws += int(marker["threshold_draws"])
-                turn["yilu_specialist_operator_draws"] = int(
-                    turn.get("yilu_specialist_operator_draws", 0)
-                ) + 2
+                turn["yilu_specialist_operator_draws"] = int(turn.get("yilu_specialist_operator_draws", 0)) + 2
                 yilu_specialist_draws_added += 2
                 special_extra_draws += 2
 
     if "yilu-babel" in effect_tags:
-        turn["yilu_double_operator_draws"] = int(
-            turn.get("yilu_double_operator_draws", 0)
-        ) + 1
+        turn["yilu_double_operator_draws"] = int(turn.get("yilu_double_operator_draws", 0)) + 1
         special_extra_draws += 1
         player["next_debt"] += 1
 
@@ -1129,9 +1137,7 @@ def apply_move(
                     continue
                 rewind_debt_cleared = int(failure.get("debt", 0))
                 rewind_failure_ordinal = int(failure["ordinal"])
-                player["next_debt"] = max(
-                    0, int(player.get("next_debt", 0)) - rewind_debt_cleared
-                )
+                player["next_debt"] = max(0, int(player.get("next_debt", 0)) - rewind_debt_cleared)
                 failure["debt_applied"] = False
                 failure["rewound_by_ordinal"] = ordinal
                 break
@@ -1189,10 +1195,16 @@ def apply_move(
             "chaos-domain": 15,
         }.get(drawn_move.move_id)
         if legacy_base is not None:
-            special_base = Fraction(0 if version < 6 and drawn_move.move_id in {
-                "future-simulation",
-                "realtime-compute",
-            } else legacy_base)
+            special_base = Fraction(
+                0
+                if version < 6
+                and drawn_move.move_id
+                in {
+                    "future-simulation",
+                    "realtime-compute",
+                }
+                else legacy_base
+            )
 
     # 达妮娅：布景招式同时累积下一次蚀域的出现权重与领域战胜利权重；
     # “世界·上班”的布景效果只增加出现权重，因此使用独立账本，不能
@@ -1207,27 +1219,22 @@ def apply_move(
         turn["daniya_collapse_count"] = int(turn.get("daniya_collapse_count", 0)) + 1
     if "daniya-domain" in effect_tags and not is_copy:
         daniya_domain_carried_units = int(player.get("daniya_domain_steps", 0))
-        turn["domain_clash_bonus_units"] = int(
-            turn.get("domain_clash_bonus_units", 0)
-        ) + daniya_domain_carried_units
-        turn["daniya_domain_carried_units"] = int(
-            turn.get("daniya_domain_carried_units", 0)
-        ) + daniya_domain_carried_units
+        turn["domain_clash_bonus_units"] = int(turn.get("domain_clash_bonus_units", 0)) + daniya_domain_carried_units
+        turn["daniya_domain_carried_units"] = (
+            int(turn.get("daniya_domain_carried_units", 0)) + daniya_domain_carried_units
+        )
         player["daniya_domain_steps"] = 0
         player["daniya_domain_draw_only_steps"] = 0
     if "daniya-flawless" in effect_tags:
         turn["domain_clash_bonus_units"] = int(turn.get("domain_clash_bonus_units", 0)) + 2
     if "daniya-loan" in effect_tags:
-        turn["opponent_domain_clash_reduction_units"] = int(
-            turn.get("opponent_domain_clash_reduction_units", 0)
-        ) + 2
+        turn["opponent_domain_clash_reduction_units"] = int(turn.get("opponent_domain_clash_reduction_units", 0)) + 2
     if "daniya-world-disable-next" in effect_tags:
         opponent_next_effects_disabled = True
     if "daniya-world-force-next" in effect_tags:
         opponent_next_forced_form = str(form_before or DANIYA_FORM_STAGING)
         opponent_next_forced_move_ids = [
-            candidate.move_id
-            for candidate in fighter_form_moves("daniya", opponent_next_forced_form)
+            candidate.move_id for candidate in fighter_form_moves("daniya", opponent_next_forced_form, version)
         ]
     if "daniya-world-work" in effect_tags:
         if version < 15:
@@ -1240,9 +1247,7 @@ def apply_move(
         elif form_before == DANIYA_FORM_DISILLUSION:
             opponent_exhaust_bonus_units += 5
         elif not is_copy:
-            player["daniya_domain_draw_only_steps"] = int(
-                player.get("daniya_domain_draw_only_steps", 0)
-            ) + 10
+            player["daniya_domain_draw_only_steps"] = int(player.get("daniya_domain_draw_only_steps", 0)) + 10
         else:
             suppressed_source_local_effects.append("daniya-world-work-domain-draw-growth")
     if "daniya-world-dragon-image" in effect_tags:
@@ -1266,9 +1271,7 @@ def apply_move(
     if "asamu-sleep" in effect_tags:
         player["asamu_future_gain_bonus"] = asamu_future_gain_before + 5
     if "asamu-charge-up" in effect_tags and not is_copy:
-        player["asamu_prime_temp_bonus_units"] = int(
-            player.get("asamu_prime_temp_bonus_units", 0)
-        ) + 10000
+        player["asamu_prime_temp_bonus_units"] = int(player.get("asamu_prime_temp_bonus_units", 0)) + 10000
     elif "asamu-charge-up" in effect_tags:
         suppressed_source_local_effects.append("asamu-prime-temporary-draw-weight")
     if "asamu-prime" in effect_tags and not is_copy:
@@ -1327,13 +1330,7 @@ def apply_move(
             "success": bool(zero_success),
             "gain": zero_bonus,
         }
-    elif (
-        version >= 6
-        and is_juejue
-        and not turn["juejue_zero_checked"]
-        and first_acceleration
-        and first_delay
-    ):
+    elif version >= 6 and is_juejue and not turn["juejue_zero_checked"] and first_acceleration and first_delay:
         turn["juejue_zero_checked"] = True
         tier_sum = int(first_acceleration["tier"]) + int(first_delay["tier"])
         both_success = bool(first_acceleration["success"] and first_delay["success"])
@@ -1378,7 +1375,22 @@ def apply_move(
     mirror_fact = {}
     if version >= 17:
         special_base, mirror_fact = mirror_battle.local_move(
-            player, effect_move_id, special_base, disabled=effects_disabled, copied=is_copy,
+            player,
+            effect_move_id,
+            special_base,
+            disabled=effects_disabled,
+            copied=is_copy,
+        )
+    xixi_fact = {}
+    if version >= 19:
+        special_base, xixi_fact = xixi_battle.local_move(
+            player,
+            effect_move_id,
+            special_base,
+            round_number,
+            automatic=automatic,
+            disabled=effects_disabled,
+            copied=is_copy,
         )
     positive_numeric = special_base > 0
     if positive_numeric and turn.get("miumiu_split_remaining", 0) > 0:
@@ -1393,18 +1405,19 @@ def apply_move(
     multiplier_contract = bool(signed_numeric or opponent_reduction)
     multiplier = 2 if multiplier_contract and player["double"] else 1
     if positive_numeric:
-        computed_numeric = max(
-            Fraction(0),
-            special_base + int(snapshot.get("level", 0)) + int(player.get("core", 0)) - penalty,
-        ) * multiplier
+        computed_numeric = (
+            max(
+                Fraction(0),
+                special_base + int(snapshot.get("level", 0)) + int(player.get("core", 0)) - penalty,
+            )
+            * multiplier
+        )
     elif special_base < 0:
         computed_numeric = special_base * multiplier
     else:
         computed_numeric = Fraction(0)
     opponent_reduction *= multiplier
-    black_flash_bonus = Fraction(
-        0 if effects_disabled else int(player.get("black_flash_stacks", 0))
-    )
+    black_flash_bonus = Fraction(0 if effects_disabled else int(player.get("black_flash_stacks", 0)))
     trait = int(positive_numeric and snapshot.get("trait_bonus", 0) and not turn["trait_used"])
     tool_gain = 2 if positive_numeric and tool == "wristband" else 0
     used_tool = bool(positive_numeric and (tool == "wristband" or (tool == "bandage" and player["heavy"])))
@@ -1414,17 +1427,8 @@ def apply_move(
         opponent_reduction += directed_numeric
     asamu_future_gain = Fraction(0 if effects_disabled else asamu_future_gain_before)
     yilu_independent_units = len(yilu_sniper_shots) if yilu_sniper_shots else effect_repeats
-    yilu_future_gain = Fraction(
-        0 if effects_disabled else yilu_future_base_before * yilu_independent_units
-    )
-    gain = (
-        own_numeric
-        + music_gain
-        + black_flash_bonus
-        + zero_bonus
-        + asamu_future_gain
-        + yilu_future_gain
-    )
+    yilu_future_gain = Fraction(0 if effects_disabled else yilu_future_base_before * yilu_independent_units)
+    gain = own_numeric + music_gain + black_flash_bonus + zero_bonus + asamu_future_gain + yilu_future_gain
     if multiplier_contract:
         player["double"] = False
     if positive_numeric:
@@ -1439,14 +1443,13 @@ def apply_move(
     extra_draws = requested_extra_draws if allow_extra_draws else 0
     turn["pending"] += extra_draws
     if effect_loan:
-        player["double"] = True
+        if not (version >= 19 and effect_move_id == "daniya-disillusion-lie"):
+            player["double"] = True
         player["next_debt"] += 1
     if "black-flash" in effect_tags:
         player["black_flash_stacks"] += 1
     purple_weight_steps_before = player["purple_weight_steps"]
-    purple_weight_steps_used = (
-        purple_weight_steps_before if "purple" in effect_tags and not is_copy else 0
-    )
+    purple_weight_steps_used = purple_weight_steps_before if "purple" in effect_tags and not is_copy else 0
     if "purple" in effect_tags and not is_copy:
         player["purple_weight_steps"] = 0
     elif "purple" in effect_tags:
@@ -1458,10 +1461,7 @@ def apply_move(
     if "infinity" in effect_tags:
         turn["infinity_used"] = True
     turn["done"] = turn["pending"] == 0
-    if (
-        miumiu.effective_fighter(player) == "yilu"
-        and int(turn.get("yilu_operator_placements", 0)) >= 10
-    ):
+    if miumiu.effective_fighter(player) == "yilu" and int(turn.get("yilu_operator_placements", 0)) >= 10:
         turn["pending"] = 0
         turn["done"] = True
         turn["yilu_force_end"] = True
@@ -1489,7 +1489,7 @@ def apply_move(
                 "infinity": "infinity" in effect_tags,
             },
         )
-    return {
+    event = {
         "ordinal": ordinal,
         "mirror": mirror_fact,
         "move_id": drawn_move.move_id,
@@ -1562,9 +1562,7 @@ def apply_move(
         "daniya_domain_steps_before": daniya_domain_before,
         "daniya_domain_steps_after": int(player.get("daniya_domain_steps", 0)),
         "daniya_domain_draw_only_steps_before": daniya_domain_draw_only_before,
-        "daniya_domain_draw_only_steps_after": int(
-            player.get("daniya_domain_draw_only_steps", 0)
-        ),
+        "daniya_domain_draw_only_steps_after": int(player.get("daniya_domain_draw_only_steps", 0)),
         "daniya_domain_carried_units": daniya_domain_carried_units,
         "daniya_dragon_image_active": "daniya-world-dragon-image" in effect_tags,
         "daniya_injury_guard": bool(turn.get("daniya_injury_guard")),
@@ -1609,9 +1607,7 @@ def apply_move(
         "next_debt": player["next_debt"],
         "next_action_bonus": player.get("next_action_bonus", 0),
         "domain_clash_bonus_units": int(turn.get("domain_clash_bonus_units", 0)),
-        "opponent_domain_clash_reduction_units": int(
-            turn.get("opponent_domain_clash_reduction_units", 0)
-        ),
+        "opponent_domain_clash_reduction_units": int(turn.get("opponent_domain_clash_reduction_units", 0)),
         "pending": turn["pending"],
         "purple_weight_steps_before": purple_weight_steps_before,
         "purple_weight_steps_used": purple_weight_steps_used,
@@ -1645,6 +1641,17 @@ def apply_move(
         "firefly_choice": deepcopy(firefly_choice or firefly_choice_context),
         "firefly_domain_choice": firefly_domain_choice,
     }
+    if version >= 19:
+        if "domain" in effect_tags and event["domain_eligible"]:
+            receiver_bonus = int(player.pop("daniya_domain_clash_only_steps", 0))
+            turn["domain_clash_bonus_units"] += receiver_bonus
+            event["receiver_domain_bonus_units"] = receiver_bonus
+        daniya_battle.local_event(player, event, version=version)
+        xixi_battle.event_context(player, event, xixi_fact)
+        if xixi_fact:
+            event["form_before"] = xixi_fact["form_before"]
+            event["form_after"] = xixi_fact["form_after"]
+    return event
 
 
 def move_weight_units(
@@ -1652,7 +1659,9 @@ def move_weight_units(
     move: Move,
     *,
     functional_fighter_id: str | None = None,
-) -> int:
+    version: int = BATTLE_VERSION,
+    round_number: int = 1,
+) -> int | Fraction:
     """Return exact ten-thousandths used by the deterministic move wheel."""
 
     units = int(move.resolved_draw_weight_units) + miumiu.draw_bonus(player, move)
@@ -1668,9 +1677,7 @@ def move_weight_units(
             units += int(player.get("juejue_sand_domain_switch_units", 0)) * (MOVE_WEIGHT_SCALE // 10)
     if fighter_id == "daniya" and "daniya-domain" in move.tags:
         units += int(player.get("daniya_domain_steps", 0)) * (MOVE_WEIGHT_SCALE // 10)
-        units += int(player.get("daniya_domain_draw_only_steps", 0)) * (
-            MOVE_WEIGHT_SCALE // 10
-        )
+        units += int(player.get("daniya_domain_draw_only_steps", 0)) * (MOVE_WEIGHT_SCALE // 10)
     if fighter_id == "asamu":
         if "asamu-milk-tea" in move.tags:
             units += int(player.get("asamu_tea_bonus_units", 0))
@@ -1688,6 +1695,10 @@ def move_weight_units(
         units += int(player.get("turn", {}).get("firefly_sam_draw_bonus_units", 0))
         if player.get("firefly_form") == FIREFLY_FORM_FIREFLY:
             units -= MOVE_WEIGHT_SCALE // 10
+    if version >= 19:
+        units = daniya_battle.move_weight_units(player, move, units)
+        units = xixi_battle.move_weight_units(player, move, round_number, units)
+        return max(Fraction(0), Fraction(units))
     return max(1, units)
 
 
@@ -1701,9 +1712,7 @@ def _apply_firefly_event_context(state: dict, side: int, event: dict) -> None:
         event.update(
             firefly_collapse_passive_gain=Fraction(0),
             firefly_target_collapse_before=int(state["sides"][1 - side].get("firefly_collapse", 0)),
-            firefly_target_collapse_after_pending=int(
-                state["sides"][1 - side].get("firefly_collapse", 0)
-            ),
+            firefly_target_collapse_after_pending=int(state["sides"][1 - side].get("firefly_collapse", 0)),
         )
         return
     if state["version"] >= 18:
@@ -1711,9 +1720,7 @@ def _apply_firefly_event_context(state: dict, side: int, event: dict) -> None:
         return
     target = state["sides"][1 - side]
     turn = player["turn"]
-    collapse_before = int(target.get("firefly_collapse", 0)) + int(
-        turn.get("firefly_outgoing_collapse", 0)
-    )
+    collapse_before = int(target.get("firefly_collapse", 0)) + int(turn.get("firefly_outgoing_collapse", 0))
     event["firefly_target_collapse_before"] = collapse_before
     extra_gain = Fraction(0)
     if event.get("firefly_sam_skill"):
@@ -1727,9 +1734,7 @@ def _apply_firefly_event_context(state: dict, side: int, event: dict) -> None:
             event["opponent_next_debt"] = int(event.get("opponent_next_debt", 0)) + 1
             event["firefly_collapse_debt_triggered"] = True
     if event.get("firefly_echo") and event.get("move_id") == "firefly-dream-destination" and collapse_before >= 2:
-        event["opponent_exhaust_bonus_units"] = Fraction(
-            event.get("opponent_exhaust_bonus_units", 0)
-        ) + 1
+        event["opponent_exhaust_bonus_units"] = Fraction(event.get("opponent_exhaust_bonus_units", 0)) + 1
         event["firefly_echo_collapse_risk_triggered"] = True
     if event.get("move_id") == "firefly-falling-sky" and collapse_before >= 3:
         event["opponent_reduction"] = Fraction(event.get("opponent_reduction", 0)) + 15
@@ -1753,9 +1758,11 @@ def play_chunk(state: dict, side: int, seed: str, *, chunk_size: int = MOVE_CHUN
     if type(chunk_size) is not int or chunk_size < 1:
         raise BattleError("无效的连抽分片大小。")
     events = []
-    if not state.get("miumiu_preview") and any(
-        miumiu.effective_fighter(p) in {"miumiu", "juejue"} for p in state["sides"]
-    ) and "miumiu_observations" not in state:
+    if (
+        not state.get("miumiu_preview")
+        and any(miumiu.effective_fighter(p) in {"miumiu", "juejue"} for p in state["sides"])
+        and "miumiu_observations" not in state
+    ):
         _miumiu_preview(state, seed)
     for _ in range(chunk_size):
         if player["turn"]["done"]:
@@ -1763,18 +1770,12 @@ def play_chunk(state: dict, side: int, seed: str, *, chunk_size: int = MOVE_CHUN
         fighter_id = miumiu.effective_fighter(player)
         forced_daniya_ids = tuple(player["turn"].get("daniya_world_forced_move_ids", ()))
         forced_daniya_world = bool(forced_daniya_ids)
-        forced_daniya_form = str(
-            player["turn"].get("daniya_world_forced_form") or DANIYA_FORM_STAGING
-        )
-        forced_milk = not forced_daniya_world and int(
-            player["turn"].get("forced_milk_dragon_count", 0)
-        ) > int(
+        forced_daniya_form = str(player["turn"].get("daniya_world_forced_form") or DANIYA_FORM_STAGING)
+        forced_milk = not forced_daniya_world and int(player["turn"].get("forced_milk_dragon_count", 0)) > int(
             player["turn"].get("forced_milk_dragon_used", 0)
         )
         forced_yilu_operator = (
-            not forced_daniya_world
-            and not forced_milk
-            and int(player["turn"].get("yilu_double_operator_draws", 0)) > 0
+            not forced_daniya_world and not forced_milk and int(player["turn"].get("yilu_double_operator_draws", 0)) > 0
         )
         forced_yilu_specialist = (
             not forced_daniya_world
@@ -1783,11 +1784,7 @@ def play_chunk(state: dict, side: int, seed: str, *, chunk_size: int = MOVE_CHUN
             and int(player["turn"].get("yilu_specialist_operator_draws", 0)) > 0
         )
         firefly_choice = None
-        if (
-            not forced_daniya_world
-            and not forced_milk
-            and player["turn"].get("firefly_forced_choices")
-        ):
+        if not forced_daniya_world and not forced_milk and player["turn"].get("firefly_forced_choices"):
             firefly_choice = player["turn"]["firefly_forced_choices"].pop(0)
         # 每次抽取都重新读取当前形态。切换招式增加的 pending 会在同一
         # play_chunk 内立刻从新轮盘抽取，不会继续使用分片开始时的旧盘。
@@ -1795,7 +1792,7 @@ def play_chunk(state: dict, side: int, seed: str, *, chunk_size: int = MOVE_CHUN
             moves = tuple(
                 move
                 for move_id in forced_daniya_ids
-                if (move := _move_by_id("daniya", str(move_id))) is not None
+                if (move := _move_by_id("daniya", str(move_id), state["version"])) is not None
             )
             if not moves:
                 raise BattleError("达妮娅·世界的冻结招式盘已经失效，不能重新抽取。")
@@ -1807,20 +1804,22 @@ def play_chunk(state: dict, side: int, seed: str, *, chunk_size: int = MOVE_CHUN
             moves = tuple(
                 move
                 for move in YILU_MOVES
-                if "yilu-operator" in move.tags
-                and "yilu-medic" not in move.tags
-                and "yilu-specialist" not in move.tags
+                if "yilu-operator" in move.tags and "yilu-medic" not in move.tags and "yilu-specialist" not in move.tags
             )
         elif player.get("miumiu_wheel"):
             moves = _available_moves(player, state["version"])
         elif fighter_id == "juejue":
-            moves = fighter_form_moves(fighter_id, player["juejue_form"])
+            moves = fighter_form_moves(fighter_id, player["juejue_form"], state["version"])
         elif fighter_id == "daniya":
-            moves = fighter_form_moves(fighter_id, player["daniya_form"])
+            moves = fighter_form_moves(fighter_id, player["daniya_form"], state["version"])
         elif fighter_id == "firefly":
             moves = fighter_form_moves(fighter_id, player["firefly_form"], state["version"])
         else:
-            moves = FIGHTERS_BY_ID[fighter_id].moves
+            moves = (
+                fighter_form_moves(fighter_id, player.get("xixi_form", "xixi-celestial"), state["version"])
+                if fighter_id == "xixi"
+                else fighter_moves(fighter_id, state["version"])
+            )
         if not player.get("miumiu_wheel") and not forced_daniya_world and not forced_milk:
             moves = (*moves, *miumiu.blank_moves(player))
         ordinal = player["turn"]["draws"] + 1
@@ -1831,6 +1830,8 @@ def play_chunk(state: dict, side: int, seed: str, *, chunk_size: int = MOVE_CHUN
                     player,
                     move,
                     functional_fighter_id="daniya" if forced_daniya_world else None,
+                    version=state["version"],
+                    round_number=state["round"],
                 ),
             )
             for index, move in enumerate(moves)
@@ -1877,12 +1878,8 @@ def play_chunk(state: dict, side: int, seed: str, *, chunk_size: int = MOVE_CHUN
             functional_form_id=forced_daniya_form if forced_daniya_world else None,
             forced=forced_milk,
             effect_repeats=2 if forced_yilu_operator else 1,
-            forced_gain_bonus=(
-                int(firefly_choice.get("forced_gain_bonus", 0)) if firefly_choice is not None else 0
-            ),
-            firefly_echo_scale=(
-                firefly_choice.get("echo_scale", 1) if firefly_choice is not None else 1
-            ),
+            forced_gain_bonus=(int(firefly_choice.get("forced_gain_bonus", 0)) if firefly_choice is not None else 0),
+            firefly_echo_scale=(firefly_choice.get("echo_scale", 1) if firefly_choice is not None else 1),
             firefly_choice_context=firefly_choice,
         )
         event.update(
@@ -1910,6 +1907,29 @@ def play_chunk(state: dict, side: int, seed: str, *, chunk_size: int = MOVE_CHUN
             player["miumiu_wheel"] = []
         player["turn"]["events"].append(deepcopy(event))
         events.append(event)
+        if state["version"] >= 19 and event.get("xixi", {}).get("auto_overload"):
+            overload = _move_by_id("xixi", "xixi-overload", state["version"])
+            auto = apply_move(
+                player,
+                overload,
+                seed=seed,
+                round_number=state["round"],
+                side=side,
+                version=state["version"],
+                consume_pending=False,
+                automatic=True,
+            )
+            auto.update(
+                round=state["round"],
+                side=side,
+                fighter_id=fighter_id,
+                automatic=True,
+                generated_by="xixi-prison-auto-overload",
+                source_ordinal=event["ordinal"],
+                source_move_id=event["move_id"],
+            )
+            player["turn"]["events"].append(deepcopy(auto))
+            events.append(auto)
     return events
 
 
@@ -1995,9 +2015,7 @@ def _domain_strength(state: dict, side: int, events: list[dict]) -> tuple[int, b
     fighter_ids = set(_domain_fighter_ids(state, side, events))
     fighter_id = next(iter(fighter_ids)) if len(fighter_ids) == 1 else ""
     distinct_juejue = {
-        event.get("move_id")
-        for event in events
-        if event.get("move_id") in {"sand-domain", "chaos-domain"}
+        event.get("move_id") for event in events if event.get("move_id") in {"sand-domain", "chaos-domain"}
     }
     dual_juejue = fighter_id == "juejue" and len(distinct_juejue) == 2
     if dual_juejue:
@@ -2034,11 +2052,9 @@ def _domain_resolution(state: dict, seed: str, cancelled: list[dict[int, dict]])
         base_strengths = strengths.copy()
         for side in (0, 1):
             own_bonus = int(state["sides"][side]["turn"].get("domain_clash_bonus_units", 0))
-            opponent_reduction = int(
-                state["sides"][1 - side]["turn"].get(
-                    "opponent_domain_clash_reduction_units", 0
-                )
-            )
+            opponent_reduction = int(state["sides"][1 - side]["turn"].get("opponent_domain_clash_reduction_units", 0))
+            if version >= 19:
+                own_bonus += int(state["sides"][side].get("daniya_permanent_domain_units", 0))
             strengths[side] = max(1, strengths[side] + own_bonus - opponent_reduction)
         wheel = (("side-0", strengths[0]), ("side-1", strengths[1]), ("tie", 30))
         outcome, roll = choose(seed, f"{state['round']}:domain:clash", wheel, version=version)
@@ -2049,13 +2065,17 @@ def _domain_resolution(state: dict, seed: str, cancelled: list[dict[int, dict]])
             winner = int(outcome[-1])
             losing = (1 - winner,)
         for side in losing:
+            if version >= 19 and state["sides"][side]["turn"].get("xixi_hourglass"):
+                continue
             for event in domains[side]:
                 _cancel_event(cancelled, side, event, "领域战落败" if winner is not None else "领域战平手")
         hit_side = winner
         mode = "clash"
     else:
         domain_side = active[0]
-        wheel = (("hit", 8), ("simple-domain", 2))
+        target_player = state["sides"][1 - domain_side]
+        simple = 4 if version >= 19 and "back-to-basics" in target_player.get("xixi_hextech", ()) else 2
+        wheel = (("hit", 10 - simple), ("simple-domain", simple))
         outcome, roll = choose(
             seed,
             f"{state['round']}:domain:solo:{domain_side}",
@@ -2063,7 +2083,7 @@ def _domain_resolution(state: dict, seed: str, cancelled: list[dict[int, dict]])
             version=version,
         )
         hit_side = domain_side if outcome == "hit" else None
-        if hit_side is None:
+        if hit_side is None and not (version >= 19 and state["sides"][domain_side]["turn"].get("xixi_hourglass")):
             for event in domains[domain_side]:
                 _cancel_event(cancelled, domain_side, event, "简易领域免疫")
         winner = hit_side
@@ -2080,10 +2100,7 @@ def _domain_resolution(state: dict, seed: str, cancelled: list[dict[int, dict]])
         "hit_side": hit_side,
         "domain_counts": [len(events) for events in domains],
         "domain_ids": [_domain_ids(events) for events in domains],
-        "domain_fighter_ids": [
-            _domain_fighter_ids(state, side, events)
-            for side, events in enumerate(domains)
-        ],
+        "domain_fighter_ids": [_domain_fighter_ids(state, side, events) for side, events in enumerate(domains)],
         "dual_juejue": dual_juejue,
         "boost_side": None,
         "boosted_ordinal": None,
@@ -2104,12 +2121,14 @@ def _available_moves(player: dict, version: int = BATTLE_VERSION) -> tuple[Move,
         return (*frozen, *miumiu.blank_moves(player))
     fighter_id = miumiu.effective_fighter(player)
     if fighter_id == "juejue":
-        return fighter_form_moves(fighter_id, player["juejue_form"])
+        return fighter_form_moves(fighter_id, player["juejue_form"], version)
     if fighter_id == "daniya":
-        return fighter_form_moves(fighter_id, player["daniya_form"])
+        return fighter_form_moves(fighter_id, player["daniya_form"], version)
     if fighter_id == "firefly":
         return fighter_form_moves(fighter_id, player["firefly_form"], version)
-    return FIGHTERS_BY_ID[fighter_id].moves
+    if fighter_id == "xixi":
+        return fighter_form_moves(fighter_id, player.get("xixi_form", "xixi-celestial"), version)
+    return fighter_moves(fighter_id, version)
 
 
 def _asamu_domain_copies(state: dict, seed: str, domain: dict | None) -> tuple[dict, ...]:
@@ -2145,9 +2164,7 @@ def _asamu_domain_copies(state: dict, seed: str, domain: dict | None) -> tuple[d
             allow_extra_draws=False,
             functional_fighter_id=miumiu.effective_fighter(opponent),
             functional_form_id=(
-                opponent.get("daniya_form")
-                if miumiu.effective_fighter(opponent) == "daniya"
-                else None
+                opponent.get("daniya_form") if miumiu.effective_fighter(opponent) == "daniya" else None
             ),
             copy_context=True,
         )
@@ -2182,7 +2199,7 @@ def _juejue_domain_auto_mimic(state: dict, seed: str, domain: dict | None) -> di
     player = state["sides"][side]
     if not _domain_has(domain, side, "juejue", "chaos-domain"):
         return None
-    mimic_move = _move_by_id("juejue", "virtual-mimic")
+    mimic_move = _move_by_id("juejue", "virtual-mimic", state["version"])
     if mimic_move is None:  # pragma: no cover - 目录定义与引擎同时发布
         raise BattleError("乱序数虚时空缺少虚拟模仿定义。")
     mimic = _juejue_mimic(
@@ -2222,13 +2239,37 @@ def _juejue_domain_auto_mimic(state: dict, seed: str, domain: dict | None) -> di
 
 def _settle_interactions(state: dict, seed: str) -> dict:
     cancelled: list[dict[int, dict]] = [{}, {}]
+    initial_daniya_records = []
+    if state["version"] >= 19:
+        for player in state["sides"]:
+            xixi_battle.finalize_turn(player)
+        daniya_battle.prepare_debuffs(state)
+        initial_daniya_records = daniya_battle.prepare_current_moves(state, cancelled, cancel=_cancel_event)
     domain = _domain_resolution(state, seed, cancelled)
     version = state["version"]
     round_number = state["round"]
+    post_positive_gains = [Fraction(0), Fraction(0)]
+    hourglass_sides = {i for i, p in enumerate(state["sides"]) if version >= 19 and p["turn"].get("xixi_hourglass")}
+    hourglass_suppressions = []
+
+    def cancel_enemy(entries, target, event, reason):
+        if target in hourglass_sides:
+            hourglass_suppressions.append(
+                {"target_side": target, "source_side": 1 - target, "ordinal": event["ordinal"], "reason": reason}
+            )
+            return Fraction(0)
+        return _cancel_event(entries, target, event, reason)
+
+    def reduce_enemy(entries, target, event, amount, reason):
+        if target in hourglass_sides:
+            hourglass_suppressions.append(
+                {"target_side": target, "source_side": 1 - target, "ordinal": event["ordinal"], "reason": reason}
+            )
+            return Fraction(0)
+        return _reduce_event(entries, target, event, amount, reason)
+
     daniya_damage_immunity_sides = {
-        side
-        for side, player in enumerate(state["sides"])
-        if player["turn"].get("daniya_world_damage_immunity")
+        side for side, player in enumerate(state["sides"]) if player["turn"].get("daniya_world_damage_immunity")
     }
 
     # 达妮娅在领域战获胜或单方8:2命中时都进入幻灭。
@@ -2262,7 +2303,7 @@ def _settle_interactions(state: dict, seed: str) -> dict:
                 continue
             if not event.get("has_numeric_contribution") or _remaining_event_gain(cancelled, attacker, event) == 0:
                 continue
-            _cancel_event(cancelled, attacker, event, "无下限·防御")
+            cancel_enemy(cancelled, attacker, event, "无下限·防御")
             break
 
     # 每次“世界·发龙图”都从对方尚未失效的正数招式中独立随机一招，
@@ -2270,15 +2311,12 @@ def _settle_interactions(state: dict, seed: str) -> dict:
     daniya_dragon_images = []
     for source_side in (0, 1):
         target_side = 1 - source_side
-        source_ordinals = tuple(
-            state["sides"][source_side]["turn"].get("daniya_dragon_image_ordinals", ())
-        )
+        source_ordinals = tuple(state["sides"][source_side]["turn"].get("daniya_dragon_image_ordinals", ()))
         for chance_ordinal, source_ordinal in enumerate(source_ordinals, start=1):
             candidates = [
                 event
                 for event in state["sides"][target_side]["turn"].get("events", ())
-                if event.get("has_numeric_contribution")
-                and _remaining_event_gain(cancelled, target_side, event) > 0
+                if event.get("has_numeric_contribution") and _remaining_event_gain(cancelled, target_side, event) > 0
             ]
             record = {
                 "side": source_side,
@@ -2300,7 +2338,7 @@ def _settle_interactions(state: dict, seed: str) -> dict:
                 )
                 event = next(item for item in candidates if int(item["ordinal"]) == selected)
                 record.update(selected_ordinal=selected, roll=roll)
-                record["cancelled_gain"] = _cancel_event(
+                record["cancelled_gain"] = cancel_enemy(
                     cancelled,
                     target_side,
                     event,
@@ -2350,8 +2388,7 @@ def _settle_interactions(state: dict, seed: str) -> dict:
             candidates = [
                 event
                 for event in state["sides"][attacker]["turn"].get("events", ())
-                if event.get("has_numeric_contribution")
-                and _remaining_event_gain(cancelled, attacker, event) != 0
+                if event.get("has_numeric_contribution") and _remaining_event_gain(cancelled, attacker, event) != 0
             ]
             future["candidate_ordinals"] = [int(event["ordinal"]) for event in candidates]
             if candidates:
@@ -2364,7 +2401,7 @@ def _settle_interactions(state: dict, seed: str) -> dict:
                 selected, roll = choose(seed, namespace, wheel, version=version)
                 event = next(item for item in candidates if int(item["ordinal"]) == selected)
                 future.update(selected_ordinal=selected, roll=roll)
-                future["cancelled_gain"] = _cancel_event(
+                future["cancelled_gain"] = cancel_enemy(
                     cancelled,
                     attacker,
                     event,
@@ -2387,7 +2424,7 @@ def _settle_interactions(state: dict, seed: str) -> dict:
                 if not event.get("has_numeric_contribution") or remaining <= 0:
                     continue
                 deduction = remaining - remaining // 2
-                applied = _reduce_event(cancelled, attacker, event, deduction, "时之沙·沙之形体")
+                applied = reduce_enemy(cancelled, attacker, event, deduction, "时之沙·沙之形体")
                 sand.update(
                     selected_ordinal=int(event["ordinal"]),
                     original_gain=remaining,
@@ -2416,9 +2453,7 @@ def _settle_interactions(state: dict, seed: str) -> dict:
                     ((True, 33), (False, 67)),
                     version=version,
                 )
-                cancelled_gain = (
-                    _cancel_event(cancelled, attacker, event, "传奇耐压王") if hit else Fraction(0)
-                )
+                cancelled_gain = cancel_enemy(cancelled, attacker, event, "传奇耐压王") if hit else Fraction(0)
                 pressure_checks.append(
                     {
                         "side": defender,
@@ -2458,7 +2493,12 @@ def _settle_interactions(state: dict, seed: str) -> dict:
                 if _remaining_event_gain(cancelled, attacker, event) > 0
             ]
             record["candidate_ordinals"] = [int(event["ordinal"]) for event in candidates]
-            if chance.get("hit") and candidates and attacker not in daniya_damage_immunity_sides:
+            if (
+                chance.get("hit")
+                and candidates
+                and attacker not in daniya_damage_immunity_sides
+                and attacker not in hourglass_sides
+            ):
                 wheel = tuple((int(event["ordinal"]), 1) for event in candidates)
                 selected, target_roll = choose(
                     seed,
@@ -2469,11 +2509,11 @@ def _settle_interactions(state: dict, seed: str) -> dict:
                 event = next(item for item in candidates if int(item["ordinal"]) == selected)
                 record["selected_ordinal"] = selected
                 record["target_roll"] = target_roll
-                record["cancelled_gain"] = _cancel_event(
-                    cancelled, attacker, event, "干员放置·重装"
-                )
+                record["cancelled_gain"] = cancel_enemy(cancelled, attacker, event, "干员放置·重装")
                 record["opponent_reduction"] = Fraction(5)
                 yilu_defender_reductions[attacker] += 5
+            elif chance.get("hit") and attacker in hourglass_sides:
+                record["suppressed_by_hourglass"] = True
             elif chance.get("hit") and attacker in daniya_damage_immunity_sides:
                 record["suppressed_by_daniya_nmsl"] = True
             yilu_defender_results.append(record)
@@ -2504,14 +2544,16 @@ def _settle_interactions(state: dict, seed: str) -> dict:
         }
         if record["active"]:
             protected_juejue_sides.add(defender)
-            reason = "相对静止·零" if relative and not dual else (
-                "双领域·时空静止" if dual and not relative else "相对静止·零与双领域"
+            reason = (
+                "相对静止·零"
+                if relative and not dual
+                else ("双领域·时空静止" if dual and not relative else "相对静止·零与双领域")
             )
             for event in state["sides"][attacker]["turn"].get("events", ()):
                 before_remaining = _remaining_event_gain(cancelled, attacker, event)
                 if before_remaining == 0:
                     continue
-                applied = _cancel_event(cancelled, attacker, event, reason)
+                applied = cancel_enemy(cancelled, attacker, event, reason)
                 if applied:
                     record["cancelled_ordinals"].append(int(event["ordinal"]))
                     record["cancelled_gain"] += applied
@@ -2520,15 +2562,53 @@ def _settle_interactions(state: dict, seed: str) -> dict:
     mirror_records = []
     if version >= 17:
         mirror_records = mirror_battle.prepare_interactions(
-            state, domain, cancelled, protected_juejue_sides | daniya_damage_immunity_sides, seed,
-            choose=choose, remaining=_remaining_event_gain, reduce=_reduce_event, cancel=_cancel_event,
+            state,
+            domain,
+            cancelled,
+            protected_juejue_sides | daniya_damage_immunity_sides | hourglass_sides,
+            seed,
+            choose=choose,
+            remaining=_remaining_event_gain,
+            reduce=reduce_enemy,
+            cancel=cancel_enemy,
         )
 
     firefly_starfield_adjustments = []
     if version >= 18:
         firefly_starfield_adjustments = firefly_battle.prepare_starfield(
-            state, cancelled, protected_juejue_sides | daniya_damage_immunity_sides,
-            remaining=_remaining_event_gain, reduce=_reduce_event,
+            state,
+            cancelled,
+            protected_juejue_sides | daniya_damage_immunity_sides | hourglass_sides,
+            remaining=_remaining_event_gain,
+            reduce=reduce_enemy,
+        )
+    daniya_v19_records, xixi_records = list(initial_daniya_records), []
+    if version >= 19:
+        protected = protected_juejue_sides | daniya_damage_immunity_sides | hourglass_sides
+        daniya_v19_records.extend(
+            daniya_battle.prepare_interactions(
+                state,
+                domain,
+                cancelled,
+                protected,
+                seed=seed,
+                choose=choose,
+                remaining=_remaining_event_gain,
+                cancel=cancel_enemy,
+            )
+        )
+        xixi_records.extend(
+            xixi_battle.prepare_interactions(
+                state,
+                domain,
+                cancelled,
+                protected,
+                seed,
+                choose=choose,
+                remaining=_remaining_event_gain,
+                reduce=reduce_enemy,
+                cancel=cancel_enemy,
+            )
         )
     adjustments = []
     for side, entries in enumerate(cancelled):
@@ -2549,11 +2629,7 @@ def _settle_interactions(state: dict, seed: str) -> dict:
         if domain.get("mode") == "clash" and winner in (0, 1):
             boost_side = int(winner)
             boost_reason = "领域战获胜"
-        elif (
-            version >= 10
-            and domain.get("mode") == "solo"
-            and domain.get("hit_side") in (0, 1)
-        ):
+        elif version >= 10 and domain.get("mode") == "solo" and domain.get("hit_side") in (0, 1):
             candidate = int(domain["hit_side"])
             is_v10_gojo = _domain_has(domain, candidate, "gojo", "void")
             if version >= 11 or is_v10_gojo:
@@ -2567,11 +2643,7 @@ def _settle_interactions(state: dict, seed: str) -> dict:
                 and not event.get("domain_reentry_suppressed")
                 and event.get("domain_eligible", True)
                 and _remaining_event_gain(cancelled, boost_side, event) > 0
-                and (
-                    domain.get("mode") == "clash"
-                    or version >= 11
-                    or event.get("move_id") == "void"
-                )
+                and (domain.get("mode") == "clash" or version >= 11 or event.get("move_id") == "void")
             ]
             if domain.get("mode") == "clash" and domain["dual_juejue"][boost_side]:
                 by_id = {}
@@ -2582,11 +2654,10 @@ def _settle_interactions(state: dict, seed: str) -> dict:
             else:
                 boosted = effective_domains[:1]
             if boosted:
-                bonus = sum(
-                    _remaining_event_gain(cancelled, boost_side, event) for event in boosted
-                )
+                bonus = sum(_remaining_event_gain(cancelled, boost_side, event) for event in boosted)
                 ordinals = [int(event["ordinal"]) for event in boosted]
                 state["sides"][boost_side]["weight"] += bonus
+                post_positive_gains[boost_side] += max(Fraction(0), bonus)
                 domain.update(
                     boost_side=boost_side,
                     boosted_ordinal=ordinals[-1],
@@ -2595,6 +2666,20 @@ def _settle_interactions(state: dict, seed: str) -> dict:
                     boost_reason=boost_reason,
                 )
 
+    if version >= 19:
+        daniya_domains = daniya_battle.domain_effects(
+            state,
+            domain,
+            cancelled,
+            protected_juejue_sides | daniya_damage_immunity_sides,
+            seed=seed,
+            choose=choose,
+            remaining=_remaining_event_gain,
+            cancel=cancel_enemy,
+        )
+        daniya_v19_records.extend(daniya_domains)
+        for fact in daniya_domains:
+            post_positive_gains[fact["side"]] += max(Fraction(0), Fraction(fact.get("gain", 0)))
     domain_effects: list[str] = list((domain or {}).get("mirror_effects", ()))
     auto_mimic = None
     extra_round_reduction = list(yilu_defender_reductions)
@@ -2603,14 +2688,14 @@ def _settle_interactions(state: dict, seed: str) -> dict:
         target = 1 - hit_side
         hit_fighter_ids = set(domain["domain_fighter_ids"][hit_side])
         if "gojo" in hit_fighter_ids:
-            if target not in protected_juejue_sides:
+            if target not in protected_juejue_sides and target not in hourglass_sides:
                 state["sides"][target]["next_debt"] += 1
                 domain_effects.append("无量空处命中：对方下回合出招数-1")
             else:
                 domain["cross_debuff_suppressed"] = True
         if _domain_has(domain, hit_side, "juejue", "sand-domain"):
             state["sides"][hit_side]["next_action_bonus"] += 1
-            if target not in protected_juejue_sides:
+            if target not in protected_juejue_sides and target not in hourglass_sides:
                 state["sides"][target]["next_debt"] += 1
                 domain_effects.append("荒时之沙命中：自己下回合+1招，对方下回合-1招")
             else:
@@ -2637,34 +2722,22 @@ def _settle_interactions(state: dict, seed: str) -> dict:
                 )
                 legacy_music_gain = 5 if player["turn"].get("juejue_music") else 0
                 direction = mimic.get("direction", "self")
-                raw_gain = (
-                    numeric + legacy_music_gain
-                    if mimic["available"] and direction == "self"
-                    else 0
-                )
-                raw_reduction = (
-                    numeric + legacy_music_gain
-                    if mimic["available"] and direction == "opponent"
-                    else 0
-                )
+                raw_gain = numeric + legacy_music_gain if mimic["available"] and direction == "self" else 0
+                raw_reduction = numeric + legacy_music_gain if mimic["available"] and direction == "opponent" else 0
                 generated = None
             else:
                 generated = chaos_auto_mimic_event
-                mimic = (
-                    deepcopy(generated.get("mimic") or {})
-                    if generated
-                    else {"available": False}
-                )
+                mimic = deepcopy(generated.get("mimic") or {}) if generated else {"available": False}
                 raw_gain = Fraction(generated.get("gain", 0)) if generated else Fraction(0)
-                raw_reduction = (
-                    Fraction(generated.get("opponent_reduction", 0))
-                    if generated
-                    else Fraction(0)
-                )
+                raw_reduction = Fraction(generated.get("opponent_reduction", 0)) if generated else Fraction(0)
                 legacy_music_gain = 0
-            numeric_suppressed = bool(mimic.get("available") and target in protected_juejue_sides)
+            numeric_suppressed = bool(
+                mimic.get("available") and (target in protected_juejue_sides or target in hourglass_sides)
+            )
             suppressed_reason = ""
-            if numeric_suppressed:
+            if numeric_suppressed and target in hourglass_sides:
+                suppressed_reason = "中亚沙漏"
+            elif numeric_suppressed:
                 target_guard = zeroes[target]
                 suppressed_reason = (
                     "相对静止·零"
@@ -2681,9 +2754,7 @@ def _settle_interactions(state: dict, seed: str) -> dict:
                     player["weight"] += applied_gain
             else:
                 applied_gain = (
-                    _remaining_event_gain(cancelled, hit_side, generated)
-                    if generated is not None
-                    else Fraction(0)
+                    _remaining_event_gain(cancelled, hit_side, generated) if generated is not None else Fraction(0)
                 )
             applied_reduction = Fraction(0) if numeric_suppressed else raw_reduction
             if version < 6 and applied_reduction:
@@ -2695,21 +2766,25 @@ def _settle_interactions(state: dict, seed: str) -> dict:
                 "training": (
                     generated.get("training", 0)
                     if generated
-                    else int(player["snapshot"].get("level", 0)) if mimic.get("available") else 0
+                    else int(player["snapshot"].get("level", 0))
+                    if mimic.get("available")
+                    else 0
                 ),
                 "core": (
                     generated.get("core", 0)
                     if generated
-                    else int(player.get("core", 0)) if mimic.get("available") else 0
+                    else int(player.get("core", 0))
+                    if mimic.get("available")
+                    else 0
                 ),
                 "heavy_penalty": (
                     generated.get("penalty", 0)
                     if generated
-                    else int(bool(player.get("heavy"))) if mimic.get("available") else 0
+                    else int(bool(player.get("heavy")))
+                    if mimic.get("available")
+                    else 0
                 ),
-                "music_gain": (
-                    generated.get("music_gain", 0) if generated else legacy_music_gain
-                ),
+                "music_gain": (generated.get("music_gain", 0) if generated else legacy_music_gain),
                 "raw_gain": raw_gain,
                 "raw_opponent_reduction": raw_reduction,
                 "gain": applied_gain,
@@ -2725,17 +2800,16 @@ def _settle_interactions(state: dict, seed: str) -> dict:
         if _domain_has(domain, hit_side, "yilu", "yilu-domain"):
             player = state["sides"][hit_side]
             player["next_action_bonus"] += 1
-            player["yilu_next_round_base_bonus"] = int(
-                player.get("yilu_next_round_base_bonus", 0)
-            ) + 1
+            player["yilu_next_round_base_bonus"] = int(player.get("yilu_next_round_base_bonus", 0)) + 1
             trigger = "领域战获胜" if domain.get("mode") == "clash" else "领域命中"
-            domain_effects.append(
-                f"末日方舟{trigger}：获得明日，下回合+1招且该回合所有招式基础胜率+1"
-            )
+            domain_effects.append(f"末日方舟{trigger}：获得明日，下回合+1招且该回合所有招式基础胜率+1")
         if _domain_has(domain, hit_side, "firefly", "firefly-falling-sky"):
             player = state["sides"][hit_side]
             firefly_domain_gain = mirror_battle.gain(player, 12) if version >= 17 else Fraction(12)
+            if version >= 19:
+                firefly_domain_gain = xixi_battle.gain(player, firefly_domain_gain)
             player["weight"] += firefly_domain_gain
+            post_positive_gains[hit_side] += max(Fraction(0), firefly_domain_gain)
             player["turn"]["firefly_self_exhaust_delta_units"] = Fraction(
                 player["turn"].get("firefly_self_exhaust_delta_units", 0)
             )
@@ -2744,24 +2818,31 @@ def _settle_interactions(state: dict, seed: str) -> dict:
                 e.get("firefly_domain_followup") and Fraction(e.get("firefly_target_collapse_after_pending", 0)) >= 3
                 for e in player["turn"]["events"]
             )
-            if full_collapse:
+            if full_collapse and target not in hourglass_sides and target not in protected_juejue_sides:
                 extra_round_reduction[target] += 15
                 target_turn["firefly_self_exhaust_delta_units"] = (
                     Fraction(target_turn.get("firefly_self_exhaust_delta_units", 0)) + 2
                 )
                 domain_effects.append("焦土陨击满溃败追加：对手胜率-15、本回合力竭权重+0.2")
-            target_turn["firefly_self_exhaust_delta_units"] = Fraction(
-                target_turn.get("firefly_self_exhaust_delta_units", 0)
-            ) + Fraction(3, 2)
+            if target not in hourglass_sides and target not in protected_juejue_sides:
+                target_turn["firefly_self_exhaust_delta_units"] = Fraction(
+                    target_turn.get("firefly_self_exhaust_delta_units", 0)
+                ) + Fraction(3, 2)
+            else:
+                domain["cross_debuff_suppressed"] = True
             trigger = "领域战获胜" if domain.get("mode") == "clash" else "领域命中"
             domain_effects.append(
                 f"自破碎的天空坠落{trigger}：追加Δ指令-焦土陨击，自己胜率+{weight_label(firefly_domain_gain)}、对手本回合力竭权重+0.15"
             )
 
     if version >= 18:
-        firefly_starfield_adjustments.extend(firefly_battle.starfield_followups(
-            state, firefly_post_adjustment_weights, domain,
-        ))
+        firefly_starfield_adjustments.extend(
+            firefly_battle.starfield_followups(
+                state,
+                firefly_post_adjustment_weights,
+                domain,
+            )
+        )
 
     if domain is not None:
         domain["effects"] = domain_effects
@@ -2771,7 +2852,13 @@ def _settle_interactions(state: dict, seed: str) -> dict:
 
     # 时延的功能结算在所有“招式数值归零”之后执行。普通抵消不回滚功能；
     # 相对零/双领域则同时保护撅撅猪免受本轮减权与跨回合欠招。
-    requested_reductions = [Fraction(value) for value in extra_round_reduction]
+    requested_reductions = [
+        Fraction(0)
+        if i in hourglass_sides
+        else Fraction(value)
+        * (Fraction(state["sides"][1 - i]["turn"].get("xixi_reduction_factor", 1)) if version >= 19 else 1)
+        for i, value in enumerate(extra_round_reduction)
+    ]
     reduction_sources: list[list[int]] = [[], []]
     cross_effects = []
     for attacker in (0, 1):
@@ -2787,11 +2874,22 @@ def _settle_interactions(state: dict, seed: str) -> dict:
             if event.get("firefly_starfield") and state["sides"][attacker]["turn"].get(
                 "firefly_condition_target_higher"
             ):
-                original_requested += 8
-                event["firefly_starfield_higher_reduction"] = 8
+                post_reduction = (
+                    Fraction(8) * Fraction(state["sides"][attacker]["turn"].get("xixi_reduction_factor", 1))
+                    if version >= 19
+                    else Fraction(8)
+                )
+                original_requested += post_reduction
+                event["firefly_starfield_higher_reduction"] = post_reduction
             if conditional_reduction and target_has_round_gain:
-                original_requested += conditional_reduction
-                event["firefly_conditional_reduction_applied"] = conditional_reduction
+                post_reduction = (
+                    Fraction(conditional_reduction)
+                    * Fraction(state["sides"][attacker]["turn"].get("xixi_reduction_factor", 1))
+                    if version >= 19
+                    else Fraction(conditional_reduction)
+                )
+                original_requested += post_reduction
+                event["firefly_conditional_reduction_applied"] = post_reduction
             debt = int(event.get("opponent_next_debt", 0))
             bonus = int(event.get("opponent_next_bonus", 0))
             milk_dragons = int(event.get("opponent_next_milk_dragons", 0))
@@ -2800,11 +2898,7 @@ def _settle_interactions(state: dict, seed: str) -> dict:
             forced_move_ids = list(event.get("opponent_next_forced_move_ids", ()))
             forced_form = str(event.get("opponent_next_forced_form", ""))
             reduction_suppressed = bool(
-                original_requested
-                and (
-                    target in protected_juejue_sides
-                    or target in daniya_damage_immunity_sides
-                )
+                original_requested and (target in protected_juejue_sides or target in daniya_damage_immunity_sides)
             )
             reduction_suppression_reason = (
                 "丸山大姐达妮娅-世界·NMSL"
@@ -2813,16 +2907,46 @@ def _settle_interactions(state: dict, seed: str) -> dict:
                 if original_requested and target in protected_juejue_sides
                 else ""
             )
+            if version >= 19 and (
+                event.get("xixi_ignored")
+                or event.get("daniya_ignored")
+                or event.get("daniya_current_cancelled")
+                or state["sides"][target]["turn"].get("xixi_hourglass")
+            ):
+                reduction_suppressed = True
+                reduction_suppression_reason = "西西无视或中亚沙漏"
             requested = 0 if reduction_suppressed else original_requested
             if requested:
                 requested_reductions[target] += requested
                 reduction_sources[target].append(int(event["ordinal"]))
-            debt_suppressed = bool(debt and target in protected_juejue_sides)
+            debt_suppressed = bool(
+                debt
+                and (
+                    target in protected_juejue_sides
+                    or (
+                        version >= 19
+                        and (
+                            event.get("xixi_ignored")
+                            or event.get("daniya_ignored")
+                            or event.get("daniya_current_cancelled")
+                            or state["sides"][target]["turn"].get("xixi_hourglass")
+                        )
+                    )
+                )
+            )
             if debt and not debt_suppressed:
                 state["sides"][target]["next_debt"] += debt
             if bonus:
                 state["sides"][target]["next_action_bonus"] += bonus
-            directed_suppressed = target in protected_juejue_sides
+            directed_suppressed = target in protected_juejue_sides or bool(
+                version >= 19
+                and (
+                    event.get("xixi_ignored")
+                    or event.get("daniya_ignored")
+                    or event.get("daniya_current_cancelled")
+                    or state["sides"][target]["turn"].get("xixi_hourglass")
+                )
+            )
             firefly_exhaust = Fraction(event.get("firefly_opponent_exhaust_delta_units", 0))
             if version >= 18 and firefly_exhaust and not directed_suppressed:
                 target_turn = state["sides"][target]["turn"]
@@ -2837,18 +2961,8 @@ def _settle_interactions(state: dict, seed: str) -> dict:
                 state["sides"][target]["daniya_world_disable_next"] = True
             if forced_move_ids and not directed_suppressed:
                 state["sides"][target]["daniya_world_forced_move_ids_next"] = forced_move_ids
-                state["sides"][target]["daniya_world_forced_form_next"] = (
-                    forced_form or DANIYA_FORM_STAGING
-                )
-            if (
-                original_requested
-                or debt
-                or bonus
-                or milk_dragons
-                or exhaust_units
-                or disable_next
-                or forced_move_ids
-            ):
+                state["sides"][target]["daniya_world_forced_form_next"] = forced_form or DANIYA_FORM_STAGING
+            if original_requested or debt or bonus or milk_dragons or exhaust_units or disable_next or forced_move_ids:
                 cross_effects.append(
                     {
                         "source_side": attacker,
@@ -2888,9 +3002,7 @@ def _settle_interactions(state: dict, seed: str) -> dict:
 
     # 以牙还牙在全部常规数值结算后使用同一份快照判定，避免双方指令顺序
     # 改变结果。低权重方只交换一次；每个以牙还牙事件仍分别提供后置奖励。
-    retaliation_counts = [
-        len(side["turn"].get("asamu_retaliation_ordinals", ())) for side in state["sides"]
-    ]
+    retaliation_counts = [len(side["turn"].get("asamu_retaliation_ordinals", ())) for side in state["sides"]]
     retaliation_before = [Fraction(side["weight"]) for side in state["sides"]]
     retaliation_after = retaliation_before.copy()
     lower_side = None
@@ -2898,7 +3010,8 @@ def _settle_interactions(state: dict, seed: str) -> dict:
         lower_side = 0
     elif retaliation_before[1] < retaliation_before[0] and retaliation_counts[1]:
         lower_side = 1
-    if lower_side is not None:
+    swap_allowed = lower_side is not None and 1 - lower_side not in hourglass_sides
+    if swap_allowed:
         retaliation_after = [retaliation_before[1], retaliation_before[0]]
     retaliation_records = []
     for current_side, count in enumerate(retaliation_counts):
@@ -2908,19 +3021,23 @@ def _settle_interactions(state: dict, seed: str) -> dict:
         was_lower = retaliation_before[current_side] < retaliation_before[opponent_side]
         if was_lower:
             bonus = Fraction(4 * count)
-            swapped = lower_side == current_side
+            swapped = swap_allowed and lower_side == current_side
         else:
             bonus = Fraction(40 * count)
             swapped = False
         if version >= 17:
             bonus = mirror_battle.gain(state["sides"][current_side], bonus)
+        if version >= 19:
+            bonus = xixi_battle.gain(state["sides"][current_side], bonus)
         retaliation_after[current_side] += bonus
+        post_positive_gains[current_side] += max(Fraction(0), bonus)
         retaliation_records.append(
             {
                 "side": current_side,
                 "count": count,
                 "was_lower": was_lower,
                 "swapped": swapped,
+                "hourglass_swap_suppressed": lower_side == current_side and not swap_allowed,
                 "bonus": bonus,
                 "before": retaliation_before[current_side],
                 "after": retaliation_after[current_side],
@@ -2936,7 +3053,11 @@ def _settle_interactions(state: dict, seed: str) -> dict:
             continue
         before_true_damage = Fraction(player["weight"])
         extra = Fraction(player["weight"]) * (2**layers - 1)
-        player["weight"] += mirror_battle.gain(player, extra) if version >= 17 else extra
+        extra = mirror_battle.gain(player, extra) if version >= 17 else extra
+        if version >= 19:
+            extra = xixi_battle.gain(player, extra)
+        player["weight"] += extra
+        post_positive_gains[current_side] += max(Fraction(0), extra)
         yilu_true_damage.append(
             {
                 "side": current_side,
@@ -2951,7 +3072,11 @@ def _settle_interactions(state: dict, seed: str) -> dict:
         added = sum(
             (Fraction if version >= 18 else int)(event.get("firefly_collapse_to_add", 0))
             for event in player["turn"].get("events", ())
+            if version < 19
+            or not (event.get("xixi_ignored") or event.get("daniya_ignored") or event.get("daniya_current_cancelled"))
         )
+        if 1 - attacker in hourglass_sides:
+            added = 0
         if not added:
             continue
         target = 1 - attacker
@@ -2969,12 +3094,44 @@ def _settle_interactions(state: dict, seed: str) -> dict:
         )
 
     if version >= 17:
-        mirror_records.extend(mirror_battle.final_effects(
-            state, domain, protected_juejue_sides | daniya_damage_immunity_sides,
-        ))
+        mirror_records.extend(
+            _mirror_final_effects(
+                state,
+                domain,
+                protected_juejue_sides | daniya_damage_immunity_sides | hourglass_sides,
+            )
+        )
 
+    if version >= 19:
+        daniya_v19_records.extend(
+            daniya_battle.finish_interactions(
+                state,
+                cancelled,
+                protected_juejue_sides | daniya_damage_immunity_sides,
+                remaining=_remaining_event_gain,
+                cancel=cancel_enemy,
+            )
+        )
+        for side, player in enumerate(state["sides"]):
+            enemy = state["sides"][1 - side]
+            gained = sum(
+                max(Fraction(0), _remaining_event_gain(cancelled, 1 - side, e)) for e in enemy["turn"]["events"]
+            )
+            if player["turn"].get("xixi_goliath_acquired_this_turn"):
+                gained = Fraction(0)
+            gained += post_positive_gains[1 - side]
+            xixi_records.append(
+                {
+                    "side": side,
+                    "goliath": xixi_battle.observe_effective_enemy_gain(player, gained, round_number=state["round"]),
+                }
+            )
     return {
         "domain": domain,
+        "hourglass_suppressions": tuple(hourglass_suppressions),
+        "daniya_v19": tuple(daniya_v19_records),
+        "xixi": tuple(xixi_records),
+        "post_positive_gains": tuple(post_positive_gains),
         "mirror": mirror_records,
         "daniya_transition": daniya_transition,
         "asamu_domain_copies": asamu_domain_copies,
@@ -2990,7 +3147,7 @@ def _settle_interactions(state: dict, seed: str) -> dict:
         "yilu_true_damage": tuple(yilu_true_damage),
         "firefly_collapse_updates": tuple(firefly_collapse_updates),
         "firefly_starfield_adjustments": tuple(firefly_starfield_adjustments),
-        "firefly_domain_continuations": tuple(firefly_battle.domain_continuation(state)) if version >= 18 else (),
+        "firefly_domain_continuations": tuple(_firefly_domain_continuation(state)) if version >= 18 else (),
         "zeroes": tuple(zeroes),
         "round_reductions": tuple(round_reductions),
         "cross_effects": tuple(cross_effects),
@@ -3000,13 +3157,76 @@ def _settle_interactions(state: dict, seed: str) -> dict:
     }
 
 
+def _mirror_final_effects(state, domain, protected):
+    records = mirror_battle.final_effects(state, domain, protected)
+    if state["version"] >= 19:
+        running_weights = {}
+        for fact in records:
+            source = state["sides"][fact["side"]]
+            target = state["sides"][1 - fact["side"]]
+            factor = Fraction(source["turn"].get("xixi_reduction_factor", 1))
+            target_side = 1 - fact["side"]
+            before = running_weights.get(target_side, Fraction(fact["before"]))
+            after = max(Fraction(1, 10), before - fact["consumed"] * 10 * factor)
+            running_weights[target_side] = after
+            target["weight"] = after
+            fact.update(before=before, after=after, equipment_factor=factor)
+            value = weight_label(before - after)
+            fact["text"] = f"（空白）消耗{fact['consumed']}层润化：对方最终点数-{value}，下回合-{fact['next_debt']}招"
+    return records
+
+
+def _firefly_domain_continuation(state):
+    if state["version"] < 19:
+        return firefly_battle.domain_continuation(state)
+    records = []
+    for side, player in enumerate(state["sides"]):
+        events = [e for e in player["turn"]["events"] if e.get("firefly_domain_followup")]
+        count = len(events)
+        if not count:
+            continue
+        extended = player.get("firefly_form") == "sam"
+        if extended:
+            player["firefly_sam_rounds_remaining"] += count
+        player["next_action_bonus"] += count
+        target = state["sides"][1 - side]
+        directed = sum(
+            not (e.get("xixi_ignored") or e.get("daniya_ignored") or e.get("daniya_current_cancelled")) for e in events
+        )
+        if target["turn"].get("xixi_hourglass"):
+            directed = 0
+        target["firefly_collapse_next"] = int(target.get("firefly_collapse_next", 0)) + directed
+        records.append(
+            {
+                "side": side,
+                "count": count,
+                "extended_sam": extended,
+                "opponent_collapse_added": directed,
+                "directed_suppressed": directed != count,
+            }
+        )
+    return records
+
+
 def _dynamic_injury_wheel(state: dict, loser: int) -> tuple[tuple, dict]:
     player = state["sides"][loser]
+    if state["version"] >= 19:
+        fixed = daniya_battle.fixed_injury_wheel(player) or xixi_battle.fixed_injury_wheel(player)
+        if fixed:
+            return fixed, {
+                "fixed": True,
+                "base_wheel": fixed,
+                "weight_scale": 1,
+                "mirror_exhaust_before_sleep_units": Fraction(dict(fixed)["exhausted"]),
+            }
     base = INJURY_WHEELS[int(player["risk"])]
     weights = {name: int(weight) for name, weight in base}
-    permanent_bonus = int(player.get("injury_exhaust_bonus_units", 0))
-    collapse_bonus = (firefly_battle.collapse_risk_units(player.get("firefly_collapse", 0))
-                      if state["version"] >= 18 else int(player.get("firefly_collapse", 0)))
+    permanent_bonus = Fraction(player.get("injury_exhaust_bonus_units", 0))
+    collapse_bonus = (
+        firefly_battle.collapse_risk_units(player.get("firefly_collapse", 0))
+        if state["version"] >= 18
+        else int(player.get("firefly_collapse", 0))
+    )
     weights["exhausted"] += permanent_bonus + collapse_bonus
     misfortune_count = sum(int(side["turn"].get("asamu_misfortune_count", 0)) for side in state["sides"])
     daniya_opponents = [
@@ -3021,6 +3241,11 @@ def _dynamic_injury_wheel(state: dict, loser: int) -> tuple[tuple, dict]:
         if side_index != loser
     )
     daniya_layer_multiplier = max(1, int(state["round"]) * 5)
+    if state["version"] >= 19:
+        daniya_passive_layers = 0
+        daniya_active_layers = 0
+        if any(side.get("daniya_form") == "black-hole" for side in daniya_opponents):
+            weights["exhausted"] += int(state["round"]) * 5 * 10
     daniya_layers = daniya_passive_layers + daniya_active_layers
     daniya_multiplier = daniya_layer_multiplier**daniya_layers
     multiplier = (5**misfortune_count) * daniya_multiplier
@@ -3029,9 +3254,7 @@ def _dynamic_injury_wheel(state: dict, loser: int) -> tuple[tuple, dict]:
     worsen_layers = int(player["turn"].get("yilu_injury_worsen_layers", 0))
     injury_factor = Fraction(1, 2) ** recovery_layers * Fraction(3, 2) ** worsen_layers
     exact_weights = {name: Fraction(value) for name, value in weights.items()}
-    current_firefly_delta = Fraction(
-        player.get("turn", {}).get("firefly_self_exhaust_delta_units", 0)
-    )
+    current_firefly_delta = Fraction(player.get("turn", {}).get("firefly_self_exhaust_delta_units", 0))
     exact_weights["exhausted"] = max(
         Fraction(1, 10),
         exact_weights["exhausted"] + current_firefly_delta,
@@ -3041,12 +3264,15 @@ def _dynamic_injury_wheel(state: dict, loser: int) -> tuple[tuple, dict]:
     mirror_before_sleep = exact_weights["exhausted"]
     if state["version"] >= 17:
         exact_weights["exhausted"] = max(
-            Fraction(1, 10), exact_weights["exhausted"] + Fraction(player.get("mirror_exhaust_offset_units", 0)),
+            Fraction(1, 10),
+            exact_weights["exhausted"] + Fraction(player.get("mirror_exhaust_offset_units", 0)),
         )
         mirror_before_sleep = exact_weights["exhausted"]
         if player["turn"].get("luoli_sleep_hit"):
             exact_weights["heavy"] /= 2
             exact_weights["exhausted"] /= 2
+    if state["version"] >= 19:
+        exact_weights = dict(xixi_battle.injury_wheel(player, tuple(exact_weights.items())))
     weight_scale = 1
     for value in exact_weights.values():
         weight_scale = lcm(weight_scale, value.denominator)
@@ -3084,8 +3310,7 @@ def resolve_round(state: dict, seed: str) -> dict | None:
     interactions = _settle_interactions(state, seed)
     for previous, player in zip(provisional, state["sides"], strict=True):
         if player.get("miumiu_wheel") and any(
-            player.get(key) != previous.get(key)
-            for key in ("juejue_form", "daniya_form", "firefly_form")
+            player.get(key) != previous.get(key) for key in ("juejue_form", "daniya_form", "firefly_form")
         ):
             player["miumiu_wheel"] = []
     interactions["miumiu_flow"] = flow_records
@@ -3101,11 +3326,15 @@ def resolve_round(state: dict, seed: str) -> dict | None:
                 player["mirror_exhaust_offset_units"] = (
                     Fraction(player.get("mirror_exhaust_offset_units", 0)) + restored - current
                 )
-                interactions["mirror"].append({
-                    "side": side,
-                    "text": f"净水即生命：润化{layers}层，力竭盘{weight_label(current / 10)}→{restored // 10}",
-                    "humidity": layers, "exhaust_before_units": current, "exhaust_after_units": restored,
-                })
+                interactions["mirror"].append(
+                    {
+                        "side": side,
+                        "text": f"净水即生命：润化{layers}层，力竭盘{weight_label(current / 10)}→{restored // 10}",
+                        "humidity": layers,
+                        "exhaust_before_units": current,
+                        "exhaust_after_units": restored,
+                    }
+                )
     before = deepcopy(state["sides"])
     winner_scale = lcm(VICTORY_WEIGHT_SCALE, *(Fraction(side["weight"]).denominator for side in before))
     winner_units = [max(1, int(Fraction(side["weight"]) * winner_scale)) for side in before]
@@ -3116,30 +3345,60 @@ def resolve_round(state: dict, seed: str) -> dict | None:
         version=state["version"],
     )
     winner = 0 if roll < winner_units[0] else 1
+    forced_targets = {
+        p["turn"]["daniya_force_defeat_target"]
+        for p in state["sides"]
+        if state["version"] >= 19 and "daniya_force_defeat_target" in p["turn"]
+    }
+    # 双方同时强制对方落败时仍用同一胜率盘，不给予输入顺序优先权。
+    if len(forced_targets) == 1:
+        winner = 1 - next(iter(forced_targets))
     loser = 1 - winner
+    player = state["sides"][loser]
     wheel, injury_modifiers = _dynamic_injury_wheel(state, loser)
-    injury, injury_roll = choose(seed, f"{state['round']}:{loser}:injury", wheel, version=state["version"])
+    fixed = bool(injury_modifiers.get("fixed"))
+    injury_skip_reason = xixi_battle.injury_guard(player, consume=True) if state["version"] >= 19 else None
+    force_exhausted = loser in forced_targets
+    if injury_skip_reason:
+        injury, injury_roll = "none", None
+    elif force_exhausted and not fixed:
+        injury, injury_roll = "exhausted", None
+    else:
+        injury, injury_roll = choose(seed, f"{state['round']}:{loser}:injury", wheel, version=state["version"])
     injury_after_guard = injury
-    daniya_injury_guarded = bool(state["sides"][loser]["turn"].get("daniya_injury_guard"))
+    if injury == "injured":
+        injury_after_guard = "heavy" if player.get("risk", 0) or player.get("heavy") else "light"
+    daniya_injury_guarded = bool(player["turn"].get("daniya_injury_guard")) and not fixed
     if daniya_injury_guarded:
-        injury_after_guard = {
-            "light": "none",
-            "heavy": "light",
-            "exhausted": "heavy",
-            "core": "core",
-        }[injury]
+        injury_after_guard = {"none": "none", "light": "none", "heavy": "light", "exhausted": "heavy", "core": "core"}[
+            injury
+        ]
     injury_rewound = bool(
-        miumiu.effective_fighter(state["sides"][loser]) == "juejue"
-        and state["sides"][loser]["turn"].get("juejue_rewind")
+        not fixed
+        and miumiu.effective_fighter(player) == "juejue"
+        and player["turn"].get("juejue_rewind")
         and injury_after_guard in {"light", "heavy"}
     )
     injury_effective = "none" if injury_rewound else injury_after_guard
-    mirror_guarded = injury_effective == "exhausted" and bool(state["sides"][loser].get("miumiu_exhaust_guard"))
+    mirror_guarded = not fixed and injury_effective == "exhausted" and bool(player.get("miumiu_exhaust_guard"))
     if mirror_guarded:
-        state["sides"][loser]["miumiu_exhaust_guard"] = False
+        player["miumiu_exhaust_guard"] = False
         injury_effective = "none"
+    particle_guard = None
+    if state["version"] >= 19 and not fixed and not injury_skip_reason:
+        injury_effective, particle_guard = daniya_battle.reduce_injury(player, injury_effective)
     if injury_effective != "none":
-        apply_injury(state["sides"][loser], injury_effective)
+        apply_injury(player, injury_effective)
+    if state["version"] >= 19 and injury_effective == "core":
+        interactions["xixi"] = (
+            *interactions["xixi"],
+            {
+                "side": loser,
+                "core_hextech": xixi_battle.core_hextech(
+                    player, state["round"], seed, choose=choose, version=state["version"]
+                ),
+            },
+        )
     natural_end = injury_effective == "exhausted"
 
     # Battle v13 的计时溃灭是当回合被动层，不再登记旧版跨回合反噬。
@@ -3148,6 +3407,8 @@ def resolve_round(state: dict, seed: str) -> dict | None:
     for player in state["sides"]:
         start_weight = Fraction(player.get("round_start_weight", 5))
         round_gain = Fraction(player["weight"]) - start_weight
+        if state["version"] >= 19:
+            round_gain += Fraction(player["turn"].get("daniya_permanent_applied", 0))
         retained_gain = Fraction(_ceil_fraction(round_gain / 2))
         next_round_weight = max(Fraction(1, VICTORY_WEIGHT_SCALE), start_weight + retained_gain)
         carryover.append(
@@ -3173,6 +3434,10 @@ def resolve_round(state: dict, seed: str) -> dict | None:
         "miumiu_exhaust_guarded": mirror_guarded,
         "daniya_injury_guarded": daniya_injury_guarded,
         "injury_after_daniya_guard": injury_after_guard,
+        "injury_skip_reason": injury_skip_reason,
+        "forced_round_defeat": tuple(sorted(forced_targets)),
+        "forced_injury_suppressed": bool(force_exhausted and fixed),
+        "daniya_particle_guard": particle_guard,
         "injury_roll": injury_roll,
         "injury_wheel": wheel,
         "injury_modifiers": injury_modifiers,
@@ -3199,9 +3464,7 @@ def resolve_round(state: dict, seed: str) -> dict | None:
             next_sam_draw_bonus_units = 0
             if miumiu.effective_fighter(player) == "firefly":
                 if not player["turn"].get("firefly_entered_sam"):
-                    next_sam_draw_bonus_units = int(
-                        player["turn"].get("firefly_no_transform_bonus_units", 0)
-                    )
+                    next_sam_draw_bonus_units = int(player["turn"].get("firefly_no_transform_bonus_units", 0))
                 before_form = str(player.get("firefly_form") or FIREFLY_FORM_FIREFLY)
                 before_remaining = int(player.get("firefly_sam_rounds_remaining", 0))
                 if before_form == FIREFLY_FORM_SAM:
@@ -3221,9 +3484,7 @@ def resolve_round(state: dict, seed: str) -> dict | None:
                 )
             world_effects_disabled = bool(player.get("daniya_world_disable_next"))
             world_forced_move_ids = list(player.get("daniya_world_forced_move_ids_next", ()))
-            world_forced_form = str(
-                player.get("daniya_world_forced_form_next") or DANIYA_FORM_STAGING
-            )
+            world_forced_form = str(player.get("daniya_world_forced_form_next") or DANIYA_FORM_STAGING)
             player["daniya_world_disable_next"] = False
             player["daniya_world_forced_move_ids_next"] = []
             player["daniya_world_forced_form_next"] = ""
@@ -3231,15 +3492,11 @@ def resolve_round(state: dict, seed: str) -> dict | None:
             player["turn"] = fresh_turn()
             player["turn"].update(mirror_next)
             player["turn"]["firefly_sam_draw_bonus_units"] = next_sam_draw_bonus_units
-            player["turn"]["yilu_round_base_bonus"] = int(
-                player.get("yilu_next_round_base_bonus", 0)
-            )
+            player["turn"]["yilu_round_base_bonus"] = int(player.get("yilu_next_round_base_bonus", 0))
             player["yilu_next_round_base_bonus"] = 0
             player["turn"]["daniya_world_effects_disabled"] = world_effects_disabled
             player["turn"]["daniya_world_forced_move_ids"] = world_forced_move_ids
-            player["turn"]["daniya_world_forced_form"] = (
-                world_forced_form if world_forced_move_ids else ""
-            )
+            player["turn"]["daniya_world_forced_form"] = world_forced_form if world_forced_move_ids else ""
             if world_effects_disabled or world_forced_move_ids:
                 daniya_world_transitions.append(
                     {
@@ -3274,15 +3531,19 @@ def _miumiu_reconstruction(state: dict, seed: str, interactions: dict) -> dict |
         return None
     count = player["miumiu_domain_triggers"]
     success, roll = choose(
-        seed, f"{state['round']}:{side}:miumiu-mode:{count}",
-        ((True, count), (False, 9)), version=state["version"],
+        seed,
+        f"{state['round']}:{side}:miumiu-mode:{count}",
+        ((True, count), (False, 9)),
+        version=state["version"],
     )
     interactions["miumiu_check"] = {"side": side, "count": count, "roll": roll, "success": success}
     if not success:
         return None
     opponent = state["sides"][1 - side]
     moves = _available_moves(opponent, state["version"])
-    weights = [move_weight_units(opponent, move) for move in moves]
+    weights = [
+        move_weight_units(opponent, move, version=state["version"], round_number=state["round"]) for move in moves
+    ]
     fact = miumiu.activate_blank(state, side, moves, weights)
     generated = []
     new_seed = f"{seed}:miumiu-reconstruction:{state['round']}:{fact['epoch']}"
@@ -3308,16 +3569,25 @@ def _miumiu_preview(state: dict, seed: str) -> None:
     Preview has no IO or receipts. Adaptive feedback is excluded to prevent
     two Miumius recursively predicting one another. This rule is user-approved.
     """
-    shadow = {"version": state["version"], "round": state["round"], "status": "active",
-              "sides": deepcopy(state.get("round_origin", state["sides"])), "miumiu_preview": True}
+    shadow = {
+        "version": state["version"],
+        "round": state["round"],
+        "status": "active",
+        "sides": deepcopy(state.get("round_origin", state["sides"])),
+        "miumiu_preview": True,
+    }
     for actor, player in enumerate(shadow["sides"]):
         player["turn"]["miumiu_preview"] = True
         actual = state["sides"][actor]["turn"]
         if player["turn"]["raw"] is None:
             roll_count(shadow, actor, seed)
         if actual["raw"] is not None:
-            player["turn"].update(raw=actual["raw"], effective=actual["effective"],
-                                  pending=actual["effective"], done=actual["effective"] == 0)
+            player["turn"].update(
+                raw=actual["raw"],
+                effective=actual["effective"],
+                pending=actual["effective"],
+                done=actual["effective"] == 0,
+            )
             player["next_debt"] = 0
             player["next_action_bonus"] = 0
         draws = 0

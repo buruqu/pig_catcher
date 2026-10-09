@@ -106,6 +106,7 @@ async def test_parfait_all_ten_after_quota_exhaustion_cooldown_restart_and_dupli
                 await session.execute("DELETE FROM schema_migrations WHERE version>68")
                 await session.execute("DROP TABLE player_clover_chains")
                 await session.execute("DROP TABLE player_moon_feasts")
+                await session.execute("ALTER TABLE battle_profiles DROP COLUMN battle_form_id")
             await db.close()
             await db.open()
             after = dict(

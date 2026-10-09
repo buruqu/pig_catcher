@@ -27,30 +27,18 @@ def _entries() -> list[dict[str, object]]:
 
 def test_formal_catalog_has_all_named_assets_and_stable_ids() -> None:
     entries = _entries()
-    assert len(entries) == 366
-    assert len({entry["template_id"] for entry in entries}) == 366
-    assert len({entry["source_path"] for entry in entries}) == 366
+    assert len(entries) == 386
+    assert len({entry["template_id"] for entry in entries}) == 386
+    assert len({entry["source_path"] for entry in entries}) == 386
     assert all(str(entry["description"]).strip() for entry in entries)
-    pig_counts = Counter(
-        int(entry["rarity"])
-        for entry in entries
-        if entry["kind"] == "pig"
-    )
-    food_counts = Counter(
-        int(entry["rarity"])
-        for entry in entries
-        if entry["kind"] == "food"
-    )
-    assert pig_counts == {1: 30, 2: 30, 3: 31, 4: 36, 5: 51, 6: 64}
-    assert food_counts == {1: 7, 2: 9, 3: 10, 4: 15, 5: 19, 6: 64}
+    pig_counts = Counter(int(entry["rarity"]) for entry in entries if entry["kind"] == "pig")
+    food_counts = Counter(int(entry["rarity"]) for entry in entries if entry["kind"] == "food")
+    assert pig_counts == {1: 30, 2: 30, 3: 31, 4: 36, 5: 51, 6: 68}
+    assert food_counts == {1: 7, 2: 9, 3: 10, 4: 15, 5: 19, 6: 80}
 
 
 def test_high_rarity_food_effects_cover_new_gameplay_families() -> None:
-    foods = {
-        entry["display_name"]: entry
-        for entry in _entries()
-        if entry["kind"] == "food"
-    }
+    foods = {entry["display_name"]: entry for entry in _entries() if entry["kind"] == "food"}
     assert foods["猪咪虾寿司"]["effect_id"] == "next-catch-quality"
     assert foods["猪猪玉子烧"]["effect_id"] == "next-cook-quality"
     assert foods["猪寿司拼盘"]["effect_params"] == {"count": 2}
@@ -120,9 +108,7 @@ def test_high_rarity_food_effects_cover_new_gameplay_families() -> None:
         "six_star_multiplier": 1.004,
         "source_label": "猪鼻蛋包饭",
     }
-    assert foods["神龙化猪七星云海锅"]["effect_id"] == (
-        "group-next-exclusive-high-star-catch"
-    )
+    assert foods["神龙化猪七星云海锅"]["effect_id"] == ("group-next-exclusive-high-star-catch")
     assert foods["神龙化猪七星云海锅"]["effect_params"] == {
         "five_star_multiplier": 8,
         "other_coin": 1680,
@@ -132,8 +118,11 @@ def test_high_rarity_food_effects_cover_new_gameplay_families() -> None:
         "uses_per_player": 1,
     }
     assert foods["撅撅猪派"]["effect_params"] == {
-        "count": 1, "max_bonus": 5, "overflow_weekly_bonus": 1,
-        "overflow_coin": 12222, "overflow_coupon": "asset-code-change",
+        "count": 1,
+        "max_bonus": 5,
+        "overflow_weekly_bonus": 1,
+        "overflow_coin": 12222,
+        "overflow_coupon": "asset-code-change",
     }
     assert foods["向你道早猪猪巧克力螺"]["effect_params"] == {"count": 5}
     # 每道不同名菜的效果签名必须唯一（群专属双群复制品除外）
@@ -152,11 +141,7 @@ def test_high_rarity_food_effects_cover_new_gameplay_families() -> None:
 
 
 def test_five_star_food_routes_are_stronger_than_four_star_counterparts() -> None:
-    foods = {
-        entry["display_name"]: entry
-        for entry in _entries()
-        if entry["kind"] == "food"
-    }
+    foods = {entry["display_name"]: entry for entry in _entries() if entry["kind"] == "food"}
 
     four_catch = foods["猪咪虾寿司"]["effect_params"]
     five_catch = foods["猪果冻"]["effect_params"]
@@ -186,14 +171,10 @@ def test_five_star_food_routes_are_stronger_than_four_star_counterparts() -> Non
 def test_phase8_collaboration_limited_pigs_and_exclusive_foods_are_complete() -> None:
     entries = _entries()
     pigs = {
-        entry["display_name"]: entry
-        for entry in entries
-        if entry["kind"] == "pig" and not entry.get("group_scope_id")
+        entry["display_name"]: entry for entry in entries if entry["kind"] == "pig" and not entry.get("group_scope_id")
     }
     foods = {
-        entry["display_name"]: entry
-        for entry in entries
-        if entry["kind"] == "food" and not entry.get("group_scope_id")
+        entry["display_name"]: entry for entry in entries if entry["kind"] == "food" and not entry.get("group_scope_id")
     }
 
     ave_names = {
@@ -205,14 +186,8 @@ def test_phase8_collaboration_limited_pigs_and_exclusive_foods_are_complete() ->
         "喵梦猪",
     }
     assert all(pigs[name]["rarity"] == 5 for name in ave_names)
-    assert {
-        int(pigs[name]["collection"]["slot"])
-        for name in ave_names
-    } == {1, 2, 3, 4, 5, 6}
-    assert all(
-        pigs[name]["collection"]["collection_id"] == "bandori-ave-mujica"
-        for name in ave_names
-    )
+    assert {int(pigs[name]["collection"]["slot"]) for name in ave_names} == {1, 2, 3, 4, 5, 6}
+    assert all(pigs[name]["collection"]["collection_id"] == "bandori-ave-mujica" for name in ave_names)
     assert pigs["初华猪"]["alternate_image"].endswith("初华猪-戴帽子版.png")
 
     assert pigs["KFC猪"]["rarity"] == 4
@@ -223,19 +198,10 @@ def test_phase8_collaboration_limited_pigs_and_exclusive_foods_are_complete() ->
 
     assert pigs["五条猪"]["rarity"] == 5
     assert pigs["宿傩猪"]["rarity"] == 5
-    assert {
-        pigs[name]["collection"]["collection_id"]
-        for name in ("五条猪", "宿傩猪")
-    } == {"jujutsu-kaisen"}
-    assert foods["伏魔朱焰咒纹猪蹄饭"]["effect_params"] == {
-        "technique_id": "malevolent-kitchen"
-    }
-    assert foods["五条猪无量苍蓝雪山"]["effect_params"] == {
-        "technique_id": "lapse-blue"
-    }
-    assert foods["五条猪无量赫焰雪山"]["effect_params"] == {
-        "technique_id": "reversal-red"
-    }
+    assert {pigs[name]["collection"]["collection_id"] for name in ("五条猪", "宿傩猪")} == {"jujutsu-kaisen"}
+    assert foods["伏魔朱焰咒纹猪蹄饭"]["effect_params"] == {"technique_id": "malevolent-kitchen"}
+    assert foods["五条猪无量苍蓝雪山"]["effect_params"] == {"technique_id": "lapse-blue"}
+    assert foods["五条猪无量赫焰雪山"]["effect_params"] == {"technique_id": "reversal-red"}
     assert all(
         foods[name]["effect_id"] == "technique-permit"
         for name in (
@@ -269,12 +235,8 @@ def test_semantic_body_ranges_match_visual_scale_and_keep_regular_pigs_regular()
 
 def test_group_custom_assets_are_confined_and_keep_user_text() -> None:
     entries = _entries()
-    group_entries = [
-        entry
-        for entry in entries
-        if entry.get("group_scope_id")
-    ]
-    assert len(group_entries) == 128
+    group_entries = [entry for entry in entries if entry.get("group_scope_id")]
+    assert len(group_entries) == 148
     assert {entry["group_scope_id"] for entry in group_entries} == {
         "qq:1092931381",
         "qq:237716658",
@@ -282,9 +244,7 @@ def test_group_custom_assets_are_confined_and_keep_user_text() -> None:
         "qq-official:9EA2810F378FBD7DC3219C56CEAB3520",
     }
     assert all(
-        f"/{str(entry['group_scope_id']).split(':', 1)[1]}/"
-        in f"/{entry['source_path']}"
-        for entry in group_entries
+        f"/{str(entry['group_scope_id']).split(':', 1)[1]}/" in f"/{entry['source_path']}" for entry in group_entries
     )
     descriptions = {
         entry["display_name"]: entry["description"]
@@ -339,7 +299,7 @@ def test_group_custom_assets_are_confined_and_keep_user_text() -> None:
         for scope in {str(entry["group_scope_id"]) for entry in group_entries}
     }
     baseline = by_scope[PAIRED_GROUP_SCOPES[0][0]]
-    assert len(baseline) == 32
+    assert len(baseline) == 37
     assert all(scope_catalog == baseline for scope_catalog in by_scope.values())
     for qq_scope, official_scope in PAIRED_GROUP_SCOPES:
         assert by_scope[qq_scope] == by_scope[official_scope]
@@ -348,17 +308,15 @@ def test_group_custom_assets_are_confined_and_keep_user_text() -> None:
 def test_every_custom_six_star_pig_has_one_same_group_food_pair() -> None:
     entries = _entries()
     by_id = {entry["template_id"]: entry for entry in entries}
-    pigs = [
-        entry
-        for entry in entries
-        if entry["kind"] == "pig" and entry["rarity"] == 6
-    ]
+    pigs = [entry for entry in entries if entry["kind"] == "pig" and entry["rarity"] == 6]
     foods = {
         entry["template_id"]
         for entry in entries
-        if entry["kind"] == "food" and entry["rarity"] == 6
+        if entry["kind"] == "food"
+        and entry["rarity"] == 6
+        and "special-reward-food" not in entry.get("recipe_tags", [])
     }
-    assert len(pigs) == len(foods) == 64
+    assert len(pigs) == len(foods) == 68
     paired = []
     for pig in pigs:
         paired_id = pig["paired_food_template_id"]
@@ -375,13 +333,9 @@ def test_bandori_collaboration_mappings_use_official_profiles_and_five_slots() -
     collabs = {
         entry["display_name"]: entry["collection"]
         for entry in _entries()
-        if entry.get("collection")
-        and str(entry["collection"]["collection_id"]).startswith("bandori-")
+        if entry.get("collection") and str(entry["collection"]["collection_id"]).startswith("bandori-")
     }
-    assert {
-        name: (value["character_name"], value["collection_name"])
-        for name, value in collabs.items()
-    } == {
+    assert {name: (value["character_name"], value["collection_name"]) for name, value in collabs.items()} == {
         "星星猪": ("户山香澄", "Poppin'Party"),
         "兔吉猪": ("花园多惠", "Poppin'Party"),
         "巧克力猪": ("牛込里美", "Poppin'Party"),
@@ -437,51 +391,40 @@ def test_bandori_collaboration_mappings_use_official_profiles_and_five_slots() -
         "由乃猪": ("千石由乃", "梦限大みゅーたいぷ"),
     }
     assert all(
-        value["total"] == (
-            6 if value["collection_id"] in {
+        value["total"]
+        == (
+            6
+            if value["collection_id"]
+            in {
                 "bandori-hello-happy-world",
                 "bandori-ave-mujica",
-            } else
-            (1 if value["collection_id"] == "bandori-yumemita-viola" else 5)
+            }
+            else (1 if value["collection_id"] == "bandori-yumemita-viola" else 5)
         )
         for value in collabs.values()
     )
     assert all(
-        str(value["official_profile_url"]).startswith((
-            "https://bang-dream.com/",
-            "https://anime.bang-dream.com/",
-            "https://bang-dream-gbp-en.bushiroad.com/",
-        ))
+        str(value["official_profile_url"]).startswith(
+            (
+                "https://bang-dream.com/",
+                "https://anime.bang-dream.com/",
+                "https://bang-dream-gbp-en.bushiroad.com/",
+            )
+        )
         for value in collabs.values()
     )
-    afterglow_slots = {
-        int(value["slot"])
-        for value in collabs.values()
-        if value["collection_name"] == "Afterglow"
-    }
+    afterglow_slots = {int(value["slot"]) for value in collabs.values() if value["collection_name"] == "Afterglow"}
     assert afterglow_slots == {1, 2, 3, 4, 5}
     poppin_party_slots = {
-        int(value["slot"])
-        for value in collabs.values()
-        if value["collection_name"] == "Poppin'Party"
+        int(value["slot"]) for value in collabs.values() if value["collection_name"] == "Poppin'Party"
     }
     assert poppin_party_slots == {1, 2, 3, 4, 5}
-    morfonica_slots = {
-        int(value["slot"])
-        for value in collabs.values()
-        if value["collection_name"] == "Morfonica"
-    }
+    morfonica_slots = {int(value["slot"]) for value in collabs.values() if value["collection_name"] == "Morfonica"}
     assert morfonica_slots == {1, 2, 3, 4, 5}
-    mygo_slots = {
-        int(value["slot"])
-        for value in collabs.values()
-        if value["collection_name"] == "MyGO!!!!!"
-    }
+    mygo_slots = {int(value["slot"]) for value in collabs.values() if value["collection_name"] == "MyGO!!!!!"}
     assert mygo_slots == {1, 2, 3, 4, 5}
     pastel_palettes_slots = {
-        int(value["slot"])
-        for value in collabs.values()
-        if value["collection_name"] == "Pastel＊Palettes"
+        int(value["slot"]) for value in collabs.values() if value["collection_name"] == "Pastel＊Palettes"
     }
     assert pastel_palettes_slots == {1, 2, 3, 4, 5}
     assert collabs["绿茶猪"]["collection_id"] == "bandori-yumemita-viola"
@@ -499,29 +442,15 @@ def test_bandori_collaboration_mappings_use_official_profiles_and_five_slots() -
         "都子猪": (4, "miyako"),
         "由乃猪": (5, "yuno"),
     }
-    hhw_slots = {
-        int(value["slot"])
-        for value in collabs.values()
-        if value["collection_name"] == "Hello, Happy World!"
-    }
+    hhw_slots = {int(value["slot"]) for value in collabs.values() if value["collection_name"] == "Hello, Happy World!"}
     assert hhw_slots == {1, 2, 3, 4, 5, 6}
-    roselia_slots = {
-        int(value["slot"])
-        for value in collabs.values()
-        if value["collection_name"] == "Roselia"
-    }
+    roselia_slots = {int(value["slot"]) for value in collabs.values() if value["collection_name"] == "Roselia"}
     assert roselia_slots == {1, 2, 3, 4, 5}
     raise_a_suilen_slots = {
-        int(value["slot"])
-        for value in collabs.values()
-        if value["collection_name"] == "RAISE A SUILEN"
+        int(value["slot"]) for value in collabs.values() if value["collection_name"] == "RAISE A SUILEN"
     }
     assert raise_a_suilen_slots == {1, 2, 3, 4, 5}
-    ave_mujica_slots = {
-        int(value["slot"])
-        for value in collabs.values()
-        if value["collection_name"] == "Ave Mujica"
-    }
+    ave_mujica_slots = {int(value["slot"]) for value in collabs.values() if value["collection_name"] == "Ave Mujica"}
     assert ave_mujica_slots == {1, 2, 3, 4, 5, 6}
     assert collabs["LAYER猪"]["character_id"] == "layer"
     assert collabs["LOCK猪"]["character_id"] == "lock"
@@ -536,29 +465,22 @@ def test_bandori_collaboration_mappings_use_official_profiles_and_five_slots() -
 
 
 def test_new_pigs_keep_reviewed_descriptions_and_rarities() -> None:
-    pigs = {
-        entry["display_name"]: entry
-        for entry in _entries()
-        if entry["kind"] == "pig"
-    }
+    pigs = {entry["display_name"]: entry for entry in _entries() if entry["kind"] == "pig"}
     assert pigs["猪纵连"]["rarity"] == 3
     assert pigs["猪纵连"]["description"] == (
         "三只小猪首尾相接排成一列，队伍一旦启动就越连越长，谁先掉队谁负责请全队加餐。"
     )
     assert pigs["面包鼓猪"]["rarity"] == 4
     assert pigs["面包鼓猪"]["description"] == (
-        "扎着山吹沙绫的侧马尾，一边守着面包一边敲响小鼓；"
-        "总把大家照顾得稳稳当当，散场后还会记得给全队留一份加餐。"
+        "扎着山吹沙绫的侧马尾，一边守着面包一边敲响小鼓；总把大家照顾得稳稳当当，散场后还会记得给全队留一份加餐。"
     )
     assert pigs["兔吉猪"]["rarity"] == 4
     assert pigs["兔吉猪"]["description"] == (
-        "学着花园多惠抱起蓝色吉他，头上的小花和身后的兔子一起听它即兴；"
-        "想法总是自由跳脱，弹起琴来却比谁都认真。"
+        "学着花园多惠抱起蓝色吉他，头上的小花和身后的兔子一起听它即兴；想法总是自由跳脱，弹起琴来却比谁都认真。"
     )
     assert pigs["傲娇猪"]["rarity"] == 5
     assert pigs["傲娇猪"]["description"] == (
-        "借来市谷有咲的双马尾，在键盘、乐谱和盆栽之间忙得团团转；"
-        "嘴上嫌麻烦，伙伴一开口却总是第一个把演出撑起来。"
+        "借来市谷有咲的双马尾，在键盘、乐谱和盆栽之间忙得团团转；嘴上嫌麻烦，伙伴一开口却总是第一个把演出撑起来。"
     )
     assert pigs["提琴猪"]["rarity"] == 4
     assert pigs["提琴猪"]["collection"]["character_name"] == "八潮瑠唯"
@@ -628,32 +550,19 @@ def test_new_pigs_keep_reviewed_descriptions_and_rarities() -> None:
         "戴上CHU²的猫耳耳机站到DJ台前，作词、作曲和制作全都要由自己掌控；"
         "这只年少却专业的制作人猪想用最强音乐改变世界，态度再强势也守礼，手边永远少不了肉干。"
     )
-    shenlong_pigs = [
-        entry
-        for entry in _entries()
-        if entry["kind"] == "pig" and entry["display_name"] == "神龙化猪"
-    ]
+    shenlong_pigs = [entry for entry in _entries() if entry["kind"] == "pig" and entry["display_name"] == "神龙化猪"]
     assert len(shenlong_pigs) == 4
     assert all(entry["rarity"] == 6 for entry in shenlong_pigs)
     assert all("七星云海" in entry["description"] for entry in shenlong_pigs)
     assert all(
-        str(entry["paired_food_template_id"]).endswith(
-            "shenlong-seven-star-cloud-sea-pot"
-        )
-        for entry in shenlong_pigs
+        str(entry["paired_food_template_id"]).endswith("shenlong-seven-star-cloud-sea-pot") for entry in shenlong_pigs
     )
     assert pigs["LOCK猪"]["source_path"].endswith("LOCK猪.png")
-    assert pigs["彩彩修车猪"]["paired_food_template_id"].endswith(
-        "aya-repair-mousse"
-    )
+    assert pigs["彩彩修车猪"]["paired_food_template_id"].endswith("aya-repair-mousse")
     assert pigs["绿茶猪"]["collection"]["collection_id"] == "bandori-yumemita-viola"
     assert pigs["向你道早猪"]["source_path"].endswith("向你道早猪.gif")
-    assert pigs["向你道早猪"]["paired_food_template_id"].endswith(
-        "xiangni-daozao-chocolate-cornet"
-    )
-    assert pigs["软糯丰川祥猪"]["paired_food_template_id"].endswith(
-        "mist-blue-keyboard-daifuku"
-    )
+    assert pigs["向你道早猪"]["paired_food_template_id"].endswith("xiangni-daozao-chocolate-cornet")
+    assert pigs["软糯丰川祥猪"]["paired_food_template_id"].endswith("mist-blue-keyboard-daifuku")
     assert pigs["HAPPY猪"]["rarity"] == 5
     assert pigs["HAPPY猪"]["collection"]["character_name"] == "弦卷心"
     assert pigs["歌剧猪"]["rarity"] == 5
@@ -672,15 +581,9 @@ def test_new_pigs_keep_reviewed_descriptions_and_rarities() -> None:
     assert pigs["米歇尔猪"]["collection"]["total"] == 6
     assert pigs["保千猪"]["rarity"] == 6
     assert pigs["保千猪"]["alternate_image"].endswith("猪保千表情包.png")
-    assert pigs["保千猪"]["paired_food_template_id"].endswith(
-        "baogian-pork-roulette"
-    )
+    assert pigs["保千猪"]["paired_food_template_id"].endswith("baogian-pork-roulette")
     # Roselia 联动与 ob 一串六星定制（按模板遍历，QQ 官方群与普通群均有复制）
-    ob_pigs = [
-        entry
-        for entry in _entries()
-        if entry["kind"] == "pig" and entry["display_name"] == "ob一串猪"
-    ]
+    ob_pigs = [entry for entry in _entries() if entry["kind"] == "pig" and entry["display_name"] == "ob一串猪"]
     assert len(ob_pigs) == 4
     for entry in ob_pigs:
         assert entry["rarity"] == 6
@@ -688,9 +591,7 @@ def test_new_pigs_keep_reviewed_descriptions_and_rarities() -> None:
         assert entry["paired_food_template_id"].endswith("tangcu-paigu")
         scope_suffix = str(entry["group_scope_id"]).split(":", 1)[1]
         expected_prefix = (
-            "food-g" + scope_suffix
-            if entry["group_scope_id"].startswith("qq:")
-            else "food-qo" + scope_suffix.lower()
+            "food-g" + scope_suffix if entry["group_scope_id"].startswith("qq:") else "food-qo" + scope_suffix.lower()
         )
         assert entry["paired_food_template_id"].startswith(expected_prefix)
     assert pigs["歌姬猪"]["rarity"] == 5

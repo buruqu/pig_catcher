@@ -30,6 +30,8 @@ from ..domain.battle_catalog import (
     fighter_moves,
 )
 from ..domain.battle_views import BattleView, BattleWheelCard, BattleWheelSegment, FighterCard
+from ..domain.daniya_battle import FIXED_BLACK_HOLE_WHEEL
+from ..domain.daniya_catalog import BLACK_HOLE
 from ..domain.dispatch import MATERIALS, safe_display_name
 from ..domain.dispatch_views import DispatchLine as Line
 from ..domain.dispatch_views import DispatchPanel as Panel
@@ -37,6 +39,14 @@ from ..domain.dispatch_views import DispatchPigCard
 from ..domain.display import format_length, format_weight
 from ..domain.mirror_battle_catalog import LUOLI_STATUS_HELP
 from ..domain.models import CommandIdentity
+from ..domain.xixi_battle_catalog import (
+    EMPEROR_GAIN,
+    HEXTECH_NAMES,
+    HEXTECH_SPECS,
+    XIXI_CORE_NAME,
+    XIXI_FORM_CELESTIAL,
+    XIXI_FORM_EMPEROR,
+)
 
 STATUS_NAMES = {
     "pending": "等待应战",
@@ -56,7 +66,10 @@ JUEJUE_FORM_NAMES = {
 DANIYA_FORM_NAMES = {
     DANIYA_FORM_STAGING: "布景",
     DANIYA_FORM_DISILLUSION: "幻灭",
+    BLACK_HOLE: "黑洞",
 }
+
+XIXI_FORM_NAMES = {XIXI_FORM_CELESTIAL: "西天帝路线", XIXI_FORM_EMPEROR: "西西天帝"}
 
 FIREFLY_FORM_NAMES = {
     FIREFLY_FORM_FIREFLY: "流萤",
@@ -239,6 +252,11 @@ def _fighter_form_name(fighter_id: str, form_id: str) -> str:
             return FIREFLY_FORM_NAMES[form_id]
         except KeyError as exc:
             raise ValueError(f"未知流萤抱抱猪形态：{form_id}") from exc
+    if fighter_id == "xixi":
+        try:
+            return XIXI_FORM_NAMES[form_id]
+        except KeyError as exc:
+            raise ValueError(f"未知西西猪形态：{form_id}") from exc
     return form_id
 
 
@@ -726,6 +744,35 @@ def move_line(
             note += f"；伤势{labels[mirror['injury_before']]}→{labels[mirror['injury_after']]}"
     if mirror.get("rebuild_bonus"):
         note += f"；上回合重构额外+{mirror['rebuild_bonus']}"
+    if event.get("daniya_native"):
+        note += (
+            f"；虚质粒子{weight_label(event['daniya_particle_before'])}"
+            f"→{weight_label(event['daniya_particle_after'])}"
+        )
+        if event.get("daniya_black_hole_factor") is not None:
+            note += f"；黑洞自身加权与敌减权×{weight_label(event['daniya_black_hole_factor'])}"
+        if event.get("daniya_transition"):
+            transition = event["daniya_transition"]
+            note += f"；{DANIYA_FORM_NAMES[transition['before']]}→黑洞，伤势清除"
+    xixi = event.get("xixi", {})
+    if xixi.get("native"):
+        note += f"；法术涌动标记{xixi['mark_before']}→{xixi['mark_after']}"
+        if xixi.get("automatic"):
+            note += "；符文禁锢自动施放，不占手抽次数"
+        if xixi.get("overload_weight_cleared"):
+            note += "；超负荷额外出现权重已清空"
+        if xixi.get("cooldown_until") is not None:
+            note += f"；第{xixi['cooldown_until'] + 1}回合可再次抽到"
+        if event.get("xixi_all_moves_bonus"):
+            note += f"；奥数专精与连续涌动：本轮每招额外+{weight_label(event['xixi_all_moves_bonus'])}"
+        if xixi.get("stop"):
+            note += f"；沙漏已停止后续{event.get('xixi_stopped_pending', 0)}次手抽，本轮免抽伤势"
+        if xixi.get("delayed_hextech_round") is not None:
+            note += f"；回归基本功：第{xixi['delayed_hextech_round']}回合抽海克斯，本招不进入领域战"
+    if event.get("xixi_gain_factor") is not None and Fraction(event["xixi_gain_factor"]) != 1:
+        note += f"；现实器/沙漏整轮自身加权×{weight_label(event['xixi_gain_factor'])}"
+    if event.get("xixi_reduction_factor") is not None and Fraction(event["xixi_reduction_factor"]) != 1:
+        note += f"；整轮敌减权×{weight_label(event['xixi_reduction_factor'])}"
     if event["tool_used"]:
         note += f"；{TOOLS_BY_ID[event['tool_used']].name}已消耗"
     return Line(f"{event['ordinal']}. {event['name']}", value, note)
@@ -752,6 +799,11 @@ def _event_move_wheel(event: dict, definition_version: int) -> BattleWheelCard:
 
     generated_copy = event.get("generated_by") == "asamu-domain-copy"
     generated_mimic = event.get("generated_by") == "chaos-domain-auto-mimic"
+    if event.get("generated_by") == "xixi-prison-auto-overload":
+        return wheel_card(
+            "move", f"第{event['ordinal']}招 · 自动超负荷", ((event["name"], 1),), None,
+            "符文禁锢消费标记后自动施放；本次没有抽取招式盘，也不消耗手抽次数。",
+        )
     source_fighter_id = str(
         event.get("functional_fighter_id")
         if event.get("daniya_world_forced")
@@ -772,7 +824,7 @@ def _event_move_wheel(event: dict, definition_version: int) -> BattleWheelCard:
     exact_moves = tuple(moves_by_id.get(move_id) for move_id in wheel_move_ids)
     if wheel_move_ids and all(move is not None for move in exact_moves):
         moves = exact_moves
-    elif source_fighter_id in {"juejue", "daniya", "firefly"} and not generated_copy and not generated_mimic:
+    elif source_fighter_id in {"juejue", "daniya", "firefly", "xixi"} and not generated_copy and not generated_mimic:
         moves = fighter_form_moves(
             source_fighter_id,
             str(event.get("form_before") or ""),
@@ -786,8 +838,11 @@ def _event_move_wheel(event: dict, definition_version: int) -> BattleWheelCard:
     options = (
         tuple((move.name, _scaled_weight(units[index], scale)) for index, move in enumerate(moves))
         if units and len(units) == len(moves)
-        else tuple((move.name, move.draw_weight) for move in moves)
+        else tuple((move.name, _move_weight(move)) for move in moves)
     )
+    # 冷却装备在冻结盘中的权重为0；不绘制不可抽取的扇区，保留其他实际比例。
+    zero_weight_labels = tuple(label for label, weight in options if weight == 0)
+    options = tuple((label, weight) for label, weight in options if weight > 0)
 
     selected_move_id = str(
         event.get("original_move_id")
@@ -825,6 +880,8 @@ def _event_move_wheel(event: dict, definition_version: int) -> BattleWheelCard:
     else:
         title_suffix = form_suffix
         note = "本卡展示最后一招的真实落点；逐招数值均为已提交事实。"
+    if zero_weight_labels:
+        note += "本次不可抽取：" + "、".join(zero_weight_labels) + "。"
     return wheel_card(
         "move",
         f"第{event['ordinal']}招落点{title_suffix}",
@@ -951,8 +1008,9 @@ def _daniya_state_projection(side: dict) -> tuple[str, str, str]:
     turn = side.get("turn", {})
     track: list[str] = []
     for event in turn.get("events", ()):
-        before = _fighter_form_name("daniya", str(event.get("form_before", side.get("daniya_form"))))
-        after = _fighter_form_name("daniya", str(event.get("form_after", before)))
+        before_id = str(event.get("form_before") or side.get("daniya_form") or DANIYA_FORM_STAGING)
+        before = _fighter_form_name("daniya", before_id)
+        after = _fighter_form_name("daniya", str(event.get("form_after") or before_id))
         if not track:
             track.append(before)
         if after != track[-1]:
@@ -961,6 +1019,22 @@ def _daniya_state_projection(side: dict) -> tuple[str, str, str]:
         track.append(current)
     elif current != track[-1]:
         track.append(current)
+    if "daniya_particles" in side:
+        facts = [
+            f"虚质粒子{weight_label(side['daniya_particles'])}",
+            f"蚀域命中{side.get('daniya_domain_hits', 0)}/7",
+            f"永久敌胜权减少{weight_label(side.get('daniya_permanent_reduction', 0))}",
+            f"永久领域战胜权+{_scaled_weight(side.get('daniya_permanent_domain_units', 0), 10)}",
+        ]
+        if side.get("daniya_form") == BLACK_HOLE:
+            facts += ["固定伤势82.3%无伤 / 12.49%逐层受伤 / 5.21%力竭", "计时溃灭被动：敌力竭权重+回合数×5"]
+        else:
+            key = (
+                "daniya_transform_staging_units" if side.get("daniya_form") == DANIYA_FORM_STAGING
+                else "daniya_transform_disillusion_units"
+            )
+            facts.append(f"黑洞转化招出现权重额外+{_scaled_weight(side.get(key, 0), MOVE_WEIGHT_SCALE)}")
+        return f"当前形态 · {current}", " → ".join(track), " · ".join(facts)
     domain_draw_units = int(side.get("daniya_domain_steps", 0)) + int(
         side.get("daniya_domain_draw_only_steps", 0)
     )
@@ -987,6 +1061,33 @@ def _daniya_state_projection(side: dict) -> tuple[str, str, str]:
         )
         facts.append(f"本回合强制使用{forced_form}达妮娅招式盘")
     return f"当前形态 · {current}", " → ".join(track), " · ".join(facts)
+
+
+def _xixi_state_projection(side: dict, *, round_number: int | None = None) -> tuple[str, str, str]:
+    form = str(side.get("xixi_form") or XIXI_FORM_CELESTIAL)
+    acquired = tuple(side.get("xixi_hextech", ()))
+    facts = [
+        f"法术涌动标记{side.get('xixi_mark', 0)}/1",
+        f"超负荷永久胜权+{weight_label(side.get('xixi_overload_bonus', 0))}",
+        f"超负荷出现权重额外+{_scaled_weight(side.get('xixi_overload_weight_units', 0), MOVE_WEIGHT_SCALE)}",
+        f"领悟：{XIXI_CORE_NAME}",
+    ]
+    if side.get("xixi_shield"):
+        facts.append("由心及物：下次败北免抽伤势")
+    if "goliath" in acquired:
+        facts.append(f"歌莉娅巨人：敌有效正收益{weight_label(side.get('xixi_goliath_gain', 0))}/100")
+    if side.get("xixi_permanent_action_bonus"):
+        facts.append("回归基本功：永久+1招、曲径折跃仅成长、简易领域40%")
+    for queued in side.get("xixi_hextech_queue", ()):
+        facts.append(f"第{queued['due']}回合待领海克斯")
+    round_number = int(side.get("turn", {}).get("round", 0)) if round_number is None else round_number
+    for move_id, until in side.get("xixi_cooldowns", {}).items():
+        if until >= round_number:
+            facts.append(f"{'现实器' if move_id == 'xixi-reality' else '中亚沙漏'}冷却至第{until}回合末")
+    if form == XIXI_FORM_EMPEROR:
+        facts.append("全部招式+21亿；固定99%无伤 / 1%力竭；装备退出抽取盘")
+    names = "、".join(HEXTECH_NAMES[key] for key in acquired) or "尚未获得"
+    return _fighter_form_name("xixi", form), f"海克斯{len(acquired)}/4 · {names}", " · ".join(facts)
 
 
 def _asamu_state_projection(side: dict) -> tuple[str, str, str]:
@@ -1368,6 +1469,78 @@ def _v4_interaction_panels(interactions: dict, names: list[str]) -> tuple[Panel,
     return tuple(panels)
 
 
+def _v19_interaction_projection(
+    interactions: dict, names: list[str],
+) -> tuple[tuple[Panel, ...], tuple[BattleWheelCard, ...]]:
+    lines, hex_wheels = [], []
+    for fact in interactions.get("daniya_v19", ()):
+        name = names[int(fact["side"])]
+        kind = fact.get("kind")
+        if kind == "permanent-reduction":
+            lines.append(Line(
+                name + " · 虚质粒子", f"敌胜权实际-{weight_label(fact['applied'])}",
+                f"本轮累计永久减权{weight_label(fact['value'])}；消耗粒子后仍保留。",
+            ))
+        elif kind in {"current-move-cancel", "domain-ignore"} or "target" in fact and "deduction" in fact:
+            lines.append(Line(
+                name + " · 无视", f"对方第{fact['ordinal']}招胜权-{weight_label(fact['deduction'])}",
+                "已发生的原生成长保留；被取消的领域不参加领域判定。"
+                if kind == "current-move-cancel" else "依据本轮冻结招式选取。",
+            ))
+        elif kind in {"domain-double", "domain-self-double"}:
+            lines.append(Line(
+                name + " · 布景蚀域", f"第{fact['ordinal']}招额外+{weight_label(fact['gain'])}",
+                "通用领域倍率后，本招独立额外×2。" if kind == "domain-self-double" else "随机选中的本轮招式再×2。",
+            ))
+        elif kind == "black-hole":
+            lines.append(Line(
+                name + " · 黑洞之形", "进入独立黑洞盘，清除已有伤势", "伤势盘固定82.3% / 12.49% / 5.21%。",
+            ))
+        elif kind == "force-defeat":
+            lines.append(Line(
+                name + " · 深黯 终末 恒常", names[int(fact["target"])] + "本轮强制落败",
+                "伤势仍遵循对方固定盘或免抽保护。",
+            ))
+    for fact in interactions.get("xixi", ()):
+        name = names[int(fact["side"])]
+        if fact.get("ignore"):
+            lines.append(Line(
+                name + " · 符文无视", f"敌方第{fact['target_ordinal']}招胜权-{weight_label(fact['cancelled_gain'])}",
+            ))
+        if fact.get("overload_next_action_bonus"):
+            lines.append(Line(name + " · 超负荷连击", "下回合出招数+1"))
+        giant = fact.get("goliath")
+        if giant:
+            lines.append(Line(
+                name + " · 歌莉娅巨人",
+                f"敌有效正收益{weight_label(giant['before'])}→{weight_label(giant['after'])}/100",
+                "免抽伤势保护仍有效。" if giant["guard_active"] else "已达到100，后续败北恢复抽取伤势盘。",
+            ))
+        grant = (
+            fact.get("core_hextech") or fact.get("domain_hit", {}).get("hextech")
+            or fact.get("delayed_hextech", {}).get("result")
+        )
+        if grant:
+            if fact.get("delayed_hextech"):
+                lines.append(Line(name + " · 延迟海克斯", f"第{fact['delayed_hextech']['due']}回合兑现",
+                                  "回归基本功在3回合后的排队奖励；读取保存的落点，不重新抽取。"))
+            if grant.get("available"):
+                lines.append(Line(
+                    name + " · 海克斯", grant["name"], f"已获得{grant['count']}/4种；重复符文不再进入候选池。",
+                ))
+                hex_wheels.append(wheel_card("move", name + " · 海克斯落点",
+                                             tuple((HEXTECH_NAMES[key], weight) for key, weight in grant["wheel"]),
+                                             grant["name"], "保存的海克斯抽取结果。"))
+                if grant.get("emperor"):
+                    lines.append(Line(
+                        name + " · 西西天帝", "全招+21亿，恢复全部伤势", "固定99%无伤 / 1%力竭，现实器与沙漏不再入盘。",
+                    ))
+            elif grant.get("reason") == "empty":
+                lines.append(Line(name + " · 海克斯", "四种已集齐，候选池为空"))
+    panels = (Panel("粒子与符文 · 本轮结算", tuple(lines)),) if lines else ()
+    return panels, tuple(hex_wheels)
+
+
 def matchup(
     identity: CommandIdentity,
     match: dict,
@@ -1412,7 +1585,7 @@ def matchup(
         turn = count_side["turn"]
         turn.setdefault("ready", False)
         if turn["raw"] is not None:
-            options = HEAVY_COUNT_WHEEL if count_side["heavy"] else COUNT_WHEEL
+            options = turn.get("count_wheel") or (HEAVY_COUNT_WHEEL if count_side["heavy"] else COUNT_WHEEL)
             count_cards[index] = wheel_card(
                 "count",
                 "本回合出招数落点",
@@ -1471,6 +1644,14 @@ def matchup(
     for index, side in enumerate(display_sides):
         snap, turn = side["snapshot"], side["turn"]
         turn.setdefault("ready", False)
+        if definition_version >= 19 and turn.get("xixi_delayed_hextech"):
+            delayed_panels, delayed_wheels = _v19_interaction_projection(
+                {"xixi": tuple({"side": index, "delayed_hextech": fact}
+                               for fact in turn["xixi_delayed_hextech"])},
+                [player["snapshot"]["player_name"] for player in display_sides],
+            )
+            panels.extend(delayed_panels)
+            wheel_cards.extend(delayed_wheels)
         if match["status"] == "pending" and snap.get("coupon_preview"):
             panels.append(
                 Panel(
@@ -1552,6 +1733,10 @@ def matchup(
             form, form_track, mechanic_summary = _juejue_state_projection(side)
         elif snap.get("fighter_id") == "daniya":
             form, form_track, mechanic_summary = _daniya_state_projection(side)
+        elif snap.get("fighter_id") == "xixi":
+            form, form_track, mechanic_summary = _xixi_state_projection(
+                side, round_number=round_result["round"] if round_result else state["round"],
+            )
         elif snap.get("fighter_id") == "asamu":
             form, form_track, mechanic_summary = _asamu_state_projection(side)
         elif snap.get("fighter_id") == "yilu":
@@ -1604,7 +1789,11 @@ def matchup(
                 chance=_percent(side["weight"], total),
                 count=count,
                 injury="重伤 · 数值招式-1" if side["heavy"] else "正常出招盘",
-                risk=("初始风险", "轻伤风险", "重伤风险")[side["risk"]],
+                risk=(
+                    "固定伤势盘"
+                    if side.get("daniya_form") == BLACK_HOLE or side.get("xixi_form") == XIXI_FORM_EMPEROR
+                    else ("初始风险", "轻伤风险", "重伤风险")[side["risk"]]
+                ),
                 core=weight_label(side["core"]),
                 debt=f"下回合待扣{weight_label(side['next_debt'])}招",
                 pending="已出完" if turn["done"] else f"待连抽{weight_label(turn['pending'])}次",
@@ -1639,18 +1828,25 @@ def matchup(
                 ),
                 "v4回合交互",
             )
-        wheel_cards.append(
-            wheel_card(
-                "injury",
-                loser + " · 伤势盘落点",
-                tuple(
-                    (INJURY_NAMES[key], _scaled_weight(weight, INJURY_WEIGHT_SCALE))
-                    for key, weight in round_result["injury_wheel"]
-                ),
-                INJURY_NAMES[round_result["injury"]],
-                "扇区按本轮抽取时的风险权重绘制；标记是已经保存的结果。",
-            )
+        loser_fighter = display_sides[round_result["loser"]]["snapshot"]["fighter_id"]
+        fixed_injury = bool(round_result.get("injury_modifiers", {}).get("fixed"))
+        injury_scale = (
+            sum(Fraction(weight) for _key, weight in round_result["injury_wheel"]) / 100
+            if fixed_injury else INJURY_WEIGHT_SCALE
         )
+        def injury_name(key):
+            return XIXI_CORE_NAME if key == "core" and loser_fighter == "xixi" else INJURY_NAMES[key]
+        if not round_result.get("injury_skip_reason"):
+            wheel_cards.append(
+                wheel_card(
+                    "injury", loser + " · 伤势盘落点",
+                    tuple((injury_name(key), _scaled_weight(weight, injury_scale))
+                          for key, weight in round_result["injury_wheel"]),
+                    injury_name(round_result["injury"]),
+                    "固定概率，不受其他伤势效果影响。" if fixed_injury
+                    else "扇区按本轮抽取时的风险权重绘制；标记是已经保存的结果。",
+                )
+            )
         domain = interactions.get("domain")
         if domain:
             names = [side["snapshot"]["player_name"] for side in display_sides]
@@ -1780,8 +1976,12 @@ def matchup(
         if definition_version >= 4:
             names = [side["snapshot"]["player_name"] for side in display_sides]
             panels.extend(_v4_interaction_panels(interactions, names))
+        if definition_version >= 19:
+            new_panels, hex_wheels = _v19_interaction_projection(interactions, names)
+            panels.extend(new_panels)
+            wheel_cards.extend(hex_wheels)
         modifiers = round_result.get("injury_modifiers")
-        if modifiers:
+        if modifiers and not fixed_injury:
             firefly_delta = Fraction(modifiers.get("firefly_current_delta_units", 0))
             lines = [
                 Line(
@@ -1814,7 +2014,9 @@ def matchup(
                 else "旧规则累计胜利权重完整保留，双方继续下一回合。"
             )
         )
-        injury_label = INJURY_NAMES[round_result["injury"]]
+        injury_label = injury_name(round_result["injury"])
+        if round_result["injury"] == "injured":
+            injury_label += " → " + injury_name(round_result["injury_effective"])
         if round_result.get("daniya_injury_guarded"):
             effective = str(round_result.get("injury_after_daniya_guard", round_result["injury"]))
             effective_label = "无伤" if effective == "none" else INJURY_NAMES[effective]
@@ -1823,15 +2025,26 @@ def matchup(
             injury_label += "（本轮已回溯）"
         injury_lines = [
             Line(
-                loser + "的伤势盘",
-                injury_label,
-                "抽取权重："
+                loser + (" · 免抽伤势" if round_result.get("injury_skip_reason") else "的伤势盘"),
+                str(round_result["injury_skip_reason"]) if round_result.get("injury_skip_reason") else injury_label,
+                "本轮未进行伤势抽取，不会受伤、力竭或领悟核心。"
+                if round_result.get("injury_skip_reason") else ("固定概率：" if fixed_injury else "抽取权重：")
                 + " / ".join(
-                    f"{INJURY_NAMES[k]} {_scaled_weight(v, INJURY_WEIGHT_SCALE)}"
+                    f"{injury_name(k)} {_scaled_weight(v, injury_scale)}{'%' if fixed_injury else ''}"
                     for k, v in round_result["injury_wheel"]
                 ),
             )
         ]
+        if round_result.get("forced_injury_suppressed"):
+            injury_lines.append(Line(
+                "固定伤势盘保护", "本轮仍按固定概率抽取", "强制落败已生效，强制力竭未覆盖固定伤势盘。",
+            ))
+        guard = round_result.get("daniya_particle_guard")
+        if guard:
+            injury_lines.append(Line(
+                "虚质粒子抵伤", f"降低{guard['layers']}级，剩余{weight_label(guard['particles_remaining'])}粒子",
+                "本轮抵伤事实已保存，消耗后永久敌减权仍保留。",
+            ))
         if round_result.get("miumiu_exhaust_guarded"):
             injury_lines.append(Line(loser + " · 水镜庇护", "免疫本次力竭", "保护已消耗，原有伤势风险不变。"))
         if round_result.get("injury_rewound"):
@@ -2108,90 +2321,98 @@ def _move_weight(move) -> int | float:
 
 
 def _daniya_effect(move, level: int) -> str:
+    if "daniya-v19" in move.tags:
+        numeric = Fraction(move.resolved_gain_tenths, VICTORY_WEIGHT_SCALE)
+        return move.description + (
+            f"强化+{level}：基础自身加权变为{weight_label(numeric + level)}。" if level and numeric > 0 else ""
+        )
     gain = Fraction(move.resolved_gain_tenths, VICTORY_WEIGHT_SCALE)
     enhanced = gain + level if gain > 0 else gain
     numeric = f"自身胜率{_signed_weight(enhanced)}" if gain else ""
     if move.resolved_opponent_reduction_tenths:
         numeric += f"、对方-{weight_label(Fraction(move.resolved_opponent_reduction_tenths, VICTORY_WEIGHT_SCALE))}"
     numeric = numeric.lstrip("、")
-    mechanics = {
-        "daniya-staging-virtual-particle": "下一次蚀域主盘权重和领域战胜利权重各+0.3",
-        "daniya-staging-dream-feast": "下一次蚀域主盘权重和领域战胜利权重各+0.3",
-        "daniya-staging-mimic-bubble": "下一次蚀域主盘权重和领域战胜利权重各+0.3",
-        "daniya-staging-final-curtain": "下一次蚀域主盘权重和领域战胜利权重各+0.3",
-        "daniya-staging-greeting": "下一次蚀域主盘权重和领域战胜利权重各+0.3",
-        "daniya-disillusion-dark-core": "对方力竭盘永久+0.3",
-        "daniya-disillusion-dream-feast": "对方力竭盘永久+0.3",
-        "daniya-disillusion-banish": "对方力竭盘永久+0.3",
-        "daniya-disillusion-final-curtain": "对方力竭盘永久+0.3",
-        "daniya-disillusion-knock": "对方力竭盘永久+0.3",
-        "daniya-flawless": "再抽2次；自身本回合领域战胜利权重+0.2",
-        "daniya-unfinished-lie": "再抽1次；下一次数值招式双方数值同步×2；对方本回合领域战权重-0.2；下回合-1招",
-        "daniya-timed-collapse": "常驻被动使对方力竭权重按回合数×5；抽中时本回合再追加1层",
-        "daniya-domain": "领域战胜利或单方命中后切换幻灭形态，自己下回合+1招",
-        "daniya-world-dragon-image": "随机令对方本回合一招的全部胜利权重归零，功能保留",
-        "daniya-world-work": "再抽1次；布景：下次蚀域出现权重+1；幻灭：对方力竭盘永久+0.5",
-        "daniya-world-nmsl": "本回合落败时将伤势降低一级；掌握核心不变",
-    }[move.move_id]
-    return "；".join(part for part in (numeric, mechanics) if part)
+    return numeric
 
 
 def _daniya_wheels(identity: CommandIdentity, level: int) -> BattleView:
-    definition = FIGHTERS_BY_ID["daniya"]
-    forms = {form.form_id: form for form in definition.forms}
-    form_wheels = tuple(
-        wheel_card(
-            "move",
-            f"达妮娅猪 · {DANIYA_FORM_NAMES[form_id]}",
-            tuple((move.name, _move_weight(move)) for move in forms[form_id].moves),
-            note="形态专属5招与公共7招同盘；上班0.5、计时溃灭0.2、NMSL为0.1，其余基础权重1。",
-        )
-        for form_id in (DANIYA_FORM_STAGING, DANIYA_FORM_DISILLUSION)
-    )
-    lines = tuple(
-        Line(
-            f"{DANIYA_FORM_NAMES[form_id]} · {move.name}",
-            _daniya_effect(move, level),
-            f"抽取权重 {_move_weight(move)}；正数胜率受强化，定向减权与纯功能不受强化。",
-        )
-        for form_id in (DANIYA_FORM_STAGING, DANIYA_FORM_DISILLUSION)
-        for move in forms[form_id].moves
-    )
+    forms = FIGHTERS_BY_ID["daniya"].forms
     return view(
-        identity,
-        "达妮娅猪 · 双形态战斗轮盘",
-        banner=f"展示强化+{level}的数值。默认布景；蚀域在领域战胜利或单方命中后切换幻灭。",
-        wheels=(*form_wheels, *_common_battle_wheels()),
+        identity, "达妮娅猪 · 三形态战斗轮盘",
+        banner=f"强化+{level}。初始布景，蚀域命中转幻灭；25粒子、7次蚀域命中或转化招进入黑洞。",
+        wheels=(
+            *(wheel_card("move", f"达妮娅猪 · {form.name}",
+                          tuple((move.name, _move_weight(move)) for move in form.moves),
+                          note="基础出现权重；实战战报保存当时的动态盘。") for form in forms),
+            wheel_card("injury", "黑洞 · 固定伤势盘",
+                       tuple((INJURY_NAMES[key], _scaled_weight(weight, 100))
+                             for key, weight in FIXED_BLACK_HOLE_WHEEL),
+                       note="82.3%无伤 / 12.49%受伤 / 5.21%力竭；受伤先轻伤、再重伤，概率始终固定。"),
+            *_common_battle_wheels(),
+        ),
         panels=(
-            Panel("双形态招式", lines, "重复出现的公共招式是同一规则，只因当前形态不同而进入不同轮盘。"),
-            Panel(
-                "形态与伤势机制",
-                (
-                    Line("布景", "每次布景招式令下次蚀域出现/领域战权重各+0.3", "蚀域实际使用后同时清除累计。"),
-                    Line("幻灭", "每次幻灭招式令对方力竭盘永久+0.3", "精确累积，不提前取整。"),
-                    Line("计时的溃灭", "每层倍率=当前回合数×5", "达妮娅常驻1层；每次抽中主动效果，本回合再追加1层。"),
-                    Line(
-                        "世界·发龙图",
-                        "自身+10并随机失效对方一招胜率",
-                        "只归零被选中招式的全部胜率数值；再抽、贷款、领域和状态效果保留。",
-                    ),
-                    Line(
-                        "世界·上班",
-                        "再抽1次",
-                        "布景令下次蚀域出现权重+1；幻灭令对方力竭盘永久+0.5。",
-                    ),
-                    Line(
-                        "世界·NMSL",
-                        "落败伤势降低一级",
-                        "轻伤化解、重伤降为轻伤、力竭倒下降为重伤；掌握核心不变。",
-                    ),
-                ),
-            ),
+            *(Panel(form.name + "招式", tuple(
+                Line(move.name, _daniya_effect(move, level), f"基础抽取权重{_move_weight(move)}")
+                for move in form.moves
+            )) for form in forms),
+            Panel("虚质粒子与伤势", (
+                Line("新获粒子", "每招+0.5，包括贷款和被无视的原生招式",
+                     "布景/幻灭每点永久敌减权0.521；黑洞每点0.823。消耗粒子不撤销减权。"),
+                Line("布景/幻灭抵伤", "严格大于5/10/15点时，减少1/2/3层伤势并消耗1/2/3点",
+                     "每回合末最多结算一次；幻灭谎言再减一级。黑洞使用固定盘。"),
+                Line("进入黑洞", "已有伤势重置，粒子恢复到至少25点",
+                     "粒子继续增长，每点使自身胜权与敌减权额外增加8%；25点为×3。"),
+                Line("计时的溃灭", "黑洞中改为被动，敌力竭权重额外+当前回合数×5",
+                     "此前永久累积保留；对方固定盘和免抽保护仍有效。"),
+            )),
         ),
-        hints=(
-            "招式抽取权重按万分之一保存；胜利权重按十分之一保存。",
-            "数值失效只归零胜率数值，贷款、形态与伤势功能仍保留。",
+        hints=("旧对局按其保存的规则继续；此处展示新对局的Battle v19。",
+               "原生粒子与形态成长不因数值无视回滚；复制招式不领取来源的粒子和形态资源。"),
+    )
+
+
+def _xixi_wheels(identity: CommandIdentity, level: int) -> BattleView:
+    moves = FIGHTERS_BY_ID["xixi"].moves
+    return view(
+        identity, "西西猪 · 西天帝战斗轮盘",
+        banner=f"强化+{level}。先用 /战斗猪 形态 西天帝 选择路线；原型尚未开放，对局中不能换路线。",
+        wheels=(
+            wheel_card("move", "西天帝路线 · 基础九格盘", tuple((move.name, _move_weight(move)) for move in moves),
+                       note="标记连招会增加超负荷权重；冷却装备暂时退出盘，成帝后永久退出。"),
+            wheel_card("move", "海克斯 · 未获得的符文",
+                       tuple((name, weight) for _key, name, _gain, weight in HEXTECH_SPECS),
+                       note="每种只会获得一次；领悟核心或领域命中时抽取。"),
+            wheel_card("injury", "西西天帝 · 固定伤势盘", (("无伤", 99), ("力竭倒下", 1)),
+                       note="集齐四种海克斯后永久使用；其他招式不能修改概率。"),
+            *_common_battle_wheels(),
         ),
+        panels=(
+            Panel("西天帝路线招式", tuple(Line(
+                move.name, move.description + (f"强化后基础胜权+{move.gain + level}。" if level and move.gain else ""),
+                f"基础抽取权重{_move_weight(move)}",
+            ) for move in moves)),
+            Panel("奥数专精与装备", (
+                Line("胜权提升高出招数", "原出招权重×[1+min(200,胜权)/200×(出招数−1)]",
+                     "胜权下限取0，上限按200计算；重伤盘仍只有1至4招。"),
+                Line("出招数提升全轮胜权", "每多出1招，本轮每个招式+2",
+                     "自动超负荷和追加出招参与统计；沙漏停止的次数不参与。"),
+                Line("现实器", "整轮己方胜权与敌减权×1.3，敌方对应数值×0.7",
+                     "覆盖已经出过的招式以及本轮后置收益。"),
+                Line("装备冷却", "使用当轮及下一回合不能再抽到", "第r回合使用，第r+2回合恢复。"),
+                Line(XIXI_CORE_NAME, "保留解除重伤和核心+1，并抽取一次海克斯", "免抽伤势时不会领悟核心。"),
+            )),
+            Panel("四种海克斯", (
+                Line("物理转魔法", "全部招式永久+6"),
+                Line("由心及物", "下一次败北免抽伤势", "保护消耗一次；不受伤、不力竭、不领悟核心。"),
+                Line("歌莉娅巨人", "全部招式永久+8", "取得后敌方有效正收益累计未达到100时，败北免抽伤势。"),
+                Line("回归基本功", "全部招式永久+10、出招数永久+1、轻伤/重伤/力竭权重减半",
+                     "曲径折跃只成长超负荷，不进入领域战；简易领域成功率40%，每次使用3回合后抽海克斯。"),
+                Line("西西天帝", f"集齐后全部招式+{EMPEROR_GAIN:,}",
+                     "清除全部伤势；99%无伤/1%力竭固定盘；现实器与中亚沙漏永久退出抽取。"),
+            )),
+        ),
+        hints=("连续法术涌动每次使整轮各招额外+4；标记只保留一层。",
+               "曲径折跃每次永久超负荷+6；手抽超负荷清空出现加权，自动超负荷不清空。"),
     )
 
 
@@ -2373,6 +2594,8 @@ def wheels(identity: CommandIdentity, fighter_id: str, level: int = 0) -> Battle
         return _juejue_wheels(identity, level)
     if fighter_id == "daniya":
         return _daniya_wheels(identity, level)
+    if fighter_id == "xixi":
+        return _xixi_wheels(identity, level)
     if fighter_id == "asamu":
         return _asamu_wheels(identity, level)
     if fighter_id == "yilu":

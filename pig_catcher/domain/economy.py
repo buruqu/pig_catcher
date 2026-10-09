@@ -7,6 +7,7 @@ from hashlib import sha256
 
 from .enums import Rarity, UpgradeType
 from .errors import DomainValidationError, StoreProductError
+from .food_templates import is_zero_value_food
 from .gameplay import ITEM_DEFINITIONS, ItemDefinition
 from .rules import (
     cooking_weights,
@@ -105,7 +106,7 @@ def scale_food_attributes(
         raise DomainValidationError("道具成品倍率必须位于 1 至 2。")
     return FoodAttributes(
         portion_weight=round(attributes.portion_weight * factor, 2),
-        official_value=max(1, round(attributes.official_value * factor)),
+        official_value=(0 if attributes.official_value == 0 else max(1, round(attributes.official_value * factor))),
         recipe_factor=attributes.recipe_factor,
     )
 
@@ -235,6 +236,7 @@ def generate_food_attributes(
     source_weight: float,
     source_weight_percentile: float,
     portion_roll: float,
+    recipe_tags: tuple[str, ...] = (),
 ) -> FoodAttributes:
     """生成份量，并按既定食谱系数与原料重量百分位计算官方价值。"""
 
@@ -252,7 +254,11 @@ def generate_food_attributes(
     portion_weight = source_weight_value * (0.35 + 0.15 * roll)
     recipe_factor = stable_recipe_factor(template_id)
     portion_factor = 0.85 + 0.30 * source_percentile
-    official_value = round(FOOD_BASE_VALUES[resolved_rarity] * portion_factor * recipe_factor)
+    official_value = (
+        0
+        if is_zero_value_food(recipe_tags)
+        else round(FOOD_BASE_VALUES[resolved_rarity] * portion_factor * recipe_factor)
+    )
     return FoodAttributes(
         portion_weight=round(portion_weight, 6),
         official_value=official_value,

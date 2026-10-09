@@ -52,6 +52,7 @@ def state(left="daniya", right="asamu", *, seed="v5", left_level=0, right_level=
             {"fighter_id": right, "level": right_level, "trait_bonus": 0, "tool_id": ""},
         ],
         seed=seed,
+        version=18,  # v19使用完整新达妮娅盘，旧盘验收冻结在最后兼容版本。
     )
 
 
@@ -67,6 +68,7 @@ def record(player: dict, move, side: int, *, seed="v5", functional_fighter_id=No
         round_number=1,
         side=side,
         functional_fighter_id=functional_fighter_id,
+        version=18,
     )
     event.update(round=1, side=side, fighter_id=player["snapshot"]["fighter_id"])
     player["turn"]["events"].append(deepcopy(event))
@@ -77,7 +79,7 @@ def seed_for(key: str, wheel: tuple, expected, *, prefix="v5") -> str:
     return next(
         seed
         for seed in (f"{prefix}-{index}" for index in range(100_000))
-        if choose(seed, key, wheel, version=BATTLE_RULE_VERSION)[0] == expected
+        if choose(seed, key, wheel, version=18)[0] == expected
     )
 
 
@@ -120,8 +122,8 @@ def test_juejue_domain_draw_weight_stays_one_while_clash_strength_stays_two_poin
 
 
 def test_daniya_two_forms_share_seven_common_moves_and_keep_five_distinct_moves_each():
-    staging = fighter_form_moves("daniya", DANIYA_FORM_STAGING)
-    disillusion = fighter_form_moves("daniya", DANIYA_FORM_DISILLUSION)
+    staging = fighter_form_moves("daniya", DANIYA_FORM_STAGING, 18)
+    disillusion = fighter_form_moves("daniya", DANIYA_FORM_DISILLUSION, 18)
     common_ids = {move.move_id for move in DANIYA_COMMON_MOVES}
     assert staging == DANIYA_STAGING_MOVES + DANIYA_COMMON_MOVES
     assert disillusion == DANIYA_DISILLUSION_MOVES + DANIYA_COMMON_MOVES
@@ -265,9 +267,7 @@ def test_daniya_disillusion_reduces_opponent_and_adds_exact_point_one_exhaust_we
     finish_turn(target)
     summary = resolve_round(current, "daniya-disillusion-cross")
     cross = next(
-        item
-        for item in summary["interactions"]["cross_effects"]
-        if item["source_ordinal"] == event["ordinal"]
+        item for item in summary["interactions"]["cross_effects"] if item["source_ordinal"] == event["ordinal"]
     )
     assert cross["round_reduction"] == 9
     assert cross["exhaust_bonus_units"] == 3
@@ -277,9 +277,7 @@ def test_daniya_disillusion_reduces_opponent_and_adds_exact_point_one_exhaust_we
     assert modifiers["daniya_passive_layers"] == 1
     base_exhausted = dict(modifiers["base_wheel"])["exhausted"]
     assert dict(wheel)["exhausted"] == (
-        (base_exhausted + 3)
-        * modifiers["daniya_multiplier"]
-        * modifiers["weight_scale"]
+        (base_exhausted + 3) * modifiers["daniya_multiplier"] * modifiers["weight_scale"]
     )
 
 
@@ -297,9 +295,7 @@ def test_unified_invalidation_zeroes_daniya_own_gain_but_keeps_directed_effects(
     summary = resolve_round(current, "invalidate-daniya-directed-effects")
     future = summary["interactions"]["future_simulations"][0]
     cross = next(
-        item
-        for item in summary["interactions"]["cross_effects"]
-        if item["source_ordinal"] == event["ordinal"]
+        item for item in summary["interactions"]["cross_effects"] if item["source_ordinal"] == event["ordinal"]
     )
     assert future["cancelled_gain"] == event["gain"]
     assert cross["round_reduction"] == 9
@@ -426,9 +422,7 @@ def test_asamu_misfortune_multiplies_exhaustion_for_both_sides_and_each_stack_is
         (9, 5, (49, 5)),
     ],
 )
-def test_asamu_tit_for_tat_uses_one_shared_snapshot_then_swaps_or_adds_forty(
-    own_before, opponent_before, expected
-):
+def test_asamu_tit_for_tat_uses_one_shared_snapshot_then_swaps_or_adds_forty(own_before, opponent_before, expected):
     current = state(left="asamu", right="sukuna")
     ready(current["sides"][0])
     event = record(current["sides"][0], ASAMU_MOVES[8], 0)

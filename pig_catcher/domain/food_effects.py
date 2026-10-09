@@ -32,6 +32,12 @@ from .special_content import (
     TECHNIQUE_MALEVOLENT_KITCHEN,
     TECHNIQUE_REVERSAL_RED,
 )
+from .xixi_feast import (
+    DANIYA_BIRTHDAY_FEAST,
+    XIXI_SIX_STAR_COOK,
+    XIXI_STAR_CHEESE_LOTTERY,
+    XIXI_TARGETED_CATCH,
+)
 
 NEXT_CATCH_QUALITY = "next-catch-quality"
 NEXT_COOK_QUALITY = "next-cook-quality"
@@ -86,6 +92,7 @@ WINDOW_SIX_STAR_RESONANCE = "window-six-star-resonance"
 # 激活独占效果时，本次动作忽略装备道具（道具保留、不消耗）。
 EXCLUSIVE_CATCH_EFFECTS = frozenset(
     {
+        XIXI_TARGETED_CATCH,
         NEXT_SIX_STAR_CATCH,
         MID_AUTUMN_FIXED_SIX_STAR_CATCH,
         CLOVER_CATCH,
@@ -97,7 +104,9 @@ EXCLUSIVE_CATCH_EFFECTS = frozenset(
         HISTORY_MIRROR_CATCH,
     }
 )
-EXCLUSIVE_COOK_EFFECTS = frozenset({CLOVER_COOK, NEXT_SIX_STAR_COOK, NEXT_FIVE_STAR_COOK, SIX_STAR_COOK_FAILURE_RETURN})
+EXCLUSIVE_COOK_EFFECTS = frozenset(
+    {XIXI_SIX_STAR_COOK, CLOVER_COOK, NEXT_SIX_STAR_COOK, NEXT_FIVE_STAR_COOK, SIX_STAR_COOK_FAILURE_RETURN}
+)
 
 # 这些六星菜自带独立抓猪次数。成功结算时消耗效果次数，但不消耗正常时段额度。
 QUOTA_EXEMPT_CATCH_EFFECTS = frozenset(
@@ -117,6 +126,7 @@ CATCH_EFFECT_IDS = frozenset(
         NEXT_CATCH_QUALITY,
         NEXT_PIG_RARITY,
         NEXT_PIG_STATURE,
+        XIXI_TARGETED_CATCH,
         NEXT_SIX_STAR_CATCH,
         MID_AUTUMN_FIXED_SIX_STAR_CATCH,
         CLOVER_CATCH,
@@ -135,6 +145,7 @@ CATCH_EFFECT_IDS = frozenset(
 )
 COOK_EFFECT_IDS = frozenset(
     {
+        XIXI_SIX_STAR_COOK,
         NEXT_COOK_QUALITY,
         NEXT_SIX_STAR_COOK,
         CLOVER_COOK,
@@ -153,6 +164,8 @@ QUOTA_EFFECT_IDS = frozenset(
 )
 IMMEDIATE_EFFECT_IDS = frozenset(
     {
+        XIXI_STAR_CHEESE_LOTTERY,
+        DANIYA_BIRTHDAY_FEAST,
         CLOVER_FEAST,
         MOON_FEAST,
         GROUP_WATER_MIRROR,
@@ -193,6 +206,7 @@ CATCH_PROBABILITY_GROUP = frozenset(
         HISTORY_MIRROR_CATCH,
         NEXT_CATCH_QUALITY,
         NEXT_PIG_RARITY,
+        XIXI_TARGETED_CATCH,
         NEXT_SIX_STAR_CATCH,
         MID_AUTUMN_FIXED_SIX_STAR_CATCH,
         CLOVER_CATCH,
@@ -216,6 +230,7 @@ COOK_SERVING_GROUP = frozenset({COOK_SERVING_BONUS})
 # 做菜概率组：所有“提高做菜成品品质”类效果互斥。
 COOK_PROBABILITY_GROUP = frozenset(
     {
+        XIXI_SIX_STAR_COOK,
         NEXT_COOK_QUALITY,
         NEXT_FOOD_RARITY,
         NEXT_SIX_STAR_COOK,
@@ -264,6 +279,7 @@ class CatchEffectApplication:
     consumed_entry_ids: tuple[str, ...]
     summaries: tuple[str, ...]
     skipped_summaries: tuple[str, ...] = ()
+    targeted_mode: str = ""
     collaboration_only: bool = False
     giant_template_multiplier: float = 1.0
     duplicate_chance_percent: float = 0.0
@@ -429,6 +445,40 @@ def resolve_food_effect(
 
     normalized_id = str(effect_id or "").strip()
     raw = dict(params)
+    if normalized_id in {XIXI_STAR_CHEESE_LOTTERY, DANIYA_BIRTHDAY_FEAST}:
+        if raw:
+            raise FoodEffectError("西西即时美食使用固定效果参数。")
+        summary = (
+            "食用后独立抽取5件美食，每件10%随机五星菜、40%水蜜桃、40%粑粑柑、10%达妮娅的生日蛋糕。"
+            if normalized_id == XIXI_STAR_CHEESE_LOTTERY
+            else "立即获得达妮娅猪和西西猪各1只；下次抓猪必得其他六星猪；下次用六星猪做菜必得其配对六星菜。"
+        )
+        return FoodEffectGrant(normalized_id, {}, 1, summary)
+    if normalized_id == XIXI_TARGETED_CATCH:
+        if set(raw) != {"mode"} or raw["mode"] not in {"pair", "other-six"}:
+            raise FoodEffectError("西西定向抓猪参数无效。")
+        summary = (
+            "下一次成功抓猪必为本群西西猪或达妮娅猪，两者均可用时等概率。"
+            if raw["mode"] == "pair"
+            else "下一次成功抓猪必为其他六星猪，排除本群西西猪及达妮娅猪。"
+        )
+        return FoodEffectGrant(normalized_id, raw, 1, summary + "正常额度与冷却适用，其他加成保留。")
+    if normalized_id == XIXI_SIX_STAR_COOK:
+        if set(raw) != {"six_star_percent"} or type(raw["six_star_percent"]) not in {int, float}:
+            raise FoodEffectError("西西做菜参数无效。")
+        percent = _number(raw, "six_star_percent", lower=60, upper=100)
+        if percent not in {60, 100}:
+            raise FoodEffectError("西西做菜概率仅允许60%或100%。")
+        return FoodEffectGrant(
+            normalized_id,
+            {"six_star_percent": percent},
+            1,
+            (
+                "水蜜桃：下次使用六星猪做菜六星概率+50个百分点，标准基础10%提升至60%；严格按源猪配对，其他加成保留且不消耗。"
+                if percent == 60
+                else "下次使用六星猪做菜必得其配对六星菜；其他加成保留且不消耗。"
+            ),
+        )
     if normalized_id in {
         MID_AUTUMN_FIXED_SIX_STAR_CATCH,
         MID_AUTUMN_SIX_STAR_COOK_BONUS,
@@ -467,8 +517,7 @@ def resolve_food_effect(
                 normalized_id,
                 raw,
                 uses,
-                f"粉蓝冰糕：{uses}次专属抓猪，每次各以50%概率抽取六星概率+3.07或+30.7个百分点；"
-                "其他加成保留且不消耗。",
+                f"粉蓝冰糕：{uses}次专属抓猪，每次各以50%概率抽取六星概率+3.07或+30.7个百分点；其他加成保留且不消耗。",
             )
         if phase != "cook":
             raise FoodEffectError("粉蓝做菜阶段无效。")
@@ -1424,7 +1473,7 @@ def has_compatible_exclusive_cook_effect(
     return any(
         effect.effect_id in EXCLUSIVE_COOK_EFFECTS
         and (
-            (effect.effect_id in {CLOVER_COOK, NEXT_SIX_STAR_COOK} and rarity is Rarity.SIX)
+            (effect.effect_id in {CLOVER_COOK, NEXT_SIX_STAR_COOK, XIXI_SIX_STAR_COOK} and rarity is Rarity.SIX)
             or (effect.effect_id == NEXT_FIVE_STAR_COOK and rarity is not Rarity.SIX)
             or (effect.effect_id == SIX_STAR_COOK_FAILURE_RETURN and rarity is Rarity.SIX)
         )
@@ -1566,7 +1615,15 @@ def apply_catch_effects(
     effects = tuple(
         sorted(
             effects,
-            key=lambda effect: (effect.effect_id != CLOVER_CATCH, effect.created_at, effect.effect_entry_id),
+            key=lambda effect: (
+                (
+                    effect.effect_id != CLOVER_CATCH
+                    if not any(e.effect_id == XIXI_TARGETED_CATCH for e in effects)
+                    else False
+                ),
+                effect.created_at,
+                effect.effect_entry_id,
+            ),
         )
     )
     adjusted = list(normalize_weights(weights))
@@ -1664,6 +1721,8 @@ def apply_catch_effects(
                     adjusted[5] = 0.0
             else:
                 adjusted = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0] if adjusted[5] > 0 else [1.0, 1.0, 1.0, 1.0, 2.0, 0.0]
+        elif exclusive.effect_id == XIXI_TARGETED_CATCH:
+            adjusted = [0.0, 0.0, 0.0, 0.0, 0.0, 100.0]
         elif exclusive.effect_id == NEXT_GUARANTEED_SIX_STAR_CATCH:
             adjusted = [0.0, 0.0, 0.0, 0.0, 0.0, 100.0] if adjusted[5] > 0.0 else [0.0, 0.0, 0.0, 0.0, 100.0, 0.0]
         elif exclusive.effect_id == EXCLUSIVE_CATCH_QUALITY:
@@ -1688,6 +1747,7 @@ def apply_catch_effects(
         return CatchEffectApplication(
             weights=normalize_weights(adjusted),
             stature_bias=0.0,
+            targeted_mode=str(grant.params["mode"]) if exclusive.effect_id == XIXI_TARGETED_CATCH else "",
             consumed_entry_ids=tuple(consumed),
             summaries=tuple(summaries),
             skipped_summaries=tuple(skipped),
@@ -2121,7 +2181,15 @@ def apply_cooking_effects(
     effects = tuple(
         sorted(
             effects,
-            key=lambda effect: (effect.effect_id != CLOVER_COOK, effect.created_at, effect.effect_entry_id),
+            key=lambda effect: (
+                (
+                    effect.effect_id != CLOVER_COOK
+                    if not any(e.effect_id == XIXI_SIX_STAR_COOK for e in effects)
+                    else False
+                ),
+                effect.created_at,
+                effect.effect_entry_id,
+            ),
         )
     )
     adjusted = list(normalize_weights(weights))
@@ -2131,7 +2199,7 @@ def apply_cooking_effects(
 
     def exclusive_compatible(effect: ActiveFoodEffect) -> bool:
         return (
-            (effect.effect_id in {CLOVER_COOK, NEXT_SIX_STAR_COOK} and rarity is Rarity.SIX)
+            (effect.effect_id in {CLOVER_COOK, NEXT_SIX_STAR_COOK, XIXI_SIX_STAR_COOK} and rarity is Rarity.SIX)
             or (effect.effect_id == NEXT_FIVE_STAR_COOK and rarity is not Rarity.SIX)
             or (effect.effect_id == SIX_STAR_COOK_FAILURE_RETURN and rarity is Rarity.SIX)
         )
@@ -2146,7 +2214,7 @@ def apply_cooking_effects(
         grant = resolve_food_effect(exclusive.effect_id, exclusive.params)
         clover_bonus_roll: float | None = None
         clover_bonus_points = 0.0
-        if exclusive.effect_id in {CLOVER_COOK, NEXT_SIX_STAR_COOK}:
+        if exclusive.effect_id in {CLOVER_COOK, NEXT_SIX_STAR_COOK, XIXI_SIX_STAR_COOK}:
             if exclusive.effect_id == CLOVER_COOK:
                 clover_bonus_points = float(grant.params["star_sum"])
                 six_star_percent = min(100.0, adjusted[5] + clover_bonus_points)

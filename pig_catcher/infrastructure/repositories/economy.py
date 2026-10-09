@@ -11,6 +11,7 @@ from ...domain.feature_shop import (
     FeatureShopProduct,
     FeatureShopSystem,
 )
+from ...domain.food_templates import is_reward_only_food, is_zero_value_food, template_recipe_tags
 from ...domain.models import AssetSelector
 from ..database import DatabaseSession
 from .activity_locks import unoccupied_clause
@@ -83,7 +84,7 @@ class EconomyRepository:
             """,
             (scope_id, rarity),
         )
-        return [dict(row) for row in rows]
+        return [dict(row) for row in rows if not is_reward_only_food(template_recipe_tags(dict(row)))]
 
     async def catch_quota_bonuses(
         self,
@@ -1343,6 +1344,13 @@ class EconomyRepository:
         *,
         values: Mapping[str, object],
     ) -> None:
+        # 价值由正式模板约束，所有发菜入口（包含管理员和自选券）保持一致。
+        template = await session.fetch_one(
+            "SELECT recipe_tags_json FROM food_templates WHERE template_id = ?",
+            (str(values["template_id"]),),
+        )
+        if template is not None and is_zero_value_food(template_recipe_tags(dict(template))):
+            values = {**values, "official_value": 0}
         await session.execute(
             """
             INSERT INTO food_instances(

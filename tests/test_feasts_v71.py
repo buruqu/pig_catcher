@@ -265,6 +265,7 @@ async def test_schema70_updates_uneaten_and_locked_food_only(tmp_path):
     with sqlite3.connect(db.path) as con:
         con.execute("DROP TABLE player_clover_chains")
         con.execute("DROP TABLE player_moon_feasts")
+        con.execute("ALTER TABLE battle_profiles DROP COLUMN battle_form_id")
         con.execute("DELETE FROM schema_migrations WHERE version>=70")
         con.execute("PRAGMA user_version=69")
     await db.open()

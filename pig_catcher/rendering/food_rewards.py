@@ -9,6 +9,7 @@ from io import BytesIO
 
 from PIL import Image
 
+from ..domain.xixi_feast import DANIYA_BIRTHDAY_FEAST, XIXI_STAR_CHEESE_LOTTERY
 from ..services.economy import EatResult
 from .models import RenderedImage
 
@@ -104,12 +105,19 @@ def food_reward_view(result: EatResult) -> FoodRewardView:
     is_lottery = bool(payload.get("prize_id"))
     reward_kind = str(payload.get("kind") or "")
     title_by_kind = {
+        XIXI_STAR_CHEESE_LOTTERY: "西西五连奖励已到账",
+        DANIYA_BIRTHDAY_FEAST: "生日双猪已到账",
         "clover-feast": "粉蓝专属抓猪已到账",
         "moon-feast": "月栖时段计划已生效",
         "catch-window-transfer": "月光迁时已生效",
         "window-six-star-resonance": "粉蓝共鸣已点亮",
     }
     hint_by_kind = {
+        XIXI_STAR_CHEESE_LOTTERY: "输入 /美食背包 查看5份奖品；每份独立抽取，重复查看不会再次发奖。",
+        DANIYA_BIRTHDAY_FEAST: (
+            "输入 /猪猪背包 查看双猪；之后 /抓猪 保底其他六星猪，使用六星猪 /做菜 保底对应六星菜。"
+            "两项效果分别排队，低星做菜不会消耗做菜保底。"
+        ),
         "clover-feast": (
             "发送 /抓猪 用完7次专属机会；按累计星数提高下一次六星猪 /做菜 成功率。"
             "成功奖励抓猪，抓完才解锁下轮做菜。"
@@ -119,6 +127,8 @@ def food_reward_view(result: EatResult) -> FoodRewardView:
         "window-six-star-resonance": "共鸣仅持续当前抓猪时段；抓猪与做菜会实时累积彼此的六星概率。",
     }
     prize_by_kind = {
+        XIXI_STAR_CHEESE_LOTTERY: "5份美食 · 独立抽取",
+        DANIYA_BIRTHDAY_FEAST: "双猪赠礼 · 抓猪与做菜保底",
         "clover-feast": "7次抓猪 → 做菜；前两轮成功各得3次抓猪与7道菜 → 抓完再做菜，最多3轮",
         "moon-feast": str(payload.get("target_window") or "奖励时段"),
         "catch-window-transfer": (f"{payload.get('blocked_window', '')} → {payload.get('target_window', '')}").strip(

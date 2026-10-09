@@ -20,6 +20,10 @@ from ..domain.enums import (
 )
 from ..domain.errors import FoodEffectError
 from ..domain.food_effects import SUPPORTED_EFFECT_IDS, resolve_food_effect
+from ..domain.food_templates import (
+    ZERO_VALUE_FOOD_TAG,
+    is_reward_only_food,
+)
 from ..domain.models import ScopeKey
 from ..version import ASSET_MANIFEST_VERSION
 
@@ -133,6 +137,14 @@ class AssetManifestEntry(BaseModel):
 
     @model_validator(mode="after")
     def validate_scope_and_kind(self) -> AssetManifestEntry:
+        reward_only = is_reward_only_food(self.recipe_tags)
+        zero_value = ZERO_VALUE_FOOD_TAG in self.recipe_tags
+        if reward_only != zero_value:
+            raise ValueError("特殊奖励菜必须同时声明 special-reward-food 和 zero-value 标签")
+        if reward_only and (
+            self.kind is not AssetKind.FOOD or self.scope is not TemplateScope.GROUP or self.rarity is not Rarity.SIX
+        ):
+            raise ValueError("特殊奖励菜只允许群专属六星美食")
         if self.scope is TemplateScope.COMMON:
             if self.rarity is Rarity.SIX:
                 raise ValueError("六星素材不能声明为公共素材")
@@ -166,8 +178,7 @@ class AssetManifestEntry(BaseModel):
             if self.effect_id or self.effect_params:
                 raise ValueError("猪素材不能声明美食效果")
             if self.paired_food_template_id and (
-                self.scope is not TemplateScope.GROUP
-                or self.rarity is not Rarity.SIX
+                self.scope is not TemplateScope.GROUP or self.rarity is not Rarity.SIX
             ):
                 raise ValueError("只有群专属六星猪可以绑定定制六星菜")
         elif any(
@@ -222,9 +233,7 @@ class AssetManifest(BaseModel):
                 continue
             slot_key = (collection.collection_id, collection.slot)
             if slot_key in collection_slots:
-                raise ValueError(
-                    f"联动收藏系列 {collection.collection_id} 存在重复槽位 {collection.slot}"
-                )
+                raise ValueError(f"联动收藏系列 {collection.collection_id} 存在重复槽位 {collection.slot}")
             collection_slots.add(slot_key)
             definition = (
                 collection.collection_name,
@@ -239,9 +248,7 @@ class AssetManifest(BaseModel):
             six_star_pigs = [
                 entry
                 for entry in self.entries
-                if entry.kind is AssetKind.PIG
-                and entry.scope is TemplateScope.GROUP
-                and entry.rarity is Rarity.SIX
+                if entry.kind is AssetKind.PIG and entry.scope is TemplateScope.GROUP and entry.rarity is Rarity.SIX
             ]
             six_star_food_ids = {
                 entry.template_id
@@ -249,31 +256,26 @@ class AssetManifest(BaseModel):
                 if entry.kind is AssetKind.FOOD
                 and entry.scope is TemplateScope.GROUP
                 and entry.rarity is Rarity.SIX
+                and not is_reward_only_food(entry.recipe_tags)
             }
             paired_food_ids: list[str] = []
             for pig in six_star_pigs:
                 paired_id = pig.paired_food_template_id
                 if not paired_id:
-                    raise ValueError(
-                        f"群专属六星猪 {pig.template_id} 必须绑定对应定制六星菜"
-                    )
+                    raise ValueError(f"群专属六星猪 {pig.template_id} 必须绑定对应定制六星菜")
                 food = entries_by_id.get(paired_id)
                 if food is None:
-                    raise ValueError(
-                        f"群专属六星猪 {pig.template_id} 绑定的美食模板不存在"
-                    )
+                    raise ValueError(f"群专属六星猪 {pig.template_id} 绑定的美食模板不存在")
                 if (
                     food.kind is not AssetKind.FOOD
                     or food.scope is not TemplateScope.GROUP
                     or food.rarity is not Rarity.SIX
                 ):
-                    raise ValueError(
-                        f"群专属六星猪 {pig.template_id} 只能绑定群专属六星菜"
-                    )
+                    raise ValueError(f"群专属六星猪 {pig.template_id} 只能绑定群专属六星菜")
                 if food.group_scope_id != pig.group_scope_id:
-                    raise ValueError(
-                        f"群专属六星猪 {pig.template_id} 不能绑定其他群的定制六星菜"
-                    )
+                    raise ValueError(f"群专属六星猪 {pig.template_id} 不能绑定其他群的定制六星菜")
+                if is_reward_only_food(food.recipe_tags):
+                    raise ValueError("六星猪不能绑定特殊奖励菜作为烹饪配方")
                 paired_food_ids.append(paired_id)
             if len(paired_food_ids) != len(set(paired_food_ids)):
                 raise ValueError("同一道定制六星菜不能绑定给多只六星猪")

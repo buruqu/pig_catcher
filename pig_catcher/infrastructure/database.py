@@ -320,6 +320,16 @@ class PigCatcherDatabase:
         if "check(usedbetween0and18)" not in normalized_moon_sql:
             raise MigrationError("数据库月栖奖励次数约束不是 18 次，请先完成 Schema 72 迁移。")
 
+        battle_columns = await (await connection.execute("PRAGMA table_info(battle_profiles)")).fetchall()
+        if not any(str(row[1]) == "battle_form_id" and bool(row[3]) for row in battle_columns):
+            raise MigrationError("数据库缺少战前形态选择字段，请先完成 Schema 73 迁移。")
+        battle_loot_guard = await (
+            await connection.execute("SELECT sql FROM sqlite_master WHERE name='battle_loot_total_insert'")
+        ).fetchone()
+        normalized_loot_sql = "".join(str(battle_loot_guard[0]).lower().split()) if battle_loot_guard else ""
+        if "definition_versionbetween2and19" not in normalized_loot_sql:
+            raise MigrationError("数据库战利品约束未支持 Battle v19，请先完成 Schema 73 迁移。")
+
         upgrade_definition = await (
             await connection.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='upgrades'")
         ).fetchone()

@@ -216,6 +216,8 @@ class BattleRepository:
         if not profile["pig_instance_id"]:
             raise BattleError(f"{safe_display_name(row['display_name'], row['platform_user_id'])}还没有设置战斗猪。")
         member = await self.member(session, player_id, profile["pig_instance_id"], available=True)
+        if member["fighter_id"] == "xixi" and profile["battle_form_id"] != "xixi-celestial":
+            raise BattleError("西西猪参战前，请先发送 /战斗猪 形态 西天帝；原型战斗盘尚未开放。")
         tool = profile["tool_id"]
         if tool:
             balance = await session.fetch_one(
@@ -225,6 +227,7 @@ class BattleRepository:
                 raise BattleError("已选择的对战器具不足，请先制作或 /战斗猪 器具 无。")
         return {
             **member,
+            **({"battle_form_id": profile["battle_form_id"]} if member["fighter_id"] == "xixi" else {}),
             "player_id": player_id,
             "player_name": safe_display_name(row["display_name"], row["platform_user_id"]),
             "tool_id": tool,

@@ -1,9 +1,9 @@
 {
-  "source_root": "asset_library/current/media",
+  "source_root": "catalogs/formal/pig-and-food-definitions.json + asset_library/current/media",
   "definitions": "catalogs/formal/pig-and-food-definitions.json",
-  "entry_count": 366,
-  "unique_binary_count": 271,
-  "stored_binary_count": 370,
+  "entry_count": 386,
+  "unique_binary_count": 276,
+  "stored_binary_count": 390,
   "duplicate_aliases": [
     {
       "source_path": "猪猪素材库/紫色品质/翻滚猪.jpg",
@@ -2573,6 +2573,149 @@
       "media_path": "media/中秋限定2026/food-snow-skin-pig-mooncake.png",
       "sha256": "3128135238e5ebbb9d013f2b65e7f768abbd22401c9d51efb554457757e09749",
       "bytes": 1060646
+    },
+    {
+      "template_id": "pig-g1092931381-xixi",
+      "source_path": "定制猪群友库/1092931381/西西猪.png",
+      "media_path": "media/定制猪群友库/1092931381/西西猪.png",
+      "sha256": "1125c35e9cf10ee8a93e46f16f70f9c2709bcbcad7ac4bf521eb8986303a12a9",
+      "bytes": 2033722
+    },
+    {
+      "template_id": "food-g1092931381-xixi-sun-star-cheese",
+      "source_path": "定制美食库/1092931381/西西昭日星酪.png",
+      "media_path": "media/定制美食库/1092931381/西西昭日星酪.png",
+      "sha256": "437107da89f88c5b14eb73065c9075a4f118bc16e847e7184714c976fc5ab25c",
+      "bytes": 2338756
+    },
+    {
+      "template_id": "food-g1092931381-daniya-peach",
+      "source_path": "定制美食库/1092931381/水蜜桃.png",
+      "media_path": "media/定制美食库/1092931381/水蜜桃.png",
+      "sha256": "d62496a61409597821b0ade84ae485c0c9c0b9830c91eed8caa8ba482796ad24",
+      "bytes": 2210435
+    },
+    {
+      "template_id": "food-g1092931381-xixi-mandarin",
+      "source_path": "定制美食库/1092931381/粑粑柑.png",
+      "media_path": "media/定制美食库/1092931381/粑粑柑.png",
+      "sha256": "f3317d330627ce62a7dab8dc7677d80a0080a492a47a1e5dfc5dbe8c23d2846e",
+      "bytes": 2352234
+    },
+    {
+      "template_id": "food-g1092931381-daniya-birthday-cake",
+      "source_path": "定制美食库/1092931381/达妮娅的生日蛋糕.png",
+      "media_path": "media/定制美食库/1092931381/达妮娅的生日蛋糕.png",
+      "sha256": "943a34eccf98156d85f8359669853bc1d7780c86ca81924f83d7ee419935b24c",
+      "bytes": 2040669
+    },
+    {
+      "template_id": "pig-g237716658-xixi",
+      "source_path": "定制猪群友库/237716658/西西猪.png",
+      "media_path": "media/定制猪群友库/237716658/西西猪.png",
+      "sha256": "1125c35e9cf10ee8a93e46f16f70f9c2709bcbcad7ac4bf521eb8986303a12a9",
+      "bytes": 2033722
+    },
+    {
+      "template_id": "food-g237716658-xixi-sun-star-cheese",
+      "source_path": "定制美食库/237716658/西西昭日星酪.png",
+      "media_path": "media/定制美食库/237716658/西西昭日星酪.png",
+      "sha256": "437107da89f88c5b14eb73065c9075a4f118bc16e847e7184714c976fc5ab25c",
+      "bytes": 2338756
+    },
+    {
+      "template_id": "food-g237716658-daniya-peach",
+      "source_path": "定制美食库/237716658/水蜜桃.png",
+      "media_path": "media/定制美食库/237716658/水蜜桃.png",
+      "sha256": "d62496a61409597821b0ade84ae485c0c9c0b9830c91eed8caa8ba482796ad24",
+      "bytes": 2210435
+    },
+    {
+      "template_id": "food-g237716658-xixi-mandarin",
+      "source_path": "定制美食库/237716658/粑粑柑.png",
+      "media_path": "media/定制美食库/237716658/粑粑柑.png",
+      "sha256": "f3317d330627ce62a7dab8dc7677d80a0080a492a47a1e5dfc5dbe8c23d2846e",
+      "bytes": 2352234
+    },
+    {
+      "template_id": "food-g237716658-daniya-birthday-cake",
+      "source_path": "定制美食库/237716658/达妮娅的生日蛋糕.png",
+      "media_path": "media/定制美食库/237716658/达妮娅的生日蛋糕.png",
+      "sha256": "943a34eccf98156d85f8359669853bc1d7780c86ca81924f83d7ee419935b24c",
+      "bytes": 2040669
+    },
+    {
+      "template_id": "pig-qo5e5854406d0297d6feae696a13e3a339-xixi",
+      "source_path": "定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/西西猪.png",
+      "media_path": "media/定制猪群友库/5E5854406D0297D6FEAE696A13E3A339/西西猪.png",
+      "sha256": "1125c35e9cf10ee8a93e46f16f70f9c2709bcbcad7ac4bf521eb8986303a12a9",
+      "bytes": 2033722
+    },
+    {
+      "template_id": "food-qo5e5854406d0297d6feae696a13e3a339-xixi-sun-star-cheese",
+      "source_path": "定制美食库/5E5854406D0297D6FEAE696A13E3A339/西西昭日星酪.png",
+      "media_path": "media/定制美食库/5E5854406D0297D6FEAE696A13E3A339/西西昭日星酪.png",
+      "sha256": "437107da89f88c5b14eb73065c9075a4f118bc16e847e7184714c976fc5ab25c",
+      "bytes": 2338756
+    },
+    {
+      "template_id": "food-qo5e5854406d0297d6feae696a13e3a339-daniya-peach",
+      "source_path": "定制美食库/5E5854406D0297D6FEAE696A13E3A339/水蜜桃.png",
+      "media_path": "media/定制美食库/5E5854406D0297D6FEAE696A13E3A339/水蜜桃.png",
+      "sha256": "d62496a61409597821b0ade84ae485c0c9c0b9830c91eed8caa8ba482796ad24",
+      "bytes": 2210435
+    },
+    {
+      "template_id": "food-qo5e5854406d0297d6feae696a13e3a339-xixi-mandarin",
+      "source_path": "定制美食库/5E5854406D0297D6FEAE696A13E3A339/粑粑柑.png",
+      "media_path": "media/定制美食库/5E5854406D0297D6FEAE696A13E3A339/粑粑柑.png",
+      "sha256": "f3317d330627ce62a7dab8dc7677d80a0080a492a47a1e5dfc5dbe8c23d2846e",
+      "bytes": 2352234
+    },
+    {
+      "template_id": "food-qo5e5854406d0297d6feae696a13e3a339-daniya-birthday-cake",
+      "source_path": "定制美食库/5E5854406D0297D6FEAE696A13E3A339/达妮娅的生日蛋糕.png",
+      "media_path": "media/定制美食库/5E5854406D0297D6FEAE696A13E3A339/达妮娅的生日蛋糕.png",
+      "sha256": "943a34eccf98156d85f8359669853bc1d7780c86ca81924f83d7ee419935b24c",
+      "bytes": 2040669
+    },
+    {
+      "template_id": "pig-qo9ea2810f378fbd7dc3219c56ceab3520-xixi",
+      "source_path": "定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/西西猪.png",
+      "media_path": "media/定制猪群友库/9EA2810F378FBD7DC3219C56CEAB3520/西西猪.png",
+      "sha256": "1125c35e9cf10ee8a93e46f16f70f9c2709bcbcad7ac4bf521eb8986303a12a9",
+      "bytes": 2033722
+    },
+    {
+      "template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-xixi-sun-star-cheese",
+      "source_path": "定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/西西昭日星酪.png",
+      "media_path": "media/定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/西西昭日星酪.png",
+      "sha256": "437107da89f88c5b14eb73065c9075a4f118bc16e847e7184714c976fc5ab25c",
+      "bytes": 2338756
+    },
+    {
+      "template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-daniya-peach",
+      "source_path": "定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/水蜜桃.png",
+      "media_path": "media/定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/水蜜桃.png",
+      "sha256": "d62496a61409597821b0ade84ae485c0c9c0b9830c91eed8caa8ba482796ad24",
+      "bytes": 2210435
+    },
+    {
+      "template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-xixi-mandarin",
+      "source_path": "定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/粑粑柑.png",
+      "media_path": "media/定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/粑粑柑.png",
+      "sha256": "f3317d330627ce62a7dab8dc7677d80a0080a492a47a1e5dfc5dbe8c23d2846e",
+      "bytes": 2352234
+    },
+    {
+      "template_id": "food-qo9ea2810f378fbd7dc3219c56ceab3520-daniya-birthday-cake",
+      "source_path": "定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/达妮娅的生日蛋糕.png",
+      "media_path": "media/定制美食库/9EA2810F378FBD7DC3219C56CEAB3520/达妮娅的生日蛋糕.png",
+      "sha256": "943a34eccf98156d85f8359669853bc1d7780c86ca81924f83d7ee419935b24c",
+      "bytes": 2040669
     }
+  ],
+  "retained_alias_files": [
+    "media/猪猪素材库/紫色品质/翻滚猪.jpg"
   ]
 }

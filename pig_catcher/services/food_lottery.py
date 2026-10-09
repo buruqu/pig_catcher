@@ -11,6 +11,7 @@ from uuid import uuid4
 from ..domain.economy import generate_food_attributes, recipe_affinity
 from ..domain.errors import AssetStateConflictError, FoodEffectError, ReceiptConflictError
 from ..domain.food_lottery import HINA_PIG_TEMPLATE_ID, YILU_LOTTERY, LotteryPrize, choose_lottery_prize, validated_roll
+from ..domain.food_templates import is_reward_only_food, template_recipe_tags
 from ..domain.gameplay import generate_pig_attributes
 from ..domain.models import CommandIdentity
 from ..domain.ports import RandomSource
@@ -112,7 +113,12 @@ async def _candidate_templates(session: DatabaseSession, scope_id: str, prize: L
         result = [dict(row) for row in rows if row["template_id"] == HINA_PIG_TEMPLATE_ID]
     else:
         # 原料绑定食谱永远不进入随机奖励池，不能用抽奖绕过 KFC / JJK 专属原料。
-        result = [dict(row) for row in rows if row["template_id"] not in SOURCE_EXCLUSIVE_FOOD_TEMPLATE_IDS]
+        result = [
+            dict(row)
+            for row in rows
+            if row["template_id"] not in SOURCE_EXCLUSIVE_FOOD_TEMPLATE_IDS
+            and not is_reward_only_food(template_recipe_tags(dict(row)))
+        ]
     if not result:
         target = "天才猪（日菜）" if prize.kind == "pig" else f"{prize.rarity}星非原料绑定美食"
         raise FoodEffectError(f"当前群没有已启用且已授权的{target}，本次品鉴未结算。")
@@ -193,6 +199,7 @@ async def _grant_item(
             source_weight=60.0,
             source_weight_percentile=0.5,
             portion_roll=portion_roll,
+            recipe_tags=template_recipe_tags(template),
         )
         try:
             tags = json.loads(template["recipe_tags_json"])

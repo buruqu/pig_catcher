@@ -29,7 +29,7 @@ class BattleSetup:
             and match["status"] == "active"
             and identity.player_id in {match["initiator_id"], match["opponent_id"]}
         ):
-            raise BattleError("正在对战，不能换猪、强化、修改器具或解除保护。")
+            raise BattleError("正在对战，不能换猪、强化、修改器具、切换形态或解除保护。")
 
     async def profile(self, session, identity, now_ms):
         profile = await self.repo.profile(session, identity.player_id)
@@ -90,6 +90,17 @@ class BattleSetup:
                             "每回合首次数值招式额外+1" if pig and pig["trait_bonus"] else "无",
                             "体型/体重模板内平均位置≥75%时生效，不翻倍。",
                         ),
+                        *(
+                            (
+                                Line(
+                                    "战前形态",
+                                    "西天帝路线" if profile["battle_form_id"] == "xixi-celestial" else "尚未选择",
+                                    "发送 /战斗猪 形态 西天帝 后参战；原型未开放，局内不能改选。",
+                                ),
+                            )
+                            if pig and pig["fighter_id"] == "xixi"
+                            else ()
+                        ),
                     ),
                 ),
             ),
@@ -136,6 +147,26 @@ class BattleSetup:
             return view(identity, "已取消战斗猪确认", banner="未消耗资源；挑战邀请请用 /比划比划 取消。")
         await self.idle(session, identity)
         profile = await self.repo.profile(session, identity.player_id)
+        if action == "select_form":
+            if args.get("form_id") == "xixi-prototype":
+                raise BattleError("西西猪原型战斗盘尚未设计，当前只能选择西天帝路线。")
+            if args.get("form_id") != "xixi-celestial":
+                raise BattleError("未知西西猪战斗形态。")
+            if not profile["pig_instance_id"]:
+                raise BattleError("请先 /战斗猪 设置 西西猪 并确认，再选择战前形态。")
+            member = await self.repo.member(session, identity.player_id, profile["pig_instance_id"], available=True)
+            if member["fighter_id"] != "xixi":
+                raise BattleError("当前战斗猪不是西西猪，不能选择西天帝路线。")
+            if profile["battle_form_id"] != "xixi-celestial":
+                await session.execute(
+                    "UPDATE battle_profiles SET battle_form_id=?,revision=revision+1 WHERE player_id=?",
+                    ("xixi-celestial", identity.player_id),
+                )
+                await self.repo.fact(
+                    session, identity.player_id, identity.scope.value, key, "battle-form-selected", now_ms,
+                    {"pig_instance_id": member["pig_instance_id"], "form_id": "xixi-celestial"},
+                )
+            return await self.profile(session, identity, now_ms)
         if action == "equip":
             tool = args.get("tool_id", "")
             if tool and tool not in TOOLS_BY_ID:
@@ -226,8 +257,9 @@ class BattleSetup:
         if operation == "assign":
             await self.repo.protect(session, identity.player_id, identity.scope.value, pig_id)
             await session.execute(
-                "UPDATE battle_profiles SET pig_instance_id=?,revision=revision+1 WHERE player_id=?",
-                (pig_id, identity.player_id),
+                "UPDATE battle_profiles SET battle_form_id=CASE WHEN pig_instance_id=? "
+                "THEN battle_form_id ELSE '' END,pig_instance_id=?,revision=revision+1 WHERE player_id=?",
+                (pig_id, pig_id, identity.player_id),
             )
         elif operation == "retire":
             await session.execute(
@@ -235,7 +267,7 @@ class BattleSetup:
                 (pig_id, identity.player_id),
             )
             await session.execute(
-                "UPDATE battle_profiles SET pig_instance_id=NULL,revision=revision+1 "
+                "UPDATE battle_profiles SET pig_instance_id=NULL,battle_form_id='',revision=revision+1 "
                 "WHERE player_id=? AND pig_instance_id=?",
                 (identity.player_id, pig_id),
             )

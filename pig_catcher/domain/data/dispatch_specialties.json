@@ -2,6 +2,10 @@
   "definition_version": 1,
   "description": "按稳定模板ID审阅的旅行特长；未来未录入模板使用中性后勤，不按名称在运行时猜测。",
   "templates": {
+    "pig-g1092931381-xixi": ["后勤"],
+    "pig-g237716658-xixi": ["后勤"],
+    "pig-qo5e5854406d0297d6feae696a13e3a339-xixi": ["后勤"],
+    "pig-qo9ea2810f378fbd7dc3219c56ceab3520-xixi": ["后勤"],
     "pig-g1092931381-luoli-c": ["灵巧", "后勤"],
     "pig-g237716658-luoli-c": ["灵巧", "后勤"],
     "pig-qo5e5854406d0297d6feae696a13e3a339-luoli-c": ["灵巧", "后勤"],

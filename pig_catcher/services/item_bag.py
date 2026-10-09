@@ -18,6 +18,7 @@ from ..domain.display import display_tags_from_json, format_length, format_weigh
 from ..domain.economy import generate_food_attributes, recipe_affinity
 from ..domain.enums import AssetKind
 from ..domain.errors import AssetStateConflictError, DomainValidationError
+from ..domain.food_templates import template_recipe_tags
 from ..domain.gameplay import generate_pig_attributes
 from ..domain.item_bag import (
     BAG_PAGE_SIZE,
@@ -590,6 +591,7 @@ class ItemBagService:
             source_weight=60.0,
             source_weight_percentile=0.5,
             portion_roll=portion_roll,
+            recipe_tags=template_recipe_tags(template),
         )
         try:
             tag_payload = json.loads(str(template.get("recipe_tags_json") or "[]"))

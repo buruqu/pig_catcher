@@ -39,6 +39,7 @@ SETUP = frozenset(
         "profile",
         "tools",
         "equip",
+        "select_form",
         "craft",
         "assign_preview",
         "retire_preview",
@@ -335,8 +336,10 @@ class BattleService:
             raise BattleError("只有本场双方可以执行此操作；其他群友可用 /对战状态 观战。")
         side = ids.index(identity.player_id)
         state = loads(match["state_json"])
-        if match["definition_version"] != BATTLE_VERSION:
+        if match["definition_version"] not in {17, 18, BATTLE_VERSION}:
             raise BattleError("当前对战规则版本不可恢复，保留现场等待维护。")
+        if state["version"] != match["definition_version"]:
+            raise BattleError("对战现场与规则快照版本不一致，保留现场等待维护。")
         if action in {"accept", "decline", "cancel_invite"}:
             if match["status"] != "pending":
                 raise BattleError("邀请已处理，不能重复接受、拒绝或取消。")
@@ -358,7 +361,7 @@ class BattleService:
                 snap["achievement_entry"] = await AchievementCouponRepository().consume(
                     session, snap["player_id"], "battle-visual", match["battle_id"], iso_ms(now_ms)
                 )
-            state = new_state(snapshots, seed=match["random_seed"])
+            state = new_state(snapshots, seed=match["random_seed"], version=match["definition_version"])
             day = beijing_day(now_ms)
             await session.execute(
                 "UPDATE battle_matches SET status='active',state_json=?,accepted_day=?,expires_ms=? WHERE battle_id=?",

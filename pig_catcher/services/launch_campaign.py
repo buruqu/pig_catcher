@@ -15,6 +15,7 @@ from ..domain.dispatch_views import DispatchView
 from ..domain.economy import generate_food_attributes, recipe_affinity
 from ..domain.enums import AssetKind
 from ..domain.errors import DomainValidationError
+from ..domain.food_templates import template_recipe_tags
 from ..domain.item_bag import (
     BATTLE_PIG_CHOICE_COUPON,
     CODE_CHANGE_COUPON,
@@ -285,6 +286,7 @@ class LaunchCampaignService:
             source_weight=60.0,
             source_weight_percentile=0.5,
             portion_roll=portion_roll,
+            recipe_tags=template_recipe_tags(template),
         )
         try:
             tags_payload = json.loads(str(template.get("recipe_tags_json") or "[]"))

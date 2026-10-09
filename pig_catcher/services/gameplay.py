@@ -111,6 +111,7 @@ from ..domain.special_content import (
     domain_cooking_weights,
     is_crazy_thursday,
 )
+from ..domain.xixi_feast import XIXI_TARGETED_CATCH, targeted_catch_templates
 from ..infrastructure.database import DatabaseSession, PigCatcherDatabase
 from ..infrastructure.repositories import (
     AchievementRepository,
@@ -1223,9 +1224,10 @@ class GameplayService:
             )
             armed_item, armed_uses = self._armed_item(armed_row, "catching")
             equipped_item = armed_item
+            xixi_pending = any(e.effect_id == XIXI_TARGETED_CATCH for e in applicable_active_effects)
             group_exclusive_effect_active = (
                 False
-                if (transfer_target_active or moon_active)
+                if (transfer_target_active or moon_active or xixi_pending)
                 else has_compatible_exclusive_group_catch_effect(active_group_effects)
             )
             personal_exclusive_effect_active = (
@@ -1259,7 +1261,9 @@ class GameplayService:
             )
             if moon_active:
                 ordinary_effects = tuple(
-                    e for e in applicable_active_effects if e.effect_id not in QUOTA_EXEMPT_CATCH_EFFECTS
+                    e
+                    for e in applicable_active_effects
+                    if e.effect_id not in QUOTA_EXEMPT_CATCH_EFFECTS | {XIXI_TARGETED_CATCH}
                 )
                 effect_application = apply_catch_effects(
                     weights,
@@ -1512,6 +1516,11 @@ class GameplayService:
                 excluded_summaries += (
                     "2.0 开服首日高星加成本次遇到六星独占、联动固定分布或概率换位规则，未参与结算。",
                 )
+            if effect_application.targeted_mode:
+                candidate_buckets = dict(candidate_buckets)
+                candidate_buckets[Rarity.SIX] = targeted_catch_templates(
+                    candidate_buckets[Rarity.SIX], identity.scope.value, effect_application.targeted_mode
+                )
             rarity_roll = self.random_source.random()
             rarity = choose_rarity(weights, rarity_roll)
             candidates = candidate_buckets[rarity]
@@ -1541,11 +1550,16 @@ class GameplayService:
                 and not history_mirror_active
                 and not effect_application.collaboration_only
             ):
-                available_festival_templates = [
-                    row for festival_id in MID_AUTUMN_PIG_UP_IDS
-                    for row in festival_templates
-                    if str(row["template_id"]) == festival_id
-                ] if rarity is Rarity.FIVE else []
+                available_festival_templates = (
+                    [
+                        row
+                        for festival_id in MID_AUTUMN_PIG_UP_IDS
+                        for row in festival_templates
+                        if str(row["template_id"]) == festival_id
+                    ]
+                    if rarity is Rarity.FIVE
+                    else []
+                )
                 if available_festival_templates:
                     festival_up_roll = self.random_source.random()
                     if festival_up_roll < MID_AUTUMN_CATCH_UP_CHANCE:
@@ -1679,7 +1693,7 @@ class GameplayService:
                 )
             auto_gift_target_player_id = ""
             resonance_reward_foods: tuple[str, ...] = ()
-            if window_resonance is not None and not moon_active:
+            if window_resonance is not None and not moon_active and not effect_application.targeted_mode:
                 cook_bonus_after = await self.economy_repository.add_window_resonance_cook_bonus(
                     session,
                     player_id=identity.player_id,
@@ -1709,6 +1723,7 @@ class GameplayService:
                 "feed_level": feed_level,
                 "player_level": probability_level,
                 "item_id": armed_item.item_id if armed_item is not None else "",
+                "xixi_targeted_mode": effect_application.targeted_mode,
                 "rarity_roll": rarity_roll,
                 "template_roll": template_roll,
                 "attribute_rolls": list(attribute_rolls),
@@ -1782,7 +1797,12 @@ class GameplayService:
                     "updated_at": now,
                 },
             )
-            if window_resonance is not None and not moon_active and rarity is Rarity.SIX:
+            if (
+                window_resonance is not None
+                and not moon_active
+                and not effect_application.targeted_mode
+                and rarity is Rarity.SIX
+            ):
                 resonance_reward_foods = await self._grant_random_three_star_foods(
                     session,
                     identity=identity,
@@ -1846,7 +1866,7 @@ class GameplayService:
                 now=now,
             )
             effect_summaries += tuple(mirror_summaries)
-            if active_group_technique is not None:
+            if active_group_technique is not None and not effect_application.targeted_mode:
                 technique_resolution = await self._apply_group_technique_to_catch(
                     session,
                     identity=identity,

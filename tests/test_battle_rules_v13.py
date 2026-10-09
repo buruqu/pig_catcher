@@ -33,11 +33,9 @@ def _move(moves, move_id: str):
 
 def _state(left: str = "daniya", right: str = "yilu") -> dict:
     return new_state(
-        [
-            {"fighter_id": fighter_id, "level": 0, "trait_bonus": 0, "tool_id": ""}
-            for fighter_id in (left, right)
-        ],
+        [{"fighter_id": fighter_id, "level": 0, "trait_bonus": 0, "tool_id": ""} for fighter_id in (left, right)],
         seed="battle-v13",
+        version=18,  # 保留历史双盘及计时被动，不套用v19三形态。
     )
 
 
@@ -160,7 +158,7 @@ def test_daniya_world_disable_and_force_transfer_to_exactly_the_next_round() -> 
 
     assert disable["opponent_next_effects_disabled"]
     assert force["opponent_next_forced_form"] == DANIYA_FORM_STAGING
-    expected_ids = [move.move_id for move in fighter_form_moves("daniya", DANIYA_FORM_STAGING)]
+    expected_ids = [move.move_id for move in fighter_form_moves("daniya", DANIYA_FORM_STAGING, 14)]
     assert force["opponent_next_forced_move_ids"] == expected_ids
 
     active, result = _resolve_non_terminal(source, "daniya-world-combined")
@@ -205,9 +203,7 @@ def test_daniya_world_114514_uses_frozen_daniya_form_with_live_effects() -> None
     assert chosen["daniya_world_forced"] and not chosen["effects_disabled"]
     assert chosen["functional_fighter_id"] == "daniya"
     assert chosen["form_before"] == DANIYA_FORM_STAGING
-    assert chosen["move_id"] in {
-        move.move_id for move in fighter_form_moves("daniya", DANIYA_FORM_STAGING)
-    }
+    assert chosen["move_id"] in {move.move_id for move in fighter_form_moves("daniya", DANIYA_FORM_STAGING, 14)}
 
 
 def test_daniya_nmsl_suppresses_direct_reduction_and_defender_damage() -> None:

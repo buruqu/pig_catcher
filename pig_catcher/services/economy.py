@@ -136,6 +136,7 @@ from ..domain.special_content import (
     SUKUNA_PIG_TEMPLATE_ID,
     TECHNIQUE_DOMAIN_GOJO_BYPASS,
 )
+from ..domain.xixi_feast import DANIYA_BIRTHDAY_FEAST, XIXI_SIX_STAR_COOK, XIXI_STAR_CHEESE_LOTTERY
 from ..infrastructure.database import DatabaseSession, PigCatcherDatabase
 from ..infrastructure.repositories import (
     AchievementRepository,
@@ -1619,6 +1620,13 @@ class EconomyService:
                 mid_autumn_active=mid_autumn_boost_active(datetime.fromisoformat(now)),
                 random_value=self.random_source.random,
             )
+        xixi_cook_used = any(
+            effect.effect_id == XIXI_SIX_STAR_COOK and effect.effect_entry_id in effect_application.consumed_entry_ids
+            for effect in active_effects
+        )
+        if xixi_cook_used:
+            achievement_cook_tickets = frozenset()
+            achievement_visual_tickets = frozenset()
         weights = effect_application.weights
         six_star_progress_stacks = await self.repository.six_star_progress_stacks(
             session,
@@ -1710,7 +1718,7 @@ class EconomyService:
             cook_effect_summaries.append("回锅重做券：首次结果低于原料品质，已重做一次并保留较高结果。")
         resonance_reward_catches = 0
         resonance_catch_bonus_after = 0
-        if window_resonance is not None and int(output_rarity) in {4, 5, 6}:
+        if window_resonance is not None and not xixi_cook_used and int(output_rarity) in {4, 5, 6}:
             bonus_basis_points = {4: 1_000, 5: 3_000, 6: 5_000}[int(output_rarity)]
             resonance_catch_bonus_after = await self.repository.add_window_resonance_catch_bonus(
                 session,
@@ -1722,7 +1730,7 @@ class EconomyService:
                 f"粉蓝四叶草共鸣：本次{int(output_rarity)}星菜令六星猪累计加成增至"
                 f"+{resonance_catch_bonus_after / 100:g}个百分点。"
             )
-        if window_resonance is not None and int(output_rarity) == 6:
+        if window_resonance is not None and not xixi_cook_used and int(output_rarity) == 6:
             await self.repository.reset_window_resonance_bonus(
                 session,
                 player_id=identity.player_id,
@@ -1779,9 +1787,7 @@ class EconomyService:
                 mooncake_chance = mooncake_cook_chance(datetime.fromisoformat(now.replace("Z", "+00:00")))
                 if mooncake_roll < mooncake_chance:
                     special_template_id = mooncake_id
-                    cook_effect_summaries.append(
-                        f"中秋猪月饼 UP：命中对应口味，概率 {mooncake_chance * 100:g}%。"
-                    )
+                    cook_effect_summaries.append(f"中秋猪月饼 UP：命中对应口味，概率 {mooncake_chance * 100:g}%。")
             if int(output_rarity) == 5:
                 if source.template_id == KFC_PIG_TEMPLATE_ID:
                     special_food_roll = self.random_source.random()
@@ -1894,7 +1900,7 @@ class EconomyService:
             food_specs.append(bonus_attributes)
         # 加餐在确定品质之后执行，独立于概率互斥组；一份效果最多增加一份同款菜。
         duplicate_effect = next(
-            (e for e in active_effects if e.effect_id == NEXT_SIX_STAR_COOK_DUPLICATE),
+            (e for e in active_effects if e.effect_id == NEXT_SIX_STAR_COOK_DUPLICATE and not xixi_cook_used),
             None,
         )
         if duplicate_effect is not None:
@@ -2019,9 +2025,7 @@ class EconomyService:
             rewards = await self._grant_clover_foods(session, identity=identity, source=source, now=now)
             cook_effect_summaries.append(
                 f"粉蓝成功奖励：{CLOVER_REWARD_CATCHES}次专属额外抓猪（每次独立抽取+3.07或+30.7个百分点）；"
-                f"{CLOVER_REWARD_FOODS}道非六星菜已入背包："
-                + "、".join(rewards)
-                + "。"
+                f"{CLOVER_REWARD_FOODS}道非六星菜已入背包：" + "、".join(rewards) + "。"
             )
         elif clover_ended:
             cook_effect_summaries.append(
@@ -2742,6 +2746,8 @@ class EconomyService:
                 MID_AUTUMN_COIN_REWARD,
                 FOOD_SUPPLY_PACK,
                 YILU_LOTTERY,
+                XIXI_STAR_CHEESE_LOTTERY,
+                DANIYA_BIRTHDAY_FEAST,
                 ROULETTE_CHANCES,
                 TECHNIQUE_PERMIT,
                 CATCH_WINDOW_TRANSFER,
@@ -2860,6 +2866,19 @@ class EconomyService:
                 )
                 reward_payload = supply.payload()
                 effect = replace(effect, summary=supply.summary)
+            elif effect.queued_effect_id in {XIXI_STAR_CHEESE_LOTTERY, DANIYA_BIRTHDAY_FEAST}:
+                from .xixi_feast import grant_xixi_feast
+
+                reward_payload = await grant_xixi_feast(
+                    session,
+                    identity=identity,
+                    food_instance_id=food.food_instance_id,
+                    source_key=idempotency_key,
+                    now=now,
+                    random_source=self.random_source,
+                    effect_id=effect.queued_effect_id,
+                )
+                effect = replace(effect, summary=reward_payload["summary"])
             elif effect.queued_effect_id == YILU_LOTTERY:
                 from .food_lottery import grant_food_lottery
 
@@ -3805,27 +3824,33 @@ class EconomyService:
                 if asset_kind == "pig":
                     raise PigNotFoundError(error)
                 raise FoodNotFoundError(error)
-            balance_after = await self.repository.apply_currency_change(
-                session,
-                player_id=identity.player_id,
-                scope_id=identity.scope.value,
-                amount=total_value,
-                reason_code=f"batch-sell-{asset_kind}",
-                reason_text=(
-                    f"批量售卖同名美食{normalized_name}"
-                    if normalized_name
-                    else "批量售卖低星" + ("猪猪" if asset_kind == "pig" else "美食")
-                ),
-                source_object_type=asset_kind,
-                source_object_id=(
-                    f"name-{normalized_name}"
-                    if normalized_name
-                    else (f"rarity-{rarity}" if rarity is not None else f"rarity-1-{max_rarity}")
-                ),
-                ledger_entry_id=self._new_identifier(),
-                idempotency_key=f"{idempotency_key}:coin",
-                now=now,
-            )
+            if total_value == 0:
+                profile = await self.repository.economy_profile_row(session, player_id=identity.player_id)
+                if profile is None:
+                    raise ReceiptConflictError("出售后无法读取玩家余额，本次未结算。")
+                balance_after = int(profile["coin_balance"])
+            else:
+                balance_after = await self.repository.apply_currency_change(
+                    session,
+                    player_id=identity.player_id,
+                    scope_id=identity.scope.value,
+                    amount=total_value,
+                    reason_code=f"batch-sell-{asset_kind}",
+                    reason_text=(
+                        f"批量售卖同名美食{normalized_name}"
+                        if normalized_name
+                        else "批量售卖低星" + ("猪猪" if asset_kind == "pig" else "美食")
+                    ),
+                    source_object_type=asset_kind,
+                    source_object_id=(
+                        f"name-{normalized_name}"
+                        if normalized_name
+                        else (f"rarity-{rarity}" if rarity is not None else f"rarity-1-{max_rarity}")
+                    ),
+                    ledger_entry_id=self._new_identifier(),
+                    idempotency_key=f"{idempotency_key}:coin",
+                    now=now,
+                )
             if balance_after is None:
                 raise RuntimeError("批量售卖正数收益无法写入玩家余额。")
             payload = {
@@ -4130,19 +4155,25 @@ class EconomyService:
                 asset_instance_id=asset_id,
                 now=now,
             )
-            balance_after = await self.repository.apply_currency_change(
-                session,
-                player_id=identity.player_id,
-                scope_id=identity.scope.value,
-                amount=official_value,
-                reason_code=f"sell-{asset_kind}",
-                reason_text=f"官方售卖{display_name}",
-                source_object_type=asset_kind,
-                source_object_id=asset_id,
-                ledger_entry_id=self._new_identifier(),
-                idempotency_key=f"{idempotency_key}:coin",
-                now=now,
-            )
+            if official_value == 0:
+                profile = await self.repository.economy_profile_row(session, player_id=identity.player_id)
+                if profile is None:
+                    raise ReceiptConflictError("出售后无法读取玩家余额，本次未结算。")
+                balance_after = int(profile["coin_balance"])
+            else:
+                balance_after = await self.repository.apply_currency_change(
+                    session,
+                    player_id=identity.player_id,
+                    scope_id=identity.scope.value,
+                    amount=official_value,
+                    reason_code=f"sell-{asset_kind}",
+                    reason_text=f"官方售卖{display_name}",
+                    source_object_type=asset_kind,
+                    source_object_id=asset_id,
+                    ledger_entry_id=self._new_identifier(),
+                    idempotency_key=f"{idempotency_key}:coin",
+                    now=now,
+                )
             if balance_after is None:
                 raise RuntimeError("官方售卖正数收益无法写入玩家余额。")
             payload = {

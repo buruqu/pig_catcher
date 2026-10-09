@@ -4,15 +4,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .daniya_catalog import build_forms as build_daniya_forms
 from .errors import PigCatcherError
 from .firefly_catalog import build_moves as build_firefly_moves
 from .mirror_battle_catalog import luoli_moves, miumiu_moves
 from .miumiu_catalog import build_moves
 from .special_content import GOJO_PIG_TEMPLATE_ID, SUKUNA_PIG_TEMPLATE_ID
+from .xixi_battle_catalog import XIXI_FORM_CELESTIAL, XIXI_FORM_EMPEROR, XIXI_PIG_TEMPLATE_IDS
+from .xixi_battle_catalog import build_moves as build_xixi_moves
 
 # 对战规则版本与活动成就事实版本分离：新版对战会改变随机命名空间，
 # 但新增字段仍是 activity_progress v1 可以向后兼容读取的事实载荷。
-BATTLE_RULE_VERSION = 18
+BATTLE_RULE_VERSION = 19
 BATTLE_FACT_VERSION = 1
 DAILY_BATTLE_ROLE_LIMIT = 2
 BATTLE_VERSION = BATTLE_RULE_VERSION
@@ -32,7 +35,14 @@ INJURY_WHEELS = (
     (("light", 25), ("heavy", 60), ("exhausted", 10), ("core", 5)),
     (("light", 10), ("heavy", 25), ("exhausted", 60), ("core", 5)),
 )
-INJURY_NAMES = {"light": "轻伤", "heavy": "重伤", "exhausted": "力竭倒下", "core": "我掌握了抓猪的核心！"}
+INJURY_NAMES = {
+    "none": "无伤",
+    "injured": "受伤",
+    "light": "轻伤",
+    "heavy": "重伤",
+    "exhausted": "力竭倒下",
+    "core": "我掌握了抓猪的核心！",
+}
 # Battle v13 为“丸山大姐达妮娅·世界·上班”的精确 0.4444 抽取权重
 # 将主招式盘统一提升到万分整数刻度；所有旧权重按比例放大，概率不变。
 MOVE_WEIGHT_SCALE = 10000
@@ -699,6 +709,15 @@ LUOLI_MOVES = luoli_moves(Move)
 LUOLI_PIG_TEMPLATE_IDS = tuple(value.replace("firefly-embrace", "luoli-c") for value in FIREFLY_PIG_TEMPLATE_IDS)
 MIUMIU_PIG_TEMPLATE_IDS = tuple(value.replace("firefly-embrace", "miumiu-flow") for value in FIREFLY_PIG_TEMPLATE_IDS)
 
+DANIYA_FORMS_V19 = build_daniya_forms(Move, FighterForm)
+DANIYA_MOVES_V19 = tuple(move for form in DANIYA_FORMS_V19 for move in form.moves)
+DANIYA_MOVES_V18 = DANIYA_STAGING_MOVES + DANIYA_DISILLUSION_MOVES + DANIYA_COMMON_MOVES
+XIXI_MOVES = build_xixi_moves(Move)
+XIXI_FORMS = (
+    FighterForm(XIXI_FORM_CELESTIAL, "西天帝", XIXI_MOVES),
+    FighterForm(XIXI_FORM_EMPEROR, "西天帝·成帝", tuple(m for m in XIXI_MOVES if "xixi-equipment" not in m.tags)),
+)
+
 FIGHTERS = (
     FighterDefinition(
         "sukuna",
@@ -758,9 +777,9 @@ FIGHTERS = (
         "daniya",
         DANIYA_PIG_TEMPLATE_IDS[0],
         "达妮娅猪",
-        DANIYA_STAGING_MOVES + DANIYA_DISILLUSION_MOVES + DANIYA_COMMON_MOVES,
+        DANIYA_MOVES_V19,
         template_aliases=DANIYA_PIG_TEMPLATE_IDS[1:],
-        forms=DANIYA_FORMS,
+        forms=DANIYA_FORMS_V19,
         initial_form_id=DANIYA_FORM_STAGING,
     ),
     FighterDefinition(
@@ -786,32 +805,43 @@ FIGHTERS = (
         forms=FIREFLY_FORMS,
         initial_form_id=FIREFLY_FORM_FIREFLY,
     ),
-    FighterDefinition("luoli", LUOLI_PIG_TEMPLATE_IDS[0], "洛璃c猪", LUOLI_MOVES,
-                      template_aliases=LUOLI_PIG_TEMPLATE_IDS[1:]),
-    FighterDefinition("miumiu", MIUMIU_PIG_TEMPLATE_IDS[0], "空白缪缪流形猪", MIUMIU_MOVES,
-                      template_aliases=MIUMIU_PIG_TEMPLATE_IDS[1:]),
+    FighterDefinition(
+        "luoli", LUOLI_PIG_TEMPLATE_IDS[0], "洛璃c猪", LUOLI_MOVES, template_aliases=LUOLI_PIG_TEMPLATE_IDS[1:]
+    ),
+    FighterDefinition(
+        "miumiu",
+        MIUMIU_PIG_TEMPLATE_IDS[0],
+        "空白缪缪流形猪",
+        MIUMIU_MOVES,
+        template_aliases=MIUMIU_PIG_TEMPLATE_IDS[1:],
+    ),
+)
+FIGHTERS += (
+    FighterDefinition(
+        "xixi",
+        XIXI_PIG_TEMPLATE_IDS[0],
+        "西西猪",
+        XIXI_MOVES,
+        template_aliases=XIXI_PIG_TEMPLATE_IDS[1:],
+        forms=XIXI_FORMS,
+        initial_form_id=XIXI_FORM_CELESTIAL,
+    ),
 )
 FIGHTERS_BY_ID = {item.fighter_id: item for item in FIGHTERS}
 FIGHTERS_BY_TEMPLATE = {
-    template_id: item
-    for item in FIGHTERS
-    for template_id in (item.template_id, *item.template_aliases)
+    template_id: item for item in FIGHTERS for template_id in (item.template_id, *item.template_aliases)
 }
-FIGHTER_FORMS_BY_ID = {
-    (fighter.fighter_id, form.form_id): form
-    for fighter in FIGHTERS
-    for form in fighter.forms
-}
+FIGHTER_FORMS_BY_ID = {(fighter.fighter_id, form.form_id): form for fighter in FIGHTERS for form in fighter.forms}
 LEGACY_MOVE_IDS = {
-    "sukuna": frozenset(
-        ("black-flash", "dismantle", "cleave", "furnace", "shrine", "loan", "reverse", "elbow", "net")
-    ),
+    "sukuna": frozenset(("black-flash", "dismantle", "cleave", "furnace", "shrine", "loan", "reverse", "elbow", "net")),
     "gojo": frozenset(move.move_id for move in FIGHTERS_BY_ID["gojo"].moves),
 }
 
 
 def fighter_moves(fighter_id: str, rule_version: int = BATTLE_RULE_VERSION) -> tuple[Move, ...]:
     moves = FIGHTERS_BY_ID[fighter_id].moves
+    if fighter_id == "xixi" and rule_version < 19:
+        return ()
     if fighter_id == "luoli" and rule_version < 17:
         return ()
     if fighter_id == "miumiu" and rule_version == 16:
@@ -830,6 +860,8 @@ def fighter_moves(fighter_id: str, rule_version: int = BATTLE_RULE_VERSION) -> t
         return ()
     if fighter_id == "daniya" and rule_version < 15:
         return DANIYA_STAGING_MOVES + DANIYA_DISILLUSION_MOVES + DANIYA_COMMON_MOVES_V14
+    if fighter_id == "daniya" and rule_version < 19:
+        return DANIYA_MOVES_V18
     if rule_version == 1:
         return tuple(move for move in moves if move.move_id in LEGACY_MOVE_IDS[fighter_id])
     return moves
@@ -848,6 +880,10 @@ def fighter_form_moves(
         if form_id == DANIYA_FORM_DISILLUSION:
             return DANIYA_DISILLUSION_MOVES + DANIYA_COMMON_MOVES_V14
         raise BattleError("未知战斗猪形态。")
+    if fighter_id == "daniya" and rule_version < 19:
+        return next(form.moves for form in DANIYA_FORMS if form.form_id == form_id)
+    if fighter_id == "xixi" and rule_version < 19:
+        raise BattleError("此规则版本没有西西战斗盘。")
     try:
         return FIGHTER_FORMS_BY_ID[(fighter_id, form_id)].moves
     except KeyError as exc:

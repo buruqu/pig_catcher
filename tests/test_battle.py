@@ -270,7 +270,7 @@ async def test_asamu_domain_copies_persist_two_moves_and_facts_with_exact_fracti
 
     setup_seed = "service-asamu-domain-setup"
     daniya_domain = next(
-        move for move in FIGHTERS_BY_ID["daniya"].moves if move.move_id == "daniya-domain"
+        move for move in FIGHTERS_BY_ID["daniya"].moves if move.move_id == "daniya-staging-domain"
     )
     for side, move in ((0, ASAMU_MOVES[-1]), (1, daniya_domain)):
         player = state["sides"][side]
@@ -295,8 +295,8 @@ async def test_asamu_domain_copies_persist_two_moves_and_facts_with_exact_fracti
         probe = resolve_round(deepcopy(state), candidate)
         copies = probe["interactions"]["generated_events"]
         if len(copies) == 2 and any(
-            event["source_move_id"] == "daniya-staging-final-curtain"
-            and event["gain"] == Fraction(40, 1)
+            event["source_move_id"] == "daniya-staging-curtain"
+            and event["gain"] == Fraction(20, 1)
             for event in copies
         ):
             seed = candidate
@@ -333,16 +333,16 @@ async def test_asamu_domain_copies_persist_two_moves_and_facts_with_exact_fracti
     assert stored_facts == stored_moves
 
     copied = next(
-        event for event in stored_moves if event["source_move_id"] == "daniya-staging-final-curtain"
+        event for event in stored_moves if event["source_move_id"] == "daniya-staging-curtain"
     )
-    assert copied["gain"] == Fraction(40, 1)
+    assert copied["gain"] == Fraction(20, 1)
     assert type(copied["gain"]) is Fraction
     raw_copied = next(
         row["event_json"]
         for row, event in zip(move_rows, stored_moves, strict=True)
-        if event["source_move_id"] == "daniya-staging-final-curtain"
+        if event["source_move_id"] == "daniya-staging-curtain"
     )
-    assert '"$battle-fraction":["0x28","0x1"]' in raw_copied
+    assert '"$battle-fraction":["0x14","0x1"]' in raw_copied
 
     replay = await world.send(section="move", actor=world.a, mid="asamu-domain-copy-persistence")
     assert replay.receipt.receipt_id == result.receipt.receipt_id

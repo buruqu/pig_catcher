@@ -1,4 +1,4 @@
-"""正式公共立绘 + 全新离线对战数据的图片验收，不连接MaiBot/QQ或用户浏览器。"""
+"""公共立绘与v18历史机制离线验收；v19另见accept_battle_v19，不连接生产。"""
 
 from __future__ import annotations
 
@@ -90,13 +90,15 @@ def _record_move(state: dict, side: int, move_id: str) -> dict:
     player = state["sides"][side]
     fighter_id = player["snapshot"]["fighter_id"]
     if fighter_id == "juejue":
-        moves = fighter_form_moves(fighter_id, player["juejue_form"])
+        moves = fighter_form_moves(fighter_id, player["juejue_form"], state["version"])
     elif fighter_id == "daniya":
-        moves = fighter_form_moves(fighter_id, player["daniya_form"])
+        moves = fighter_form_moves(fighter_id, player["daniya_form"], state["version"])
     else:
         moves = FIGHTERS_BY_ID[fighter_id].moves
     move_index = next(index for index, move in enumerate(moves) if move.move_id == move_id)
-    wheel_units = [move_weight_units(player, move) for move in moves]
+    wheel_units = [
+        move_weight_units(player, move, version=state["version"], round_number=state["round"]) for move in moves
+    ]
     event = apply_move(
         player,
         moves[move_index],
@@ -467,8 +469,9 @@ def deterministic_mechanic_cases(
     v5_state = new_state(
         [deepcopy(daniya_snapshot), deepcopy(asamu_snapshot)],
         seed="battle-visual-daniya-asamu-entry",
+        version=18,
     )
-    v5_match = {**initial_match, "battle_id": "BTV5DANIYAASAMU", "definition_version": 5}
+    v5_match = {**initial_match, "battle_id": "BTV18DANIYAASAMU", "definition_version": 18}
     name = "13j-daniya-asamu-formal-art"
     cases.append(
         (
@@ -478,7 +481,7 @@ def deterministic_mechanic_cases(
                 {**v5_match, "status": "active"},
                 v5_state,
                 now_ms,
-                title="Battle v5 · 达妮娅猪与阿萨姆猪",
+                title="Battle v18历史 · 达妮娅猪与阿萨姆猪",
                 banner="正式素材离线验收：达妮娅猪以布景形态入场，阿萨姆猪携动态招式盘入场。",
             ),
         )

@@ -12,6 +12,7 @@ from ..domain.admin_grants import MAX_GRANT_ASSETS, grant_resource_candidates, v
 from ..domain.economy import generate_food_attributes, recipe_affinity
 from ..domain.enums import AssetKind
 from ..domain.errors import DomainValidationError
+from ..domain.food_templates import template_recipe_tags
 from ..domain.gameplay import generate_pig_attributes
 from ..domain.models import CommandIdentity, CommandReceipt
 from ..domain.ports import (
@@ -1256,6 +1257,7 @@ class AdministrationService:
             source_weight=synthetic_source_weight,
             source_weight_percentile=synthetic_source_percentile,
             portion_roll=portion_roll,
+            recipe_tags=template_recipe_tags(template),
         )
         try:
             tags_payload = json.loads(str(template.get("recipe_tags_json") or "[]"))

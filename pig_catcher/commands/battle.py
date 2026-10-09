@@ -21,6 +21,7 @@ BATTLE_HELP = f"""【PiG Dream! 猪猪对战】
 /战斗猪 轮盘 达妮娅猪；/战斗猪 轮盘 阿萨姆猪；/战斗猪 轮盘 熠～噜猪
 /战斗猪 轮盘 栖夜流萤抱抱猪
 /战斗猪 轮盘 空白缪缪流形猪；/战斗猪 轮盘 洛璃c猪
+/战斗猪 轮盘 西西猪；/战斗猪 形态 西天帝（先设置西西猪，战前选择；原型未开放）
 /战斗猪 器具；/战斗猪 制作 练习护腕 2；/战斗猪 器具 练习护腕（或 无）
 /比划比划 @群友；/比划比划 接受；/比划比划 拒绝；/比划比划 取消
 /出招数 → /出招（第二位完成出招后立即结算，结算图完整展示双方本回合招式）
@@ -125,6 +126,11 @@ def parse_battle_request(
         if tail and tail not in FIGHTER_ALIASES:
             raise BattleError(f"目前支持{FIGHTER_NAMES}的战斗盘。")
         return BattleRequest("wheels", {"fighter_id": FIGHTER_ALIASES.get(tail, "sukuna")})
+    if head == "形态":
+        forms = {"西天帝": "xixi-celestial", "原型": "xixi-prototype"}
+        if tail not in forms:
+            raise BattleError("格式：/战斗猪 形态 西天帝。西西猪原型战斗盘尚未开放。")
+        return BattleRequest("select_form", {"form_id": forms[tail]})
     if head == "器具":
         return (
             BattleRequest("equip", {"tool_id": "" if tail == "无" else tool_id(tail)})
